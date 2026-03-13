@@ -38,7 +38,7 @@ function App() {
     switch(currentPage) {
       case 'dashboard':
         return <Dashboard user={user} />;
-      case 'ops':
+      case 'operation':
         return <Operation user={user} />;
       default:
         return <Dashboard user={user} />;
