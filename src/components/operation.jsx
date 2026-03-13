@@ -696,25 +696,33 @@ export default function Operation({ user }) {
                   <button
                     style={{
                       padding: '12px 32px',
-                      backgroundColor: '#3b82f6',
+                      backgroundColor: loading ? '#9ca3af' : '#3b82f6',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '16px',
                       fontWeight: '600',
-                      cursor: 'pointer',
+                      cursor: loading ? 'not-allowed' : 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+                      boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
+                    disabled={loading}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#2563eb';
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 8px 12px -2px rgba(59, 130, 246, 0.4)';
+                      if (!loading) {
+                        e.target.style.backgroundColor = '#2563eb';
+                        e.target.style.transform = 'translateY(-2px)';
+                        e.target.style.boxShadow = '0 8px 12px -2px rgba(59, 130, 246, 0.4)';
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#3b82f6';
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 4px 6px -1px rgba(59, 130, 246, 0.3)';
+                      if (!loading) {
+                        e.target.style.backgroundColor = '#3b82f6';
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 4px 6px -1px rgba(59, 130, 246, 0.3)';
+                      }
                     }}
                     onClick={() => {
                       // Handle submit with API call
@@ -724,18 +732,7 @@ export default function Operation({ user }) {
                         selectedTable
                       });
                       
-                      // Debug validation
-                      console.log('🔍 Validation check:', {
-                        fromDay: !!fromDay,
-                        fromMonth: !!fromMonth,
-                        fromYear: !!fromYear,
-                        toDay: !!toDay,
-                        toMonth: !!toMonth,
-                        toYear: !!toYear,
-                        values: { fromDay, fromMonth, fromYear, toDay, toMonth, toYear }
-                      });
-                      
-                      // Validate all fields are selected
+                      // Validation
                       if (!fromDay || !fromMonth || !fromYear || !toDay || !toMonth || !toYear) {
                         console.log('❌ Validation failed - missing date fields');
                         setError('Please select all date fields');
@@ -743,13 +740,55 @@ export default function Operation({ user }) {
                         return;
                       }
                       
-                      console.log('✅ Validation passed, calling fetchData');
+                      // Clear previous errors
+                      setError(null);
                       
-                      // Call the API
+                      // Fetch data
                       fetchData();
                     }}
                   >
-                    Submit
+                    {loading ? (
+                      <>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {/* Three dots animation */}
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '50%',
+                            animation: 'dotPulse 1.4s ease-in-out infinite'
+                          }}></div>
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '50%',
+                            animation: 'dotPulse 1.4s ease-in-out infinite 0.2s'
+                          }}></div>
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '50%',
+                            animation: 'dotPulse 1.4s ease-in-out infinite 0.4s'
+                          }}></div>
+                        </div>
+                        <span style={{ 
+                          marginLeft: '12px', 
+                          fontSize: '14px', 
+                          fontWeight: '500',
+                          color: 'rgba(255, 255, 255, 0.9)'
+                        }}>
+                          Processing
+                        </span>
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
                   </button>
                 </div>
               </div>

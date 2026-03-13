@@ -37,7 +37,7 @@ export default function Login({ onLogin }) {
           <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 rounded-3xl shadow-2xl mb-4 transform transition-all duration-500 hover:scale-110 hover:rotate-6 backdrop-blur-sm">
             <span className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">S</span>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-lg"> Satyukt CRM</h1>
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-lg"> Satyukt </h1>
           <p className="text-purple-200 text-lg font-light">Welcome back! Please sign in to continue</p>
         </div>
 
@@ -142,7 +142,7 @@ export default function Login({ onLogin }) {
         {/* Footer */}
         <div className="mt-10 text-center">
           <p className="text-xs text-purple-300/60">
-            © 2024 Zoho CRM. Built with innovation and professionalism.
+            © 2024 Satyukt. Built with innovation and professionalism.
           </p>
         </div>
       </div>
