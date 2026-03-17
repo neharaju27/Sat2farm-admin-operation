@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown } from 'lucide-react';
 import sat2farmLogo from '../assets/logo.png';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
+  const [showOperationDropdown, setShowOperationDropdown] = useState(false);
+
   return (
     <div className="h-full bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800 flex flex-col shadow-xl border-r border-slate-200">
 
@@ -71,20 +74,66 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                 </div>
               </li>
-              <li 
-                className={`${
-                  currentPage === 'operation' 
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
-                    : 'bg-white hover:bg-gradient-to-r hover:from-blue-600 hover:to-indigo-600'
-                } p-4 rounded-2xl cursor-pointer flex items-center transition-all duration-300 hover:translate-x-3 hover:shadow-lg hover:shadow-blue-500/30 border border-slate-200 hover:border-transparent`}
-                onClick={() => onPageChange('operation')}
-              >
-                <ClipboardList className={`w-5 h-5 mr-3 ${
-                  currentPage === 'operation' ? 'text-white' : 'text-slate-600 hover:text-white'
-                } transition-colors duration-300 transform hover:scale-125 transition-transform duration-200`} />
-                <span className={`font-medium ${
-                  currentPage === 'operation' ? 'text-white' : 'text-slate-700 hover:text-white'
-                } transition-colors duration-300`}>Operation</span>
+              <li className="bg-white p-4 rounded-2xl cursor-pointer flex items-center transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-600 hover:to-indigo-600 hover:translate-x-3 hover:shadow-lg hover:shadow-blue-500/30 border border-slate-200 hover:border-transparent">
+                <div className="relative">
+                  <button
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-600 hover:to-indigo-600 hover:translate-x-3 hover:shadow-lg hover:shadow-blue-500/30 border border-slate-200 hover:border-transparent ${
+                      currentPage === 'operation' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' : 'bg-white'
+                    }`}
+                    onClick={() => setShowOperationDropdown(!showOperationDropdown)}
+                  >
+                    <div className="flex items-center">
+                      <ClipboardList className={`w-5 h-5 mr-3 ${
+                        currentPage === 'operation' ? 'text-white' : 'text-slate-600 hover:text-white'
+                      } transition-colors duration-300 transform hover:scale-125 transition-transform duration-200`} />
+                      <span className={`font-medium ${
+                        currentPage === 'operation' ? 'text-white' : 'text-slate-700 hover:text-white'
+                      } transition-colors duration-300`}>Operation</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${
+                      showOperationDropdown ? 'rotate-180' : ''
+                    } ${
+                      currentPage === 'operation' ? 'text-white' : 'text-slate-600'
+                    }`} />
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {showOperationDropdown && (
+                    <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
+                      <div className="py-1">
+                        
+                        <button
+                          className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-all duration-200 flex items-center group"
+                          onClick={() => {
+                            console.log('Get acreage clicked');
+                            setShowOperationDropdown(false);
+                            onPageChange('operation');
+                          }}
+                        >
+                          <BarChart3 className="w-4 h-4 mr-3 text-blue-600 group-hover:text-blue-700 transition-colors duration-200" />
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-700 group-hover:text-slate-900 transition-colors duration-200">Get acreage</span>
+                            <span className="text-xs text-slate-500 mt-1">Analyze data trends</span>
+                          </div>
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 transition-all duration-200 flex items-center group"
+                          onClick={() => {
+                            console.log('Unlock Farm clicked');
+                            setShowOperationDropdown(false);
+                          }}
+                        >
+                          <Users className="w-4 h-4 mr-3 text-green-600 group-hover:text-green-700 transition-colors duration-200" />
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-slate-700 group-hover:text-slate-900 transition-colors duration-200">Unlock Farm</span>
+                            <span className="text-xs text-slate-500 mt-1">Manage farm access</span>
+                          </div>
+                        </button>
+                      </div>
+                      
+                    </div>
+                  )}
+                </div>
                 {currentPage === 'operation' && (
                   <div className="ml-auto">
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-lg"></div>

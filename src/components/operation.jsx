@@ -451,7 +451,8 @@ export default function Operation({ user }) {
               letterSpacing: '-0.5px',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
-              Admin Operation Portal
+                Get acreage data
+        
             </h1>
             
           </div>
@@ -471,18 +472,21 @@ export default function Operation({ user }) {
       <main style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '32px',
+        padding: '20px',
         minHeight: 'calc(100vh - 80px)'
       }}>
         <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
-          {/* Date Range and Table Selection Section */}
+          {/* Date Range and Table Selection Section - Moved to Top */}
           <div style={{ 
-            marginBottom: '32px',
+            marginBottom: '24px',
             background: 'white',
             borderRadius: '12px',
-            padding: '24px',
+            padding: '20px',
             border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            position: 'sticky',
+            top: '20px',
+            zIndex: 10
           }}>
             <div style={{
               display: 'flex',
@@ -520,11 +524,12 @@ export default function Operation({ user }) {
                         value={fromDay}
                         onChange={(e) => setFromDay(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '4px 6px',
                           border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '80px',
+                          borderRadius: '3px',
+                          fontSize: '12px',
+                          minWidth: '45px',
+                          minHeight: '28px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -616,11 +621,12 @@ export default function Operation({ user }) {
                         value={toDay}
                         onChange={(e) => setToDay(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '4px 6px',
                           border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '80px',
+                          borderRadius: '3px',
+                          fontSize: '12px',
+                          minWidth: '45px',
+                          minHeight: '28px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
