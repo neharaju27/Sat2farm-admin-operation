@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown } from 'lucide-react';
 import sat2farmLogo from '../assets/logo.png';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
+  const [operationsOpen, setOperationsOpen] = useState(true);
+  const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'add-acreages';
+
   return (
     <div className="h-full bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800 flex flex-col shadow-xl border-r border-slate-200">
 
@@ -71,26 +75,56 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                 </div>
               </li>
-              <li 
+              <li
                 className={`${
-                  currentPage === 'operation' 
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
+                  isOperationsActive
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
                     : 'bg-white hover:bg-gradient-to-r hover:from-blue-600 hover:to-indigo-600'
                 } p-4 rounded-2xl cursor-pointer flex items-center transition-all duration-300 hover:translate-x-3 hover:shadow-lg hover:shadow-blue-500/30 border border-slate-200 hover:border-transparent`}
-                onClick={() => onPageChange('operation')}
+                onClick={() => setOperationsOpen((prev) => !prev)}
               >
                 <ClipboardList className={`w-5 h-5 mr-3 ${
-                  currentPage === 'operation' ? 'text-white' : 'text-slate-600 hover:text-white'
+                  isOperationsActive ? 'text-white' : 'text-slate-600 hover:text-white'
                 } transition-colors duration-300 transform hover:scale-125 transition-transform duration-200`} />
                 <span className={`font-medium ${
-                  currentPage === 'operation' ? 'text-white' : 'text-slate-700 hover:text-white'
-                } transition-colors duration-300`}>Operation</span>
-                {currentPage === 'operation' && (
-                  <div className="ml-auto">
-                    <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-lg"></div>
-                  </div>
-                )}
+                  isOperationsActive ? 'text-white' : 'text-slate-700 hover:text-white'
+                } transition-colors duration-300`}>Operations</span>
+                <ChevronDown className={`w-4 h-4 ml-auto transition-transform duration-200 ${operationsOpen ? 'rotate-180' : 'rotate-0'} ${isOperationsActive ? 'text-white' : 'text-slate-500'}`} />
               </li>
+              {operationsOpen && (
+                <ul className="ml-4 mt-2 space-y-2">
+                  <li
+                    className={`${
+                      currentPage === 'operation-portal'
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'bg-white hover:bg-slate-100'
+                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
+                    onClick={() => onPageChange('operation-portal')}
+                  >
+                    <span className="text-xs font-semibold">Admin Operational Portal</span>
+                  </li>
+                  <li
+                    className={`${
+                      currentPage === 'unlock-farm'
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'bg-white hover:bg-slate-100'
+                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
+                    onClick={() => onPageChange('unlock-farm')}
+                  >
+                    <span className="text-xs font-semibold">Unlock Farm</span>
+                  </li>
+                  <li
+                    className={`${
+                      currentPage === 'add-acreages'
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'bg-white hover:bg-slate-100'
+                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
+                    onClick={() => onPageChange('add-acreages')}
+                  >
+                    <span className="text-xs font-semibold">Add Acreages</span>
+                  </li>
+                </ul>
+              )}
               <li className="bg-white p-4 rounded-2xl cursor-pointer flex items-center transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-600 hover:to-indigo-600 hover:translate-x-3 hover:shadow-lg hover:shadow-blue-500/30 border border-slate-200 hover:border-transparent">
                 <Users className="w-5 h-5 mr-3 text-slate-600 hover:text-white transition-colors duration-300 transform hover:scale-125 transition-transform duration-200" />
                 <span className="font-medium text-slate-700 hover:text-white transition-colors duration-300">Farmer</span>

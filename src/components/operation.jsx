@@ -1,6 +1,6 @@
 import Card from "./Card";
 import { Search, Plus, Bell, Calendar, Settings, Grid3x3, RefreshCw, MoreVertical, Building, Users, Phone, Target, Menu, X, Home, BarChart3, TrendingUp, ClipboardList, ChevronDown, User, Download } from 'lucide-react';
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
 export default function Operation({ user }) {
@@ -17,6 +17,35 @@ export default function Operation({ user }) {
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(10);
+
+  // Countdown timer (30s) shown in date range header
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const timerRef = useRef(null);
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startTimer = () => {
+    clearTimer();
+    setTimerSeconds(30);
+    timerRef.current = setInterval(() => {
+      setTimerSeconds(prev => {
+        if (prev <= 1) {
+          clearTimer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => {
+    return () => clearTimer();
+  }, []);
 
   // API integration
   const API_URL = import.meta.env.VITE_API_URL;
@@ -157,6 +186,9 @@ export default function Operation({ user }) {
       alert(`❌ API Error: ${error.message}\n\nPlease check your API configuration and try again.`);
     } finally {
       setLoading(false);
+      // Stop countdown when request completes
+      setTimerSeconds(0);
+      clearTimer();
       console.log('🏁 fetchData completed');
     }
   };
@@ -312,23 +344,26 @@ export default function Operation({ user }) {
             <div style={{ 
               overflowX: 'auto',
               overflowY: 'auto',
-              maxHeight: '400px'
+              height: '520px',
+              maxHeight: '520px',
+              border: '1px solid #e5e7f0',
+              borderRadius: '8px'
             }}>
               <table style={{
                 width: '100%',
                 borderCollapse: 'collapse'
               }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f9fafb', position: 'sticky', top: 0, zIndex: 1 }}>
+                  <tr style={{ backgroundColor: '#f9fafb', position: 'sticky', top: 0, zIndex: 1, height: '34px' }}>
                     {/* Dynamic headers based on actual data */}
                     {data.length > 0 && Object.keys(data[0]).map((key, index) => (
                       <th key={index} style={{
-                        padding: '12px 16px',
+                        padding: '8px 10px',
                         textAlign: 'left',
                         fontWeight: '600',
                         color: '#374151',
                         borderBottom: '1px solid #e5e7eb',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         backgroundColor: '#f9fafb'
                       }}>
                         {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
@@ -344,9 +379,9 @@ export default function Operation({ user }) {
                     }}>
                       {Object.keys(data[0]).map((key, cellIndex) => (
                         <td key={cellIndex} style={{
-                          padding: '12px 16px',
+                          padding: '6px 8px',
                           color: '#374151',
-                          fontSize: '14px'
+                          fontSize: '12px'
                         }}>
                           {item[key] !== null && item[key] !== undefined ? item[key].toString() : 'N/A'}
                         </td>
@@ -462,7 +497,35 @@ export default function Operation({ user }) {
             color: '#6b7280', 
             fontWeight: '500'
           }}>
-            
+            {timerSeconds > 0 ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '999px',
+                backgroundColor: '#f3f4f6',
+                color: '#1f2937',
+                fontWeight: '600'
+              }}>
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>Timer:</span>
+                <span style={{ fontSize: '14px' }}>
+                  {String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:
+                  {String(timerSeconds % 60).padStart(2, '0')}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: '999px',
+                backgroundColor: '#f3f4f6',
+                color: '#6b7280',
+                fontWeight: '500',
+                fontSize: '12px'
+              }}>
+                Ready to submit
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -471,10 +534,10 @@ export default function Operation({ user }) {
       <main style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '32px',
+        padding: '14px',
         minHeight: 'calc(100vh - 80px)'
       }}>
-        <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ width: '100%', maxWidth: '820px', margin: '0 auto' }}>
           {/* Date Range and Table Selection Section */}
           <div style={{ 
             marginBottom: '32px',
@@ -743,40 +806,21 @@ export default function Operation({ user }) {
                       // Clear previous errors
                       setError(null);
                       
-                      // Fetch data
+                      // Start countdown timer and fetch data
+                      startTimer();
                       fetchData();
                     }}
                   >
                     {loading ? (
                       <>
                         <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          {/* Three dots animation */}
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '50%',
-                            animation: 'dotPulse 1.4s ease-in-out infinite'
-                          }}></div>
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '50%',
-                            animation: 'dotPulse 1.4s ease-in-out infinite 0.2s'
-                          }}></div>
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '50%',
-                            animation: 'dotPulse 1.4s ease-in-out infinite 0.4s'
-                          }}></div>
-                        </div>
+                          width: '20px',
+                          height: '20px',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          borderTop: '2px solid #ffffff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }}></div>
                         <span style={{ 
                           marginLeft: '12px', 
                           fontSize: '14px', 
