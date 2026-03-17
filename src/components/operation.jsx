@@ -587,12 +587,12 @@ export default function Operation({ user }) {
                         value={fromDay}
                         onChange={(e) => setFromDay(e.target.value)}
                         style={{
-                          padding: '4px 6px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
-                          borderRadius: '3px',
-                          fontSize: '12px',
-                          minWidth: '45px',
-                          minHeight: '28px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          minWidth: '100px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -616,11 +616,12 @@ export default function Operation({ user }) {
                         value={fromMonth}
                         onChange={(e) => setFromMonth(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '100px',
+                          fontSize: '13px',
+                          minWidth: '96px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -645,11 +646,12 @@ export default function Operation({ user }) {
                         value={fromYear}
                         onChange={(e) => setFromYear(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '100px',
+                          fontSize: '13px',
+                          minWidth: '96px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -684,12 +686,12 @@ export default function Operation({ user }) {
                         value={toDay}
                         onChange={(e) => setToDay(e.target.value)}
                         style={{
-                          padding: '4px 6px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
-                          borderRadius: '3px',
-                          fontSize: '12px',
-                          minWidth: '45px',
-                          minHeight: '28px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          minWidth: '100px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -714,11 +716,12 @@ export default function Operation({ user }) {
                         value={toMonth}
                         onChange={(e) => setToMonth(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '100px',
+                          fontSize: '13px',
+                          minWidth: '96px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
@@ -743,11 +746,12 @@ export default function Operation({ user }) {
                         value={toYear}
                         onChange={(e) => setToYear(e.target.value)}
                         style={{
-                          padding: '8px 12px',
+                          padding: '8px 10px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          fontSize: '14px',
-                          minWidth: '100px',
+                          fontSize: '13px',
+                          minWidth: '96px',
+                          minHeight: '34px',
                           backgroundColor: 'white',
                           cursor: 'pointer'
                         }}
