@@ -91,6 +91,8 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 } transition-colors duration-300`}>Operations</span>
                 <ChevronDown className={`w-4 h-4 ml-auto transition-transform duration-200 ${operationsOpen ? 'rotate-180' : 'rotate-0'} ${isOperationsActive ? 'text-white' : 'text-slate-500'}`} />
               </li>
+
+              </li>
               {operationsOpen && (
                 <ul className="ml-4 mt-2 space-y-2">
                   <li

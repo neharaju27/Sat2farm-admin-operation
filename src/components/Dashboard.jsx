@@ -149,7 +149,7 @@ export default function Dashboard({ user }) {
               marginBottom: '32px',
               fontWeight: '300',
               letterSpacing: '0.5px'
-            }}>Welcome to you Dashboard</p>
+            }}>Welcome to your Dashboard</p>
           </div>
 
           {/* Horizontal Cards Section */}
