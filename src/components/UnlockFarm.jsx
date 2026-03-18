@@ -4,36 +4,85 @@ export default function UnlockFarm({ user }) {
   const [farmId, setFarmId] = useState('');
   const [status, setStatus] = useState('unlock');
   const [paymentMode, setPaymentMode] = useState('cash');
-  const [expiry, setExpiry] = useState('3 month');
+  const [expiry, setExpiry] = useState('6');
   const [customExpiry, setCustomExpiry] = useState('');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!farmId.trim()) {
-      setMessage('Please enter a Farm ID.');
+      setError('Please enter a Farm ID.');
       return;
     }
 
-    const statusText = status === 'lock' ? 'locked' : 'unlocked';
-    let expiryValue = '';
-    if (status === 'unlock') {
-      if (!paymentMode.trim()) {
-        setMessage('Please select a mode of payment.');
-        return;
-      }
-      expiryValue = expiry === 'other' ? customExpiry.trim() : expiry;
-      if (!expiryValue) {
-        setMessage('Please select or enter expiry.');
-        return;
-      }
-    }
+    setLoading(true);
+    setError('');
+    setMessage('');
 
-    setMessage(`Farm ID ${farmId.trim()} has been ${statusText}.`);
-    setFarmId('');
-    setStatus('unlock');
-    setPaymentMode('cash');
-    setExpiry('3 month');
-    setCustomExpiry('');
+    try {
+      // Map status to lockstatus: unlock -> 1, lock -> 0 (reversed based on API behavior)
+      const lockStatus = status === 'lock' ? 0 : 1;
+      
+      console.log('Form status:', status);
+      console.log('Mapped lockstatus:', lockStatus);
+      console.log('Farm ID:', farmId.trim());
+      
+      // Map expiry to numeric value
+      let expiryValue = expiry;
+      if (expiry === 'other') {
+        expiryValue = customExpiry.trim();
+      }
+      
+      // Construct API URL
+      const apiUrl = `${import.meta.env.VITE_UNLOCK_FARM_API_URL}?farm_id=${farmId.trim()}&lockstatus=${lockStatus}&mode=${paymentMode}&expiry=${expiryValue}`;
+      
+      console.log('Calling API:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json().catch(err => {
+        console.log('Response is not JSON, trying to get text:', err);
+        return response.text().then(text => {
+          console.log('Response text:', text);
+          return { rawResponse: text };
+        });
+      });
+      console.log('API Response:', data);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      // Check if the API call was successful based on response data
+      if (data && data.status !== 'Failure') {
+        const statusText = status === 'lock' ? 'locked' : 'unlocked';
+        setMessage(`Farm ID ${farmId.trim()} has been ${statusText} successfully!`);
+      } else {
+        // Show the API message directly to the user
+        const apiMessage = data?.message || 'API returned an error';
+        console.log('API indicates failure:', apiMessage);
+        setError(apiMessage);
+        return; // Don't throw error, just set error message
+      }
+      
+      // Reset form
+      setFarmId('');
+      setStatus('unlock');
+      setPaymentMode('cash');
+      setExpiry('6');
+      setCustomExpiry('');
+      
+    } catch (err) {
+      console.error('API Error:', err);
+      setError(`Failed to update farm status: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,27 +113,28 @@ export default function UnlockFarm({ user }) {
 
           {status === 'unlock' ? (
             <>
-              <label className="block text-sm font-medium text-slate-700 mt-3">Mode of Payment</label>
+              <label className="block text-sm font-medium text-slate-700 mt-3">Mode</label>
               <select
                 value={paymentMode}
                 onChange={(e) => setPaymentMode(e.target.value)}
                 className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
+                
                 <option value="cash">Cash</option>
                 <option value="card">Card</option>
                 <option value="upi">UPI</option>
                 <option value="netbanking">Netbanking</option>
               </select>
 
-              <label className="block text-sm font-medium text-slate-700 mt-3">Expiry</label>
+              <label className="block text-sm font-medium text-slate-700 mt-3">Expiry (in months)</label>
               <select
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
                 className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="3 month">3 Month</option>
-                <option value="6 month">6 Month</option>
-                <option value="1 year">1 Year</option>
+                <option value="3">3</option>
+                <option value="6">6</option>
+                <option value="12">12</option>
                 <option value="other">Other</option>
               </select>
               {expiry === 'other' && (
@@ -92,7 +142,7 @@ export default function UnlockFarm({ user }) {
                   type="text"
                   value={customExpiry}
                   onChange={(e) => setCustomExpiry(e.target.value)}
-                  placeholder="Enter custom expiry (e.g. 2 month)"
+                  placeholder="Enter custom expiry (e.g. 2)"
                   className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
@@ -103,11 +153,13 @@ export default function UnlockFarm({ user }) {
 
           <button
             onClick={handleSubmit}
-            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            disabled={loading}
+            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
-            Update Status
+            {loading ? 'Processing...' : 'Update Status'}
           </button>
           {message && <p className="mt-2 text-sm text-green-700">{message}</p>}
+          {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
         </div>
       </div>
     </div>
