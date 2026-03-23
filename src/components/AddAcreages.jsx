@@ -86,16 +86,6 @@ export default function AddAcreages({ user }) {
             {/* Tab Buttons */}
             <div className="flex gap-4 mb-6">
               <button
-                onClick={() => setActiveTab('delete')}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'delete'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                }`}
-              >
-                Delete Acreages
-              </button>
-              <button
                 onClick={() => setActiveTab('add')}
                 className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === 'add'
@@ -104,6 +94,16 @@ export default function AddAcreages({ user }) {
                 }`}
               >
                 Add Acreages
+              </button>
+              <button
+                onClick={() => setActiveTab('delete')}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'delete'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                }`}
+              >
+                Delete Acreages
               </button>
             </div>
 
@@ -114,17 +114,17 @@ export default function AddAcreages({ user }) {
               <form onSubmit={activeTab === 'add' ? handleSubmit : handleDeleteSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="registerId" className="block text-sm font-medium text-slate-700 mb-1">
-                      {activeTab === 'add' ? 'Register ID' : 'Register ID'}
+                    <label htmlFor="register number" className="block text-sm font-medium text-slate-700 mb-1">
+                      {activeTab === 'add' ? 'Register number' : 'Register number'}
                     </label>
                     <input
                       type="text"
-                      id="registerId"
-                      name="registerId"
+                      id="register number"
+                      name="register number"
                       value={activeTab === 'add' ? formData.registerId : deleteFormData.registerId}
                       onChange={activeTab === 'add' ? handleChange : handleDeleteChange}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={activeTab === 'add' ? 'Enter register ID' : 'Enter register ID to delete'}
+                      placeholder={activeTab === 'add' ? 'Enter register number' : 'Enter register number to delete'}
                     />
                   </div>
 
@@ -146,23 +146,7 @@ export default function AddAcreages({ user }) {
 
                 {activeTab === 'add' ? (
                   <>
-                    <div>
-                      <label htmlFor="plan" className="block text-sm font-medium text-slate-700 mb-1">
-                        Plan
-                      </label>
-                      <select
-                        id="plan"
-                        name="plan"
-                        value={formData.plan}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select a plan</option>
-                        <option value="monthly">Monthly Subscription</option>
-                        <option value="biannually">Biannually Subscription</option>
-                        <option value="annually">Annually Subscription</option>
-                      </select>
-                    </div>
+                    
 
                     <div>
                       <label htmlFor="addAcreage" className="block text-sm font-medium text-slate-700 mb-1">
@@ -244,14 +228,12 @@ export default function AddAcreages({ user }) {
               <thead>
                 <tr className="bg-slate-100">
                   <th className="px-4 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider border-b">
-                    Register ID
+                    Register number
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider border-b">
                     Client ID
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider border-b">
-                    Plan
-                  </th>
+                 
                   <th className="px-4 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider border-b">
                     Add Acreage
                   </th>
@@ -269,9 +251,7 @@ export default function AddAcreages({ user }) {
                     <td className="px-4 py-2 text-sm text-slate-900 border-b">
                       {entry.clientId}
                     </td>
-                    <td className="px-4 py-2 text-sm text-slate-900 border-b">
-                      {entry.plan}
-                    </td>
+                    
                     <td className="px-4 py-2 text-sm text-slate-900 border-b">
                       {entry.addAcreage}
                     </td>

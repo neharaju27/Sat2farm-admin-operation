@@ -61,7 +61,13 @@ export default function UnlockFarm({ user }) {
       // Check if the API call was successful based on response data
       if (data && data.status !== 'Failure') {
         const statusText = status === 'lock' ? 'locked' : 'unlocked';
-        setMessage(`Farm ID ${farmId.trim()} has been ${statusText} successfully!`);
+        const successMessage = `Farm ID ${farmId.trim()} has been ${statusText} successfully!`;
+        
+        // Show alert message
+        alert(successMessage);
+        
+        // Also set the message state for UI display
+        setMessage(successMessage);
       } else {
         // Show the API message directly to the user
         const apiMessage = data?.message || 'API returned an error';
