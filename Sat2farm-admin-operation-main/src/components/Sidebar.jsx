@@ -4,7 +4,7 @@ import sat2farmLogo from '../assets/logo.png';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
-  const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'add-acreages';
+  const isOperationsActive = currentPage === 'add-acreages';
 
   return (
     <div className="h-full bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800 flex flex-col shadow-xl border-r border-slate-200">
@@ -93,26 +93,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               </li>
               {operationsOpen && (
                 <ul className="ml-4 mt-2 space-y-2">
-                  <li
-                    className={`${
-                      currentPage === 'operation-portal'
-                        ? 'bg-slate-200 text-slate-900'
-                        : 'bg-white hover:bg-slate-100'
-                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
-                    onClick={() => onPageChange('operation-portal')}
-                  >
-                    <span className="text-xs font-semibold">Admin Operational Portal</span>
-                  </li>
-                  <li
-                    className={`${
-                      currentPage === 'unlock-farm'
-                        ? 'bg-slate-200 text-slate-900'
-                        : 'bg-white hover:bg-slate-100'
-                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
-                    onClick={() => onPageChange('unlock-farm')}
-                  >
-                    <span className="text-xs font-semibold">Unlock Farm</span>
-                  </li>
                   <li
                     className={`${
                       currentPage === 'add-acreages'

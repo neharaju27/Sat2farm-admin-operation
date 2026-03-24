@@ -3,8 +3,6 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 
 
-import Operation from "./components/operation";
-import UnlockFarm from "./components/UnlockFarm";
 import AddAcreages from "./components/AddAcreages";
 import Login from "./components/Login";
 
@@ -40,10 +38,6 @@ function App() {
     switch(currentPage) {
       case 'dashboard':
         return <Dashboard user={user} />;
-      case 'operation-portal':
-        return <Operation user={user} />;
-      case 'unlock-farm':
-        return <UnlockFarm user={user} />;
       case 'add-acreages':
         return <AddAcreages user={user} />;
       default:
