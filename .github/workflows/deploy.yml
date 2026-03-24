@@ -24,15 +24,17 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # 🔥 Upload FULL dist folder (important fix)
       - name: Upload dist to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: 3.14.103.172
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "dist/*"
-          target: "/home/ubuntu/dist"
+          source: "dist"
+          target: "/home/ubuntu"
 
+      # 🔥 Clean + copy properly + fix permissions
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -42,4 +44,5 @@ jobs:
           script: |
             sudo rm -rf /var/www/admin/*
             sudo cp -r /home/ubuntu/dist/* /var/www/admin/
+            sudo chown -R www-data:www-data /var/www/admin
             sudo systemctl restart nginx
