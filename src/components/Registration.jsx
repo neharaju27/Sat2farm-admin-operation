@@ -140,11 +140,7 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <User className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   First Name <span className="text-red-500 ml-1">*</span>
-=======
-                  First Name
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="text"
@@ -160,11 +156,7 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <User className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   Last Name <span className="text-red-500 ml-1">*</span>
-=======
-                  Last Name
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="text"
@@ -183,11 +175,7 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <Mail className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   Email <span className="text-red-500 ml-1">*</span>
-=======
-                  Email
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="email"
@@ -203,11 +191,7 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <Phone className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   Phone Number <span className="text-red-500 ml-1">*</span>
-=======
-                  Phone Number
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="tel"
@@ -228,21 +212,14 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <Building className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   Account ID <span className="text-red-500 ml-1">*</span>
-=======
-                  Account ID
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="text"
                   name="acc_id"
                   value={formData.acc_id}
                   onChange={handleChange}
-<<<<<<< HEAD
                   required
-=======
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                   placeholder="Enter account ID"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-2xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 transition-all duration-300 hover:bg-gray-100"
                 />
@@ -269,11 +246,7 @@ export default function Registration() {
               <div className="space-y-3 relative z-10">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
                   <Tag className="w-4 h-4 mr-2 text-blue-600" />
-<<<<<<< HEAD
                   Category <span className="text-red-500 ml-1">*</span>
-=======
-                  Category
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <select
                   name="category"
@@ -294,11 +267,7 @@ export default function Registration() {
                   <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-<<<<<<< HEAD
                   Password <span className="text-red-500 ml-1">*</span>
-=======
-                  Password
->>>>>>> 935f5cf04e695e21cde9535dac104ba2c88adcb6
                 </label>
                 <input
                   type="password"
