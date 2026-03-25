@@ -3,60 +3,86 @@ import { Eye, EyeOff, User, Lock, ArrowRight } from "lucide-react";
 
 import backgroundImage from "../assets/satyukt.webp";
 
-const API_URL = import.meta.env.VITE_LOGIN_API_URL;
+const API_URL = null; // Set to null for demo mode, or "http://localhost:3000/api/login" for real API
 
 export default function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    phone_number: "",
-    password: "",
-  });
-  const [error, setError] = useState("");
+    phone_number: "",
+    password: "",
+  });
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(""); // Clear previous errors
+   const handleSubmit = async (e) => {
+     e.preventDefault();
+     setError(""); // Clear previous errors
 
-    // Validate phone number is exactly 10 digits
-    if (formData.phone_number.length !== 10 || !/^\d{10}$/.test(formData.phone_number)) {
-      setError("Phone number must be exactly 10 digits");
-      return;
-    }
+     // Validate phone number is exactly 10 digits
+     if (formData.phone_number.length !== 10 || !/^\d{10}$/.test(formData.phone_number)) {
+       setError("Phone number must be exactly 10 digits");
+       return;
+     }
 
-    try {
-      const response = await fetch(`${API_URL}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phone_number: formData.phone_number,
-          password: formData.password
-        }),
-      });
+     // Demo mode - simulate successful login without API call
+     if (!API_URL) {
+       // Simulate API delay
+       setTimeout(() => {
+         onLogin({
+           name: formData.phone_number, // Use phone number as username for demo
+           phone_number: formData.phone_number,
+           success: true
+         });
+       }, 1000);
+       return;
+     }
 
-      const data = await response.json();
+     try {
+       const response = await fetch(`${API_URL}`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         body: JSON.stringify({
+           phone_number: formData.phone_number,
+           password: formData.password
+         }),
+       });
 
-      if (response.ok && data.success) {
-        onLogin(data);
-      } else {
-        // Show specific error message from API or generic error
-        const errorMessage = data.message || 'Login failed. Please check your credentials and try again.';
-        setError(errorMessage);
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setError('Network error. Please check your connection and try again.');
-    }
-  };
+       // Check if response is ok before parsing JSON
+       if (!response.ok) {
+         throw new Error(`HTTP error! status: ${response.status}`);
+       }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+       const text = await response.text();
+       
+       // Try to parse JSON, if fails, it's not valid JSON
+       let data;
+       try {
+         data = JSON.parse(text);
+       } catch (jsonError) {
+         throw new Error('Invalid JSON response from server');
+       }
+
+       if (data.success) {
+         onLogin(data);
+       } else {
+         // Show specific error message from API or generic error
+         const errorMessage = data.message || 'Login failed. Please check your credentials and try again.';
+         setError(errorMessage);
+       }
+     } catch (error) {
+       console.error('Login error:', error);
+       setError('Network error. Please check your connection and try again.');
+     }
+   };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
