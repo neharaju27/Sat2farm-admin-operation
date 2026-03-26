@@ -2,7 +2,7 @@ import Card from "./Card";
 import { Search, Plus, Bell, Calendar, Settings, Grid3x3, RefreshCw, MoreVertical, Building, Users, Phone, Target, Menu, X, Home, BarChart3, TrendingUp, ClipboardList, ChevronDown, User, Download } from 'lucide-react';
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
-
+// pushing in to get_acreages_data branch
 export default function Operation({ user }) {
   const today = new Date();
   const [fromDay, setFromDay] = useState('01');
@@ -257,23 +257,14 @@ export default function Operation({ user }) {
   const renderTable = () => {
     const data = getCurrentData();
     
-    // Pagination logic
-    const indexOfLastRecord = currentPage * recordsPerPage;
-    const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
-    const currentRecords = data.slice(indexOfFirstRecord, indexOfLastRecord);
-    const totalPages = Math.ceil(data.length / recordsPerPage);
-    
-    // Reset to page 1 when data changes
-    if (data.length > 0 && currentPage > totalPages) {
-      setCurrentPage(1);
-    }
+    // Show only first 10 records
+    const currentRecords = data.slice(0, 10);
     
     return (
       <div style={{
         background: 'white',
         borderRadius: '12px',
         border: '1px solid #e2e8f0',
-        overflow: 'hidden',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
       }}>
         {/* Table Header */}
@@ -337,15 +328,14 @@ export default function Operation({ user }) {
               fontSize: '14px',
               color: '#6b7280'
             }}>
-              Showing {indexOfFirstRecord + 1} to {Math.min(indexOfLastRecord, data.length)} of {data.length} records
+              Showing {currentRecords.length} of {data.length} records
             </div>
-
             {/* Table */}
             <div style={{ 
               overflowX: 'auto',
               overflowY: 'auto',
-              height: '520px',
-              maxHeight: '520px',
+              height: '240px',
+              minHeight: '200px',
               border: '1px solid #e5e7f0',
               borderRadius: '8px'
             }}>
@@ -354,11 +344,11 @@ export default function Operation({ user }) {
                 borderCollapse: 'collapse'
               }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f9fafb', position: 'sticky', top: 0, zIndex: 1, height: '34px' }}>
+                  <tr style={{ backgroundColor: '#f9fafb', position: 'sticky', top: 0, zIndex: 1, height: '24px' }}>
                     {/* Dynamic headers based on actual data */}
                     {data.length > 0 && Object.keys(data[0]).map((key, index) => (
                       <th key={index} style={{
-                        padding: '8px 10px',
+                        padding: '6px 8px',
                         textAlign: 'left',
                         fontWeight: '600',
                         color: '#374151',
@@ -379,9 +369,9 @@ export default function Operation({ user }) {
                     }}>
                       {Object.keys(data[0]).map((key, cellIndex) => (
                         <td key={cellIndex} style={{
-                          padding: '6px 8px',
+                          padding: '2px 6px',
                           color: '#374151',
-                          fontSize: '12px'
+                          fontSize: '10px'
                         }}>
                           {item[key] !== null && item[key] !== undefined ? item[key].toString() : 'N/A'}
                         </td>
@@ -392,52 +382,6 @@ export default function Operation({ user }) {
               </table>
             </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div style={{
-                padding: '16px 24px',
-                borderTop: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                  Page {currentPage} of {totalPages}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                      color: currentPage === 1 ? '#9ca3af' : '#374151',
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                      color: currentPage === totalPages ? '#9ca3af' : '#374151',
-                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -461,7 +405,7 @@ export default function Operation({ user }) {
       background: 'linear-gradient(135deg, #f8fafc 0%, #dbeafe 50%, #e0e7ff 100%)',
       display: 'flex',
       flexDirection: 'column',
-      overflow: 'hidden'
+      overflow: 'auto'
     }}>
       {/* Top Header */}
       <header style={{
@@ -540,11 +484,11 @@ export default function Operation({ user }) {
       }}>
         <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
           {/* Date Range and Table Selection Section */}
-          <div style={{ 
-            marginBottom: '24px',
+          <div style={{
+            marginBottom: '16px',
             background: 'white',
             borderRadius: '12px',
-            padding: '20px',
+            padding: '16px',
             border: '1px solid #e2e8f0',
             boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
             position: 'sticky',
@@ -562,8 +506,7 @@ export default function Operation({ user }) {
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px',
-                flex: '1'
+                gap: '2px'
               }}>
                 {/* From Date Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -665,9 +608,9 @@ export default function Operation({ user }) {
                 </div>
 
                 {/* To Date Section */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{
-                    fontSize: '14px',
+                    fontSize: '10px',
                     fontWeight: '500',
                     color: '#374151'
                   }}>To Date</label>
@@ -765,7 +708,7 @@ export default function Operation({ user }) {
                 </div>
 
                 {/* Submit Button */}
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     style={{
                       padding: '12px 32px',
