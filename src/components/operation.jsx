@@ -49,11 +49,15 @@ export default function Operation({ user }) {
 
   // API integration
   const API_URL = import.meta.env.VITE_API_URL;
+  const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
 
   const fetchData = async () => {
     console.log('🚀 fetchData called');
     console.log('🌐 API_URL:', API_URL);
-    console.log('📅 Selected dates:', { fromDay, fromMonth, fromYear, toDay, toMonth, toYear });
+    console.log('� isDevelopment:', isDevelopment);
+    console.log('🔍 MODE:', import.meta.env.MODE);
+    console.log('🔍 DEV:', import.meta.env.DEV);
+    console.log('� Selected dates:', { fromDay, fromMonth, fromYear, toDay, toMonth, toYear });
     console.log('📊 Selected table:', selectedTable);
     
     try {
@@ -84,12 +88,12 @@ export default function Operation({ user }) {
       }
       
       // Construct full URL - use proxy for development, direct API for production
-const fullUrl = import.meta.env.DEV 
-  ? `${endpoint}?from_date=${fromDate}&to_date=${toDate}` // Use proxy in dev
-  : `${API_URL}/data/monthly-acreage?from_date=${fromDate}&to_date=${toDate}`; // Direct API call in prod
+      const fullUrl = isDevelopment 
+        ? `${endpoint}?from_date=${fromDate}&to_date=${toDate}` // Use proxy in dev
+        : `${API_URL}${endpoint}?from_date=${fromDate}&to_date=${toDate}`; // Direct API call in prod
       
       console.log('🚀 Making API call:', fullUrl);
-      console.log('🌐 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
+      console.log('🌐 Environment:', isDevelopment ? 'Development' : 'Production');
       console.log('🔗 API_URL:', API_URL);
       
       // Make API call with multiple methods
@@ -109,7 +113,7 @@ const fullUrl = import.meta.env.DEV
         console.log('🔍 Axios error details:', axiosError);
         
         // If in production and we get a CORS error, try with CORS headers
-        if (!import.meta.env.DEV && axiosError.message.includes('CORS')) {
+        if (!isDevelopment && axiosError.message.includes('CORS')) {
           console.log('🔄 CORS error detected, trying alternative approach...');
           try {
             response = await axios.get(fullUrl, {
@@ -216,9 +220,9 @@ const fullUrl = import.meta.env.DEV
         ];
         
         for (const fallbackEndpoint of possibleEndpoints) {
-          const fallbackUrl = import.meta.env.DEV 
-            ? `${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`
-            : `${API_URL}${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`;
+          const fallbackUrl = isDevelopment 
+            ? `${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}` 
+            : `${API_URL}${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`; 
           
           console.log('🔄 Trying fallback endpoint:', fallbackUrl);
           
