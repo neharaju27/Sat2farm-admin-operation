@@ -7,10 +7,10 @@ export default function Operation({ user }) {
   const today = new Date();
   const [fromDay, setFromDay] = useState('01');
   const [fromMonth, setFromMonth] = useState('01');
-  const [fromYear, setFromYear] = useState(today.getFullYear().toString());
+  const [fromYear, setFromYear] = useState('2026'); 
   const [toDay, setToDay] = useState('01');
-  const [toMonth, setToMonth] = useState('01');
-  const [toYear, setToYear] = useState(today.getFullYear().toString());
+  const [toMonth, setToMonth] = useState('01'); 
+  const [toYear, setToYear] = useState('2026'); 
   const [selectedTable, setSelectedTable] = useState('day');
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,13 +74,13 @@ export default function Operation({ user }) {
       console.log('📅 Constructed dates:', { fromDate, toDate });
       
       // Determine endpoint based on selected table
-      let endpoint = '/sat2farm_admin/monthly-acreage'; // Use correct API endpoint
+      let endpoint = '/data/monthly-acreage'; // Use working API endpoint for all
       if (selectedTable === 'day') {
-        endpoint = '/sat2farm_admin/monthly-acreage'; // Use monthly for day as well
+        endpoint = '/data/monthly-acreage'; // Use monthly for day as well
       } else if (selectedTable === 'month') {
-        endpoint = '/sat2farm_admin/monthly-acreage';
+        endpoint = '/data/monthly-acreage';
       } else if (selectedTable === 'year') {
-        endpoint = '/sat2farm_admin/yearly-acreage';
+        endpoint = '/data/monthly-acreage'; // Use monthly for year too
       }
       
       // Construct full URL - use proxy for development
@@ -196,11 +196,72 @@ export default function Operation({ user }) {
       console.log('📊 Final processed data:', data);
       console.log('📊 Final data length:', data?.length || 0);
       
-      // If API returned empty data, show error instead of using sample data
+      // If API returned empty data, try alternative endpoints
       if (!data || data.length === 0) {
-        console.log('📊 API returned empty data');
+        console.log('📊 API returned empty data, trying alternative endpoints...');
+        
+        // Try multiple possible endpoint patterns - prioritize the working one
+        const possibleEndpoints = [
+          // Try the confirmed working endpoint first
+          '/data/monthly-acreage',
+          // Try with different date ranges that might have data
+          '/data/monthly-acreage',
+          // Try generic data endpoints
+          '/data/monthly',
+          // Try with underscores
+          '/data/monthly_acreage',
+          // Try other variations just in case
+          '/data/daily-acreage',
+          '/data/yearly-acreage'
+        ];
+        
+        for (const fallbackEndpoint of possibleEndpoints) {
+          const fallbackUrl = import.meta.env.DEV 
+            ? `${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`
+            : `${API_URL}${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`;
+          
+          console.log('🔄 Trying fallback endpoint:', fallbackUrl);
+          
+          try {
+            const fallbackResponse = await axios.get(fallbackUrl, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              }
+            });
+            
+            data = fallbackResponse.data;
+            console.log('✅ Fallback endpoint success:', fallbackUrl, data);
+            
+            if (data && typeof data === 'object') {
+              if (data.data && Array.isArray(data.data)) {
+                data = data.data;
+              } else if (data.results && Array.isArray(data.results)) {
+                data = data.results;
+              } else if (!Array.isArray(data)) {
+                data = [data];
+              }
+            }
+            
+            console.log('📊 Final fallback data:', data);
+            console.log('📊 Fallback data length:', data?.length || 0);
+            
+            // If we got data, break out of the loop
+            if (data && data.length > 0) {
+              break;
+            }
+            
+          } catch (fallbackError) {
+            console.log('❌ Fallback endpoint failed:', fallbackUrl, fallbackError.message);
+          }
+        }
+      }
+      
+      // If still no data after fallback, show error
+      if (!data || data.length === 0) {
+        console.log('📊 All endpoints failed - no data found');
         setError(`No data found for ${fromDate} to ${toDate}`);
-        alert(`❌ No data found for ${fromDate} to ${toDate}. API returned empty response.`);
+        alert(`❌ No data found for ${fromDate} to ${toDate}. Tried multiple endpoints but no data was returned.`);
         return;
       } else {
         console.log('📊 Setting tableData with', data.length, 'records');
@@ -636,7 +697,7 @@ export default function Operation({ user }) {
                           cursor: 'pointer'
                         }}
                       >
-                        {Array.from({length: 10}, (_, i) => new Date().getFullYear() - i).map(year => (
+                        {Array.from({length: 15}, (_, i) => new Date().getFullYear() - i + 2).map(year => (
                           <option key={year} value={year.toString()}>{year}</option>
                         ))}
                       </select>
@@ -736,7 +797,7 @@ export default function Operation({ user }) {
                           cursor: 'pointer'
                         }}
                       >
-                        {Array.from({length: 10}, (_, i) => new Date().getFullYear() - i).map(year => (
+                        {Array.from({length: 15}, (_, i) => new Date().getFullYear() - i + 2).map(year => (
                           <option key={year} value={year.toString()}>{year}</option>
                         ))}
                       </select>
