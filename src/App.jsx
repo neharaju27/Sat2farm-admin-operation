@@ -43,8 +43,6 @@ function App() {
         return <Dashboard user={user} />;
       case 'operation-portal':
         return <Operation user={user} />;
-      case 'unlock-farm':
-        return <UnlockFarm user={user} />;
       case 'add-acreages':
         return <AddAcreages user={user} />;
       case 'Registration':
