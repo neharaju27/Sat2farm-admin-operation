@@ -74,13 +74,13 @@ export default function Operation({ user }) {
       console.log('📅 Constructed dates:', { fromDate, toDate });
       
       // Determine endpoint based on selected table
-      let endpoint = '/data/monthly-acreage'; // Use monthly endpoint as default
+      let endpoint = '/sat2farm_admin/monthly-acreage'; // Use correct API endpoint
       if (selectedTable === 'day') {
-        endpoint = '/data/monthly-acreage'; // Use monthly for day as well
+        endpoint = '/sat2farm_admin/monthly-acreage'; // Use monthly for day as well
       } else if (selectedTable === 'month') {
-        endpoint = '/data/monthly-acreage';
+        endpoint = '/sat2farm_admin/monthly-acreage';
       } else if (selectedTable === 'year') {
-        endpoint = '/data/yearly-acreage';
+        endpoint = '/sat2farm_admin/yearly-acreage';
       }
       
       // Construct full URL - use proxy for development
@@ -89,6 +89,8 @@ export default function Operation({ user }) {
         : `${API_URL}${endpoint}?from_date=${fromDate}&to_date=${toDate}`; // Direct in prod
       
       console.log('🚀 Making API call:', fullUrl);
+      console.log('🌐 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
+      console.log('🔗 API_URL:', API_URL);
       
       // Make API call with multiple methods
       let response;
@@ -106,25 +108,44 @@ export default function Operation({ user }) {
         console.log('❌ Direct axios failed, trying fetch:', axiosError.message);
         console.log('🔍 Axios error details:', axiosError);
         
-        // Method 2: Fetch API as fallback
-        console.log('📡 Trying fetch API...');
-        const fetchResponse = await fetch(fullUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+        // If in production and we get a CORS error, try with CORS headers
+        if (!import.meta.env.DEV && axiosError.message.includes('CORS')) {
+          console.log('🔄 CORS error detected, trying alternative approach...');
+          try {
+            response = await axios.get(fullUrl, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+              },
+              withCredentials: false
+            });
+            console.log('✅ CORS workaround success:', response.data);
+          } catch (corsError) {
+            console.log('❌ CORS workaround failed:', corsError.message);
+            throw corsError;
           }
-        });
-        
-        console.log('📡 Fetch response status:', fetchResponse.status);
-        
-        if (!fetchResponse.ok) {
-          throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+        } else {
+          // Method 2: Fetch API as fallback
+          console.log('📡 Trying fetch API...');
+          const fetchResponse = await fetch(fullUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+          
+          console.log('📡 Fetch response status:', fetchResponse.status);
+          
+          if (!fetchResponse.ok) {
+            throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+          }
+          
+          const data = await fetchResponse.json();
+          response = { data };
+          console.log('✅ Fetch API success:', data);
         }
-        
-        const data = await fetchResponse.json();
-        response = { data };
-        console.log('✅ Fetch API success:', data);
       }
       
       // Check if response is HTML (error page) instead of JSON
