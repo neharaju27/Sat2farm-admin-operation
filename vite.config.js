@@ -8,12 +8,12 @@ export default defineConfig({
 
   server: {
     proxy: {
-      "/data": {
+      "/sat2farm_admin": {
         target: "https://api.sat2farm.com",
         changeOrigin: true,
         secure: false,
       },
-      "/sat2farm_admin": {
+      "/data": {
         target: "https://api.sat2farm.com",
         changeOrigin: true,
         secure: false,
