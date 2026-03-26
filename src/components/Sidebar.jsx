@@ -125,16 +125,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   >
                     <span className="text-xs font-semibold"> Unlock farm </span>
                   </li>
-                   <li
-                    className={`${
-                      currentPage === 'add-acreages'
-                        ? 'bg-slate-200 text-slate-900'
-                        : 'bg-white hover:bg-slate-100'
-                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
-                    onClick={() => onPageChange('add-acreages')}
-                  >
-                    <span className="text-xs font-semibold"> Add Acreages </span>
-                  </li>
+                   
                   
                   
                   
