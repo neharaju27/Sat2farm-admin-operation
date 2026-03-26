@@ -86,7 +86,7 @@ export default function Operation({ user }) {
       // Construct full URL - use proxy for development
       const fullUrl = import.meta.env.DEV 
         ? `${endpoint}?from_date=${fromDate}&to_date=${toDate}` // Use proxy in dev
-        : `${API_URL}${endpoint}?from_date=${fromDate}&to_date=${toDate}`; // Direct in prod
+        :`${API_URL}/data/monthly-acreage?from_date=${fromDate}&to_date=${toDate}`; // Direct in prod
       
       console.log('🚀 Making API call:', fullUrl);
       console.log('🌐 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
