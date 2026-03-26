@@ -4,8 +4,8 @@ import Dashboard from "./components/Dashboard";
 
 
 import Operation from "./components/operation";
-
-
+import UnlockFarm from "./components/UnlockFarm";
+import AddAcreages from "./components/AddAcreages";
 import Registration from "./components/Registration";
 import Login from "./components/Login";
 
@@ -43,6 +43,8 @@ function App() {
         return <Dashboard user={user} />;
       case 'operation-portal':
         return <Operation user={user} />;
+      case 'unlock-farm':
+        return <UnlockFarm user={user} />;
       case 'add-acreages':
         return <AddAcreages user={user} />;
       case 'Registration':
