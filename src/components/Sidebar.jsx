@@ -114,16 +114,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   >
                     <span className="text-xs font-semibold"> Get Acreages Data</span>
                   </li>
-                  <li
-                    className={`${
-                      currentPage === 'Registration'
-                        ? 'bg-slate-200 text-slate-900'
-                        : 'bg-white hover:bg-slate-100'
-                    } p-3 rounded-xl cursor-pointer flex items-center border border-slate-200`}
-                    onClick={() => onPageChange('Registration')}
-                  >
-                    <span className="text-xs font-semibold"> New Registeration</span>
-                  </li>
+                  
                   <li
                     className={`${
                       currentPage === 'unlock-farm'
