@@ -49,14 +49,10 @@ export default function Operation({ user }) {
 
   // API integration
   const API_URL = import.meta.env.VITE_API_URL;
-  const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
 
   const fetchData = async () => {
     console.log('🚀 fetchData called');
     console.log('🌐 API_URL:', API_URL);
-    console.log('� isDevelopment:', isDevelopment);
-    console.log('🔍 MODE:', import.meta.env.MODE);
-    console.log('🔍 DEV:', import.meta.env.DEV);
     console.log('� Selected dates:', { fromDay, fromMonth, fromYear, toDay, toMonth, toYear });
     console.log('📊 Selected table:', selectedTable);
     
@@ -77,23 +73,10 @@ export default function Operation({ user }) {
       
       console.log('📅 Constructed dates:', { fromDate, toDate });
       
-      // Determine endpoint based on selected table
-      let endpoint = '/data/monthly-acreage'; // Use working API endpoint for all
-      if (selectedTable === 'day') {
-        endpoint = '/data/monthly-acreage'; // Use monthly for day as well
-      } else if (selectedTable === 'month') {
-        endpoint = '/data/monthly-acreage';
-      } else if (selectedTable === 'year') {
-        endpoint = '/data/monthly-acreage'; // Use monthly for year too
-      }
-      
-      // Construct full URL - use proxy for development, direct API for production
-      const fullUrl = isDevelopment 
-        ? `${endpoint}?from_date=${fromDate}&to_date=${toDate}` // Use proxy in dev
-        : `${API_URL}${endpoint}?from_date=${fromDate}&to_date=${toDate}`; // Direct API call in prod
+      // Construct full URL - always use direct API URL
+      const fullUrl = `${API_URL}/data/monthly-acreage?from_date=${fromDate}&to_date=${toDate}`;
       
       console.log('🚀 Making API call:', fullUrl);
-      console.log('🌐 Environment:', isDevelopment ? 'Development' : 'Production');
       console.log('🔗 API_URL:', API_URL);
       
       // Make API call with multiple methods
@@ -101,6 +84,7 @@ export default function Operation({ user }) {
       try {
         // Method 1: Direct axios call
         console.log('📡 Trying axios...');
+        
         response = await axios.get(fullUrl, {
           headers: {
             'Content-Type': 'application/json',
@@ -113,7 +97,7 @@ export default function Operation({ user }) {
         console.log('🔍 Axios error details:', axiosError);
         
         // If in production and we get a CORS error, try with CORS headers
-        if (!isDevelopment && axiosError.message.includes('CORS')) {
+        if (axiosError.message.includes('CORS')) {
           console.log('🔄 CORS error detected, trying alternative approach...');
           try {
             response = await axios.get(fullUrl, {
@@ -220,9 +204,7 @@ export default function Operation({ user }) {
         ];
         
         for (const fallbackEndpoint of possibleEndpoints) {
-          const fallbackUrl = isDevelopment 
-            ? `${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}` 
-            : `${API_URL}${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`; 
+          const fallbackUrl = `${API_URL}${fallbackEndpoint}?from_date=${fromDate}&to_date=${toDate}`; 
           
           console.log('🔄 Trying fallback endpoint:', fallbackUrl);
           
