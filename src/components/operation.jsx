@@ -127,11 +127,27 @@ export default function Operation({ user }) {
         console.log('✅ Fetch API success:', data);
       }
       
+      // Check if response is HTML (error page) instead of JSON
+      if (typeof response.data === 'string' && response.data.includes('<!doctype html>')) {
+        console.log('❌ API returned HTML instead of JSON - endpoint not found');
+        setError('API endpoint not found. Please check the API configuration.');
+        alert(`❌ API Error: Endpoint "${endpoint}" not found\n\nThe server returned HTML instead of JSON data.\nPlease check:\n1. API URL: ${API_URL}\n2. Endpoint: ${endpoint}\n3. Server availability`);
+        return;
+      }
+      
       // Process response data
       let data = response.data;
       console.log('📊 Raw response data:', data);
       console.log('📊 Data type:', typeof data);
       console.log('📊 Is array?:', Array.isArray(data));
+      
+      // Validate that data is JSON/array, not HTML
+      if (typeof data === 'string' && data.includes('<html')) {
+        console.log('❌ Response contains HTML - invalid API response');
+        setError('Invalid API response format');
+        alert('❌ API returned HTML instead of JSON data\n\nPlease check the API endpoint and server configuration.');
+        return;
+      }
       
       // Log first few records to understand structure
       if (data && data.length > 0) {
