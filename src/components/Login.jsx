@@ -3,6 +3,7 @@ import { Eye, EyeOff, User, Lock, ArrowRight } from "lucide-react";
 
 import backgroundImage from "../assets/satyukt.webp";
 
+
 const API_URL = import.meta.env.VITE_LOGIN_API_URL;
 
 export default function Login({ onLogin }) {
@@ -70,17 +71,11 @@ export default function Login({ onLogin }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/50"></div>
 
       <div className="relative z-10 w-full max-w-md mr-auto ml-8">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="relative inline-flex items-center justify-center mb-4">
-            {/* Subtle glow effect */}
-            <div className="absolute inset-0 w-20 h-20 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-full blur-lg"></div>
-
-
-
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-lg"> Admin Operation Portal </h1>
-          </div>
+                {/* Logo */}
+        <div className="text-center mb-8">
+          
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight drop-shadow-lg"> Sat2farm Business </h1>
+        </div>
 
         {/* Login Form - More Transparent */}
         <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 p-10 relative overflow-hidden">
@@ -99,7 +94,7 @@ export default function Login({ onLogin }) {
             <div className="space-y-3">
               <label className="flex items-center text-sm font-bold text-white">
                 <User className="w-5 h-5 mr-3" style={{ color: '#184876' }} />
-                Username
+                Phone number
               </label>
               <div className="relative group">
                 <input

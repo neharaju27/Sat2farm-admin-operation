@@ -1,7 +1,17 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 
 export default function UnlockFarm({ user, onPageChange }) {
   const [currentRole, setCurrentRole] = useState('ops');
+  const [modalOpen, setModalOpen] = useState(null);
+
+  const openModal = (modalType) => {
+    setModalOpen(modalType);
+  };
+
+  const closeModal = () => {
+    setModalOpen(null);
+  };
 
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
@@ -200,7 +210,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
             <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('quick-actions')}>+ New</button>
         </div>
       </div>
 
@@ -212,10 +222,49 @@ export default function UnlockFarm({ user, onPageChange }) {
         <span className="badge badge-amber">4 pending</span>
       </div>
 
+      {/* Quick Actions Modal */}
+      {modalOpen === 'quick-actions' && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '420px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Quick actions</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeModal}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('farm-management'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new farm
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('client-accounts'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new client
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('sales-acreage'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Assign acreage to client
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('client-team'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add manager to team
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('client-alloc'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Allocate acreage to manager
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Unlock farm
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('monthly-acreages'); openModal('add-registration-modal'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new registration
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Unlock by Form ID Card */}
       <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
         <div className="card-head">
-          <span className="card-title">Unlock Farm by Form ID</span>
+          <span className="card-title">Unlock Farm by Farm ID</span>
         </div>
         <div className="card-body">
           <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
@@ -261,7 +310,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                     value={expiry}
                     onChange={(e) => setExpiry(e.target.value)}
                   >
-                    <option value="3">3</option>
+                    <option value="1">1</option>
                     <option value="6">6</option>
                     <option value="12">12</option>
                     <option value="other">Other</option>

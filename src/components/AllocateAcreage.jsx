@@ -1,7 +1,17 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 
 export default function AllocateAcreage({ user, onPageChange }) {
   const [currentRole, setCurrentRole] = useState('client');
+  const [modalOpen, setModalOpen] = useState(null);
+
+  const openModal = (modalType) => {
+    setModalOpen(modalType);
+  };
+
+  const closeModal = () => {
+    setModalOpen(null);
+  };
 
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
@@ -84,7 +94,7 @@ export default function AllocateAcreage({ user, onPageChange }) {
             <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
             <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={handleAllocateAcreage}>+ New</button>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('quick-actions')}>+ New</button>
         </div>
       </div>
 
@@ -208,6 +218,45 @@ export default function AllocateAcreage({ user, onPageChange }) {
           </div>
         </div>
       </div>
+
+      {/* Quick Actions Modal */}
+      {modalOpen === 'quick-actions' && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '420px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Quick actions</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeModal}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); openModal('add-farm-modal'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new farm
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); openModal('add-client-modal'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new client
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('sales-acreage'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Assign acreage to client
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('client-team'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add manager to team
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); handleAllocateAcreage(); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Allocate acreage to manager
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Unlock farm
+                </button>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); openModal('add-registration-modal'); }}>
+                  <span style={{marginRight: '8px'}}>+</span> Add new registration
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

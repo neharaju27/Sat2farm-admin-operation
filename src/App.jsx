@@ -18,16 +18,49 @@ function App() {
   const [currentPage, setCurrentPage] = useState('monthly-acreages');
 
   const handleLogin = (userData) => {
-    // Use the username from the API response, fallback to phone_number if name is not available
-    const username = userData.name || userData.phone_number || 'User';
-    // Capitalize first letter and make the rest lowercase
-    const formattedName = username.charAt(0).toUpperCase() + username.slice(1);
+    console.log('Login response:', userData);
+    
+    // Extract user info from response
+    const username = userData.phone_number || userData.username || '';
+    
+    // Format the name properly from API response
+    const firstName = userData.first_name || '';
+    const lastName = userData.last_name || '';
+    const fullNameFromAPI = userData.full_name || '';
+    
+    // Use full_name if available, otherwise combine first and last names
+    let formattedName = fullNameFromAPI;
+    if (!formattedName && (firstName || lastName)) {
+      formattedName = `${firstName} ${lastName}`.trim();
+    }
+    if (!formattedName) {
+      formattedName = username;
+    }
+    
+    // Get role from API response - check multiple possible field names and values
+    let role = userData.role || userData.user_role || userData.type || 'User';
+    role = role.toLowerCase().trim();
+    console.log('Detected role:', role);
     
     setUser({
       name: formattedName,
       username: username,
-      fullName: formattedName
+      fullName: formattedName,
+      role: role
     });
+    
+    // Redirect based on role - sales users go to sales page, client users go to client page, others go to ops
+    if (role === 'sales') {
+      console.log('Redirecting to assign-acreages (sales)');
+      setCurrentPage('assign-acreages');
+    } else if (role === 'client' || role === 'test' || role === 'user') {
+      console.log('Redirecting to client-team (client/test user)');
+      setCurrentPage('client-team');
+    } else {
+      console.log('Redirecting to monthly-acreages (default/ops)');
+      setCurrentPage('monthly-acreages');
+    }
+    
     setIsLoggedIn(true);
   };
 
@@ -50,7 +83,8 @@ function App() {
         return <MonthlyAcreages user={user} onPageChange={handlePageChange} />;
       case 'farm-management':
         return <FarmManagement user={user} onPageChange={handlePageChange} />;
-      case 'sales-acreage':
+      
+      case 'assign-acreages':
         return <AssignAcreage user={user} onPageChange={handlePageChange} />;
       case 'sales-clients':
         return <ClientAccounts user={user} onPageChange={handlePageChange} />;

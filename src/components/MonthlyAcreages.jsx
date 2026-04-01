@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import { Search, Plus, ChevronDown, Home, TrendingUp, Users, Settings, LogOut, Menu, X, Download, Edit, Eye, Lock, Unlock, AlertCircle, CheckCircle, Clock, MapPin, Phone, Mail, Calendar, Filter, BarChart3, Database, User, Building, Package, ArrowUp, ArrowDown } from 'lucide-react';
 import '../styles/Sat2FarmAdminPortal.css';
@@ -36,6 +36,24 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   const [unlockMessage, setUnlockMessage] = useState('');
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [unlockError, setUnlockError] = useState('');
+
+  // Assign Acreage form state
+  const [assignFormData, setAssignFormData] = useState({
+    client: '',
+    addAcreage: '',
+    plan: ' 1 month',
+    expiryDate: '',
+    notes: '',
+    registerNumber: ''
+  });
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState(false);
+  const [clientDetails, setClientDetails] = useState(null);
+  const [fetchingClient, setFetchingClient] = useState(false);
+  const [registerDetails, setRegisterDetails] = useState(null);
+  const [fetchingRegister, setFetchingRegister] = useState(false);
+  const [searchType, setSearchType] = useState('clientId');
 
   const views = {
     'ops-acreage': { title: 'Monthly Acreage', sub: 'Operations · Reporting' },
@@ -86,6 +104,19 @@ export default function MonthlyAcreages({ user, onPageChange }) {
 
   const closeModal = () => {
     setModalOpen(null);
+    setAssignSuccess(false);
+    setAssignError('');
+    setClientDetails(null);
+    setRegisterDetails(null);
+    setSearchType('clientId');
+    setAssignFormData({
+      client: '',
+      addAcreage: '',
+      plan: ' 1 month',
+      expiryDate: '',
+      notes: '',
+      registerNumber: ''
+    });
   };
 
   const handleRegisterSubmit = async () => {
@@ -162,6 +193,109 @@ export default function MonthlyAcreages({ user, onPageChange }) {
       setRegError('Network error. Please check your connection and try again.');
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handleAssignInputChange = (e) => {
+    const { name, value } = e.target;
+    setAssignFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const fetchClientDetails = async (clientId) => {
+    if (!clientId) return;
+    setFetchingClient(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit'}?client_id=${clientId}`);
+      const data = await response.json();
+      if (response.ok && data) {
+        setClientDetails({
+          clientId: data.client_id || clientId,
+          company: data.company || data.full_name || data.name || 'N/A',
+          allocateArea: data.allocate_area || 0,
+          usedArea: data.used_area || 0,
+          availableArea: data.available_area || 0,
+          totalArea: data.total_area || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching client details:', error);
+    } finally {
+      setFetchingClient(false);
+    }
+  };
+
+  const fetchRegisterDetails = async (registerNumber) => {
+    if (!registerNumber) return;
+    setFetchingRegister(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit'}?username=${registerNumber}`);
+      const data = await response.json();
+      if (response.ok && data) {
+        setRegisterDetails({
+          registerId: registerNumber,
+          clientId: data.client_id || 'N/A',
+          company: data.company || data.full_name || data.name || 'N/A',
+          allocateArea: data.allocate_area || 0,
+          usedArea: data.used_area || 0,
+          availableArea: data.available_area || 0,
+          totalArea: data.total_area || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching register details:', error);
+    } finally {
+      setFetchingRegister(false);
+    }
+  };
+
+  // Fetch client details when client ID changes
+  useEffect(() => {
+    if (searchType === 'clientId' && assignFormData.client) {
+      const timeoutId = setTimeout(() => {
+        fetchClientDetails(assignFormData.client);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [assignFormData.client, searchType]);
+
+  // Fetch register details when register number changes
+  useEffect(() => {
+    if (searchType === 'registerNumber' && assignFormData.registerNumber) {
+      const timeoutId = setTimeout(() => {
+        fetchRegisterDetails(assignFormData.registerNumber);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [assignFormData.registerNumber, searchType]);
+
+  const handleAssignAcreage = async () => {
+    if (!assignFormData.addAcreage || !assignFormData.expiryDate || !assignFormData.client) {
+      setAssignError('Please fill in all required fields');
+      return;
+    }
+
+    setAssignLoading(true);
+    setAssignError('');
+
+    try {
+      // Mock API call - replace with actual API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setAssignSuccess(true);
+      setAssignFormData({
+        client: '',
+        addAcreage: '',
+        plan: ' 1 month',
+        expiryDate: '',
+        notes: '',
+        registerNumber: ''
+      });
+    } catch (error) {
+      setAssignError('Failed to assign acreage. Please try again.');
+    } finally {
+      setAssignLoading(false);
     }
   };
 
@@ -548,7 +682,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                 <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { openModal('add-client-modal'); }}>
                   <span style={{marginRight: '8px'}}>+</span> Add new client
                 </button>
-                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { handleNavigate('sales-acreage'); closeModal(); }}>
+                <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); openModal('assign-acreage-modal'); }}>
                   <span style={{marginRight: '8px'}}>+</span> Assign acreage to client
                 </button>
                 <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { handleNavigate('client-team'); closeModal(); }}>
@@ -564,6 +698,195 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                   <span style={{marginRight: '8px'}}>+</span> Add new registration
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Acreage Modal */}
+      {modalOpen === 'assign-acreage-modal' && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '700px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Assign acreage to client</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeModal}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              {assignError && (
+                <div className="alert alert-danger" style={{marginBottom: '16px', padding: '10px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '6px'}}>
+                  {assignError}
+                </div>
+              )}
+              {assignSuccess ? (
+                <div style={{textAlign: 'center', padding: '20px'}}>
+                  <div style={{fontSize: '48px', marginBottom: '16px'}}>✅</div>
+                  <h3 style={{marginBottom: '8px'}}>Acreage Assigned Successfully!</h3>
+                  <p style={{color: 'var(--text-2)'}}>The acreage has been assigned to the client.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Radio button selection */}
+                  <div style={{marginBottom: '16px'}}>
+                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '500'}}>Search by:</label>
+                    <div style={{display: 'flex', gap: '24px'}}>
+                      <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                        <input
+                          type="radio"
+                          name="searchType"
+                          value="clientId"
+                          checked={searchType === 'clientId'}
+                          onChange={(e) => {
+                            setSearchType(e.target.value);
+                            setClientDetails(null);
+                            setRegisterDetails(null);
+                            setAssignFormData(prev => ({ ...prev, client: '', registerNumber: '' }));
+                          }}
+                          style={{marginRight: '8px'}}
+                        />
+                        <span>Client ID</span>
+                      </label>
+                      <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                        <input
+                          type="radio"
+                          name="searchType"
+                          value="registerNumber"
+                          checked={searchType === 'registerNumber'}
+                          onChange={(e) => {
+                            setSearchType(e.target.value);
+                            setClientDetails(null);
+                            setRegisterDetails(null);
+                            setAssignFormData(prev => ({ ...prev, client: '', registerNumber: '' }));
+                          }}
+                          style={{marginRight: '8px'}}
+                        />
+                        <span>Registered Number</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Conditional input field */}
+                  {searchType === 'clientId' ? (
+                    <div className="form-group" style={{marginBottom: '16px'}}>
+                      <label>Client ID</label>
+                      <input type="text" name="client" value={assignFormData.client} onChange={handleAssignInputChange} placeholder="e.g. 343" />
+                      {fetchingClient && <div style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>Loading client details...</div>}
+                    </div>
+                  ) : (
+                    <div className="form-group" style={{marginBottom: '16px'}}>
+                      <label>Registered Number</label>
+                      <input type="text" name="registerNumber" value={assignFormData.registerNumber} onChange={handleAssignInputChange} placeholder="e.g. 9963758295" />
+                      {fetchingRegister && <div style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>Loading register details...</div>}
+                    </div>
+                  )}
+
+                  {/* Client Details - Full Width */}
+                  {clientDetails && !fetchingClient && (
+                    <div style={{backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '16px', marginTop: '16px', marginBottom: '16px'}}>
+                      <div style={{fontSize: '16px', fontWeight: '600', color: '#166534', marginBottom: '12px', borderBottom: '2px solid #86efac', paddingBottom: '8px'}}>Client Details</div>
+                      <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
+                        <tbody>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', width: '25%', fontWeight: '500'}}>Client ID</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.clientId}</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Company</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.company}</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Allocated Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.allocateArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Used Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.usedArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Available Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.availableArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Total Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{clientDetails.totalArea?.toFixed(2)} ac</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Register Details - Full Width */}
+                  {registerDetails && !fetchingRegister && (
+                    <div style={{backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '16px', marginBottom: '16px'}}>
+                      <div style={{fontSize: '16px', fontWeight: '600', color: '#166534', marginBottom: '12px', borderBottom: '2px solid #86efac', paddingBottom: '8px'}}>Register Details</div>
+                      <table style={{width: '100%', fontSize: '14px', borderCollapse: 'collapse'}}>
+                        <tbody>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', width: '25%', fontWeight: '500'}}>Registered ID</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.registerId}</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Client ID</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.clientId}</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Company</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.company}</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Allocated Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.allocateArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Used Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.usedArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr style={{borderBottom: '1px solid #bbf7d0'}}>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Available Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.availableArea?.toFixed(2)} ac</td>
+                          </tr>
+                          <tr>
+                            <td style={{padding: '10px 0', color: '#374151', fontWeight: '500'}}>Total Area</td>
+                            <td style={{padding: '10px 0', fontWeight: '600', color: '#1f2937'}}>{registerDetails.totalArea?.toFixed(2)} ac</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px'}}>
+                    <div className="form-group">
+                      <label>Add acreage (ac) *</label>
+                      <input type="number" name="addAcreage" value={assignFormData.addAcreage} onChange={handleAssignInputChange} placeholder="e.g. 1000" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Plan</label>
+                      <select name="plan" value={assignFormData.plan} onChange={handleAssignInputChange}>
+                        <option> 1 month</option>
+                        <option> 6 month</option>
+                        <option>12 month</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{gridColumn: 'span 2'}}>
+                      <label>Expiry date *</label>
+                      <input type="date" name="expiryDate" value={assignFormData.expiryDate} onChange={handleAssignInputChange} required />
+                    </div>
+                    <div className="form-group" style={{gridColumn: 'span 2'}}>
+                      <label>Notes</label>
+                      <textarea name="notes" value={assignFormData.notes} onChange={handleAssignInputChange} placeholder="Reason for assignment, sales deal reference..." style={{minHeight: '80px'}} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={closeModal}>Cancel</button>
+              {!assignSuccess && (
+                <button className="btn btn-primary" onClick={handleAssignAcreage} disabled={assignLoading}>
+                  {assignLoading ? 'Assigning...' : 'Assign Acreage'}
+                </button>
+              )}
             </div>
           </div>
         </div>
