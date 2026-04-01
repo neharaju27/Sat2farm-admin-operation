@@ -19,7 +19,11 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         <img src={sat2farmLogo} alt="Sat2farm" style={{width: '100px', height: 'auto', margin: '8px 0'}} />
         <div className="sb-logo-sub">ADMIN PORTAL · v2.4</div>
       </div>
-      <div className="sb-role">Viewing as: <span>{user?.role === 'sales' || user?.role === 'Sales' ? 'Sales' : 'Operations'}</span></div>
+      <div className="sb-role">Viewing as: <span>{
+        user?.role === 'sales' || user?.role === 'Sales' ? 'Sales' : 
+        user?.role === 'client' || user?.role === 'Client' ? 'Client' : 
+        'Operations'
+      }</span></div>
       
       {/* Navigation */}
       <div className="sb-nav">

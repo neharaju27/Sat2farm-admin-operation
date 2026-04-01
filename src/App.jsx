@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from "./components/Sidebar";
 import UnlockFarm from "./components/UnlockFarm";
 import AddAcreages from "./components/AddAcreages";
@@ -11,24 +11,58 @@ import ClientAccounts from "./components/ClientAccounts";
 import TeamManagers from "./components/TeamManagers";
 import AllocateAcreage from "./components/AllocateAcreage";
 import Registration from "./components/Register";
+import { useAuth } from './context/AuthContext';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState(null);
+  const { user, loading, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState('monthly-acreages');
+  const [hasRedirected, setHasRedirected] = useState(false);
 
-  const handleLogin = (userData) => {
-    console.log('Login response:', userData);
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  // Handle role-based redirect after login
+  useEffect(() => {
+    if (user && !hasRedirected) {
+      // Get role from user data
+      let role = user.role || user.user_role || user.type || 'User';
+      role = role.toLowerCase().trim();
+      
+      console.log('User logged in, detected role:', role);
+      
+      // Redirect based on role
+      if (role === 'sales') {
+        console.log('Redirecting to assign-acreages (sales)');
+        setCurrentPage('assign-acreages');
+      } else if (role === 'client' || role === 'test' || role === 'user') {
+        console.log('Redirecting to client-team (client/test user)');
+        setCurrentPage('client-team');
+      } else {
+        console.log('Redirecting to monthly-acreages (default/ops)');
+        setCurrentPage('monthly-acreages');
+      }
+      
+      setHasRedirected(true);
+    }
+  }, [user, hasRedirected]);
+
+  // Reset redirect flag when user logs out
+  useEffect(() => {
+    if (!user) {
+      setHasRedirected(false);
+      setCurrentPage('monthly-acreages');
+    }
+  }, [user]);
+
+  // Build user display object from auth context data
+  const getUserDisplay = () => {
+    if (!user) return null;
+    const username = user.phone_number || user.username || user.name || 'User';
+    const firstName = user.first_name || '';
+    const lastName = user.last_name || '';
+    const fullNameFromAPI = user.full_name || '';
     
-    // Extract user info from response
-    const username = userData.phone_number || userData.username || '';
-    
-    // Format the name properly from API response
-    const firstName = userData.first_name || '';
-    const lastName = userData.last_name || '';
-    const fullNameFromAPI = userData.full_name || '';
-    
-    // Use full_name if available, otherwise combine first and last names
     let formattedName = fullNameFromAPI;
     if (!formattedName && (firstName || lastName)) {
       formattedName = `${firstName} ${lastName}`.trim();
@@ -37,74 +71,65 @@ function App() {
       formattedName = username;
     }
     
-    // Get role from API response - check multiple possible field names and values
-    let role = userData.role || userData.user_role || userData.type || 'User';
-    role = role.toLowerCase().trim();
-    console.log('Detected role:', role);
-    
-    setUser({
+    return {
       name: formattedName,
       username: username,
       fullName: formattedName,
-      role: role
-    });
-    
-    // Redirect based on role - sales users go to sales page, client users go to client page, others go to ops
-    if (role === 'sales') {
-      console.log('Redirecting to assign-acreages (sales)');
-      setCurrentPage('assign-acreages');
-    } else if (role === 'client' || role === 'test' || role === 'user') {
-      console.log('Redirecting to client-team (client/test user)');
-      setCurrentPage('client-team');
-    } else {
-      console.log('Redirecting to monthly-acreages (default/ops)');
-      setCurrentPage('monthly-acreages');
-    }
-    
-    setIsLoggedIn(true);
+      role: user.role || user.user_role || user.type || 'User'
+    };
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUser(null);
-  };
-
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
+  const userDisplay = getUserDisplay();
 
   const renderCurrentPage = () => {
     switch(currentPage) {
       case 'unlock-farm':
-        return <UnlockFarm user={user} onPageChange={handlePageChange} />;
+        return <UnlockFarm user={userDisplay} onPageChange={handlePageChange} />;
       case 'add-acreages':
-        return <AddAcreages user={user} onPageChange={handlePageChange} />;
+        return <AddAcreages user={userDisplay} onPageChange={handlePageChange} />;
       case 'monthly-acreages':
-        return <MonthlyAcreages user={user} onPageChange={handlePageChange} />;
+        return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
       case 'farm-management':
-        return <FarmManagement user={user} onPageChange={handlePageChange} />;
-      
+        return <FarmManagement user={userDisplay} onPageChange={handlePageChange} />;
       case 'assign-acreages':
-        return <AssignAcreage user={user} onPageChange={handlePageChange} />;
+        return <AssignAcreage user={userDisplay} onPageChange={handlePageChange} />;
       case 'sales-clients':
-        return <ClientAccounts user={user} onPageChange={handlePageChange} />;
+        return <ClientAccounts user={userDisplay} onPageChange={handlePageChange} />;
       case 'client-team':
-        return <TeamManagers user={user} onPageChange={handlePageChange} />;
+        return <TeamManagers user={userDisplay} onPageChange={handlePageChange} />;
       case 'client-alloc':
-        return <AllocateAcreage user={user} onPageChange={handlePageChange} />;
+        return <AllocateAcreage user={userDisplay} onPageChange={handlePageChange} />;
       case 'admin-operational-portal':
-        return <AdminOperationalPortal user={user} onPageChange={handlePageChange} />;
+        return <AdminOperationalPortal user={userDisplay} onPageChange={handlePageChange} />;
       case 'sat2farm-admin-portal':
-        return <MonthlyAcreages user={user} onPageChange={handlePageChange} />;
+        return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
       case 'register':
-        return <Registration user={user} onPageChange={handlePageChange} />;
+        return <Registration user={userDisplay} onPageChange={handlePageChange} />;
       default:
-        return <MonthlyAcreages user={user} onPageChange={handlePageChange} />;
+        return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
     }
   };
 
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+  // Show loading spinner while checking stored session
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        width: '100vw',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        color: '#94a3b8',
+        fontSize: '1.125rem',
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
   }
 
   return (
@@ -120,7 +145,7 @@ function App() {
         borderRight: '1px solid #334155',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
       }}>
-        <Sidebar onLogout={handleLogout} user={user} onPageChange={handlePageChange} currentPage={currentPage} />
+        <Sidebar onLogout={logout} user={userDisplay} onPageChange={handlePageChange} currentPage={currentPage} />
       </div>
       <div style={{ 
         flex: 1,
