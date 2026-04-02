@@ -6,12 +6,14 @@ import API from '../api/api';
 
 const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
 const REPORT_API_URL = '/report/report';
+const REPORT_DATA_API_URL = '/report_data/report_data';
 
 export default function MonthlyAcreages({ user, onPageChange }) {
   const [currentView, setCurrentView] = useState('ops-acreage');
   const [currentRole, setCurrentRole] = useState('ops');
   const [selectedMonth, setSelectedMonth] = useState('Mar 26');
   const [reportData, setReportData] = useState(null);
+  const [monthlyData, setMonthlyData] = useState(null);
   const [availableMonths, setAvailableMonths] = useState(['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26']);
   const [loadingReport, setLoadingReport] = useState(false);
   const [reportError, setReportError] = useState('');
@@ -100,7 +102,42 @@ export default function MonthlyAcreages({ user, onPageChange }) {
 
   const handleMonthSelect = async (month) => {
     setSelectedMonth(month);
-    await fetchReportData(month);
+    
+    // Find the file path for selected month from report data
+    if (reportData && Array.isArray(reportData)) {
+      const monthData = reportData.find(item => item.label === month);
+      if (monthData && monthData.file) {
+        await fetchMonthlyData(monthData.file);
+      }
+    }
+  };
+
+  const fetchMonthlyData = async (filePath) => {
+    setLoadingReport(true);
+    setReportError('');
+    
+    try {
+      // Use direct fetch to call report_data API with file parameter
+      const response = await fetch(`${REPORT_DATA_API_URL}?file=${encodeURIComponent(filePath)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMonthlyData(data);
+      } else {
+        setReportError(data.message || 'Failed to fetch monthly data');
+      }
+    } catch (error) {
+      console.error('Error fetching monthly data:', error);
+      setReportError('Network error. Please try again.');
+    } finally {
+      setLoadingReport(false);
+    }
   };
 
   const fetchReportData = async (month) => {
@@ -504,8 +541,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                   <div className="section-head">
                     <div className="section-title">Monthly acreage report</div>
                     <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                      <button className="btn btn-sm">↓ Export CSV</button>
-                      <button className="btn btn-sm">↓ Export PDF</button>
+                      <button className="btn btn-sm" onClick={() => window.open(monthlyData?.download_url, '_blank')}>↓ Export CSV</button>
                     </div>
                   </div>
 
@@ -523,23 +559,33 @@ export default function MonthlyAcreages({ user, onPageChange }) {
 
                   <div className="two-col" style={{marginBottom: '16px'}}>
                     <div className="card">
-                      <div className="card-head">
-                        <span className="card-title">Acreage by client type</span>
-                        <span className="badge badge-green">{selectedMonth}</span>
-                      </div>
-                      <div className="card-body">
-                        {(reportData?.cropData || mockData.monthlyAcreage.cropData).map((crop, index) => (
-                          <div key={index} className="chart-row">
-                            <div className="chart-label">{crop.crop}</div>
-                            <div className="chart-bar-wrap">
-                              <div className="chart-bar" style={{width: `${crop.percentage}%`}}>
-                                {crop.acres}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="card-head">
+                      <span className="card-title">Top 5 Clients by Used Acreage</span>
+                      <div className="month-chip">{selectedMonth}</div>
                     </div>
+                    <div className="card-body">
+                      {monthlyData?.top5_clients && monthlyData.top5_clients.length > 0 ? (
+                        (() => {
+                          const maxUsedArea = Math.max(...monthlyData.top5_clients.map(client => client.used_area));
+                          return (
+                            <div className="client-acreage-chart">
+                              {monthlyData.top5_clients.map((client, index) => (
+                                <div className="chart-item" key={index}>
+                                  <div className="label">{client.full_name}</div>
+                                  <div className="bar-wrap">
+                                    <div className="bar-fill" style={{width: `${(client.used_area / maxUsedArea) * 100}%`}}></div>
+                                    <div className="value">{client.used_area.toLocaleString()} ac</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <p>No client acreage data available.</p>
+                      )}
+                    </div>
+                  </div>
                     <div className="card">
                       <div className="card-head"><span className="card-title">State breakdown</span></div>
                       <div className="card-body">
@@ -567,38 +613,34 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                       <table>
                         <thead>
                           <tr>
-                            <th>ClientID</th>
+                            <th>Client ID</th>
                             <th>Full Name</th>
-                            <th>Date of payment</th>
-                            <th>Date of expiry</th>
+                            <th>Mobile No</th>
+                            <th>Date of Payment</th>
+                            <th>Date of Expiry</th>
                             <th>Unit Limit</th>
                             <th>Used Area</th>
                             <th>Total Area</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(reportData?.clients || mockData.monthlyAcreage.clients).map((client, index) => (
+                          {(monthlyData?.top5_clients || []).map((client, index) => (
                             <tr key={index}>
                               <td>
                                 <div className="flex-cell">
-                                  <div className="avatar-sm">{client.avatar}</div>
                                   <div>
-                                    <div className="tbl-name">{client.name}</div>
-                                    <div className="tbl-sub">ID #{client.id}</div>
+                                    <div className="tbl-name">{client.client}</div>
+                                    <div className="tbl-sub">ID #{client.client_id}</div>
                                   </div>
                                 </div>
                               </td>
-                              <td>{client.assigned.toLocaleString()}</td>
-                              <td>{client.used.toLocaleString()}</td>
-                              <td>
-                                <div className="prog-wrap">
-                                  <div className={`prog-fill ${getProgressClass(client.utilization)}`} style={{width: `${client.utilization}%`}}></div>
-                                </div>
-                                <span style={{fontSize: '10px', color: 'var(--text-3)'}}>{client.utilization}%</span>
-                              </td>
-                              <td>{client.crops}</td>
-                              <td>{client.state}</td>
-                              <td>{getStatusBadge(client.status)}</td>
+                              <td>{client.full_name}</td>
+                              <td>{client.mobile_no}</td>
+                              <td>{client.dateOfPayment}</td>
+                              <td>{client.dateOfExpiry}</td>
+                              <td>{client.unit_limit.toLocaleString()}</td>
+                              <td>{client.used_area.toLocaleString()}</td>
+                              <td>{client.total_area.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>

@@ -38,6 +38,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/report_data": {
+        target: "https://api.sat2farm.com",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
