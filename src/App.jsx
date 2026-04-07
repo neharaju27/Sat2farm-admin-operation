@@ -34,8 +34,8 @@ function App() {
       
       // Redirect based on role
       if (role === 'sales') {
-        console.log('Redirecting to unlock-farm (sales - restricted access)');
-        setCurrentPage('unlock-farm');
+        console.log('Redirecting to assign-acreages (sales - with access)');
+        setCurrentPage('assign-acreages');
       } else if (role === 'client' || role === 'test' || role === 'user') {
         console.log('Redirecting to client-team (client/test user)');
         setCurrentPage('client-team');

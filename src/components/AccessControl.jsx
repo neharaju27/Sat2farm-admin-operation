@@ -4,7 +4,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
   const isSalesUser = user?.role === 'sales' || user?.role === 'Sales';
   
   // Pages that sales users are allowed to access
-  const allowedPagesForSales = ['unlock-farm'];
+  const allowedPagesForSales = ['unlock-farm', 'assign-acreages'];
   
   // Check if current page is restricted for sales users
   const isPageRestricted = isSalesUser && !allowedPagesForSales.includes(currentPage);

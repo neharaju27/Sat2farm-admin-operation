@@ -119,17 +119,19 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   setReportError('');
 
   try {
-    const response = await fetch(
-      `${REPORT_DATA_API_URL}?file=${encodeURIComponent(filePath)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const apiUrl = `${REPORT_DATA_API_URL}?file=${encodeURIComponent(filePath)}`;
+    console.log('Fetching monthly data from:', apiUrl); // Debug log
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     const data = await response.json();
+
+    console.log('Monthly data API response:', data); // Debug log
 
     if (response.ok) {
       setMonthlyData(data);
@@ -574,15 +576,26 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                     <div className="card-body">
                       {monthlyData?.top5_clients && monthlyData.top5_clients.length > 0 ? (
                         (() => {
-                          const maxUsedArea = Math.max(...monthlyData.top5_clients.map(client => client.used_area));
+                          const maxUsedArea = Math.max(...monthlyData.top5_clients.map(client => client.unlocked_area || 0));
                           return (
                             <div className="client-acreage-chart">
                               {monthlyData.top5_clients.map((client, index) => (
                                 <div className="chart-item" key={index}>
                                   <div className="label">{client.full_name}</div>
-                                  <div className="bar-wrap">
-                                    <div className="bar-fill" style={{width: `${(client.used_area / maxUsedArea) * 100}%`}}></div>
-                                    <div className="value">{client.used_area.toLocaleString()} ac</div>
+                                  <div className="bar-wrap" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div className="bar-fill" style={{width: `${((client.unlocked_area || 0) / maxUsedArea) * 100}%`}}></div>
+                                    <div className="value" style={{ 
+                                      fontSize: '14px', 
+                                      fontWeight: '700', 
+                                      color: '#000000',
+                                      backgroundColor: '#f3f4f6',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      border: '1px solid #d1d5db',
+                                      minWidth: '80px',
+                                      textAlign: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                    }}>{(client.unlocked_area || 0).toLocaleString()} ac</div>
                                   </div>
                                 </div>
                               ))}
@@ -623,34 +636,41 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                           <tr>
                             <th>Client ID</th>
                             <th>Full Name</th>
+                            <th>Company Name</th>
                             <th>Mobile No</th>
                             <th>Date of Payment</th>
                             <th>Date of Expiry</th>
-                            <th>Unit Limit</th>
-                            <th>Total Used Area</th>
+                            <th>Total Area Added</th>
                             <th>Monthly Used Area</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(monthlyData?.top5_clients || []).map((client, index) => (
+                          {(monthlyData?.top5_clients || []).map((client, index) => {
+                            console.log(`Client ${index} data:`, client); // Debug log
+                            console.log(`Client ${index} ALL FIELDS:`, Object.keys(client)); // Show all available fields
+                            console.log(`Client ${index} client_id:`, client.client_id); // Specific check for client_id
+                            return (
                             <tr key={index}>
                               <td>
                                 <div className="flex-cell">
                                   <div>
-                                    <div className="tbl-name">{client.client}</div>
-                                    <div className="tbl-sub">ID #{client.client_id}</div>
+                                    
+                                    <div className="tbl-sub">ID: {client.client_id || 'N/A'}</div>
                                   </div>
                                 </div>
                               </td>
+                          
                               <td>{client.full_name}</td>
+                              <td>{client.company_name}</td>
                               <td>{client.mobile_no}</td>
                               <td>{client.dateOfPayment}</td>
                               <td>{client.dateOfExpiry}</td>
-                              <td>{client.unit_limit.toLocaleString()}</td>
-                              <td>{client.used_area.toLocaleString()}</td>
-                              <td>{client.total_area.toLocaleString()}</td>
+                              <td>{(client.Total_added_area || 0).toLocaleString()}</td>
+                              <td>{(client.unlocked_area|| 0).toLocaleString()}</td>
+                              
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

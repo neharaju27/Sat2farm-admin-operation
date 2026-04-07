@@ -140,29 +140,13 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         
         <div className="sb-section">CRM</div>
         <div 
-          className={`sb-item ${currentPage === 'assign-acreages' || currentPage === 'sales-acreage' ? 'active' : ''} ${isSalesUser ? 'restricted' : ''}`}
+          className={`sb-item ${currentPage === 'assign-acreages' || currentPage === 'sales-acreage' ? 'active' : ''}`}
           onClick={() => handleNavigationClick('assign-acreages')}
-          style={{
-            opacity: isSalesUser ? 0.5 : 1,
-            cursor: isSalesUser ? 'not-allowed' : 'pointer',
-            position: 'relative'
-          }}
         >
           <svg className="ic" viewBox="0 0 16 16" fill="none">
             <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Assign Acreage
-          {isSalesUser && (
-            <Lock style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '12px',
-              height: '12px',
-              color: '#ef4444'
-            }} />
-          )}
         </div>
         <div 
           className={`sb-item ${currentPage === 'sales-clients' ? 'active' : ''} ${isSalesUser ? 'restricted' : ''}`}
