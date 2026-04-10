@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock } from 'lucide-react';
-import sat2farmLogo from '../assets/sat2farm.png';
+import sat2farmLogo from '../assets/satyukt.webp';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
@@ -77,8 +77,8 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       
       {/* Header */}
       <div className="sb-logo">
-        <div className="sb-logo-text">Satyukt</div>
-        <img src={sat2farmLogo} alt="Sat2farm" style={{width: '100px', height: 'auto', margin: '8px 0'}} />
+        <div className="sb-logo-text">SATYUKT</div>
+        <img src={sat2farmLogo} alt="Satyukt" style={{width: '100px', height: 'auto', margin: '8px 0'}} />
         <div className="sb-logo-sub">ADMIN PORTAL · v2.4</div>
       </div>
       <div className="sb-role">Viewing as: <span>{
