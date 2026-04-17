@@ -38,8 +38,8 @@ function App() {
         console.log('Redirecting to assign-acreages (sales - with access)');
         setCurrentPage('assign-acreages');
       } else if (role === 'client' || role === 'test' || role === 'user') {
-        console.log('Redirecting to unlock-farm (client/test user)');
-        setCurrentPage('unlock-farm');
+        console.log('Redirecting to client-monthly-report (client/test user)');
+        setCurrentPage('client-monthly-report');
       } else if (role === 'operation') {
         console.log('Redirecting to monthly-acreages (operations user)');
         setCurrentPage('monthly-acreages');
