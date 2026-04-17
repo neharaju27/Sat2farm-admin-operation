@@ -108,59 +108,60 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
     }
   };
 
-  // Fetch monthly report data from API
+  // Fetch available months from API
   useEffect(() => {
-    const fetchMonthlyReports = async () => {
+    const fetchAvailableMonths = async () => {
       try {
-        setLoadingMonths(true);
         const response = await fetch(`${import.meta.env.VITE_LABELING_API_URL}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-          const months = data.map(item => item.label);
-          const filesMap = {};
-          data.forEach(item => {
-            filesMap[item.label] = item.file;
-          });
-          
-          setAvailableMonths(months);
-          setMonthlyFiles(filesMap);
-          
-          // Set the first month as selected by default
-          if (months.length > 0) {
-            setSelectedMonth(months[0]);
-            setMonthlyData(dummyMonthlyData[months[0]] || null);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            // Extract month labels from API response
+            const months = data.map(item => item.label);
+            setAvailableMonths(months);
+            
+            // Create monthlyFiles mapping using query parameter for fetch_esly
+            const filesMapping = {};
+            data.forEach(item => {
+              filesMapping[item.label] = `${import.meta.env.VITE_ESLY_API_URL}?month_year=${item.query}`;
+            });
+            setMonthlyFiles(filesMapping);
+            
+            // Select the most recent month (last in array)
+            if (months.length > 0) {
+              const mostRecentMonth = months[months.length - 1];
+              setSelectedMonth(mostRecentMonth);
+            }
           }
-        } else {
-          throw new Error('Invalid API response format');
         }
       } catch (error) {
-        console.error('Error fetching monthly reports:', error);
-        setReportError('Failed to load monthly reports. Using fallback data.');
-        // Fallback to hardcoded months if API fails
-        const fallbackMonths = ['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26'];
-        setAvailableMonths(fallbackMonths);
-        setSelectedMonth('Mar 26');
-        setMonthlyData(dummyMonthlyData['Mar 26']);
+        console.error('Error fetching available months:', error);
+        // Fallback to dummy months if API fails
+        const dummyMonths = ['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26'];
+        setAvailableMonths(dummyMonths);
+        const mostRecentMonth = dummyMonths[dummyMonths.length - 1];
+        setSelectedMonth(mostRecentMonth);
+        // Removed: setMonthlyData(dummyMonthlyData[mostRecentMonth]);
+        // Removed: setApiMetrics(dummyMonthlyData[mostRecentMonth]);
       } finally {
         setLoadingMonths(false);
       }
     };
-
-    fetchMonthlyReports();
+    
+    fetchAvailableMonths();
   }, []);
+
+  // Auto-fetch data when selectedMonth and monthlyFiles are available
+  useEffect(() => {
+    if (selectedMonth && monthlyFiles[selectedMonth]) {
+      fetchMetricsForMonth(selectedMonth);
+    }
+  }, [selectedMonth, monthlyFiles]);
 
   const handleMonthSelect = (month) => {
     setSelectedMonth(month);
-    setMonthlyData(dummyMonthlyData[month] || null);
-    // Reset metrics when month changes
-    setApiMetrics(null);
-    // Auto-fetch metrics for the selected month
+    // Removed: setMonthlyData(dummyMonthlyData[month] || null);
+    // Fetch real API data for selected month
     fetchMetricsForMonth(month);
   };
 
@@ -168,12 +169,25 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
     const selectedFile = monthlyFiles[month];
     if (selectedFile) {
       try {
-        const response = await fetch(`${import.meta.env.VITE_ESLY_API_URL}?filename=${encodeURIComponent(selectedFile.split('/').pop())}&download=true`);
+        // Extract month_year parameter from the URL
+        const monthYearParam = selectedFile.includes('?month_year=') 
+          ? selectedFile.split('?month_year=')[1] 
+          : month; // Fallback to month label if not in URL format
+        
+        const response = await fetch(`${import.meta.env.VITE_ESLY_API_URL}?month_year=${encodeURIComponent(monthYearParam)}`);
         
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'success' && data.metrics) {
-            setApiMetrics(data.metrics);
+          console.log('API Response:', data); // Debug log
+          if (data.status === 'success') {
+            // Set the entire response data to include metrics, plan, and karnataka_bucket
+            const apiData = {
+              ...data.metrics,
+              plan: data.plan,
+              karnataka_bucket: data.karnataka_bucket
+            };
+            console.log('Setting apiMetrics:', apiData); // Debug log
+            setApiMetrics(apiData);
           }
         }
       } catch (error) {
@@ -412,226 +426,682 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                 </div>
               </div>
 
-              {/* Summary Metrics */}
+              {/* Summary Metrics Bar Charts - Side by Side */}
               {apiMetrics && (
-                <div className="metrics" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '24px'}}>
-                  <div className="metric">
-                    <div className="metric-label">Total Unlocked Area</div>
-                    <div className="metric-val">{(apiMetrics.total_unlocked_area || 0).toFixed(2)}</div>
-                    <div className="metric-sub">Acres</div>
+                <div style={{display: 'flex', gap: '16px', marginBottom: '24px'}}>
+                  {/* Added Area Summary Bar Chart */}
+                  <div className="card" style={{flex: 1}}>
+                    <div className="card-head">
+                      <span className="card-title">Added Area Summary</span>
+                      <div className="month-chip">{selectedMonth}</div>
+                    </div>
+                    <div className="card-body">
+                      <div style={{textAlign: 'center', padding: '20px'}}>
+                        <svg width="100%" height="300" viewBox="0 0 600 300" style={{fontFamily: 'Arial, sans-serif'}}>
+                          {/* Chart Title */}
+                          <text x="300" y="20" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#333">
+                            Area Added - {selectedMonth}
+                          </text>
+                          
+                          {/* Y-axis */}
+                          <line x1="60" y1="50" x2="60" y2="250" stroke="#666" strokeWidth="2"/>
+                          
+                          {/* X-axis */}
+                          <line x1="60" y1="250" x2="550" y2="250" stroke="#666" strokeWidth="2"/>
+                          
+                          {/* Calculate max value for scaling */}
+                          {(() => {
+                            const totalAdded = apiMetrics.total_added_area || 0;
+                            const karnatakaAdded = apiMetrics.karnataka_added_area || 0;
+                            const outsideKarnatakaAdded = apiMetrics.outside_karnataka_added_area || 0;
+                            const maxValue = Math.max(totalAdded, karnatakaAdded, outsideKarnatakaAdded);
+                            const scale = maxValue > 0 ? 180 / maxValue : 1;
+                            
+                            return (
+                              <>
+                                  {/* Y-axis labels */}
+                                  <text x="50" y="55" textAnchor="end" fontSize="12" fill="#666">{maxValue.toFixed(0)}</text>
+                                  <text x="50" y="105" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.75).toFixed(0)}</text>
+                                  <text x="50" y="155" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.5).toFixed(0)}</text>
+                                  <text x="50" y="205" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.25).toFixed(0)}</text>
+                                  <text x="50" y="255" textAnchor="end" fontSize="12" fill="#666">0</text>
+                                  
+                                  {/* Total Added Area Bar */}
+                                  <rect x="100" y={250 - (totalAdded * scale)} width="80" height={totalAdded * scale} fill="#3B6D11" stroke="#27500A" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Total Added Area: {totalAdded.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="140" y={245 - (totalAdded * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {totalAdded.toFixed(1)}
+                                  </text>
+                                  <text x="140" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Total Added
+                                  </text>
+                                  
+                                  {/* Karnataka Added Area Bar */}
+                                  <rect x="240" y={250 - (karnatakaAdded * scale)} width="80" height={karnatakaAdded * scale} fill="#185FA5" stroke="#0F4A8A" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Karnataka Added Area: {karnatakaAdded.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="280" y={245 - (karnatakaAdded * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {karnatakaAdded.toFixed(1)}
+                                  </text>
+                                  <text x="280" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Karnataka
+                                  </text>
+                                  
+                                  {/* Outside Karnataka Added Area Bar */}
+                                  <rect x="380" y={250 - (outsideKarnatakaAdded * scale)} width="80" height={outsideKarnatakaAdded * scale} fill="#059669" stroke="#047857" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Outside Karnataka Added Area: {outsideKarnatakaAdded.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="420" y={245 - (outsideKarnatakaAdded * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {outsideKarnatakaAdded.toFixed(1)}
+                                  </text>
+                                  <text x="420" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Outside Karnataka
+                                  </text>
+                                </>
+                            );
+                          })()}
+                        </svg>
+                        
+                        {/* Value Summary Below Chart */}
+                        <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
+                          <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Total Added</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.total_added_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Karnataka Added</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#185FA5'}}>{(apiMetrics.karnataka_added_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Outside Karnataka Added</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#059669'}}>{(apiMetrics.outside_karnataka_added_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="metric">
-                    <div className="metric-label">Total Added Area</div>
-                    <div className="metric-val">{(apiMetrics.total_added_area || 0).toFixed(2)}</div>
-                    <div className="metric-sub">Acres</div>
+
+                  {/* Unlocked Area Summary Bar Chart */}
+                  <div className="card" style={{flex: 1}}>
+                    <div className="card-head">
+                      <span className="card-title">Unlocked Area Summary</span>
+                      <div className="month-chip">{selectedMonth}</div>
+                    </div>
+                    <div className="card-body">
+                      <div style={{textAlign: 'center', padding: '20px'}}>
+                        <svg width="100%" height="300" viewBox="0 0 600 300" style={{fontFamily: 'Arial, sans-serif'}}>
+                          {/* Chart Title */}
+                          <text x="300" y="20" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#333">
+                            Area Unlocked - {selectedMonth}
+                          </text>
+                          
+                          {/* Y-axis */}
+                          <line x1="60" y1="50" x2="60" y2="250" stroke="#666" strokeWidth="2"/>
+                          
+                          {/* X-axis */}
+                          <line x1="60" y1="250" x2="550" y2="250" stroke="#666" strokeWidth="2"/>
+                          
+                          {/* Calculate max value for scaling */}
+                          {(() => {
+                            const totalUnlocked = apiMetrics.total_unlocked_area || 0;
+                            const karnatakaUnlocked = apiMetrics.karnataka_unlocked_area || 0;
+                            const outsideKarnatakaUnlocked = apiMetrics.outside_karnataka_unlocked_area || 0;
+                            const maxValue = Math.max(totalUnlocked, karnatakaUnlocked, outsideKarnatakaUnlocked);
+                            const scale = maxValue > 0 ? 180 / maxValue : 1;
+                            
+                            return (
+                              <>
+                                  {/* Y-axis labels */}
+                                  <text x="50" y="55" textAnchor="end" fontSize="12" fill="#666">{maxValue.toFixed(0)}</text>
+                                  <text x="50" y="105" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.75).toFixed(0)}</text>
+                                  <text x="50" y="155" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.5).toFixed(0)}</text>
+                                  <text x="50" y="205" textAnchor="end" fontSize="12" fill="#666">{(maxValue * 0.25).toFixed(0)}</text>
+                                  <text x="50" y="255" textAnchor="end" fontSize="12" fill="#666">0</text>
+                                  
+                                  {/* Total Unlocked Area Bar */}
+                                  <rect x="100" y={250 - (totalUnlocked * scale)} width="80" height={totalUnlocked * scale} fill="#BA7517" stroke="#9A5F12" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Total Unlocked Area: {totalUnlocked.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="140" y={245 - (totalUnlocked * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {totalUnlocked.toFixed(1)}
+                                  </text>
+                                  <text x="140" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Total Unlocked
+                                  </text>
+                                  
+                                  {/* Karnataka Unlocked Area Bar */}
+                                  <rect x="240" y={250 - (karnatakaUnlocked * scale)} width="80" height={karnatakaUnlocked * scale} fill="#0F6E56" stroke="#0A5A47" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Karnataka Unlocked Area: {karnatakaUnlocked.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="280" y={245 - (karnatakaUnlocked * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {karnatakaUnlocked.toFixed(1)}
+                                  </text>
+                                  <text x="280" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Karnataka
+                                  </text>
+                                  
+                                  {/* Outside Karnataka Unlocked Area Bar */}
+                                  <rect x="380" y={250 - (outsideKarnatakaUnlocked * scale)} width="80" height={outsideKarnatakaUnlocked * scale} fill="#DC2626" stroke="#B91C1C" strokeWidth="2" rx="4" style={{cursor: 'pointer'}}>
+                                    <title>Outside Karnataka Unlocked Area: {outsideKarnatakaUnlocked.toFixed(2)} Acres</title>
+                                  </rect>
+                                  <text x="420" y={245 - (outsideKarnatakaUnlocked * scale)} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff">
+                                    {outsideKarnatakaUnlocked.toFixed(1)}
+                                  </text>
+                                  <text x="420" y="270" textAnchor="middle" fontSize="12" fill="#333">
+                                    Outside Karnataka
+                                  </text>
+                                </>
+                            );
+                          })()}
+                        </svg>
+                        
+                        {/* Value Summary Below Chart */}
+                        <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
+                          <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Total Unlocked</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#BA7517'}}>{(apiMetrics.total_unlocked_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Karnataka Unlocked</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#0F6E56'}}>{(apiMetrics.karnataka_unlocked_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Outside Karnataka Unlocked</div>
+                              <div style={{fontSize: '16px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.outside_karnataka_unlocked_area || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '11px', color: '#666'}}>Acres</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Karnataka and Outside Karnataka Metrics */}
+              {/* Plan Distribution Donut Charts - Side by Side */}
               {apiMetrics && (
-                <div className="two-col" style={{marginBottom: '24px'}}>
-                  <div className="card">
+                <div style={{display: 'flex', gap: '16px', marginBottom: '24px'}}>
+                  {/* One Month Plan Donut Chart */}
+                  <div className="card" style={{flex: 1}}>
                     <div className="card-head">
-                      <span className="card-title">Added Area</span>
+                      <span className="card-title">One Month Plan</span>
                       <div className="month-chip">{selectedMonth}</div>
                     </div>
                     <div className="card-body">
                       <div style={{textAlign: 'center', padding: '20px'}}>
-                        <div style={{marginBottom: '12px'}}>
-                          <div style={{fontSize: '20px', color: '#184876', marginBottom: '4px'}}>
-                            📍 Karnataka: {(apiMetrics.karnataka_added_area || 0).toFixed(2)} Acres
-                          </div>
-                          <div style={{fontSize: '20px', color: '#059669', marginBottom: '8px'}}>
-                            🌍 Outside Karnataka: {(apiMetrics.outside_karnataka_added_area || 0).toFixed(2)} Acres
-                          </div>
+                        <svg width="100%" height="350" viewBox="0 0 400 350" style={{fontFamily: 'Arial, sans-serif'}}>
+                          {/* Chart Title */}
+                          <text x="200" y="25" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
+                            One Month Distribution
+                          </text>
                           
-                        </div>
-                        
-                        {/* 3D Pie Chart */}
-                        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '16px'}}>
-                          <svg width="240" height="240" viewBox="0 0 120 120" style={{filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))'}}>
-                            <defs>
-                              <linearGradient id="karnatakaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style={{stopColor: '#3B6D11', stopOpacity: 1}} />
-                                <stop offset="100%" style={{stopColor: '#27500A', stopOpacity: 1}} />
-                              </linearGradient>
-                              <linearGradient id="otherGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style={{stopColor: '#185FA5', stopOpacity: 1}} />
-                                <stop offset="100%" style={{stopColor: '#0F4A8A', stopOpacity: 1}} />
-                              </linearGradient>
-                            </defs>
+                          {/* Calculate data for donut chart */}
+                          {(() => {
+                            console.log('apiMetrics in donut chart:', apiMetrics); // Debug log
+                            const karnatakaData = apiMetrics.plan?.karnataka?.['1_month'] || 0;
+                            const outsideKarnatakaData = apiMetrics.plan?.outside_karnataka?.['1_month'] || 0;
+                            const entireRegionData = apiMetrics.karnataka_bucket?.plan?.['1_month'] || 0;
+                            console.log('Donut chart data - Karnataka:', karnatakaData, 'Outside:', outsideKarnatakaData, 'Entire:', entireRegionData); // Debug log
                             
-                            {/* 3D Effect - Bottom Ellipse */}
-                            <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
+                            // Always show all three segments, even if some are 0
+                            // If total is 0, assign equal proportions to show all segments
+                            const total = karnatakaData + outsideKarnatakaData + entireRegionData || 1;
                             
-                            {/* Pie Slices */}
-                            {(() => {
-                              const karnatakaAdded = apiMetrics.karnataka_added_area || 0;
-                              const outsideKarnatakaAdded = apiMetrics.outside_karnataka_added_area || 0;
-                              const totalAdded = karnatakaAdded + outsideKarnatakaAdded;
-                              const karnatakaPercentage = totalAdded > 0 ? (karnatakaAdded / totalAdded) * 100 : 0;
-                              const otherPercentage = 100 - karnatakaPercentage;
-                              const karnatakaAngle = (karnatakaPercentage / 100) * 360;
-                              
-                              // Handle 100% cases
-                              if (karnatakaPercentage === 100) {
-                                return (
-                                  <g>
-                                    {/* Full Karnataka Circle */}
-                                    <circle cx="60" cy="60" r="50" fill="url(#karnatakaGradient)" stroke="#ffffff" strokeWidth="2" />
-                                    {/* 3D Effect - Full Circle */}
-                                    <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
-                                  </g>
-                                );
+                            // Calculate percentages
+                            const karnatakaPercentage = total > 0 ? (karnatakaData / total) * 100 : 0;
+                            const outsideKarnatakaPercentage = total > 0 ? (outsideKarnatakaData / total) * 100 : 0;
+                            const entireRegionPercentage = total > 0 ? (entireRegionData / total) * 100 : 0;
+                            
+                            // Calculate angles for donut segments
+                            const karnatakaAngle = (karnatakaPercentage / 100) * 360;
+                            const outsideKarnatakaAngle = (outsideKarnatakaPercentage / 100) * 360;
+                            const entireRegionAngle = (entireRegionPercentage / 100) * 360;
+                            
+                            // Donut chart parameters - much larger donut only
+                            const centerX = 200;
+                            const centerY = 160;
+                            const outerRadius = 130;
+                            const innerRadius = 70;
+                            
+                            // Helper function to create arc path
+                            const createArcPath = (startAngle, endAngle, outerRadius, innerRadius) => {
+                              // Handle case where angle is 0 or very small
+                              if (Math.abs(endAngle - startAngle) < 0.1) {
+                                return ''; // Don't render anything for zero/near-zero angles
                               }
                               
-                              if (otherPercentage === 100) {
-                                return (
-                                  <g>
-                                    {/* Full Other States Circle */}
-                                    <circle cx="60" cy="60" r="50" fill="url(#otherGradient)" stroke="#ffffff" strokeWidth="2" />
-                                    {/* 3D Effect - Full Circle */}
-                                    <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
-                                  </g>
-                                );
+                              // Handle full circle case (360 degrees)
+                              if (Math.abs(endAngle - startAngle) >= 359.9) {
+                                return `
+                                  M ${centerX - outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX + outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX - outerRadius} ${centerY}
+                                  M ${centerX - innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX + innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX - innerRadius} ${centerY}
+                                  Z
+                                `;
                               }
                               
-                              return (
-                                <g>
-                                  {/* Karnataka Slice */}
-                                  <path
-                                    d={`M 60 60 L 60 10 A 50 50 0 ${karnatakaAngle > 180 ? 1 : 0} 1 ${60 + 50 * Math.sin(karnatakaAngle * Math.PI / 180)} ${60 - 50 * Math.cos(karnatakaAngle * Math.PI / 180)} Z`}
-                                    fill="url(#karnatakaGradient)"
-                                    stroke="#ffffff"
-                                    strokeWidth="2"
-                                  />
-                                    
-                                  {/* Other States Slice */}
-                                  <path
-                                    d={`M 60 60 L ${60 + 50 * Math.sin(karnatakaAngle * Math.PI / 180)} ${60 - 50 * Math.cos(karnatakaAngle * Math.PI / 180)} A 50 50 0 ${karnatakaAngle > 180 ? 0 : 1} 1 60 10 Z`}
-                                    fill="url(#otherGradient)"
-                                    stroke="#ffffff"
-                                    strokeWidth="2"
-                                  />
-                                    
-                                  {/* 3D Side Effect */}
-                                  <path
-                                    d={`M 60 60 L 60 10 A 50 50 0 ${karnatakaAngle > 180 ? 1 : 0} 1 ${60 + 50 * Math.sin(karnatakaAngle * Math.PI / 180)} ${60 - 50 * Math.cos(karnatakaAngle * Math.PI / 180)} L ${60 + 55 * Math.sin(karnatakaAngle * Math.PI / 180)} ${85 - 8 * Math.cos(karnatakaAngle * Math.PI / 180)} Z`}
-                                    fill="rgba(0,0,0,0.1)"
-                                  />
-                                </g>
-                              );
-                            })()}
-                          </svg>
-                        </div>
+                              const startAngleRad = (startAngle * Math.PI) / 180;
+                              const endAngleRad = (endAngle * Math.PI) / 180;
+                              
+                              const x1 = centerX + outerRadius * Math.cos(startAngleRad);
+                              const y1 = centerY + outerRadius * Math.sin(startAngleRad);
+                              const x2 = centerX + outerRadius * Math.cos(endAngleRad);
+                              const y2 = centerY + outerRadius * Math.sin(endAngleRad);
+                              
+                              const x3 = centerX + innerRadius * Math.cos(endAngleRad);
+                              const y3 = centerY + innerRadius * Math.sin(endAngleRad);
+                              const x4 = centerX + innerRadius * Math.cos(startAngleRad);
+                              const y4 = centerY + innerRadius * Math.sin(startAngleRad);
+                              
+                              const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+                              
+                              return `
+                                M ${x1} ${y1}
+                                A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}
+                                L ${x3} ${y3}
+                                A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}
+                                Z
+                              `;
+                            };
+                            
+                            let currentAngle = -90; // Start from top
+                            
+                            return (
+                              <>
+                                {/* Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle, currentAngle + karnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#185FA5"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Karnataka Data: {karnatakaData.toFixed(2)} Acres ({karnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Outside Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#059669"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Outside Karnataka Data: {outsideKarnatakaData.toFixed(2)} Acres ({outsideKarnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Entire Region Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle + outsideKarnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle + entireRegionAngle, outerRadius, innerRadius)}
+                                  fill="#BA7517"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>Entire Region Data: {entireRegionData.toFixed(2)} Acres ({entireRegionPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                                                
+                                {/* Center text */}
+                                <text x={centerX} y={centerY - 5} textAnchor="middle" fontSize="15" fontWeight="bold" fill="#333">
+                                  One Month
+                                </text>
+                                <text x={centerX} y={centerY + 8} textAnchor="middle" fontSize="12" fill="#666">
+                                  Plan
+                                </text>
+                              </>
+                            );
+                          })()}
+                        </svg>
                         
-                        <div style={{fontSize: '20px', color: 'var(--text-3)', marginTop: '8px'}}>
-                            📊 {((apiMetrics.karnataka_added_area || 0) / ((apiMetrics.karnataka_added_area || 0) + (apiMetrics.outside_karnataka_added_area || 0)) * 100).toFixed(1)}% Karnataka, {((apiMetrics.outside_karnataka_added_area || 0) / ((apiMetrics.karnataka_added_area || 0) + (apiMetrics.outside_karnataka_added_area || 0)) * 100).toFixed(1)}% Other States
+                        {/* Legend Summary Below Chart */}
+                        <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
+                          <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#185FA5'}}>{(apiMetrics.plan?.karnataka?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#059669'}}>{(apiMetrics.plan?.outside_karnataka?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#BA7517'}}>{(apiMetrics.karnataka_bucket?.plan?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
                           </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="card">
+
+                  {/* Six Months Plan Donut Chart */}
+                  <div className="card" style={{flex: 1}}>
                     <div className="card-head">
-                      <span className="card-title">Unlocked Acres</span>
+                      <span className="card-title">Six Months Plan</span>
                       <div className="month-chip">{selectedMonth}</div>
                     </div>
                     <div className="card-body">
                       <div style={{textAlign: 'center', padding: '20px'}}>
-                        <div style={{marginBottom: '12px'}}>
-                          <div style={{fontSize: '20px', color: '#BA7517', marginBottom: '4px'}}>
-                            📍 Karnataka: {(apiMetrics.karnataka_unlocked_area || 0).toFixed(2)} Acres
-                          </div>
-                          <div style={{fontSize: '20px', color: '#0F6E56', marginBottom: '8px'}}>
-                            🌍 Outside Karnataka: {(apiMetrics.outside_karnataka_unlocked_area || 0).toFixed(2)} Acres
-                          </div>
+                        <svg width="100%" height="350" viewBox="0 0 400 350" style={{fontFamily: 'Arial, sans-serif'}}>
+                          {/* Chart Title */}
+                          <text x="200" y="25" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
+                            Six Months Distribution
+                          </text>
                           
-                        </div>
-                        
-                        {/* 3D Pie Chart */}
-                        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '16px'}}>
-                          <svg width="240" height="240" viewBox="0 0 120 120" style={{filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))'}}>
-                            <defs>
-                              <linearGradient id="outsideGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style={{stopColor: '#0F6E56', stopOpacity: 1}} />
-                                <stop offset="100%" style={{stopColor: '#0A5A47', stopOpacity: 1}} />
-                              </linearGradient>
-                              <linearGradient id="karnatakaUsageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style={{stopColor: '#BA7517', stopOpacity: 1}} />
-                                <stop offset="100%" style={{stopColor: '#9A5F12', stopOpacity: 1}} />
-                              </linearGradient>
-                            </defs>
+                          {/* Calculate data for donut chart */}
+                          {(() => {
+                            const karnatakaData = apiMetrics.plan?.karnataka?.['6_month'] || 0;
+                            const outsideKarnatakaData = apiMetrics.plan?.outside_karnataka?.['6_month'] || 0;
+                            const entireRegionData = apiMetrics.karnataka_bucket?.plan?.['6_month'] || 0;
                             
-                            {/* 3D Effect - Bottom Ellipse */}
-                            <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
+                            // Always show all three segments, even if some are 0
+                            // If total is 0, assign equal proportions to show all segments
+                            const total = karnatakaData + outsideKarnatakaData + entireRegionData || 1;
                             
-                            {/* Pie Slices */}
-                            {(() => {
-                              const karnatakaUnlocked = apiMetrics.karnataka_unlocked_area || 0;
-                              const outsideKarnatakaUnlocked = apiMetrics.outside_karnataka_unlocked_area || 0;
-                              const totalUnlocked = karnatakaUnlocked + outsideKarnatakaUnlocked;
-                              const outsidePercentage = totalUnlocked > 0 ? (outsideKarnatakaUnlocked / totalUnlocked) * 100 : 0;
-                              const karnatakaUsagePercentage = 100 - outsidePercentage;
-                              const outsideAngle = (outsidePercentage / 100) * 360;
-                              
-                              // Handle 100% cases
-                              if (karnatakaUsagePercentage === 100) {
-                                return (
-                                  <g>
-                                    {/* Full Karnataka Circle */}
-                                    <circle cx="60" cy="60" r="50" fill="url(#karnatakaUsageGradient)" stroke="#ffffff" strokeWidth="2" />
-                                    {/* 3D Effect - Full Circle */}
-                                    <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
-                                  </g>
-                                );
+                            // Calculate percentages
+                            const karnatakaPercentage = total > 0 ? (karnatakaData / total) * 100 : 0;
+                            const outsideKarnatakaPercentage = total > 0 ? (outsideKarnatakaData / total) * 100 : 0;
+                            const entireRegionPercentage = total > 0 ? (entireRegionData / total) * 100 : 0;
+                            
+                            // Calculate angles for donut segments
+                            const karnatakaAngle = (karnatakaPercentage / 100) * 360;
+                            const outsideKarnatakaAngle = (outsideKarnatakaPercentage / 100) * 360;
+                            const entireRegionAngle = (entireRegionPercentage / 100) * 360;
+                            
+                            // Donut chart parameters - much larger donut only
+                            const centerX = 200;
+                            const centerY = 160;
+                            const outerRadius = 130;
+                            const innerRadius = 70;
+                            
+                            // Helper function to create arc path
+                            const createArcPath = (startAngle, endAngle, outerRadius, innerRadius) => {
+                              // Handle case where angle is 0 or very small
+                              if (Math.abs(endAngle - startAngle) < 0.1) {
+                                return ''; // Don't render anything for zero/near-zero angles
                               }
                               
-                              if (outsidePercentage === 100) {
-                                return (
-                                  <g>
-                                    {/* Full Other States Circle */}
-                                    <circle cx="60" cy="60" r="50" fill="url(#outsideGradient)" stroke="#ffffff" strokeWidth="2" />
-                                    {/* 3D Effect - Full Circle */}
-                                    <ellipse cx="60" cy="85" rx="55" ry="8" fill="rgba(0,0,0,0.1)" />
-                                  </g>
-                                );
+                              // Handle full circle case (360 degrees)
+                              if (Math.abs(endAngle - startAngle) >= 359.9) {
+                                return `
+                                  M ${centerX - outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX + outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX - outerRadius} ${centerY}
+                                  M ${centerX - innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX + innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX - innerRadius} ${centerY}
+                                  Z
+                                `;
                               }
                               
-                              return (
-                                <g>
-                                  {/* Outside Karnataka Slice */}
-                                  <path
-                                    d={`M 60 60 L 60 10 A 50 50 0 ${outsideAngle > 180 ? 1 : 0} 1 ${60 + 50 * Math.sin(outsideAngle * Math.PI / 180)} ${60 - 50 * Math.cos(outsideAngle * Math.PI / 180)} Z`}
-                                    fill="url(#outsideGradient)"
-                                    stroke="#ffffff"
-                                    strokeWidth="2"
-                                  />
-                                    
-                                  {/* Karnataka Usage Slice */}
-                                  <path
-                                    d={`M 60 60 L ${60 + 50 * Math.sin(outsideAngle * Math.PI / 180)} ${60 - 50 * Math.cos(outsideAngle * Math.PI / 180)} A 50 50 0 ${outsideAngle > 180 ? 0 : 1} 1 60 10 Z`}
-                                    fill="url(#karnatakaUsageGradient)"
-                                    stroke="#ffffff"
-                                    strokeWidth="2"
-                                  />
-                                    
-                                  {/* 3D Side Effect */}
-                                  <path
-                                    d={`M 60 60 L 60 10 A 50 50 0 ${outsideAngle > 180 ? 1 : 0} 1 ${60 + 50 * Math.sin(outsideAngle * Math.PI / 180)} ${60 - 50 * Math.cos(outsideAngle * Math.PI / 180)} L ${60 + 55 * Math.sin(outsideAngle * Math.PI / 180)} ${85 - 8 * Math.cos(outsideAngle * Math.PI / 180)} Z`}
-                                    fill="rgba(0,0,0,0.1)"
-                                  />
-                                </g>
-                              );
-                            })()}
-                          </svg>
-                        </div>
+                              const startAngleRad = (startAngle * Math.PI) / 180;
+                              const endAngleRad = (endAngle * Math.PI) / 180;
+                              
+                              const x1 = centerX + outerRadius * Math.cos(startAngleRad);
+                              const y1 = centerY + outerRadius * Math.sin(startAngleRad);
+                              const x2 = centerX + outerRadius * Math.cos(endAngleRad);
+                              const y2 = centerY + outerRadius * Math.sin(endAngleRad);
+                              
+                              const x3 = centerX + innerRadius * Math.cos(endAngleRad);
+                              const y3 = centerY + innerRadius * Math.sin(endAngleRad);
+                              const x4 = centerX + innerRadius * Math.cos(startAngleRad);
+                              const y4 = centerY + innerRadius * Math.sin(startAngleRad);
+                              
+                              const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+                              
+                              return `
+                                M ${x1} ${y1}
+                                A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}
+                                L ${x3} ${y3}
+                                A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}
+                                Z
+                              `;
+                            };
+                            
+                            let currentAngle = -90; // Start from top
+                            
+                            return (
+                              <>
+                                {/* Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle, currentAngle + karnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#3B6D11"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Karnataka Data (6 months): {karnatakaData.toFixed(2)} Acres ({karnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Outside Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#DC2626"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Outside Karnataka Data (6 months): {outsideKarnatakaData.toFixed(2)} Acres ({outsideKarnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Entire Region Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle + outsideKarnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle + entireRegionAngle, outerRadius, innerRadius)}
+                                  fill="#7C3AED"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>Entire Region Data (6 months): {entireRegionData.toFixed(2)} Acres ({entireRegionPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                                                
+                                {/* Center text */}
+                                <text x={centerX} y={centerY - 5} textAnchor="middle" fontSize="15" fontWeight="bold" fill="#333">
+                                  Six Months
+                                </text>
+                                <text x={centerX} y={centerY + 8} textAnchor="middle" fontSize="12" fill="#666">
+                                  Plan
+                                </text>
+                              </>
+                            );
+                          })()}
+                        </svg>
                         
-                        <div style={{fontSize: '20px', color: 'var(--text-3)', marginTop: '8px'}}>
-                            📊 {((apiMetrics.karnataka_unlocked_area || 0) / ((apiMetrics.karnataka_unlocked_area || 0) + (apiMetrics.outside_karnataka_unlocked_area || 0)) * 100).toFixed(1)}% Karnataka, {((apiMetrics.outside_karnataka_unlocked_area || 0) / ((apiMetrics.karnataka_unlocked_area || 0) + (apiMetrics.outside_karnataka_unlocked_area || 0)) * 100).toFixed(1)}% Other States
+                        {/* Legend Summary Below Chart */}
+                        <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
+                          <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['6_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['6_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['6_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Twelve Months Plan Donut Chart */}
+                  <div className="card" style={{flex: 1}}>
+                    <div className="card-head">
+                      <span className="card-title">Twelve Months Plan</span>
+                      <div className="month-chip">{selectedMonth}</div>
+                    </div>
+                    <div className="card-body">
+                      <div style={{textAlign: 'center', padding: '20px'}}>
+                        <svg width="100%" height="350" viewBox="0 0 400 350" style={{fontFamily: 'Arial, sans-serif'}}>
+                          {/* Chart Title */}
+                          <text x="200" y="25" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
+                            Twelve Months Distribution
+                          </text>
+                          
+                          {/* Calculate data for donut chart */}
+                          {(() => {
+                            const karnatakaData = apiMetrics.plan?.karnataka?.['12_month'] || 0;
+                            const outsideKarnatakaData = apiMetrics.plan?.outside_karnataka?.['12_month'] || 0;
+                            const entireRegionData = apiMetrics.karnataka_bucket?.plan?.['12_month'] || 0;
+                            
+                            // Always show all three segments, even if some are 0
+                            // If total is 0, assign equal proportions to show all segments
+                            const total = karnatakaData + outsideKarnatakaData + entireRegionData || 1;
+                            
+                            // Calculate percentages
+                            const karnatakaPercentage = total > 0 ? (karnatakaData / total) * 100 : 0;
+                            const outsideKarnatakaPercentage = total > 0 ? (outsideKarnatakaData / total) * 100 : 0;
+                            const entireRegionPercentage = total > 0 ? (entireRegionData / total) * 100 : 0;
+                            
+                            // Calculate angles for donut segments
+                            const karnatakaAngle = (karnatakaPercentage / 100) * 360;
+                            const outsideKarnatakaAngle = (outsideKarnatakaPercentage / 100) * 360;
+                            const entireRegionAngle = (entireRegionPercentage / 100) * 360;
+                            
+                            // Donut chart parameters - much larger donut only
+                            const centerX = 200;
+                            const centerY = 160;
+                            const outerRadius = 130;
+                            const innerRadius = 70;
+                            
+                            // Helper function to create arc path
+                            const createArcPath = (startAngle, endAngle, outerRadius, innerRadius) => {
+                              // Handle case where angle is 0 or very small
+                              if (Math.abs(endAngle - startAngle) < 0.1) {
+                                return ''; // Don't render anything for zero/near-zero angles
+                              }
+                              
+                              // Handle full circle case (360 degrees)
+                              if (Math.abs(endAngle - startAngle) >= 359.9) {
+                                return `
+                                  M ${centerX - outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX + outerRadius} ${centerY}
+                                  A ${outerRadius} ${outerRadius} 0 1 1 ${centerX - outerRadius} ${centerY}
+                                  M ${centerX - innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX + innerRadius} ${centerY}
+                                  A ${innerRadius} ${innerRadius} 0 1 0 ${centerX - innerRadius} ${centerY}
+                                  Z
+                                `;
+                              }
+                              
+                              const startAngleRad = (startAngle * Math.PI) / 180;
+                              const endAngleRad = (endAngle * Math.PI) / 180;
+                              
+                              const x1 = centerX + outerRadius * Math.cos(startAngleRad);
+                              const y1 = centerY + outerRadius * Math.sin(startAngleRad);
+                              const x2 = centerX + outerRadius * Math.cos(endAngleRad);
+                              const y2 = centerY + outerRadius * Math.sin(endAngleRad);
+                              
+                              const x3 = centerX + innerRadius * Math.cos(endAngleRad);
+                              const y3 = centerY + innerRadius * Math.sin(endAngleRad);
+                              const x4 = centerX + innerRadius * Math.cos(startAngleRad);
+                              const y4 = centerY + innerRadius * Math.sin(startAngleRad);
+                              
+                              const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+                              
+                              return `
+                                M ${x1} ${y1}
+                                A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}
+                                L ${x3} ${y3}
+                                A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${x4} ${y4}
+                                Z
+                              `;
+                            };
+                            
+                            let currentAngle = -90; // Start from top
+                            
+                            return (
+                              <>
+                                {/* Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle, currentAngle + karnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#059669"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Karnataka Data (12 months): {karnatakaData.toFixed(2)} Acres ({karnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Outside Karnataka Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle, outerRadius, innerRadius)}
+                                  fill="#F59E0B"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>{user?.name || user?.fullName || 'Client'} Outside Karnataka Data (12 months): {outsideKarnatakaData.toFixed(2)} Acres ({outsideKarnatakaPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                {/* Entire Region Data Segment */}
+                                <path
+                                  d={createArcPath(currentAngle + karnatakaAngle + outsideKarnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle + entireRegionAngle, outerRadius, innerRadius)}
+                                  fill="#EC4899"
+                                  stroke="#fff"
+                                  strokeWidth="2"
+                                  style={{cursor: 'pointer'}}
+                                >
+                                  <title>Entire Region Data (12 months): {entireRegionData.toFixed(2)} Acres ({entireRegionPercentage.toFixed(1)}%)</title>
+                                </path>
+                                
+                                                                
+                                {/* Center text */}
+                                <text x={centerX} y={centerY - 5} textAnchor="middle" fontSize="15" fontWeight="bold" fill="#333">
+                                  Twelve Months
+                                </text>
+                                <text x={centerX} y={centerY + 8} textAnchor="middle" fontSize="12" fill="#666">
+                                  Plan
+                                </text>
+                              </>
+                            );
+                          })()}
+                        </svg>
+                        
+                        {/* Legend Summary Below Chart */}
+                        <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
+                          <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#059669'}}>{(apiMetrics.plan?.karnataka?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#F59E0B'}}>{(apiMetrics.plan?.outside_karnataka?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                            <div style={{textAlign: 'center'}}>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#EC4899'}}>{(apiMetrics.karnataka_bucket?.plan?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
