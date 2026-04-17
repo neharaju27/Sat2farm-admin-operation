@@ -65,6 +65,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   const [registerDetails, setRegisterDetails] = useState(null);
   const [fetchingRegister, setFetchingRegister] = useState(false);
   const [searchType, setSearchType] = useState('clientId');
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
 
   const views = {
     'ops-acreage': { title: 'Monthly Acreage', sub: 'Operations · Reporting' },
@@ -199,11 +200,34 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   }
 };
 
-  // Fetch report data when component mounts with default month
+  // Fetch report data when component mounts and auto-select most recent month
   useEffect(() => {
     // Initial fetch to get available months
     fetchReportData(selectedMonth);
   }, []);
+
+  // Auto-select most recent month and fetch its data when reportData is available (only on initial mount)
+  useEffect(() => {
+    if (reportData && Array.isArray(reportData) && !hasAutoLoaded) {
+      const monthLabels = reportData.map(item => item.label).filter(label => label);
+      if (monthLabels.length > 0) {
+        // Get the most recent month (last item in array)
+        const mostRecentMonth = monthLabels[monthLabels.length - 1];
+        console.log('Auto-selecting most recent month:', mostRecentMonth);
+        setSelectedMonth(mostRecentMonth);
+        
+        // Fetch the monthly data for the auto-selected month
+        const monthData = reportData.find(item => item.label === mostRecentMonth);
+        if (monthData && monthData.file) {
+          console.log('Auto-loading monthly data for:', mostRecentMonth, 'file:', monthData.file);
+          fetchMonthlyData(monthData.file);
+        }
+        
+        // Mark as auto-loaded to prevent re-running
+        setHasAutoLoaded(true);
+      }
+    }
+  }, [reportData, hasAutoLoaded]);
 
   // Refetch data when selected month changes
   useEffect(() => {
