@@ -781,17 +781,19 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                         <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
                           <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Outside Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
@@ -939,17 +941,19 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                         <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
                           <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['6_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Outside Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['6_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['6_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
@@ -1097,17 +1101,19 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                         <div style={{marginTop: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6'}}>
                           <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
+                              <div style={{fontSize: '11px', color: '#666', marginBottom: '2px'}}>{user?.name || user?.fullName || 'Client'}</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Outside Karnataka</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
-                              <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
+                              <div style={{fontSize: '10px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
                               <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
