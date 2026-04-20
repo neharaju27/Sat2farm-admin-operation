@@ -12,6 +12,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
   const [availableMonths, setAvailableMonths] = useState([]);
   const [monthlyFiles, setMonthlyFiles] = useState({});
   const [loadingMonths, setLoadingMonths] = useState(true);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [apiMetrics, setApiMetrics] = useState(null);
 
   // Dummy data for different months
@@ -169,6 +170,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
     const selectedFile = monthlyFiles[month];
     if (selectedFile) {
       try {
+        setLoadingMetrics(true);
         // Extract month_year parameter from the URL
         const monthYearParam = selectedFile.includes('?month_year=') 
           ? selectedFile.split('?month_year=')[1] 
@@ -192,6 +194,8 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
         }
       } catch (error) {
         console.error('Error fetching metrics:', error);
+      } finally {
+        setLoadingMetrics(false);
       }
     }
   };
@@ -378,6 +382,13 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
             </div>
           )}
           
+          {loadingMetrics && (
+            <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-2)'}}>
+              <div style={{fontSize: '24px', marginBottom: '16px'}}>⏳</div>
+              <div>Loading metrics data...</div>
+            </div>
+          )}
+          
           {loadingReport && (
             <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-2)'}}>
               <div style={{fontSize: '24px', marginBottom: '16px'}}>⏳</div>
@@ -392,7 +403,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
           )}
 
           {/* Report Data */}
-          {!loadingMonths && !reportError && (
+          {!loadingMonths && !loadingMetrics && !reportError && (
             <>
               {/* Month Selection */}
               <div className="section-head">
@@ -723,7 +734,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Karnataka Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle, currentAngle + karnatakaAngle, outerRadius, innerRadius)}
-                                  fill="#185FA5"
+                                  fill="#3B6D11"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -734,7 +745,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Outside Karnataka Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle + karnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle, outerRadius, innerRadius)}
-                                  fill="#059669"
+                                  fill="#DC2626"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -745,7 +756,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Entire Region Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle + karnatakaAngle + outsideKarnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle + entireRegionAngle, outerRadius, innerRadius)}
-                                  fill="#BA7517"
+                                  fill="#7C3AED"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -771,17 +782,17 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                           <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#185FA5'}}>{(apiMetrics.plan?.karnataka?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#059669'}}>{(apiMetrics.plan?.outside_karnataka?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#BA7517'}}>{(apiMetrics.karnataka_bucket?.plan?.['1_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['1_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                           </div>
@@ -1039,7 +1050,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Karnataka Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle, currentAngle + karnatakaAngle, outerRadius, innerRadius)}
-                                  fill="#059669"
+                                  fill="#3B6D11"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -1050,7 +1061,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Outside Karnataka Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle + karnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle, outerRadius, innerRadius)}
-                                  fill="#F59E0B"
+                                  fill="#DC2626"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -1061,7 +1072,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                                 {/* Entire Region Data Segment */}
                                 <path
                                   d={createArcPath(currentAngle + karnatakaAngle + outsideKarnatakaAngle, currentAngle + karnatakaAngle + outsideKarnatakaAngle + entireRegionAngle, outerRadius, innerRadius)}
-                                  fill="#EC4899"
+                                  fill="#7C3AED"
                                   stroke="#fff"
                                   strokeWidth="2"
                                   style={{cursor: 'pointer'}}
@@ -1087,17 +1098,17 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
                           <div style={{display: 'flex', justifyContent: 'space-around', alignItems: 'center'}}>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Karnataka</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#059669'}}>{(apiMetrics.plan?.karnataka?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#3B6D11'}}>{(apiMetrics.plan?.karnataka?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>{user?.name || user?.fullName || 'Client'} Outside Karnataka</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#F59E0B'}}>{(apiMetrics.plan?.outside_karnataka?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#DC2626'}}>{(apiMetrics.plan?.outside_karnataka?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                             <div style={{textAlign: 'center'}}>
                               <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>Entire Region</div>
-                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#EC4899'}}>{(apiMetrics.karnataka_bucket?.plan?.['12_month'] || 0).toFixed(2)}</div>
+                              <div style={{fontSize: '14px', fontWeight: 'bold', color: '#7C3AED'}}>{(apiMetrics.karnataka_bucket?.plan?.['12_month'] || 0).toFixed(2)}</div>
                               <div style={{fontSize: '10px', color: '#666'}}>Acres</div>
                             </div>
                           </div>
