@@ -77,12 +77,11 @@ function App() {
   // Build user display object from auth context data
   const getUserDisplay = () => {
     if (!user) return null;
-
+    // Prioritize name from API response over phone number
     const username = user.name || user.full_name || user.first_name || user.last_name || user.phone_number || user.username || 'User';
     const firstName = user.first_name || '';
     const lastName = user.last_name || '';
     const fullNameFromAPI = user.full_name || user.name || '';
-
     let formattedName = fullNameFromAPI;
     if (!formattedName && (firstName || lastName)) {
       formattedName = `${firstName} ${lastName}`.trim();
@@ -90,7 +89,6 @@ function App() {
     if (!formattedName) {
       formattedName = username;
     }
-
     return {
       name: formattedName,
       username: username,
@@ -132,7 +130,8 @@ function App() {
     };
 
     const component = getComponent();
-
+    
+    // Wrap with AccessControl to handle restrictions
     return (
       <AccessControl user={userDisplay} currentPage={currentPage} onPageChange={handlePageChange}>
         {component}
