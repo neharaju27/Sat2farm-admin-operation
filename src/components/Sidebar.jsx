@@ -6,6 +6,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [salesOpen, setSalesOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
+  const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
   
   // Debug: Log user data and role detection
   console.log('Sidebar - User data:', user);
@@ -89,6 +90,39 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       
       {/* Navigation */}
       <div className="sb-nav">
+        {/* Satyukt CRM Section - Only for Operations and Sales Users */}
+        {(isOperationsUser || isSalesUser) && (
+          <>
+            <div 
+              className="sb-section"
+              onClick={() => setSatyuktCrmOpen(!satyuktCrmOpen)}
+              style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
+            >
+              Satyukt CRM
+              <ChevronDown 
+                size={16} 
+                style={{transform: satyuktCrmOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
+              />
+            </div>
+            
+            {satyuktCrmOpen && (
+              <div style={{marginLeft: '12px'}}>
+                <div 
+                  className={`sb-item ${currentPage === 'lead-pipeline' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('lead-pipeline')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  Lead Pipeline
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Operations Section - Only for Operations Users */}
         {isOperationsUser && (
           <>
@@ -129,19 +163,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               New Registration
               <span className="sb-dot"></span>
             </div>
-            <div 
-              className={`sb-item ${currentPage === 'lead-pipeline' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('lead-pipeline')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              Lead Pipeline
-              <span className="sb-dot"></span>
-            </div>
-            <div 
+                        <div 
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}
             >
@@ -160,18 +182,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             <div className="sb-section">CRM</div>
             
             
-            <div 
-              className={`sb-item ${currentPage === 'lead-pipeline' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('lead-pipeline')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              Lead Pipeline
-            </div>
-            
+                        
             <div 
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}

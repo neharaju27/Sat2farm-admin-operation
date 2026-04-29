@@ -14,7 +14,8 @@ export default function LeadPipeline({ onPageChange }) {
     const fetchLeads = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}`);
+        const currentUserName = user?.name || user?.phone_number || 'operation';
+        const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -355,6 +356,9 @@ export default function LeadPipeline({ onPageChange }) {
       } else if (fieldName === 'companyName') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&company_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
         successMessage = `Company name updated to ${newValue} successfully!`;
+      } else if (fieldName === 'alternateNumber') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Alternate phone number updated to ${newValue} successfully!`;
       } else {
         // Use generic update approach for other fields
         url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
@@ -414,7 +418,15 @@ export default function LeadPipeline({ onPageChange }) {
 
   const saveEdit = () => {
     if (editingField && editValue.trim() !== '') {
-      handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
+      if (editingField === 'city') {
+        handleCityUpdate(selectedUser.id, editValue.trim());
+      } else if (editingField === 'state') {
+        handleStateUpdate(selectedUser.id, editValue.trim());
+      } else if (editingField === 'country') {
+        handleCountryUpdate(selectedUser.id, editValue.trim());
+      } else {
+        handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
+      }
       setEditingField(null);
       setEditValue('');
     }
@@ -529,6 +541,162 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
+  const handleCityUpdate = async (leadId, newCity) => {
+    console.log('Updating city:', { leadId, newCity });
+    
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newCity)}&user=${encodeURIComponent(currentUserName)}`;
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('API result:', result);
+      
+      if (result.success) {
+        console.log('City update successful');
+        // Update local state
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId ? { ...lead, city: newCity } : lead
+          )
+        );
+        
+        // Update selected user if modal is open
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(prev => ({ ...prev, city: newCity }));
+        }
+        
+        alert(`City updated to ${newCity} successfully!`);
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to update city: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error updating city:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    }
+  };
+
+  const handleStateUpdate = async (leadId, newState) => {
+    console.log('Updating state:', { leadId, newState });
+    
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newState)}&user=${encodeURIComponent(currentUserName)}`;
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('API result:', result);
+      
+      if (result.success) {
+        console.log('State update successful');
+        // Update local state
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId ? { ...lead, state: newState } : lead
+          )
+        );
+        
+        // Update selected user if modal is open
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(prev => ({ ...prev, state: newState }));
+        }
+        
+        alert(`State updated to ${newState} successfully!`);
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to update state: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error updating state:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    }
+  };
+
+  const handleCountryUpdate = async (leadId, newCountry) => {
+    console.log('Updating country:', { leadId, newCountry });
+    
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newCountry)}&user=${encodeURIComponent(currentUserName)}`;
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('API result:', result);
+      
+      if (result.success) {
+        console.log('Country update successful');
+        // Update local state
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId ? { ...lead, country: newCountry } : lead
+          )
+        );
+        
+        // Update selected user if modal is open
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(prev => ({ ...prev, country: newCountry }));
+        }
+        
+        alert(`Country updated to ${newCountry} successfully!`);
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to update country: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error updating country:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    }
+  };
+
   const handleIndustryUpdate = async (leadId, newIndustry) => {
     console.log('Updating industry:', { leadId, newIndustry });
     
@@ -634,6 +802,119 @@ export default function LeadPipeline({ onPageChange }) {
       }
     } catch (err) {
       console.error('Network error updating lead status:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    }
+  };
+
+  const handleAlternateNumberUpdate = async (leadId, newAlternateNumber) => {
+    console.log('Updating alternate phone number from Lead Information modal:', { leadId, newAlternateNumber });
+    
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newAlternateNumber)}&user=${encodeURIComponent(currentUserName)}`;
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('API result:', result);
+      
+      if (result.success) {
+        console.log('Alternate number update successful');
+        // Update local state
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            lead.id === leadId ? { ...lead, alternateNumber: newAlternateNumber, modifiedBy: currentUserName, lastActivity: new Date().toISOString() } : lead
+          )
+        );
+        
+        // Update selectedLead if modal is open
+        if (selectedLead && selectedLead.id === leadId) {
+          setSelectedLead(prev => ({ ...prev, alternateNumber: newAlternateNumber, modifiedBy: currentUserName, lastActivity: new Date().toISOString() }));
+        }
+        
+        // Update selectedUser if modal is open
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(prev => ({ ...prev, alternateNumber: newAlternateNumber, modifiedBy: currentUserName, lastActivity: new Date().toISOString() }));
+        }
+        
+        alert(`Alternate phone number updated to ${newAlternateNumber} successfully!`);
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to update alternate phone number: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error updating alternate phone number:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    }
+  };
+
+  const handleDeleteLead = async (leadId) => {
+    console.log('Deleting lead:', { leadId });
+    
+    // Confirm deletion
+    const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action cannot be undone.');
+    if (!confirmDelete) {
+      return;
+    }
+    
+    try {
+      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}`;
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('API result:', result);
+      
+      if (result.success) {
+        console.log('Lead deletion successful');
+        // Remove lead from local state
+        setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
+        
+        // Close modals if they contain the deleted lead
+        if (selectedLead && selectedLead.id === leadId) {
+          setSelectedLead(null);
+        }
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(null);
+        }
+        
+        alert('Lead deleted successfully!');
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to delete lead: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error deleting lead:', err);
       alert(`Network error: ${err.message || 'Unknown error occurred'}`);
     }
   };
@@ -919,6 +1200,16 @@ export default function LeadPipeline({ onPageChange }) {
           const operator = filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `country_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
+          urlParams.push(`date_type=on`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
+          urlParams.push(`date_type=before`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
+          urlParams.push(`date_type=between`);
+          urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+          urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
         }
       });
       
@@ -1149,7 +1440,8 @@ export default function LeadPipeline({ onPageChange }) {
       formData.append('contact_owner', user?.name || user?.phone_number || 'operation');
       
       console.log('Uploading CSV to API...');
-      const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}`, {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}?user=${encodeURIComponent(currentUserName)}`, {
         method: 'POST',
         body: formData
       });
@@ -1184,7 +1476,8 @@ export default function LeadPipeline({ onPageChange }) {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}`);
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -1790,47 +2083,7 @@ export default function LeadPipeline({ onPageChange }) {
                     <td style={{ padding: '12px 8px' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                         <button
-                          onClick={() => setSelectedLead(lead)}
-                          style={{
-                            padding: '4px 6px',
-                            background: 'var(--blue-100)',
-                            color: 'var(--blue-600)',
-                            border: '1px solid var(--blue-200)',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px'
-                          }}
-                          title="View Details"
-                        >
-                          <Eye size={10} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            // Edit functionality
-                          }}
-                          style={{
-                            padding: '4px 6px',
-                            background: 'var(--amber-100)',
-                            color: 'var(--amber-600)',
-                            border: '1px solid var(--amber-200)',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px'
-                          }}
-                          title="Edit"
-                        >
-                          <Edit size={10} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            // Delete functionality
-                          }}
+                          onClick={() => handleDeleteLead(lead.id)}
                           style={{
                             padding: '4px 6px',
                             background: 'var(--red-100)',
@@ -1982,7 +2235,18 @@ export default function LeadPipeline({ onPageChange }) {
                   onChange={(e) => {
                     const property = e.target.value;
                     if (property && !selectedProperties.find(p => p.property === property)) {
-                      setSelectedProperties([...selectedProperties, { property, value: '', operator: property === 'contact_name' ? 'is' : '' }]);
+                      const newProperty = { 
+                        property, 
+                        value: '', 
+                        operator: property === 'contact_name' ? 'is' : '' 
+                      };
+                      
+                      // Set default dateOperator for created_time
+                      if (property === 'created_time') {
+                        newProperty.dateOperator = 'on';
+                      }
+                      
+                      setSelectedProperties([...selectedProperties, newProperty]);
                     }
                     setCurrentProperty('');
                   }}
@@ -3577,6 +3841,25 @@ export default function LeadPipeline({ onPageChange }) {
                       }
                     }
                     
+                    // Add created_time filter if configured
+                    const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
+                    if (createdTimeProp) {
+                      if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before') && createdTimeProp.value) {
+                        activeFilters.push({
+                          property: 'created_time',
+                          value: createdTimeProp.value,
+                          dateOperator: createdTimeProp.dateOperator
+                        });
+                      } else if (createdTimeProp.dateOperator === 'between' && createdTimeProp.fromDate && createdTimeProp.toDate) {
+                        activeFilters.push({
+                          property: 'created_time',
+                          fromDate: createdTimeProp.fromDate,
+                          toDate: createdTimeProp.toDate,
+                          dateOperator: createdTimeProp.dateOperator
+                        });
+                      }
+                    }
+                    
                     // Apply all filters together in single API call
                     if (activeFilters.length > 0) {
                       handleCombinedFilters(activeFilters);
@@ -3937,48 +4220,21 @@ export default function LeadPipeline({ onPageChange }) {
                   Location Information
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>City Name</label>
-                    <div style={{ 
-                      color: selectedUser.city ? 'var(--text)' : 'var(--text-3)', 
-                      fontStyle: selectedUser.city ? 'normal' : 'italic',
-                      padding: '8px 12px',
-                      background: 'var(--gray-50)',
-                      border: '1px solid var(--border-soft)',
-                      borderRadius: 'var(--r)',
-                      fontSize: '12px'
-                    }}>
-                      {selectedUser.city || 'Not specified'}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>State Name</label>
-                    <div style={{ 
-                      color: selectedUser.state ? 'var(--text)' : 'var(--text-3)', 
-                      fontStyle: selectedUser.state ? 'normal' : 'italic',
-                      padding: '8px 12px',
-                      background: 'var(--gray-50)',
-                      border: '1px solid var(--border-soft)',
-                      borderRadius: 'var(--r)',
-                      fontSize: '12px'
-                    }}>
-                      {selectedUser.state || 'Not specified'}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Country Name</label>
-                    <div style={{ 
-                      color: selectedUser.country ? 'var(--text)' : 'var(--text-3)', 
-                      fontStyle: selectedUser.country ? 'normal' : 'italic',
-                      padding: '8px 12px',
-                      background: 'var(--gray-50)',
-                      border: '1px solid var(--border-soft)',
-                      borderRadius: 'var(--r)',
-                      fontSize: '12px'
-                    }}>
-                      {selectedUser.country || 'Not specified'}
-                    </div>
-                  </div>
+                  <EditableField 
+                    label="City Name" 
+                    value={selectedUser.city} 
+                    fieldName="city" 
+                  />
+                  <EditableField 
+                    label="State Name" 
+                    value={selectedUser.state} 
+                    fieldName="state" 
+                  />
+                  <EditableField 
+                    label="Country Name" 
+                    value={selectedUser.country} 
+                    fieldName="country" 
+                  />
                 </div>
               </div>
 
@@ -4827,7 +5083,37 @@ export default function LeadPipeline({ onPageChange }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Alternate Number</label>
-                  <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.alternateNumber}</div>
+                  <input
+                    type="text"
+                    value={selectedLead.alternateNumber || ''}
+                    onChange={(e) => {
+                      const newAlternateNumber = e.target.value;
+                      // Update local state immediately for better UX
+                      setSelectedLead(prev => ({ ...prev, alternateNumber: newAlternateNumber }));
+                    }}
+                    onBlur={(e) => {
+                      const newAlternateNumber = e.target.value;
+                      if (newAlternateNumber !== selectedLead.alternateNumber) {
+                        handleAlternateNumberUpdate(selectedLead.id, newAlternateNumber);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.target.blur();
+                      }
+                    }}
+                    placeholder="Enter alternate phone number"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)',
+                      color: 'var(--text)',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}
+                  />
                 </div>
               </div>
               
