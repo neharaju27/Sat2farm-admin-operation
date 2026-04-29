@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import Sidebar from "./components/Sidebar";
 import UnlockFarm from "./components/UnlockFarm";
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
 import Login from "./components/Login";
 import AdminOperationalPortal from "./components/AdminOperationalPortal";
 import MonthlyAcreages from "./components/MonthlyAcreages";
@@ -12,17 +15,27 @@ import TeamManagers from "./components/TeamManagers";
 import AllocateAcreage from "./components/AllocateAcreage";
 import Registration from "./components/Register";
 import ClientMonthlyReport from "./components/ClientMonthlyReport";
+<<<<<<< HEAD
 import LeadPipeline from "./components/LeadPipeline";
+=======
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
 import AccessControl from "./components/AccessControl";
 import { useAuth } from './context/AuthContext';
 
 function App() {
   const { user, loading, logout } = useAuth();
+<<<<<<< HEAD
   const [currentPage, setCurrentPage] = useState('monthly-acreages');
+=======
+  const [currentPage, setCurrentPage] = useState(() => {
+    return localStorage.getItem('currentPage') || 'monthly-acreages';
+  });
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
   const [hasRedirected, setHasRedirected] = useState(false);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
+<<<<<<< HEAD
   };
 
   // Handle role-based redirect after login
@@ -60,6 +73,58 @@ function App() {
       setCurrentPage('monthly-acreages');
     }
   }, [user]);
+=======
+    localStorage.setItem('currentPage', page);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('currentPage');
+    setHasRedirected(false);
+    setCurrentPage('monthly-acreages');
+    logout();
+  };
+
+  // Single unified effect for role-based redirect and page restore
+  useEffect(() => {
+    if (!user) {
+      setHasRedirected(false);
+      return;
+    }
+
+    if (hasRedirected) return;
+
+    const savedPage = localStorage.getItem('currentPage');
+
+    // After refresh — restore saved page
+    if (savedPage) {
+      setCurrentPage(savedPage);
+      setHasRedirected(true);
+      return;
+    }
+
+    // Fresh login — redirect based on role
+    let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
+
+    console.log('User logged in, detected role:', role);
+
+    if (role === 'sales') {
+      console.log('Redirecting to assign-acreages (sales)');
+      setCurrentPage('assign-acreages');
+      localStorage.setItem('currentPage', 'assign-acreages');
+    } else if (role === 'client' || role === 'test' || role === 'user') {
+      console.log('Redirecting to client-monthly-report (client/test/user)');
+      setCurrentPage('client-monthly-report');
+      localStorage.setItem('currentPage', 'client-monthly-report');
+    } else {
+      // operation, admin, default
+      console.log('Redirecting to monthly-acreages (operation/admin/default)');
+      setCurrentPage('monthly-acreages');
+      localStorage.setItem('currentPage', 'monthly-acreages');
+    }
+
+    setHasRedirected(true);
+  }, [user, hasRedirected]);
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
 
   // Build user display object from auth context data
   const getUserDisplay = () => {
@@ -69,7 +134,10 @@ function App() {
     const firstName = user.first_name || '';
     const lastName = user.last_name || '';
     const fullNameFromAPI = user.full_name || user.name || '';
+<<<<<<< HEAD
     
+=======
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
     let formattedName = fullNameFromAPI;
     if (!formattedName && (firstName || lastName)) {
       formattedName = `${firstName} ${lastName}`.trim();
@@ -77,7 +145,10 @@ function App() {
     if (!formattedName) {
       formattedName = username;
     }
+<<<<<<< HEAD
     
+=======
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
     return {
       name: formattedName,
       username: username,
@@ -90,10 +161,16 @@ function App() {
 
   const renderCurrentPage = () => {
     const getComponent = () => {
+<<<<<<< HEAD
       switch(currentPage) {
         case 'unlock-farm':
           return <UnlockFarm user={userDisplay} onPageChange={handlePageChange} />;
         
+=======
+      switch (currentPage) {
+        case 'unlock-farm':
+          return <UnlockFarm user={userDisplay} onPageChange={handlePageChange} />;
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
         case 'monthly-acreages':
           return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
         case 'farm-management':
@@ -114,8 +191,11 @@ function App() {
           return <Registration user={userDisplay} onPageChange={handlePageChange} />;
         case 'client-monthly-report':
           return <ClientMonthlyReport user={userDisplay} onPageChange={handlePageChange} />;
+<<<<<<< HEAD
         case 'lead-pipeline':
           return <LeadPipeline user={userDisplay} onPageChange={handlePageChange} />;
+=======
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
         default:
           return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
       }
@@ -154,6 +234,7 @@ function App() {
   }
 
   return (
+<<<<<<< HEAD
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
@@ -162,13 +243,29 @@ function App() {
     }}>
       <div style={{ 
         width: '256px', 
+=======
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      width: '100vw',
+      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
+    }}>
+      <div style={{
+        width: '256px',
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
         flexShrink: 0,
         borderRight: '1px solid #334155',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
       }}>
+<<<<<<< HEAD
         <Sidebar onLogout={logout} user={userDisplay} onPageChange={handlePageChange} currentPage={currentPage} />
       </div>
       <div style={{ 
+=======
+        <Sidebar onLogout={handleLogout} user={userDisplay} onPageChange={handlePageChange} currentPage={currentPage} />
+      </div>
+      <div style={{
+>>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
         flex: 1,
         overflow: 'hidden'
       }}>
