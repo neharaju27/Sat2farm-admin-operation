@@ -6,10 +6,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [salesOpen, setSalesOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
-<<<<<<< HEAD
   const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
-=======
->>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
   
   // Debug: Log user data and role detection
   console.log('Sidebar - User data:', user);
@@ -48,11 +45,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-<<<<<<< HEAD
       const allowedOperationsPages = ['monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline'];
-=======
-      const allowedOperationsPages = ['monthly-acreages', 'unlock-farm', 'register', 'assign-acreages'];
->>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -97,7 +90,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       
       {/* Navigation */}
       <div className="sb-nav">
-<<<<<<< HEAD
         {/* Satyukt CRM Section - Only for Operations and Sales Users */}
         {(isOperationsUser || isSalesUser) && (
           <>
@@ -130,9 +122,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             )}
           </>
         )}
-
-=======
->>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
         {/* Operations Section - Only for Operations Users */}
         {isOperationsUser && (
           <>
@@ -173,11 +162,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               New Registration
               <span className="sb-dot"></span>
             </div>
-<<<<<<< HEAD
-                        <div 
-=======
             <div 
->>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}
             >
@@ -195,11 +180,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
           <>
             <div className="sb-section">CRM</div>
             
-            
-<<<<<<< HEAD
-                        
-=======
->>>>>>> 2e928d9e21c87778a9e2f11598d54361849c5608
             <div 
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}
