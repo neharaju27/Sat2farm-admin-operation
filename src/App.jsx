@@ -11,6 +11,7 @@ import TeamManagers from "./components/TeamManagers";
 import AllocateAcreage from "./components/AllocateAcreage";
 import Registration from "./components/Register";
 import ClientMonthlyReport from "./components/ClientMonthlyReport";
+import LeadPipeline from "./components/LeadPipeline";
 import AccessControl from "./components/AccessControl";
 import { useAuth } from './context/AuthContext';
 
@@ -77,12 +78,10 @@ function App() {
   // Build user display object from auth context data
   const getUserDisplay = () => {
     if (!user) return null;
-
     const username = user.name || user.full_name || user.first_name || user.last_name || user.phone_number || user.username || 'User';
     const firstName = user.first_name || '';
     const lastName = user.last_name || '';
     const fullNameFromAPI = user.full_name || user.name || '';
-
     let formattedName = fullNameFromAPI;
     if (!formattedName && (firstName || lastName)) {
       formattedName = `${firstName} ${lastName}`.trim();
@@ -90,7 +89,6 @@ function App() {
     if (!formattedName) {
       formattedName = username;
     }
-
     return {
       name: formattedName,
       username: username,
@@ -126,6 +124,8 @@ function App() {
           return <Registration user={userDisplay} onPageChange={handlePageChange} />;
         case 'client-monthly-report':
           return <ClientMonthlyReport user={userDisplay} onPageChange={handlePageChange} />;
+        case 'lead-pipeline':
+          return <LeadPipeline user={userDisplay} onPageChange={handlePageChange} />;
         default:
           return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
       }
@@ -140,7 +140,6 @@ function App() {
     );
   };
 
-  // Show loading spinner while checking stored session
   if (loading) {
     return (
       <div style={{
