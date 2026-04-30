@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import toast from 'react-hot-toast';
 import '../styles/Sat2FarmAdminPortal.css';
 
 export default function LeadPipeline({ onPageChange }) {
@@ -271,14 +272,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, leadStatus: newStatus }));
         }
         
-        alert(`Lead status updated to ${newStatus} successfully!`);
+        toast.success('Lead status updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update lead status: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update lead status: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating lead status:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -323,14 +324,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, contactOwner: newOwner }));
         }
         
-        alert(`Lead owner updated to ${newOwner} successfully!`);
+        toast.success('Contact owner updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update lead owner: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update lead owner: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating lead owner:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -359,6 +360,30 @@ export default function LeadPipeline({ onPageChange }) {
       } else if (fieldName === 'alternateNumber') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
         successMessage = `Alternate phone number updated to ${newValue} successfully!`;
+      } else if (fieldName === 'city') {
+        url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `City updated to ${newValue} successfully!`;
+      } else if (fieldName === 'state') {
+        url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `State updated to ${newValue} successfully!`;
+      } else if (fieldName === 'country') {
+        url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Country updated to ${newValue} successfully!`;
+      } else if (fieldName === 'leadStatus') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Lead status updated to ${newValue} successfully!`;
+      } else if (fieldName === 'industry') {
+        url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Industry updated to ${newValue} successfully!`;
+      } else if (fieldName === 'contactOwner') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Contact owner updated to ${newValue} successfully!`;
+      } else if (fieldName === 'leadSource') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Lead source updated to ${newValue} successfully!`;
+      } else if (fieldName === 'tags') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Tags updated to ${newValue} successfully!`;
       } else {
         // Use generic update approach for other fields
         url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
@@ -400,7 +425,23 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
         }
         
-        alert(successMessage);
+        // Show field-specific toast message
+        const fieldMessages = {
+          'contactName': 'Contact name updated',
+          'phoneNumber': 'Phone number updated',
+          'email': 'Email updated',
+          'companyName': 'Company name updated',
+          'alternateNumber': 'Alternate phone number updated',
+          'city': 'City updated',
+          'state': 'State updated',
+          'country': 'Country updated',
+          'leadStatus': 'Lead status updated',
+          'industry': 'Industry updated',
+          'contactOwner': 'Contact owner updated',
+          'leadSource': 'Lead source updated',
+          'tags': 'Tags updated'
+        };
+        toast.success(fieldMessages[fieldName] || `${fieldName} updated`);
       } else {
         console.error('API returned failure:', result);
         // Check if the message contains "updated" or "success" despite success=false
@@ -420,15 +461,31 @@ export default function LeadPipeline({ onPageChange }) {
             setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
           }
           
-          alert(successMessage);
+          // Show field-specific toast message
+          const fieldMessages = {
+            'contactName': 'Contact name updated',
+            'phoneNumber': 'Phone number updated',
+            'email': 'Email updated',
+            'companyName': 'Company name updated',
+            'alternateNumber': 'Alternate phone number updated',
+            'city': 'City updated',
+            'state': 'State updated',
+            'country': 'Country updated',
+            'leadStatus': 'Lead status updated',
+            'industry': 'Industry updated',
+            'contactOwner': 'Contact owner updated',
+            'leadSource': 'Lead source updated',
+            'tags': 'Tags updated'
+          };
+          toast.success(fieldMessages[fieldName] || `${fieldName} updated`);
         } else {
           // Genuine error
-          alert(`Failed to update lead ${fieldName}: ${message}`);
+          // alert(`Failed to update lead ${fieldName}: ${message}`); // Removed alert
         }
       }
     } catch (err) {
       console.error('Network error updating lead field:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -439,15 +496,7 @@ export default function LeadPipeline({ onPageChange }) {
 
   const saveEdit = () => {
     if (editingField && editValue.trim() !== '') {
-      if (editingField === 'city') {
-        handleCityUpdate(selectedUser.id, editValue.trim());
-      } else if (editingField === 'state') {
-        handleStateUpdate(selectedUser.id, editValue.trim());
-      } else if (editingField === 'country') {
-        handleCountryUpdate(selectedUser.id, editValue.trim());
-      } else {
-        handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
-      }
+      handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
       setEditingField(null);
       setEditValue('');
     }
@@ -499,14 +548,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, tags: newTags }));
         }
         
-        alert(`Lead tags updated to ${newTags} successfully!`);
+        toast.success('Tags updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update lead tags: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update lead tags: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating lead tags:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -551,14 +600,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, leadSource: newLeadSource }));
         }
         
-        alert(`Lead source updated to ${newLeadSource} successfully!`);
+        toast.success('Lead source updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update lead source: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update lead source: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating lead source:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -603,14 +652,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, city: newCity }));
         }
         
-        alert(`City updated to ${newCity} successfully!`);
+        toast.success('City updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update city: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update city: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating city:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -655,14 +704,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, state: newState }));
         }
         
-        alert(`State updated to ${newState} successfully!`);
+        toast.success('State updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update state: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update state: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating state:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -707,14 +756,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, country: newCountry }));
         }
         
-        alert(`Country updated to ${newCountry} successfully!`);
+        toast.success('Country updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update country: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update country: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating country:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -759,14 +808,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, industry: newIndustry }));
         }
         
-        alert(`Industry updated to ${newIndustry} successfully!`);
+        toast.success('Industry updated');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to update industry: ${result.message || 'Unknown error'}`);
+        // alert(`Failed to update industry: ${result.message || 'Unknown error'}`); // Removed alert
       }
     } catch (err) {
       console.error('Network error updating industry:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
     }
   };
 
@@ -816,7 +865,7 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, leadStatus: newStatus, modifiedBy: currentUserName, lastActivity: new Date().toISOString() }));
         }
         
-        alert(`Lead status updated to ${newStatus} successfully!`);
+        toast.success('Lead status updated');
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to update lead status: ${result.message || 'Unknown error'}`);
@@ -873,7 +922,7 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, alternateNumber: newAlternateNumber, modifiedBy: currentUserName, lastActivity: new Date().toISOString() }));
         }
         
-        alert(`Alternate phone number updated to ${newAlternateNumber} successfully!`);
+        toast.success('Alternate phone number updated');
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to update alternate phone number: ${result.message || 'Unknown error'}`);
@@ -1138,7 +1187,7 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(prev => ({ ...prev, contactName: newContactName }));
         }
         
-        alert(`Contact name updated to ${newContactName} successfully!`);
+        toast.success('Contact name updated');
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to update contact name: ${result.message || 'Unknown error'}`);
@@ -1181,7 +1230,7 @@ export default function LeadPipeline({ onPageChange }) {
         // Refresh the leads list
         fetchLeads();
         setShowAddModal(false);
-        alert('Lead created successfully!');
+        toast.success('Lead created successfully!');
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to create lead: ${result.message || 'Unknown error'}`);
@@ -4097,7 +4146,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               key={industry}
                               onClick={() => {
-                                handleIndustryUpdate(selectedUser.id, industry);
+                                handleFieldUpdate(selectedUser.id, 'industry', industry);
                                 setIndustryDropdownOpen(false);
                               }}
                               style={{
@@ -4179,7 +4228,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               onClick={() => {
                                 if (customIndustry.trim()) {
-                                  handleIndustryUpdate(selectedUser.id, customIndustry.trim());
+                                  handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim());
                                   setCustomIndustry('');
                                   setShowCustomIndustryInput(false);
                                 }
@@ -4325,7 +4374,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               key={status}
                               onClick={() => {
-                                handleStatusUpdate(selectedUser.id, status);
+                                handleFieldUpdate(selectedUser.id, 'leadStatus', status);
                                 setStatusDropdownOpen(false);
                               }}
                               style={{
@@ -4408,7 +4457,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               onClick={() => {
                                 if (customStatus.trim()) {
-                                  handleStatusUpdate(selectedUser.id, customStatus.trim());
+                                  handleFieldUpdate(selectedUser.id, 'leadStatus', customStatus.trim());
                                   setCustomStatus('');
                                   setShowCustomStatusInput(false);
                                 }
@@ -4498,7 +4547,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               key={owner}
                               onClick={() => {
-                                handleOwnerUpdate(selectedUser.id, owner);
+                                handleFieldUpdate(selectedUser.id, 'contactOwner', owner);
                                 setOwnerDropdownOpen(false);
                               }}
                               style={{
@@ -4580,7 +4629,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               onClick={() => {
                                 if (customOwner.trim()) {
-                                  handleOwnerUpdate(selectedUser.id, customOwner.trim());
+                                  handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim());
                                   setCustomOwner('');
                                   setShowCustomOwnerInput(false);
                                 }
@@ -4670,7 +4719,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               key={source}
                               onClick={() => {
-                                handleLeadSourceUpdate(selectedUser.id, source);
+                                handleFieldUpdate(selectedUser.id, 'leadSource', source);
                                 setLeadSourceDropdownOpen(false);
                               }}
                               style={{
@@ -4752,7 +4801,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               onClick={() => {
                                 if (customLeadSource.trim()) {
-                                  handleLeadSourceUpdate(selectedUser.id, customLeadSource.trim());
+                                  handleFieldUpdate(selectedUser.id, 'leadSource', customLeadSource.trim());
                                   setCustomLeadSource('');
                                   setShowCustomLeadSourceInput(false);
                                 }
@@ -4842,7 +4891,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               key={tag}
                               onClick={() => {
-                                handleTagsUpdate(selectedUser.id, tag);
+                                handleFieldUpdate(selectedUser.id, 'tags', tag);
                                 setTagsDropdownOpen(false);
                               }}
                               style={{
@@ -4924,7 +4973,7 @@ export default function LeadPipeline({ onPageChange }) {
                             <button
                               onClick={() => {
                                 if (customTags.trim()) {
-                                  handleTagsUpdate(selectedUser.id, customTags.trim());
+                                  handleFieldUpdate(selectedUser.id, 'tags', customTags.trim());
                                   setCustomTags('');
                                   setShowCustomTagsInput(false);
                                 }
