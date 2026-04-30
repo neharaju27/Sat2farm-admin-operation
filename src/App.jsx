@@ -14,7 +14,7 @@ import ClientMonthlyReport from "./components/ClientMonthlyReport";
 import LeadPipeline from "./components/LeadPipeline";
 import AccessControl from "./components/AccessControl";
 import { useAuth } from './context/AuthContext';
-
+import { Toaster } from 'react-hot-toast';
 function App() {
   const { user, loading, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
@@ -182,6 +182,27 @@ function App() {
       }}>
         {renderCurrentPage()}
       </div>
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: '#f0fdf4',
+            color: '#166534',
+            border: '1px solid #86efac',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          success: {
+            iconTheme: {
+              primary: '#22c55e',
+              secondary: '#ffffff',
+            },
+          },
+        }}
+      />
     </div>
   );
 }
