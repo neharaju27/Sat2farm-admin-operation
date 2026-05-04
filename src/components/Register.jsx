@@ -3,6 +3,7 @@ import { User, Mail, Phone, Building, Tag, ArrowRight, CheckCircle, Eye, EyeOff,
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import '../styles/Sat2FarmAdminPortal.css';
+import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL ;
 
@@ -50,7 +51,9 @@ export default function Registration({ user, onPageChange }) {
 
     // Validate phone number
     if (formData.pNumber && !/^\d{10}$/.test(formData.pNumber)) {
-      setError("Phone number must be exactly 10 digits");
+      const errorMessage = "Phone number must be exactly 10 digits";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setShowErrorModal(true);
       setLoading(false);
       return;
@@ -58,7 +61,9 @@ export default function Registration({ user, onPageChange }) {
 
     // Validate email
     if (formData.user_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.user_email)) {
-      setError("Please enter a valid email address");
+      const errorMessage = "Please enter a valid email address";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setShowErrorModal(true);
       setLoading(false);
       return;
@@ -92,13 +97,16 @@ export default function Registration({ user, onPageChange }) {
         console.log('Exact match test:', data.Message === "User already registered");
         
         if (data.Message && data.Message.toLowerCase().includes("already registered")) {
-          setError("User already registered with this phone number. Please try registering with a new phone number.");
+          const errorMessage = "User already registered with this phone number. Please try registering with a new phone number.";
+          setError(errorMessage);
+          toast.error(errorMessage);
           setShowErrorModal(true);
           setLoading(false);
           return;
         }
         
         setSuccess(true);
+        toast.success('User registered successfully!');
         // Set current user for table display
         const newUser = {
           id: Date.now(),
@@ -132,10 +140,13 @@ export default function Registration({ user, onPageChange }) {
       } else {
         const errorMessage = data.message || 'Registration failed. Please try again.';
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Registration error:', error);
-      setError('Network error. Please check your connection and try again.');
+      const errorMessage = 'Network error. Please check your connection and try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
       setShowErrorModal(true);
     } finally {
       setLoading(false);

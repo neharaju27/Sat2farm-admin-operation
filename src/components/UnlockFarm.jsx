@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
+import toast from 'react-hot-toast';
 
 export default function UnlockFarm({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -106,7 +107,9 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   const handleFormSubmit = async () => {
     if (!farmId.trim()) {
-      setFormError('Please enter a Farm ID.');
+      const errorMessage = 'Please enter a Farm ID.';
+      setFormError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
@@ -133,7 +136,9 @@ export default function UnlockFarm({ user, onPageChange }) {
         }
         
         if (!userMobileNumber) {
-          setFormError('User mobile number not found. Please login again.');
+          const errorMessage = 'User mobile number not found. Please login again.';
+          setFormError(errorMessage);
+          toast.error(errorMessage);
           return;
         }
 
@@ -155,7 +160,9 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log('Farm verification response:', verifyData);
         
         if (verifyData.message !== "Access granted") {
-          setFormError('Access denied: This farm does not belong to your account.');
+          const errorMessage = 'Access denied: This farm does not belong to your account.';
+          setFormError(errorMessage);
+          toast.error(errorMessage);
           return;
         }
         
@@ -207,8 +214,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         const statusText = status === 'lock' ? 'locked' : 'unlocked';
         const successMessage = `Farm ID ${farmId.trim()} has been ${statusText} successfully!`;
         
-        // Show alert message
-        alert(successMessage);
+        // Show toast message instead of alert
+        toast.success(successMessage);
         
         // Also set the message state for UI display
         setMessage(successMessage);
@@ -224,12 +231,15 @@ export default function UnlockFarm({ user, onPageChange }) {
         const apiMessage = data?.message || 'API returned an error';
         console.log('API indicates failure:', apiMessage);
         setFormError(apiMessage);
+        toast.error(apiMessage);
         return;
       }
       
     } catch (err) {
       console.error('API Error:', err);
-      setFormError(`Failed to update farm status: ${err.message}`);
+      const errorMessage = `Failed to update farm status: ${err.message}`;
+      setFormError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setFormLoading(false);
     }

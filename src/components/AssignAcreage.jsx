@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from "lucide-react";
 import { normalizeUserRole } from '../utils/roleUtils';
+import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL || 'https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web';
 const FETCH_CLIENT_API_URL = import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit';
@@ -175,7 +176,9 @@ export default function AssignAcreage({ user, onPageChange }) {
 
   const handleAssign = async () => {
     if (!formData.addAcreage || !formData.expiryDate) {
-      setError('Please fill in all required fields');
+      const errorMessage = 'Please fill in all required fields';
+      setError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
@@ -206,14 +209,18 @@ export default function AssignAcreage({ user, onPageChange }) {
       console.log('Assign API Response:', data);
 
       if (response.ok) {
-        alert('Acreage assigned successfully!');
+        toast.success('Acreage assigned successfully!');
         closeModal();
       } else {
-        setError(data.message || 'Failed to assign acreage');
+        const errorMessage = data.message || 'Failed to assign acreage';
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (err) {
       console.error('Assign Error:', err);
-      setError('Network error. Please try again.');
+      const errorMessage = 'Network error. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
