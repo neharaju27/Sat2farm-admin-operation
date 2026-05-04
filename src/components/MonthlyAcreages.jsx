@@ -11,34 +11,38 @@ const REPORT_DATA_API_URL = import.meta.env.DEV ? '/report_data/report_data' : i
 const SIX_MONTH_DATA_API_URL = import.meta.env.VITE_SIX_MONTH_DATA_API_URL || 'https://api.sat2farm.com/downloadv1/six_month';
 
 // Function to sort months chronologically and limit to 6 months
-const processAvailableMonths = (months) => {
-  if (!months || months.length === 0) return [];
+const sortAndLimitMonths = (months) => {
+  if (!Array.isArray(months) || months.length === 0) return [];
   
-  // Month mapping for chronological sorting
-  const monthOrder = {
-    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
-  };
+  // Month order for chronological sorting
+  const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  // Parse month strings and sort chronologically
+  // Parse month strings and convert to sortable objects
   const parsedMonths = months.map(monthStr => {
     const parts = monthStr.split(' ');
-    const monthName = parts[0];
-    const yearSuffix = parts[1] || '';
-    const year = 2000 + parseInt(yearSuffix); // Convert "25" to 2025, "26" to 2026
+    if (parts.length !== 2) return { month: monthStr, monthName: '', year: '', sortOrder: -1 };
+    
+    const [monthName, year] = parts;
+    const monthIndex = monthOrder.indexOf(monthName);
+    
     return {
-      original: monthStr,
+      month: monthStr,
       monthName,
-      year,
-      sortKey: year * 100 + (monthOrder[monthName] || 0)
+      year: parseInt(year),
+      monthIndex,
+      // Create a sort key that accounts for year rollover
+      sortKey: monthIndex === -1 ? -1 : (parseInt(year) * 100 + monthIndex)
     };
-  }).sort((a, b) => a.sortKey - b.sortKey);
+  }).filter(item => item.sortKey !== -1);
+  
+  // Sort chronologically
+  parsedMonths.sort((a, b) => a.sortKey - b.sortKey);
   
   // Take the last 6 months (most recent)
   const recentMonths = parsedMonths.slice(-6);
   
-  // Return original month strings in the correct order
-  return recentMonths.map(m => m.original);
+  // Return just the month strings
+  return recentMonths.map(item => item.month);
 };
 
 export default function MonthlyAcreages({ user, onPageChange }) {
@@ -48,7 +52,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   const [selectedMonth, setSelectedMonth] = useState('Mar 26');
   const [reportData, setReportData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
-  const [availableMonths, setAvailableMonths] = useState(() => processAvailableMonths(['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26']));
+  const [availableMonths, setAvailableMonths] = useState(() => sortAndLimitMonths(['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26']));
   const [loadingReport, setLoadingReport] = useState(false);
   const [reportError, setReportError] = useState('');
   const [modalOpen, setModalOpen] = useState(null);
@@ -217,8 +221,8 @@ export default function MonthlyAcreages({ user, onPageChange }) {
       if (Array.isArray(parsedData)) {
         const monthLabels = parsedData.map(item => item.label).filter(label => label);
         if (monthLabels.length > 0) {
-          const processedMonths = processAvailableMonths(monthLabels);
-          setAvailableMonths(processedMonths);
+          const sortedMonths = sortAndLimitMonths(monthLabels);
+          setAvailableMonths(sortedMonths);
         }
       }
     } else {
@@ -243,8 +247,9 @@ export default function MonthlyAcreages({ user, onPageChange }) {
     if (reportData && Array.isArray(reportData) && !hasAutoLoaded) {
       const monthLabels = reportData.map(item => item.label).filter(label => label);
       if (monthLabels.length > 0) {
-        // Get the most recent month (last item in array)
-        const mostRecentMonth = monthLabels[monthLabels.length - 1];
+        // Sort months and get the most recent one
+        const sortedMonths = sortAndLimitMonths(monthLabels);
+        const mostRecentMonth = sortedMonths[sortedMonths.length - 1];
         console.log('Auto-selecting most recent month:', mostRecentMonth);
         setSelectedMonth(mostRecentMonth);
         
