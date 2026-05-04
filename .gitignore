@@ -23,4 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 RSA_Key
-RSA_Key.pub
+RSA_Key.pub.env
