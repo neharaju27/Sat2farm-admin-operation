@@ -14,7 +14,6 @@ import ClientMonthlyReport from "./components/ClientMonthlyReport";
 import LeadPipeline from "./components/LeadPipeline";
 import AccessControl from "./components/AccessControl";
 import { useAuth } from './context/AuthContext';
-import { Toaster } from 'react-hot-toast';
 function App() {
   const { user, loading, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
