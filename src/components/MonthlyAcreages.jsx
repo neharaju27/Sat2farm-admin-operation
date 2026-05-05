@@ -6,9 +6,9 @@ import API from '../api/api';
 import { normalizeUserRole } from '../utils/roleUtils';
 
 const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
-const REPORT_API_URL = import.meta.env.DEV ? '/report/report' : import.meta.env.VITE_REPORT_API_URL;
-const REPORT_DATA_API_URL = import.meta.env.DEV ? '/report_data/report_data' : import.meta.env.VITE_REPORT_DATA_API_URL;
-const SIX_MONTH_DATA_API_URL = import.meta.env.VITE_SIX_MONTH_DATA_API_URL || 'https://api.sat2farm.com/downloadv1/six_month';
+const REPORT_API_URL = import.meta.env.VITE_REPORT_API_URL;
+const REPORT_DATA_API_URL = import.meta.env.VITE_REPORT_DATA_API_URL;
+const SIX_MONTH_DATA_API_URL = import.meta.env.VITE_SIX_MONTH_DATA_API_URL;
 
 // Function to sort months chronologically and limit to 6 months
 const sortAndLimitMonths = (months) => {
@@ -383,7 +383,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
     if (!clientId) return;
     setFetchingClient(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit'}?client_id=${clientId}`);
+      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL}?client_id=${clientId}`);
       const data = await response.json();
       if (response.ok && data) {
         setClientDetails({
@@ -406,7 +406,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
     if (!registerNumber) return;
     setFetchingRegister(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit'}?username=${registerNumber}`);
+      const response = await fetch(`${import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL}?username=${registerNumber}`);
       const data = await response.json();
       if (response.ok && data) {
         setRegisterDetails({

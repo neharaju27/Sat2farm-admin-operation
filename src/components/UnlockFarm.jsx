@@ -143,9 +143,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         }
 
         // Verify farm belongs to this user
-        const verifyUrl = import.meta.env.DEV 
-          ? `/fetch_farm/partner?mobile_no=${userMobileNumber}&farm_id=${farmId.trim()}`
-          : `${import.meta.env.VITE_FETCH_FARM_API_URL}?mobile_no=${userMobileNumber}&farm_id=${farmId.trim()}`;
+        const verifyUrl = import.meta.env.VITE_FETCH_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmId.trim()}`;
         console.log('Verifying farm ownership:', verifyUrl);
         
         const verifyResponse = await fetch(verifyUrl, {
@@ -184,10 +182,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       }
       
       // Construct API URL
-      const apiUrl = import.meta.env.DEV 
-        ? `/internal/premium?farm_id=${farmId.trim()}&lockstatus=${lockStatus}&mode=${paymentMode}&expiry=${expiryValue}`
-        : `${import.meta.env.VITE_UNLOCK_FARM_API_URL}?farm_id=${farmId.trim()}&lockstatus=${lockStatus}&mode=${paymentMode}&expiry=${expiryValue}`;
-      
+      const apiUrl = import.meta.env.VITE_UNLOCK_FARM_API_URL + `?farm_id=${farmId.trim()}&lockstatus=${lockStatus}&mode=${paymentMode}&expiry=${expiryValue}`;
       console.log('Calling API:', apiUrl);
       
       const response = await fetch(apiUrl, {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL || 'https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web';
-const FETCH_CLIENT_API_URL = import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL || 'https://api.sat2farm.com/fetch-unit-limit/get-unit-limit';
+const API_URL = import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL;
+const FETCH_CLIENT_API_URL = import.meta.env.VITE_FETCH_UNIT_LIMIT_API_URL;
 
 export default function ClientAccounts({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -334,7 +334,7 @@ export default function ClientAccounts({ user, onPageChange }) {
     setUnlockMessage('');
     try {
       const expiryMonths = unlockExpiry === 'custom' ? unlockCustomExpiry : unlockExpiry;
-      const apiUrl = `${import.meta.env.VITE_UNLOCK_FARM_API_URL || 'https://api.sat2farm.com/sat2farm_admin_web/unlock_farm_sat2farm_admin_web'}?farm_id=${unlockFarmId}&farm_lock=${unlockStatus === 'unlock' ? 'No' : 'Yes'}&date_of_expiry=${expiryMonths}&payment_mode=${unlockPaymentMode}`;
+      const apiUrl = `${import.meta.env.VITE_UNLOCK_FARM_API_URL}?farm_id=${unlockFarmId}&farm_lock=${unlockStatus === 'unlock' ? 'No' : 'Yes'}&date_of_expiry=${expiryMonths}&payment_mode=${unlockPaymentMode}`;
       const response = await fetch(apiUrl, { method: 'GET' });
       const data = await response.json();
       if (data.status === 'Success') {

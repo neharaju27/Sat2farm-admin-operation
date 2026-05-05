@@ -137,10 +137,10 @@ export default function AddAcreages({ user, onPageChange }) {
     const totalAreaUpdated = parseFloat(acreage) || 0;
     
     try {
-      // Call the API using full URL for add/delete operations
+      // Call the API using environment variables
       const apiUrl = inputType === 'registeredNumber' 
-        ? `https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web?mobile_number=${identifier}&area_to_update=${totalAreaUpdated}&operation=add`
-        : `https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web?clientID=${identifier}&area_to_update=${totalAreaUpdated}&operation=add`;
+        ? `${import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL}?mobile_number=${identifier}&area_to_update=${totalAreaUpdated}&operation=add`
+        : `${import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL}?clientID=${identifier}&area_to_update=${totalAreaUpdated}&operation=add`;
       console.log('Add Acreage API Call:', apiUrl);
       
       const response = await fetch(
@@ -223,10 +223,10 @@ export default function AddAcreages({ user, onPageChange }) {
     const totalAreaUpdated = parseFloat(acreage) || 0;
     
     try {
-      // Call API using full URL for add/delete operations
+      // Call API using environment variables
       const apiUrl = inputType === 'registeredNumber' 
-        ? `https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web?mobile_number=${identifier}&area_to_update=${totalAreaUpdated}&operation=sub`
-        : `https://api.sat2farm.com/sat2farm_admin_web/update_limit_area_sat2farm_admin_web?clientID=${identifier}&area_to_update=${totalAreaUpdated}&operation=sub`;
+        ? `${import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL}?mobile_number=${identifier}&area_to_update=${totalAreaUpdated}&operation=sub`
+        : `${import.meta.env.VITE_UPDATE_LIMIT_AREA_API_URL}?clientID=${identifier}&area_to_update=${totalAreaUpdated}&operation=sub`;
       console.log('Delete Acreage API Call:', apiUrl);
       
       const response = await fetch(

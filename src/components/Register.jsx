@@ -5,7 +5,7 @@ import 'react-phone-input-2/lib/style.css';
 import '../styles/Sat2FarmAdminPortal.css';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL ;
+const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
 
 export default function Registration({ user, onPageChange }) {
   // Set currentRole based on actual user role
