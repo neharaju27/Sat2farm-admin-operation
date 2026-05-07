@@ -132,10 +132,12 @@ export default function MonthlyAcreages({ user, onPageChange }) {
     setCurrentRole(role);
     if (role === 'sales') {
       onPageChange('sales-acreage');
+    } else if (role === 'ops') {
+      onPageChange('monthly-acreages');
     } else if (role === 'client') {
       onPageChange('client-team');
-    } else {
-      setCurrentView(firstViews[role]);
+    } else if (role === 'partner') {
+      onPageChange('client-team');
     }
   };
 
@@ -625,6 +627,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
               <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
               <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
               <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
+              <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
               <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => openModal('new-modal')}>+ New</button>

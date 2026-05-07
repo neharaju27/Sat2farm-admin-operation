@@ -22,6 +22,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isOperationsUser = userRole === 'operation' || userRole === 'operations';
   const isSalesUser = userRole === 'sales';
   const isClientUser = userRole === 'client' || userRole === 'test' || userRole === 'user';
+  const isPartnerUser = userRole === 'partner' || userRole === 'admin';
   
   // Debug: Log what should be visible
   console.log('Sidebar - User data:', user);
@@ -39,6 +40,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
   const isClientActive = currentPage === 'unlock-farm' || currentPage === 'register';
+  const isPartnerActive = currentPage === 'unlock-farm' || currentPage === 'register';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -67,6 +69,14 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       } else {
         alert('Access denied: Client users cannot access this page');
       }
+    } else if (isPartnerUser) {
+      // Partner users can only access specific pages
+      const allowedPartnerPages = ['unlock-farm', 'register'];
+      if (allowedPartnerPages.includes(page)) {
+        onPageChange(page);
+      } else {
+        alert('Access denied: Partner users cannot access this page');
+      }
     } else {
       // Default fallback
       onPageChange(page);
@@ -85,6 +95,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       <div className="sb-role">Viewing as: <span>{
         user?.role === 'sales' || user?.role === 'Sales' ? 'Sales' : 
         user?.role === 'client' || user?.role === 'Client' ? 'Client' : 
+        user?.role === 'partner' || user?.role === 'Partner' ? 'Partner' :
         'Operations'
       }</span></div>
       
@@ -219,6 +230,36 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               Monthly Report
               <span className="sb-dot"></span>
             </div>
+            <div 
+              className={`sb-item ${currentPage === 'unlock-farm' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('unlock-farm')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
+              </svg>
+              Unlock Farms
+              <span className="sb-dot"></span>
+            </div>
+            <div 
+              className={`sb-item ${currentPage === 'register' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('register')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              New Registration
+              <span className="sb-dot"></span>
+            </div>
+          </>
+        )}
+
+        {/* Partner Section - Only for Partner Users */}
+        {isPartnerUser && (
+          <>
+            <div className="sb-section">Partner</div>
             <div 
               className={`sb-item ${currentPage === 'unlock-farm' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('unlock-farm')}
