@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { User, Mail, Phone, Building, Tag, ArrowRight, CheckCircle } from "lucide-react";
+import { User, Mail, Phone, Building, Tag, ArrowRight, CheckCircle, Eye, EyeOff, AlertCircle } from "lucide-react";
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import '../styles/Sat2FarmAdminPortal.css';
+import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL ;
+const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
 
 export default function Registration({ user, onPageChange }) {
-  const [currentRole, setCurrentRole] = useState('ops');
+  // Set currentRole based on actual user role
+  const [currentRole, setCurrentRole] = useState(() => {
+    const userRole = user?.role || user?.user_role || user?.type || 'ops';
+    return userRole.toLowerCase();
+  });
 
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
@@ -16,6 +21,8 @@ export default function Registration({ user, onPageChange }) {
     } else if (role === 'sales') {
       onPageChange('sales-acreage');
     } else if (role === 'client') {
+      onPageChange('client-team');
+    } else if (role === 'partner') {
       onPageChange('client-team');
     }
   };
@@ -35,6 +42,8 @@ export default function Registration({ user, onPageChange }) {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,18 +53,25 @@ export default function Registration({ user, onPageChange }) {
 
     // Validate phone number
     if (formData.pNumber && !/^\d{10}$/.test(formData.pNumber)) {
-      setError("Phone number must be exactly 10 digits");
+      const errorMessage = "Phone number must be exactly 10 digits";
+      setError(errorMessage);
+      toast.error(errorMessage);
+      setShowErrorModal(true);
       setLoading(false);
       return;
     }
 
     // Validate email
     if (formData.user_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.user_email)) {
-      setError("Please enter a valid email address");
+      const errorMessage = "Please enter a valid email address";
+      setError(errorMessage);
+      toast.error(errorMessage);
+      setShowErrorModal(true);
       setLoading(false);
       return;
     }
 
+    
     try {
       // Debug: Log form data before sending
       console.log('Form data being sent:', formData);
@@ -77,7 +93,22 @@ export default function Registration({ user, onPageChange }) {
       console.log('API Response:', data); // Debug: Log full response
 
       if (response.ok) {
+        // Check if the API returned a duplicate user message
+        console.log('Checking for duplicate - Message:', data.Message);
+        console.log('Message type:', typeof data.Message);
+        console.log('Exact match test:', data.Message === "User already registered");
+        
+        if (data.Message && data.Message.toLowerCase().includes("already registered")) {
+          const errorMessage = "User already registered with this phone number. Please try registering with a new phone number.";
+          setError(errorMessage);
+          toast.error(errorMessage);
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+        
         setSuccess(true);
+        toast.success('User registered successfully!');
         // Set current user for table display
         const newUser = {
           id: Date.now(),
@@ -111,10 +142,14 @@ export default function Registration({ user, onPageChange }) {
       } else {
         const errorMessage = data.message || 'Registration failed. Please try again.';
         setError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Registration error:', error);
-      setError('Network error. Please check your connection and try again.');
+      const errorMessage = 'Network error. Please check your connection and try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -145,6 +180,7 @@ export default function Registration({ user, onPageChange }) {
               <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
               <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
               <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
+              <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
               <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
@@ -244,6 +280,7 @@ export default function Registration({ user, onPageChange }) {
             <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
             <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
             <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
+            <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
             <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
@@ -265,13 +302,7 @@ export default function Registration({ user, onPageChange }) {
           </div>
           <div className="card-body" style={{padding: '32px 24px'}}>
             <form onSubmit={handleSubmit}>
-              {/* Error Message */}
-              {error && (
-                <div className="alert alert-danger" style={{marginBottom: '16px'}}>
-                  {error}
-                </div>
-              )}
-
+              
               {/* First Name and Last Name */}
               <div className="two-col" style={{marginBottom: '24px'}}>
                 <div className="form-group">
@@ -358,37 +389,55 @@ export default function Registration({ user, onPageChange }) {
                 </div>
               </div>
 
-              {/* Account ID and Referral Code */}
-              <div className="two-col" style={{marginBottom: '24px'}}>
-                <div className="form-group">
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <Building className="input-icon" />
-                    <label>Account ID *</label>
-                  </div>
-                  <input
-                    type="text"
-                    name="acc_id"
-                    value={formData.acc_id}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter account ID"
-                  />
-                </div>
-
-                <div className="form-group">
+              {currentRole === 'client' || currentRole === 'partner' ? (
+                /* Only Referral Code for Client and Partner */
+                <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
-                    <label>Referral Code</label>
+                    <label>Referral Code *</label>
                   </div>
                   <input
                     type="text"
                     name="referal_code"
                     value={formData.referal_code}
                     onChange={handleChange}
-                    placeholder="Enter referral code (optional)"
+                    placeholder="Enter referral code (required)"
+                    required
                   />
                 </div>
-              </div>
+              ) : (
+                /* Account ID and Referral Code for other roles */
+                <div className="two-col" style={{marginBottom: '24px'}}>
+                  <div className="form-group">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <Building className="input-icon" />
+                      <label>Account ID *</label>
+                    </div>
+                    <input
+                      type="text"
+                      name="acc_id"
+                      value={formData.acc_id}
+                      onChange={handleChange}
+                      required
+                      placeholder="Enter account ID"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <Tag className="input-icon" />
+                      <label>Referral Code</label>
+                    </div>
+                    <input
+                      type="text"
+                      name="referal_code"
+                      value={formData.referal_code}
+                      onChange={handleChange}
+                      placeholder="Enter referral code (optional)"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Category and Password */}
               <div className="two-col" style={{marginBottom: '24px'}}>
@@ -404,9 +453,18 @@ export default function Registration({ user, onPageChange }) {
                     required
                   >
                     <option value="">Choose a role...</option>
-                    <option value="farmer">Farmer</option>
-                    <option value="Admin">Super Admin</option>
-                    <option value="Franchise">Admin</option>
+                    {currentRole === 'client' || currentRole === 'partner' ? (
+                      <>
+                        <option value="farmer">Farmer</option>
+                        <option value="Franchise">Manager</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="farmer">Farmer</option>
+                        <option value="Admin">Partner</option>
+                        <option value="Franchise">Manager</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 
@@ -415,14 +473,38 @@ export default function Registration({ user, onPageChange }) {
                     <Tag className="input-icon" />
                     <label>Password *</label>
                   </div>
-                  <input
-                    type="password"
-                    name="new_password"
-                    value={formData.new_password}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter password"
-                  />
+                  <div style={{position: 'relative'}}>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="new_password"
+                      value={formData.new_password}
+                      onChange={handleChange}
+                      required
+                      placeholder="Enter password"
+                      style={{width: '100%', paddingRight: '40px'}}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        color: 'var(--text-2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      tabIndex="-1"
+                    >
+                      {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -442,6 +524,93 @@ export default function Registration({ user, onPageChange }) {
           </div>
         </div>
       </div>
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '32px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              backgroundColor: '#fee2e2',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <AlertCircle style={{ width: '24px', height: '24px', color: '#dc2626' }} />
+            </div>
+            
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#1f2937',
+              marginBottom: '12px',
+              margin: '0 0 12px 0'
+            }}>
+              Registration Error
+            </h3>
+            
+            <p style={{
+              fontSize: '14px',
+              color: '#6b7280',
+              lineHeight: '1.5',
+              marginBottom: '24px'
+            }}>
+              {error}
+            </p>
+            
+            <button
+              onClick={() => {
+                setShowErrorModal(false);
+                setError("");
+              }}
+              style={{
+                backgroundColor: '#184876',
+                color: 'white',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                width: '100%'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#1a5490';
+                e.target.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#184876';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
