@@ -38,70 +38,11 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [message, setMessage] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  // Mock pending requests data matching the HTML structure
-  const [pendingRequests] = useState([
-    {
-      id: 1,
-      farmName: 'Kurnool North',
-      farmId: '#F-3671',
-      clientName: 'Deccan Planters',
-      lockedReason: 'Payment overdue',
-      requestedBy: 'Ravi Shankar',
-      requestDate: '20 Mar 26'
-    },
-    {
-      id: 2,
-      farmName: 'Warangal East',
-      farmId: '#F-3210',
-      clientName: 'Kaveri Holdings',
-      lockedReason: 'KYC incomplete',
-      requestedBy: 'Sales Team',
-      requestDate: '18 Mar 26'
-    },
-    {
-      id: 3,
-      farmName: 'Mysuru Block-2',
-      farmId: '#F-4201',
-      clientName: 'GreenField Agro',
-      lockedReason: 'Quota exceeded',
-      requestedBy: 'Priya Nair',
-      requestDate: '15 Mar 26'
-    },
-    {
-      id: 4,
-      farmName: 'Hospet Plot-7',
-      farmId: '#F-3980',
-      clientName: 'Vijaya FarmTech',
-      lockedReason: 'Manual review',
-      requestedBy: 'Admin',
-      requestDate: '10 Mar 26'
-    }
-  ]);
+ 
+  
 
   // Mock bulk toggle data
-  const [bulkToggles, setBulkToggles] = useState([
-    {
-      id: 1,
-      clientName: 'GreenField Agro',
-      farmCount: 12,
-      description: 'Lock all / unlock all in one click',
-      isOn: true
-    },
-    {
-      id: 2,
-      clientName: 'Kaveri Holdings',
-      farmCount: 8,
-      description: 'KYC pending — unlock after verification',
-      isOn: false
-    },
-    {
-      id: 3,
-      clientName: 'Deccan Planters',
-      farmCount: 21,
-      description: 'Payment confirmed on 22 Mar 26',
-      isOn: true
-    }
-  ]);
+  
 
   const handleToggleFarm = (requestId, action) => {
     console.log(`${action} farm ${requestId}`);
@@ -253,7 +194,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   };
 
   return (
-    <div className="content-area" style={{backgroundColor: '#f8f7f4', padding: '0', overflow: 'auto', maxHeight: '100vh'}}>
+    <div className="content-area" style={{backgroundColor: '#ffffff', padding: '0', overflow: 'auto', minHeight: '100vh', width: '100%'}}>
       {/* Top Navigation Bar - Full Width */}
       <div className="topbar" style={{marginBottom: '16px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
         <div className="tb-left">
@@ -427,87 +368,9 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       </div>
 
-      {/* Pending Requests Table */}
-      <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
-        <div className="card-head">
-          <span className="card-title">Pending unlock requests</span>
-        </div>
-        <div className="tbl-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Farm</th>
-                <th>Client</th>
-                <th>Locked reason</th>
-                <th>Requested by</th>
-                <th>Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingRequests.map((request) => (
-                <tr key={request.id}>
-                  <td>
-                    <div className="tbl-name">{request.farmName}</div>
-                    <div className="tbl-sub">{request.farmId}</div>
-                  </td>
-                  <td>{request.clientName}</td>
-                  <td>{request.lockedReason}</td>
-                  <td>{request.requestedBy}</td>
-                  <td>{request.requestDate}</td>
-                  <td style={{display: 'flex', gap: '6px', alignItems: 'center', paddingTop: '13px'}}>
-                    <button 
-                      className="btn btn-primary btn-sm" 
-                      onClick={() => handleToggleFarm(request.id, 'Unlock')}
-                    >
-                      Unlock
-                    </button>
-                    <button 
-                      className="btn btn-danger btn-sm" 
-                      onClick={() => handleToggleFarm(request.id, 'Deny')}
-                    >
-                      Deny
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+     
 
-      {/* Bulk Toggle Section */}
-      <div className="card" style={{marginLeft: '24px', marginRight: '24px'}}>
-        <div className="card-head">
-          <span className="card-title">Unlock all farms — bulk toggle</span>
-        </div>
-        <div className="card-body">
-          <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-            {bulkToggles.map((toggle) => (
-              <div 
-                key={toggle.id}
-                style={{
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  padding: '10px 12px', 
-                  border: '1px solid var(--border-soft)', 
-                  borderRadius: 'var(--r)'
-                }}
-              >
-                <div>
-                  <div className="tbl-name">{toggle.clientName} — all farms ({toggle.farmCount})</div>
-                  <div className="tbl-sub">{toggle.description}</div>
-                </div>
-                <button 
-                  className={`toggle ${toggle.isOn ? 'on' : ''}`}
-                  onClick={() => handleBulkToggle(toggle.id)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 }

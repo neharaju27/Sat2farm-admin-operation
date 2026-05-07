@@ -61,10 +61,10 @@ function App() {
       console.log('Redirecting to assign-acreages (sales)');
       setCurrentPage('assign-acreages');
       localStorage.setItem('currentPage', 'assign-acreages');
-    } else if (role === 'client' || role === 'test' || role === 'user') {
-      console.log('Redirecting to client-monthly-report (client/test/user)');
-      setCurrentPage('client-monthly-report');
-      localStorage.setItem('currentPage', 'client-monthly-report');
+    } else if (role === 'client' || role === 'partner' || role === 'test' || role === 'user') {
+      console.log('Redirecting to unlock-farm (client/partner/test/user)');
+      setCurrentPage('unlock-farm');
+      localStorage.setItem('currentPage', 'unlock-farm');
     } else {
       // operation, admin, default
       console.log('Redirecting to monthly-acreages (operation/admin/default)');
