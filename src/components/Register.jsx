@@ -22,6 +22,8 @@ export default function Registration({ user, onPageChange }) {
       onPageChange('sales-acreage');
     } else if (role === 'client') {
       onPageChange('client-team');
+    } else if (role === 'partner') {
+      onPageChange('client-team');
     }
   };
   const [formData, setFormData] = useState({
@@ -178,6 +180,7 @@ export default function Registration({ user, onPageChange }) {
               <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
               <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
               <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
+              <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
               <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
@@ -277,6 +280,7 @@ export default function Registration({ user, onPageChange }) {
             <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
             <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
             <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
+            <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
             <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
@@ -385,8 +389,8 @@ export default function Registration({ user, onPageChange }) {
                 </div>
               </div>
 
-              {currentRole === 'client' ? (
-                /* Only Referral Code for Client */
+              {currentRole === 'client' || currentRole === 'partner' ? (
+                /* Only Referral Code for Client and Partner */
                 <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
@@ -449,7 +453,7 @@ export default function Registration({ user, onPageChange }) {
                     required
                   >
                     <option value="">Choose a role...</option>
-                    {currentRole === 'client' ? (
+                    {currentRole === 'client' || currentRole === 'partner' ? (
                       <>
                         <option value="farmer">Farmer</option>
                         <option value="Franchise">Manager</option>
