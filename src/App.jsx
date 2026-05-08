@@ -93,7 +93,8 @@ function App() {
       name: formattedName,
       username: username,
       fullName: formattedName,
-      role: user.role || user.user_role || user.type || 'User'
+      role: user.role || user.user_role || user.type || 'User',
+      phone_number: user.phone_number || user.phoneNumber || user.pNumber || username
     };
   };
 
