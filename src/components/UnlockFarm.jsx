@@ -211,7 +211,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
           <div className="section-title">Farm unlock requests</div>
         </div>
-        <span className="badge badge-amber">4 pending</span>
+        
       </div>
 
       {/* Quick Actions Modal */}
