@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Mail, Phone, Building, Tag, ArrowRight, CheckCircle, Eye, EyeOff, AlertCircle } from "lucide-react";
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
@@ -6,6 +6,7 @@ import '../styles/Sat2FarmAdminPortal.css';
 import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
+const MANAGER_RESTRICT_API_URL = import.meta.env.VITE_MANAGER_RESTRICT_API_URL;
 
 export default function Registration({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -34,9 +35,49 @@ export default function Registration({ user, onPageChange }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [registeredUsers, setRegisteredUsers] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+
+  useEffect(() => {
+    console.log('User prop in Registration component:', user);
+  }, [user]);
+
+  // Function to check manager count for client/partner roles
+  const checkManagerCount = async (phoneNumber, category) => {
+    try {
+      console.log('Making API call to:', MANAGER_RESTRICT_API_URL);
+      console.log('Request body:', JSON.stringify({
+        phone_number: phoneNumber,
+        category: category
+      }));
+
+      const response = await fetch(MANAGER_RESTRICT_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          category: category
+        })
+      });
+
+      const data = await response.json();
+      console.log('Manager restrict API response:', data);
+
+      if (response.ok) {
+        return data; // Returns { status: 1, manager_count: 1, remaining_slots: 1, message: "Manager added successfully" }
+      } else {
+        console.error('API Error:', response.status, data);
+        throw new Error(data.message || `API Error: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error checking manager count:', error);
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -64,7 +105,64 @@ export default function Registration({ user, onPageChange }) {
       return;
     }
 
-    
+    // Check manager count restriction for client/partner roles when registering managers
+    if ((currentRole === 'client' || currentRole === 'partner') && formData.category === 'Franchise') {
+      try {
+        // Get the logged-in user's phone number from the user object
+        const loggedInPhoneNumber = user?.phone_number || user?.phoneNumber || user?.pNumber;
+        
+        if (!loggedInPhoneNumber) {
+          const errorMessage = "Unable to verify account. Please log in again.";
+          setError(errorMessage);
+          toast.error(errorMessage);
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+
+        console.log('Checking manager count for phone:', loggedInPhoneNumber, 'category:', formData.category);
+        
+        // First, check current manager count BEFORE registration
+        const currentManagerData = await checkManagerCount(loggedInPhoneNumber, formData.category);
+        
+        console.log('=== PRE-REGISTRATION MANAGER COUNT CHECK ===');
+        console.log('Current manager count BEFORE registration:', currentManagerData.manager_count);
+        console.log('Remaining slots BEFORE registration:', currentManagerData.remaining_slots);
+        
+        // Check if manager count has already reached the limit BEFORE trying to add
+        // Block when manager_count is exactly 2 (already have 2 managers)
+        if (currentManagerData.manager_count === 2) {
+          console.log('🚫 BLOCKING: Manager count is', currentManagerData.manager_count, ', cannot add more');
+          const errorMessage = "Please contact operations team to add more managers";
+          setError(errorMessage);
+          toast.error(errorMessage);
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('✅ ALLOWING: Registration can proceed. Current manager count:', currentManagerData.manager_count, 'is less than 2');
+        console.log('=== END PRE-REGISTRATION CHECK ===');
+      } catch (error) {
+        console.error('API Error:', error);
+        
+        // If API fails (500 error), allow registration to proceed with a warning
+        if (error.message.includes('Internal Server Error') || error.message.includes('500')) {
+          console.log('API unavailable, allowing registration to proceed');
+          toast.info('Manager limit check temporarily unavailable. Registration will proceed.');
+          // Don't return here - allow registration to continue
+        } else {
+          // For other errors, block registration
+          const errorMessage = "Failed to verify manager limit. Please try again.";
+          setError(errorMessage);
+          toast.error(errorMessage);
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     try {
       // Debug: Log form data before sending
       console.log('Form data being sent:', formData);
@@ -102,7 +200,7 @@ export default function Registration({ user, onPageChange }) {
         
         setSuccess(true);
         toast.success('User registered successfully!');
-        // Set current user for table display
+        // Add new user to the registered users list
         const newUser = {
           id: Date.now(),
           firstName: formData.fName,
@@ -117,7 +215,7 @@ export default function Registration({ user, onPageChange }) {
           password: formData.new_password,
           registrationDate: new Date().toLocaleDateString()
         };
-        setCurrentUser(newUser);
+        setRegisteredUsers(prev => [...prev, newUser]);
         
         // Reset form
         setFormData({
@@ -192,7 +290,7 @@ export default function Registration({ user, onPageChange }) {
               className="btn btn-primary" 
               onClick={() => {
                 setSuccess(false);
-                setCurrentUser(null);
+                setRegisteredUsers([]);
               }}
               style={{padding: '8px 16px', fontSize: '13px'}}
             >
@@ -201,12 +299,12 @@ export default function Registration({ user, onPageChange }) {
           </div>
         </div>
 
-        {/* Current Registered User Table */}
-        {currentUser && (
+        {/* Registered Users Table */}
+        {registeredUsers.length > 0 && (
           <div className="card">
             <div className="card-head">
-              <span className="card-title">Current Registered User</span>
-              <span className="badge badge-blue">1 User</span>
+              <span className="card-title">Registered Users</span>
+              <span className="badge badge-blue">{registeredUsers.length} User{registeredUsers.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="card-body">
               <div className="table-wrapper">
@@ -225,22 +323,24 @@ export default function Registration({ user, onPageChange }) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr key={currentUser.id}>
-                      <td>{currentUser.firstName} {currentUser.lastName}</td>
-                      <td>{currentUser.email}</td>
-                      <td>{currentUser.phone}</td>
-                      
-                      <td>{currentUser.countryCode}</td>
-                      <td>{currentUser.accountId}</td>
-                      <td>
-                        <span className="badge badge-blue">
-                          {currentUser.category}
-                        </span>
-                      </td>
-                      <td>{currentUser.referralCode}</td>
-                      <td>{currentUser.password}</td>
-                      <td>{currentUser.registrationDate}</td>
-                    </tr>
+                    {registeredUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td>{user.firstName} {user.lastName}</td>
+                        <td>{user.email}</td>
+                        <td>{user.phone}</td>
+                        
+                        <td>{user.countryCode}</td>
+                        <td>{user.accountId}</td>
+                        <td>
+                          <span className="badge badge-blue">
+                            {user.category}
+                          </span>
+                        </td>
+                        <td>{user.referralCode}</td>
+                        <td>{user.password}</td>
+                        <td>{user.registrationDate}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
