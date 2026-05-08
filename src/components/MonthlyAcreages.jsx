@@ -130,15 +130,12 @@ export default function MonthlyAcreages({ user, onPageChange }) {
 
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
-    if (role === 'sales') {
-      onPageChange('sales-acreage');
-    } else if (role === 'ops') {
+    // Only redirect when switching to ops role
+    // For sales, partner, and client roles, stay on the monthly acreages page
+    if (role === 'ops') {
       onPageChange('monthly-acreages');
-    } else if (role === 'client') {
-      onPageChange('client-team');
-    } else if (role === 'partner') {
-      onPageChange('client-team');
     }
+    // Remove redirects for sales, partner, and client to stay on monthly acreages page
   };
 
   const handleMonthSelect = async (month) => {
@@ -623,13 +620,6 @@ export default function MonthlyAcreages({ user, onPageChange }) {
             </div>
           </div>
           <div className="tb-right">
-            <div className="role-switcher">
-              <span style={{fontSize: '10px', color: 'var(--text-3)', marginRight: '2px'}}>Role:</span>
-              <button className={`role-btn ${currentRole === 'ops' ? 'active' : ''}`} onClick={() => handleRoleSwitch('ops')}>Ops</button>
-              <button className={`role-btn ${currentRole === 'sales' ? 'active' : ''}`} onClick={() => handleRoleSwitch('sales')}>Sales</button>
-              <button className={`role-btn ${currentRole === 'partner' ? 'active' : ''}`} onClick={() => handleRoleSwitch('partner')}>Partner</button>
-              <button className={`role-btn ${currentRole === 'client' ? 'active' : ''}`} onClick={() => handleRoleSwitch('client')}>Client</button>
-            </div>
             <button className="btn btn-primary btn-sm" onClick={() => openModal('new-modal')}>+ New</button>
           </div>
         </div>
