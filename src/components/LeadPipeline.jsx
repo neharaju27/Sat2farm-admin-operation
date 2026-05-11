@@ -1361,7 +1361,13 @@ export default function LeadPipeline({ onPageChange }) {
         });
         setCurrentFilterCriteria(filterDescriptions.join(', '));
         
-        alert(`Leads filtered successfully! Found ${result.total || transformedLeads.length} records.`);
+        // Show toast message for successful filtering
+        const filterCount = result.total || transformedLeads.length;
+        if (filters.length === 1) {
+          toast.success(`Filter applied: ${filterDescriptions[0]} (${filterCount} records found)`);
+        } else {
+          toast.success(`${filters.length} filters applied (${filterCount} records found)`);
+        }
       } else {
         console.error('API returned unexpected format:', result);
         alert(`Failed to filter leads: Unexpected response format`);

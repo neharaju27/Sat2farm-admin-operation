@@ -45,9 +45,20 @@ function App() {
 
     const savedPage = localStorage.getItem('currentPage');
 
-    // After refresh — restore saved page
+    // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
-      setCurrentPage(savedPage);
+      // Check if user is partner and saved page is lead-pipeline
+      let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
+      
+      if (role === 'partner' && savedPage === 'lead-pipeline') {
+        // Partner trying to access lead-pipeline - redirect to unlock-farm instead
+        console.log('Partner user trying to access lead-pipeline, redirecting to unlock-farm');
+        setCurrentPage('unlock-farm');
+        localStorage.setItem('currentPage', 'unlock-farm');
+      } else {
+        // Normal page restore
+        setCurrentPage(savedPage);
+      }
       setHasRedirected(true);
       return;
     }
