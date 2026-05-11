@@ -41,6 +41,7 @@ export default function UnlockFarm({ user, onPageChange }) {
     console.log(`${action} farm ${requestId}`);
   };
 
+
   const handleFormSubmit = async () => {
     if (!farmId.trim()) {
       const errorMessage = 'Please enter a Farm ID.';
@@ -122,7 +123,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Calling API:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method: 'GET',
+        method: 'GET'
       });
       
       if (!response.ok) {
@@ -354,6 +355,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       </div>
 
+      
      
 
       
