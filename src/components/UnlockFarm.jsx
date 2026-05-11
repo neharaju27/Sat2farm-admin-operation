@@ -160,7 +160,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         setCustomExpiry('');
       } else {
         // Show the API message directly to the user
-        const apiMessage = data?.message || 'API returned an error';
+        const apiMessage = data?.message || 'Farm already unlocked';
         console.log('API indicates failure:', apiMessage);
         setFormError(apiMessage);
         toast.error(apiMessage);
