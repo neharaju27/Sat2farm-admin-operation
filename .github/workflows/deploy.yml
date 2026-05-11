@@ -45,4 +45,4 @@ jobs:
             sudo rm -rf /var/www/admin/*
             sudo cp -r /home/ubuntu/dist/* /var/www/admin/
             sudo chown -R www-data:www-data /var/www/admin
-            sudo systemctl restart nginx
+            sudo systemctl restart apache2
