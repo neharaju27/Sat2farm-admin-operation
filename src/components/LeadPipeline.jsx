@@ -1082,7 +1082,7 @@ export default function LeadPipeline({ onPageChange }) {
           const paramName = `owner_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'lead_status' && filter.value) {
-          const operator = filter.operator === 'isn\'t' ? 'is_not' : 'is';
+          const operator = filter.operator === 'isn\'t' || filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `status_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'tag' && filter.value) {
@@ -1248,6 +1248,11 @@ export default function LeadPipeline({ onPageChange }) {
       let url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?`;
       const urlParams = [];
       
+      // Add base parameters
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
+      urlParams.push('status_is_not=junk');
+      
       // Build URL parameters for all filters
       filters.forEach(filter => {
         if (filter.property === 'contact_owner' && filter.value) {
@@ -1255,7 +1260,7 @@ export default function LeadPipeline({ onPageChange }) {
           const paramName = `owner_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'lead_status' && filter.value) {
-          const operator = filter.operator === 'isn\'t' ? 'is_not' : 'is';
+          const operator = filter.operator === 'isn\'t' || filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `status_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'tag' && filter.value) {
@@ -1285,6 +1290,7 @@ export default function LeadPipeline({ onPageChange }) {
       
       url += urlParams.join('&');
       console.log('Full API URL:', url);
+      console.log('URL params:', urlParams);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -1331,6 +1337,18 @@ export default function LeadPipeline({ onPageChange }) {
           lastActivity: lead.last_activity || new Date().toISOString()
         }));
         
+        console.log('Setting filtered leads:', transformedLeads.length);
+        console.log('Filtered leads sample:', transformedLeads.slice(0, 3));
+        
+        // Debug: Show unique states in the data
+        const uniqueStates = [...new Set(transformedLeads.map(lead => lead.state).filter(state => state))];
+        console.log('Unique states in data:', uniqueStates);
+        
+        // Debug: Show Karnataka records
+        const karnatakaRecords = transformedLeads.filter(lead => 
+          lead.state && lead.state.toLowerCase().includes('karnatak')
+        );
+        console.log('Records with Karnataka in state:', karnatakaRecords.length);
         setLeads(transformedLeads);
         setError(null);
         
