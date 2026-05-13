@@ -55,6 +55,11 @@ function App() {
         console.log('Partner user trying to access lead-pipeline, redirecting to unlock-farm');
         setCurrentPage('unlock-farm');
         localStorage.setItem('currentPage', 'unlock-farm');
+      } else if (role === 'client' && savedPage !== 'client-monthly-report') {
+        // Client trying to access other pages - redirect to client-monthly-report instead
+        console.log('Client user trying to access other page, redirecting to client-monthly-report');
+        setCurrentPage('client-monthly-report');
+        localStorage.setItem('currentPage', 'client-monthly-report');
       } else {
         // Normal page restore
         setCurrentPage(savedPage);
@@ -72,8 +77,12 @@ function App() {
       console.log('Redirecting to assign-acreages (sales)');
       setCurrentPage('assign-acreages');
       localStorage.setItem('currentPage', 'assign-acreages');
-    } else if (role === 'client' || role === 'partner' || role === 'test' || role === 'user') {
-      console.log('Redirecting to unlock-farm (client/partner/test/user)');
+    } else if (role === 'client') {
+      console.log('Redirecting to client-monthly-report (client)');
+      setCurrentPage('client-monthly-report');
+      localStorage.setItem('currentPage', 'client-monthly-report');
+    } else if (role === 'partner' || role === 'test' || role === 'user') {
+      console.log('Redirecting to unlock-farm (partner/test/user)');
       setCurrentPage('unlock-farm');
       localStorage.setItem('currentPage', 'unlock-farm');
     } else {

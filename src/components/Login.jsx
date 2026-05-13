@@ -18,12 +18,6 @@ export default function Login() {
     e.preventDefault();
     setError(""); // Clear previous errors
 
-    // Validate phone number is exactly 10 digits
-    if (formData.phone_number.length !== 10 || !/^\d{10}$/.test(formData.phone_number)) {
-      setError("Phone number must be exactly 10 digits");
-      return;
-    }
-
     setIsLoading(true);
     setError("");
 
@@ -94,8 +88,6 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   placeholder="Enter your username"
-                  maxLength={10}
-                  pattern="[0-9]{10}"
                   className="w-full px-5 py-4 bg-white/5 backdrop-blur-sm border border-white/20 rounded-2xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/40 focus:border-purple-400 transition-all duration-300 group-hover:bg-white/10 group-hover:border-purple-300 text-lg"
                 />
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
