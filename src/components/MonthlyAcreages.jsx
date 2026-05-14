@@ -620,6 +620,19 @@ export default function MonthlyAcreages({ user, onPageChange }) {
             </div>
           </div>
           <div className="tb-right">
+            {/* Role Switcher for Account Monitor */}
+            <div className="role-switcher" style={{ marginRight: '16px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: '500', marginRight: '8px' }}>Monitor:</span>
+              {['sales', 'client', 'partner'].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => onPageChange('account-monitor')}
+                  className="role-btn"
+                >
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                </button>
+              ))}
+            </div>
             <button className="btn btn-primary btn-sm" onClick={() => openModal('new-modal')}>+ New</button>
           </div>
         </div>

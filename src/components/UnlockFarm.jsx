@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
@@ -31,14 +31,387 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [message, setMessage] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
- 
+  const [farmDetails, setFarmDetails] = useState(null);
+  const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
+  const [farmDetailsError, setFarmDetailsError] = useState('');
   
-
-  // Mock bulk toggle data
+  // State for recently added farms
+  const [recentFarms, setRecentFarms] = useState([]);
+  const [recentFarmsLoading, setRecentFarmsLoading] = useState(false);
+  const [recentFarmsError, setRecentFarmsError] = useState('');
+  const [activePage, setActivePage] = useState(0);
   
+  // State for plan selection modal
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [selectedFarmId, setSelectedFarmId] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [planLoading, setPlanLoading] = useState(false);
 
-  const handleToggleFarm = (requestId, action) => {
-    console.log(`${action} farm ${requestId}`);
+  // State for delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [farmToDelete, setFarmToDelete] = useState(null);
+
+  // Function to fetch top 50 recently added farms
+  const fetchRecentFarms = async () => {
+    // Only fetch for client and partner roles
+    if (currentRole !== 'client' && currentRole !== 'partner') {
+      return;
+    }
+
+    setRecentFarmsLoading(true);
+    setRecentFarmsError('');
+
+    try {
+      // Get user mobile number from login storage
+      const storedAuth = localStorage.getItem('sat2farm_auth');
+      let userMobileNumber = null;
+      let authToken = null;
+      
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          userMobileNumber = authData.phone_number;
+          authToken = authData.token || authData.jwt;
+        } catch (e) {
+          console.error('Error parsing auth data:', e);
+        }
+      }
+      
+      if (!userMobileNumber) {
+        setRecentFarmsError('User mobile number not found. Please login again.');
+        return;
+      }
+
+      // Call real API to fetch top 50 farms
+      const apiUrl = import.meta.env.VITE_FETCH_50_FARMS_API_URL + `?mobile_no=${userMobileNumber}`;
+      console.log('Fetching top 50 farms:', apiUrl);
+      
+      // Prepare headers - only add Authorization if token exists to avoid CORS issues
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: headers
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoint not found. Please check the API URL configuration.');
+        } else if (response.status === 500) {
+          throw new Error('Server error occurred. Please try again later or contact support.');
+        } else if (response.status === 401) {
+          throw new Error('Unauthorized access. Please login again.');
+        } else if (response.status === 403) {
+          throw new Error('Access forbidden. You do not have permission to access this resource.');
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      }
+      
+      const data = await response.json();
+      console.log('Top 50 farms API response:', data);
+      
+      if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
+        // Format the API response data to match the expected structure
+        const formattedFarms = data.data.map((farm, index) => ({
+          farmId: farm.farm_id || `FARM${String(index + 1).padStart(5, '0')}`,
+          farmName: farm.farm_name || 'Unknown Farm',
+          region: farm.state || 'Unknown Region', // Using state as region since API doesn't provide region
+          area: farm.area ? `${farm.area} acer` : 'N/A',
+          createdTime: farm.created_time || 'N/A'
+        }));
+        
+        setRecentFarms(formattedFarms);
+        console.log(`Successfully loaded ${formattedFarms.length} farms`);
+      } else {
+        console.log('API response structure:', data);
+        setRecentFarmsError('No farms data received from server');
+      }
+    } catch (error) {
+      console.error('Error fetching recent farms:', error);
+      setRecentFarmsError('Failed to fetch recent farms');
+    } finally {
+      setRecentFarmsLoading(false);
+    }
+  };
+
+  // Function to show plan selection modal for farm unlock
+  const unlockRecentFarm = (farmId) => {
+    setSelectedFarmId(farmId);
+    setSelectedPlan('');
+    setShowPlanModal(true);
+  };
+
+  // Function to unlock farm with selected plan
+  const unlockFarmWithPlan = async () => {
+    if (!selectedPlan) {
+      toast.error('Please select a plan');
+      return;
+    }
+
+    setPlanLoading(true);
+    setFormError('');
+    setMessage('');
+
+    try {
+      // Call unlock API with selected plan using the new endpoint
+      const apiUrl = import.meta.env.VITE_UNLOCK_FARM_API_URL + `?farm_id=${selectedFarmId}&lockstatus=1&mode=cash&expiry=${selectedPlan}`;
+      console.log('Unlocking farm with plan:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Unlock API response:', data);
+      
+      if (data && data.status !== 'Failure') {
+        toast.success(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
+        setMessage(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
+        
+        // Remove the unlocked farm from the list to show it's been processed
+        setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
+        
+        // Close the modal
+        setShowPlanModal(false);
+        setSelectedFarmId('');
+        setSelectedPlan('');
+      } else {
+        const errorMessage = data?.message || 'Farm already unlocked';
+        setFormError(errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (err) {
+      console.error('API Error:', err);
+      const errorMessage = `Failed to unlock farm: ${err.message}`;
+      setFormError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  // Function to open delete confirmation modal
+  const openDeleteModal = (farmId, index) => {
+    setFarmToDelete({ farmId, index });
+    setShowDeleteModal(true);
+  };
+
+  // Function to close delete confirmation modal
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setFarmToDelete(null);
+  };
+
+  // Function to delete a farm
+  const handleDeleteFarm = async () => {
+    if (!farmToDelete) return;
+
+    const { farmId } = farmToDelete;
+    console.log('=== DELETE FUNCTION START ===');
+    console.log('farmId:', farmId);
+
+    closeDeleteModal();
+    setFormLoading(true);
+    setFormError('');
+
+    try {
+      // Get user mobile number from login storage
+      const storedAuth = localStorage.getItem('sat2farm_auth');
+      let userMobileNumber = null;
+
+      console.log('storedAuth:', storedAuth);
+
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          userMobileNumber = authData.phone_number;
+          console.log('authData:', authData);
+          console.log('userMobileNumber:', userMobileNumber);
+        } catch (e) {
+          console.error('Error parsing auth data:', e);
+        }
+      }
+
+      if (!userMobileNumber) {
+        console.log('=== NO MOBILE NUMBER FOUND ===');
+        setFormError('User mobile number not found. Please login again.');
+        toast.error('User mobile number not found. Please login again.');
+        setFormLoading(false);
+        return;
+      }
+
+      // Call delete API with mobile_no and farm_id parameters
+      const apiUrl = import.meta.env.VITE_DELETE_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmId}`;
+      console.log('=== CALLING DELETE API ===');
+      console.log('API URL:', apiUrl);
+      console.log('VITE_DELETE_FARM_API_URL:', import.meta.env.VITE_DELETE_FARM_API_URL);
+
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('=== API RESPONSE RECEIVED ===');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('=== API RESPONSE DATA ===');
+      console.log('Response data:', data);
+
+      if (data && data.status !== 'Failure') {
+        console.log('=== DELETE SUCCESSFUL ===');
+        toast.success(`Farm ID ${farmId} has been deleted successfully!`);
+
+        // Remove the deleted farm from the list
+        setRecentFarms(prev => prev.filter(farm => farm.farmId !== farmId));
+      } else {
+        console.log('=== DELETE FAILED ===');
+        const errorMessage = data?.message || 'Failed to delete farm';
+        setFormError(errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (err) {
+      console.error('=== API ERROR ===');
+      console.error('Error:', err);
+      const errorMessage = `Failed to delete farm: ${err.message}`;
+      setFormError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      console.log('=== DELETE FUNCTION END ===');
+      setFormLoading(false);
+    }
+  };
+
+  // Function to fetch farm details with referral code validation
+  const fetchFarmDetails = async (farmIdValue) => {
+    if (!farmIdValue.trim()) {
+      setFarmDetails(null);
+      setFarmDetailsError('');
+      return;
+    }
+
+    setFarmDetailsLoading(true);
+    setFarmDetailsError('');
+
+    try {
+      // Step 1: Validate referral code for partner and client roles
+      if (currentRole === 'partner' || currentRole === 'client') {
+        // Get user data from AuthContext storage
+        const storedAuth = localStorage.getItem('sat2farm_auth');
+        let userMobileNumber = null;
+        let authToken = null;
+        
+        if (storedAuth) {
+          try {
+            const authData = JSON.parse(storedAuth);
+            userMobileNumber = authData.phone_number;
+            authToken = authData.token || authData.jwt;
+          } catch (e) {
+            console.error('Error parsing auth data:', e);
+          }
+        }
+        
+        if (!userMobileNumber) {
+          setFarmDetailsError('User mobile number not found. Please login again.');
+          return;
+        }
+
+        // Check if farm ID is under this referral code
+        const referralCheckUrl = import.meta.env.VITE_FETCH_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue.trim()}`;
+        console.log('Checking referral code access:', referralCheckUrl);
+        
+        // Prepare headers - only add Authorization if token exists to avoid CORS issues
+        const referralHeaders = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (authToken) {
+          referralHeaders['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        const referralResponse = await fetch(referralCheckUrl, {
+          method: 'GET',
+          headers: referralHeaders
+        });
+        
+        const referralData = await referralResponse.json();
+        console.log('Referral validation response:', referralData);
+        
+        // Check if referral validation passed - look for success indicators
+        const isAccessGranted = referralData.message === "Access granted" || 
+                              referralData.status === "Success" || 
+                              referralData.success === true ||
+                              (referralData.data && referralData.data.access === true);
+        
+        if (!isAccessGranted) {
+          setFarmDetailsError('Access denied: This farm ID is not under your referral code.');
+          return;
+        }
+        
+        console.log('Referral code validation successful');
+      }
+
+      // Step 2: Fetch farm details after successful validation
+      const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farmIdValue.trim()}`;
+      console.log('Fetching farm details:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Farm details API response:', data);
+      
+      if (data.success && data.data) {
+        // Clear any previous error messages
+        setFarmDetailsError('');
+        
+        // Handle null values and format the data
+        const farmData = {
+          farmId: data.data.farm_id || farmIdValue.trim(),
+          cropType: data.data.croptype || 'N/A',
+          area: data.data.area ? `${data.data.area} acer` : 'N/A',
+          district: data.data.district || 'N/A',
+          state: data.data.state || 'N/A',
+          country: data.data.country || 'N/A',
+          timeOfRegistration: data.data.time || 'N/A'
+        };
+        
+        setFarmDetails(farmData);
+      } else {
+        setFarmDetailsError('Farm ID doesn\'t exist, please enter proper farm ID');
+      }
+    } catch (error) {
+      console.error('Error fetching farm details:', error);
+      setFarmDetailsError('Failed to fetch farm details');
+    } finally {
+      setFarmDetailsLoading(false);
+    }
   };
 
 
@@ -160,7 +533,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         setCustomExpiry('');
       } else {
         // Show the API message directly to the user
-        const apiMessage = data?.message || 'Farm already unlocked';
+        const apiMessage = data?.message || 'API returned an error';
         console.log('API indicates failure:', apiMessage);
         setFormError(apiMessage);
         toast.error(apiMessage);
@@ -177,18 +550,19 @@ export default function UnlockFarm({ user, onPageChange }) {
     }
   };
 
-  const handleBulkToggle = (clientId) => {
-    setBulkToggles(prev => 
-      prev.map(toggle => 
-        toggle.id === clientId 
-          ? { ...toggle, isOn: !toggle.isOn }
-          : toggle
-      )
-    );
-  };
+  // useEffect to fetch farm details when farm ID changes
+  useEffect(() => {
+    fetchFarmDetails(farmId);
+  }, [farmId]);
 
+  // useEffect to fetch recent farms on component load for client and partner roles
+  useEffect(() => {
+    fetchRecentFarms();
+  }, [currentRole]);
+
+  
   return (
-    <div className="content-area" style={{backgroundColor: '#ffffff', padding: '0', overflow: 'auto', minHeight: '100vh', width: '100%'}}>
+    <div className="content-area" style={{backgroundColor: '#ffffff', padding: '0', overflow: 'auto', height: '100vh', width: '100%'}}>
       {/* Top Navigation Bar - Full Width */}
       <div className="topbar" style={{marginBottom: '16px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
         <div className="tb-left">
@@ -215,6 +589,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         
       </div>
 
+      
       {/* Quick Actions Modal */}
       {modalOpen === 'quick-actions' && (
         <div className="modal-overlay">
@@ -253,6 +628,132 @@ export default function UnlockFarm({ user, onPageChange }) {
                   </>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Selection Modal */}
+      {showPlanModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '420px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto'}}>
+            <div className="modal-head">
+              <h3>Select Unlock Plan</h3>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowPlanModal(false)}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                <div>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
+                    Farm ID: <span style={{fontWeight: '600', color: 'var(--primary)'}}>{selectedFarmId}</span>
+                  </label>
+                </div>
+                
+                <div>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
+                    Select Plan Duration
+                  </label>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <button 
+                      className={`btn ${selectedPlan === '1' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      onClick={(e) => { e.stopPropagation(); setSelectedPlan('1'); }}
+                    >
+                      <div>
+                        <strong>1 Month</strong>
+                        <div style={{fontSize: '12px', color: selectedPlan === '1' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
+                          Short term access
+                        </div>
+                      </div>
+                    </button>
+                    
+                    <button 
+                      className={`btn ${selectedPlan === '6' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      onClick={(e) => { e.stopPropagation(); setSelectedPlan('6'); }}
+                    >
+                      <div>
+                        <strong>6 Months</strong>
+                        <div style={{fontSize: '12px', color: selectedPlan === '6' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
+                          Standard plan
+                        </div>
+                      </div>
+                    </button>
+                    
+                    <button 
+                      className={`btn ${selectedPlan === '12' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      onClick={(e) => { e.stopPropagation(); setSelectedPlan('12'); }}
+                    >
+                      <div>
+                        <strong>12 Months</strong>
+                        <div style={{fontSize: '12px', color: selectedPlan === '12' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
+                          Best value
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => setShowPlanModal(false)}
+                    disabled={planLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={unlockFarmWithPlan}
+                    disabled={planLoading || !selectedPlan}
+                  >
+                    {planLoading ? 'Processing...' : 'Unlock Farm'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && farmToDelete && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '400px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Confirm Delete</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeDeleteModal}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{padding: '16px 0'}}>
+                <p style={{fontSize: '14px', color: 'var(--text-1)', marginBottom: '8px'}}>
+                  Are you sure you want to delete Farm ID <strong>{farmToDelete.farmId}</strong>?
+                </p>
+                <p style={{fontSize: '12px', color: 'var(--text-3)'}}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button 
+                className="btn btn-ghost" 
+                onClick={closeDeleteModal}
+                disabled={formLoading}
+              >
+                No
+              </button>
+              <button 
+                className="btn btn-danger" 
+                onClick={handleDeleteFarm}
+                disabled={formLoading}
+              >
+                {formLoading ? 'Deleting...' : 'Yes, Delete'}
+              </button>
             </div>
           </div>
         </div>
@@ -355,10 +856,179 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       </div>
 
-      
-     
+      {/* Farm Details Table */}
+      {farmDetails && farmId.trim() && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-head">
+            <span className="card-title">Farm Details</span>
+          </div>
+          <div className="card-body">
+            <div style={{overflowX: 'auto'}}>
+              <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+                <thead>
+                  <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>District</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>State</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Country</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Time of Registration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{borderBottom: '1px solid var(--border)'}}>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.farmId}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.cropType}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.area}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.district}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.state}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.country}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.timeOfRegistration}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
-      
+      {/* Farm Details Loading */}
+      {farmDetailsLoading && farmId.trim() && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-body" style={{textAlign: 'center', padding: '24px'}}>
+            <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading farm details...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Farm Details Error */}
+      {farmDetailsError && farmId.trim() && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-body" style={{textAlign: 'center', padding: '24px'}}>
+            <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{farmDetailsError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Recently Added Farms Table - Only for Client and Partner */}
+      {(currentRole === 'client' || currentRole === 'partner') && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-head">
+            <span className="card-title">Top 50 Recently Added Farms</span>
+          </div>
+          <div className="card-body" style={{padding: '16px'}}>
+            {recentFarmsLoading && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recent farms...</p>
+              </div>
+            )}
+            
+            {recentFarmsError && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{recentFarmsError}</p>
+              </div>
+            )}
+            
+            {!recentFarmsLoading && !recentFarmsError && recentFarms.length > 0 && (
+              <div>
+                {/* Show only the selected farm group */}
+                {(() => {
+                  const startIdx = activePage * 10;
+                  const endIdx = Math.min(startIdx + 10, recentFarms.length);
+                  const groupFarms = recentFarms.slice(startIdx, endIdx);
+                  const groupNumber = activePage + 1;
+                  
+                  return (
+                    <div>
+                      <div style={{backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        <span style={{fontWeight: '600', color: 'var(--text-1)', fontSize: '13px'}}>
+                          {startIdx + 1} to {endIdx} farm ids in {groupNumber}
+                        </span>
+                      </div>
+                      <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '16px'}}>
+                        <thead>
+                          <tr style={{borderBottom: '1px solid var(--border)'}}>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Added Time</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupFarms.map((farm, index) => (
+                            <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmId}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmName}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.region}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.area}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.createdTime}</td>
+                              <td style={{padding: '10px 16px'}}>
+                                <div style={{display: 'flex', gap: '8px'}}>
+                                  <button
+                                    onClick={() => unlockRecentFarm(farm.farmId)}
+                                    disabled={formLoading}
+                                    className="btn btn-primary btn-sm"
+                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                                  >
+                                    {formLoading ? '...' : 'Unlock'}
+                                  </button>
+                                  <button
+                                    onClick={() => openDeleteModal(farm.farmId, startIdx + index)}
+                                    disabled={formLoading}
+                                    className="btn btn-danger btn-sm"
+                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+                
+                {/* Pagination Buttons */}
+                <div style={{display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                  {Array.from({ length: Math.ceil(recentFarms.length / 10) }, (_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setActivePage(index)}
+                      className="btn btn-sm"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '14px',
+                        borderRadius: '20px',
+                        backgroundColor: activePage === index ? '#2d7a3d' : '#ffffff',
+                        color: activePage === index ? '#ffffff' : '#333333',
+                        border: activePage === index ? 'none' : '1px solid #cccccc',
+                        cursor: 'pointer',
+                        fontWeight: activePage === index ? '600' : '400',
+                        minWidth: '36px',
+                        height: '36px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {!recentFarmsLoading && !recentFarmsError && recentFarms.length === 0 && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
