@@ -18,7 +18,7 @@ export default function Registration({ user, onPageChange }) {
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
     // Stay on the registration page for all role switches
-    // No redirects for any role - ops, sales, partner, or client
+    // No redirects for any role - ops, sales, manager, or client
   };
   const [formData, setFormData] = useState({
     fName: "",
@@ -43,7 +43,7 @@ export default function Registration({ user, onPageChange }) {
     console.log('User prop in Registration component:', user);
   }, [user]);
 
-  // Function to check manager count for client/partner roles
+  // Function to check manager count for client/manager roles
   const checkManagerCount = async (phoneNumber, category) => {
     try {
       console.log('Making API call to:', MANAGER_RESTRICT_API_URL);
@@ -105,8 +105,8 @@ export default function Registration({ user, onPageChange }) {
       return;
     }
 
-    // Check manager count restriction for client/partner roles when registering managers
-    if ((currentRole === 'client' || currentRole === 'partner') && formData.category === 'Franchise') {
+    // Check manager count restriction for client/manager roles when registering managers
+    if ((currentRole === 'client' || currentRole === 'manager') && formData.category === 'Franchise') {
       try {
         // Get the logged-in user's phone number from the user object
         const loggedInPhoneNumber = user?.phone_number || user?.phoneNumber || user?.pNumber;
@@ -468,8 +468,8 @@ export default function Registration({ user, onPageChange }) {
                 </div>
               </div>
 
-              {currentRole === 'client' || currentRole === 'partner' ? (
-                /* Only Referral Code for Client and Partner */
+              {currentRole === 'client' || currentRole === 'manager' ? (
+                /* Only Referral Code for Client and Manager */
                 <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
@@ -532,7 +532,7 @@ export default function Registration({ user, onPageChange }) {
                     required
                   >
                     <option value="">Choose a role...</option>
-                    {currentRole === 'client' || currentRole === 'partner' ? (
+                    {currentRole === 'client' || currentRole === 'manager' ? (
                       <>
                         <option value="farmer">Farmer</option>
                         <option value="Franchise">Manager</option>

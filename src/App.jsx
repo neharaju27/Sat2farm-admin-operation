@@ -48,12 +48,12 @@ function App() {
 
     // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
-      // Check if user is partner and saved page is lead-pipeline
+      // Check if user is manager and saved page is lead-pipeline
       let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
       
-      if (role === 'partner' && savedPage === 'lead-pipeline') {
-        // Partner trying to access lead-pipeline - redirect to unlock-farm instead
-        console.log('Partner user trying to access lead-pipeline, redirecting to unlock-farm');
+      if (role === 'manager' && savedPage === 'lead-pipeline') {
+        // Manager trying to access lead-pipeline - redirect to unlock-farm instead
+        console.log('Manager user trying to access lead-pipeline, redirecting to unlock-farm');
         setCurrentPage('unlock-farm');
         localStorage.setItem('currentPage', 'unlock-farm');
       } else if (role === 'client' && savedPage !== 'client-monthly-report' && savedPage !== 'unlock-farm' && savedPage !== 'register') {
@@ -82,8 +82,8 @@ function App() {
       console.log('Redirecting to client-monthly-report (client)');
       setCurrentPage('client-monthly-report');
       localStorage.setItem('currentPage', 'client-monthly-report');
-    } else if (role === 'partner' || role === 'test' || role === 'user') {
-      console.log('Redirecting to unlock-farm (partner)');
+    } else if (role === 'manager' || role === 'test' || role === 'user') {
+      console.log('Redirecting to unlock-farm (manager)');
       setCurrentPage('unlock-farm');
       localStorage.setItem('currentPage', 'unlock-farm');
     } else {

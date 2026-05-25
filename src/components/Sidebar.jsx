@@ -22,7 +22,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isOperationsUser = userRole === 'operation' || userRole === 'operations';
   const isSalesUser = userRole === 'sales';
   const isClientUser = userRole === 'client' || userRole === 'test' || userRole === 'user';
-  const isPartnerUser = userRole === 'partner' || userRole === 'admin';
+  const isManagerUser = userRole === 'manager' || userRole === 'admin';
   
   // Debug: Log what should be visible
   console.log('Sidebar - User data:', user);
@@ -40,7 +40,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
   const isClientActive = currentPage === 'unlock-farm' || currentPage === 'register';
-  const isPartnerActive = currentPage === 'unlock-farm' || currentPage === 'register';
+  const isManagerActive = currentPage === 'unlock-farm' || currentPage === 'register';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -69,13 +69,13 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       } else {
         alert('Access denied: Client users cannot access this page');
       }
-    } else if (isPartnerUser) {
-      // Partner users can only access specific pages
-      const allowedPartnerPages = ['unlock-farm', 'register'];
-      if (allowedPartnerPages.includes(page)) {
+    } else if (isManagerUser) {
+      // Manager users can only access specific pages
+      const allowedManagerPages = ['unlock-farm', 'register'];
+      if (allowedManagerPages.includes(page)) {
         onPageChange(page);
       } else {
-        alert('Access denied: Partner users cannot access this page');
+        alert('Access denied: Manager users cannot access this page');
       }
     } else {
       // Default fallback
@@ -95,7 +95,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       <div className="sb-role">Viewing as: <span>{
         user?.role === 'sales' || user?.role === 'Sales' ? 'Sales' : 
         user?.role === 'client' || user?.role === 'Client' ? 'Client' : 
-        user?.role === 'partner' || user?.role === 'Partner' ? 'Partner' :
+        user?.role === 'manager' || user?.role === 'Manager' ? 'Manager' :
         'Operations'
       }</span></div>
       
@@ -256,10 +256,10 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
           </>
         )}
 
-        {/* Partner Section - Only for Partner Users */}
-        {isPartnerUser && (
+        {/* Manager Section - Only for Manager Users */}
+        {isManagerUser && (
           <>
-            <div className="sb-section">Partner</div>
+            <div className="sb-section">Manager</div>
             <div 
               className={`sb-item ${currentPage === 'unlock-farm' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('unlock-farm')}

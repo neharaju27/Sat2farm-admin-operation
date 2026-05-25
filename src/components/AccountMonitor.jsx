@@ -19,10 +19,10 @@ export default function AccountMonitor({ user, onPageChange }) {
       { id: 3, name: 'Rahul', phone: '+91 9876543212', email: 'rahul@satyukt.com', role: 'sales' },
       { id: 4, name: 'Priya', phone: '+91 9876543213', email: 'priya@satyukt.com', role: 'sales' },
     ],
-    partner: [
-      { id: 5, name: 'GreenField Agro', phone: '+91 8765432101', email: 'contact@greenfield.com', role: 'partner' },
-      { id: 6, name: 'Sunrise Farms', phone: '+91 8765432102', email: 'info@sunrisefarms.com', role: 'partner' },
-      { id: 7, name: 'Deccan Planters', phone: '+91 8765432103', email: 'admin@deccan.com', role: 'partner' },
+    manager: [
+      { id: 5, name: 'GreenField Agro', phone: '+91 8765432101', email: 'contact@greenfield.com', role: 'manager' },
+      { id: 6, name: 'Sunrise Farms', phone: '+91 8765432102', email: 'info@sunrisefarms.com', role: 'manager' },
+      { id: 7, name: 'Deccan Planters', phone: '+91 8765432103', email: 'admin@deccan.com', role: 'manager' },
     ],
     client: [
       { id: 8, name: 'Kaveri Holdings', phone: '+91 7654321010', email: 'kaveri@holdings.com', role: 'client' },
@@ -69,7 +69,7 @@ export default function AccountMonitor({ user, onPageChange }) {
       // Redirect to appropriate page based on role
       if (account.role === 'sales') {
         onPageChange('assign-acreages');
-      } else if (account.role === 'partner' || account.role === 'client') {
+      } else if (account.role === 'manager' || account.role === 'client') {
         onPageChange('unlock-farm');
       }
     } catch (error) {
@@ -92,13 +92,13 @@ export default function AccountMonitor({ user, onPageChange }) {
 
   const roleLabels = {
     sales: 'Sales Accounts',
-    partner: 'Partner Accounts',
+    manager: 'Manager Accounts',
     client: 'Client Accounts'
   };
 
   const roleIcons = {
     sales: Users,
-    partner: Building,
+    manager: Building,
     client: User
   };
 
@@ -135,7 +135,7 @@ export default function AccountMonitor({ user, onPageChange }) {
           <div style={{ marginBottom: '24px' }}>
             <div className="role-switcher">
               <span style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: '500', marginRight: '8px' }}>Monitor:</span>
-              {['sales', 'partner', 'client'].map((role) => (
+              {['sales', 'manager', 'client'].map((role) => (
                 <button
                   key={role}
                   onClick={() => setSelectedRole(role)}

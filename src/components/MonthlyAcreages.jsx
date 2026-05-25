@@ -131,11 +131,11 @@ export default function MonthlyAcreages({ user, onPageChange }) {
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
     // Only redirect when switching to ops role
-    // For sales, partner, and client roles, stay on the monthly acreages page
+    // For sales, manager, and client roles, stay on the monthly acreages page
     if (role === 'ops') {
       onPageChange('monthly-acreages');
     }
-    // Remove redirects for sales, partner, and client to stay on monthly acreages page
+    // Remove redirects for sales, manager, and client to stay on monthly acreages page
   };
 
   const handleMonthSelect = async (month) => {
@@ -623,7 +623,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
             {/* Role Switcher for Account Monitor */}
             <div className="role-switcher" style={{ marginRight: '16px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: '500', marginRight: '8px' }}>Monitor:</span>
-              {['sales', 'client', 'partner'].map((role) => (
+              {['sales', 'client', 'manager'].map((role) => (
                 <button
                   key={role}
                   onClick={() => onPageChange('account-monitor')}
@@ -1549,7 +1549,7 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                       >
                         <option value="">Choose a role...</option>
                         <option value="farmer">Farmer</option>
-                        <option value="Admin">Partner</option>
+                        <option value="Admin">Manager</option>
                         <option value="Franchise">Manager</option>
                       </select>
                     </div>

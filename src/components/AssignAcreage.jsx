@@ -29,7 +29,7 @@ export default function AssignAcreage({ user, onPageChange }) {
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
     // Stay on the assign acreage page for all role switches
-    // No redirects for any role - ops, sales, partner, or client
+    // No redirects for any role - ops, sales, manager, or client
   };
 
   const openModal = (modalType = 'assign-modal') => {

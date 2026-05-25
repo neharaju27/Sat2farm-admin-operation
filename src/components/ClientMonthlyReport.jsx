@@ -318,7 +318,7 @@ export default function ClientMonthlyReport({ user, onPageChange }) {
   const handleDownload6MonthData = async () => {
     try {
       setLoadingReport(true);
-      const response = await fetch(`${import.meta.env.VITE_PARTNER_REPORTS_API_URL}`);
+      const response = await fetch(`${import.meta.env.VITE_MANAGER_REPORTS_API_URL}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

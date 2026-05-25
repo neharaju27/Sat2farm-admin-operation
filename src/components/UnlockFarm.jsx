@@ -19,7 +19,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
     // Stay on the unlock farm page for all role switches
-    // No redirects for any role - ops, sales, partner, or client
+    // No redirects for any role - ops, sales, manager, or client
   };
   // State for Unlock by Form ID modal
   const [showFormModal, setShowFormModal] = useState(false);
@@ -475,8 +475,8 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // Function to fetch top 50 recently added farms
   const fetchRecentFarms = async () => {
-    // Only fetch for client and partner roles
-    if (currentRole !== 'client' && currentRole !== 'partner') {
+    // Only fetch for client and manager roles
+    if (currentRole !== 'client' && currentRole !== 'manager') {
       return;
     }
 
@@ -587,7 +587,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Unlocking farm with plan:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method: 'GET'
+        method:'GET'
       });
       
       if (!response.ok) {
@@ -737,8 +737,8 @@ export default function UnlockFarm({ user, onPageChange }) {
     setFarmDetailsError('');
 
     try {
-      // Step 1: Validate referral code for partner and client roles
-      if (currentRole === 'partner' || currentRole === 'client') {
+      // Step 1: Validate referral code for manager and client roles
+      if (currentRole === 'manager' || currentRole === 'client') {
         // Get user data from AuthContext storage
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
@@ -853,8 +853,8 @@ export default function UnlockFarm({ user, onPageChange }) {
     setMessage('');
 
     try {
-      // Step 1: Verify farm ownership first (for client and partner roles)
-      if (currentRole === 'client' || currentRole === 'partner') {
+      // Step 1: Verify farm ownership first (for client and manager roles)
+      if (currentRole === 'client' || currentRole === 'manager') {
         // Get user data from AuthContext storage
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
@@ -983,7 +983,7 @@ export default function UnlockFarm({ user, onPageChange }) {
     fetchFarmDetails(farmId);
   }, [farmId]);
 
-  // useEffect to fetch recent farms on component load for client and partner roles
+  // useEffect to fetch recent farms on component load for client and manager roles
   useEffect(() => {
     fetchRecentFarms();
   }, [currentRole]);
@@ -999,7 +999,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             <div className="tb-sub">
               {currentRole === 'ops' ? 'Operations · Access Control' : 
                currentRole === 'sales' ? 'Sales · Access Control' : 
-               currentRole === 'partner' ? 'Partner · Access Control' :
+               currentRole === 'manager' ? 'Manager · Access Control' :
                'Client · Access Control'}
             </div>
           </div>
@@ -1014,7 +1014,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
           <div className="section-title">Farm requests</div>
         </div>
-        {(currentRole === 'partner' || currentRole === 'client') && (
+        {(currentRole === 'manager' || currentRole === 'client') && (
           <button className="btn btn-primary btn-sm" onClick={openAddFarmModal}>+ Add Farms</button>
         )}
       </div>
@@ -1031,8 +1031,8 @@ export default function UnlockFarm({ user, onPageChange }) {
             </div>
             <div className="modal-body">
               <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                {currentRole === 'client' || currentRole === 'partner' ? (
-                  // Client and Partner user options
+                {currentRole === 'client' || currentRole === 'manager' ? (
+                  // Client and Manager user options
                   <>
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('register'); }}>
                       <span style={{marginRight: '8px'}}>+</span> New registration
@@ -1838,8 +1838,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       )}
 
-      {/* Recently Added Farms Table - Only for Client and Partner */}
-      {(currentRole === 'client' || currentRole === 'partner') && (
+      {/* Recently Added Farms Table - Only for Client and Manager */}
+      {(currentRole === 'client' || currentRole === 'manager') && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
             <span className="card-title">Top 50 Recently Added Farms</span>

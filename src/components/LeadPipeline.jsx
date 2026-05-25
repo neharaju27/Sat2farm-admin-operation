@@ -89,7 +89,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(100);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]); // Array of {property, value, operator} objects
@@ -140,6 +140,30 @@ export default function LeadPipeline({ onPageChange }) {
 
   const getLeadsByStatus = (status) => {
     return leads.filter(lead => lead.leadStatus === status);
+  };
+
+  const getStatusSummary = () => {
+    const counts = {};
+    leads.forEach(lead => {
+      const status = lead.leadStatus || 'Unknown';
+      counts[status] = (counts[status] || 0) + 1;
+    });
+
+    const allowedStatuses = ['Enterprise', 'Growth', 'Starter', 'In Discussion'];
+
+    const orderedStatuses = allowedStatuses.filter(status => counts[status] > 0);
+
+    return orderedStatuses.map(status => ({
+      status,
+      count: counts[status] || 0,
+      color: statusConfig[status]?.color || '#6b7280',
+      label: statusConfig[status]?.label || status
+    }));
+  };
+
+  const handleStatusSummaryClick = (status) => {
+    setFilterStatus(prev => (prev === status ? 'all' : status));
+    setCurrentPage(1);
   };
 
   const getTotalValue = (status) => {
@@ -208,8 +232,12 @@ export default function LeadPipeline({ onPageChange }) {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const isNewThisWeek = createdDate >= oneWeekAgo;
     
-    return matchesSearch && (!newThisWeekFilter || isNewThisWeek);
-  });  
+    const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
+
+    return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
+  });
+
+  const statusSummary = getStatusSummary();  
 
   // Pagination
   const indexOfLastLead = currentPage * itemsPerPage;
@@ -1975,7 +2003,7 @@ export default function LeadPipeline({ onPageChange }) {
                 background: 'var(--gray-100)',
                 borderBottom: '2px solid var(--border)'
               }}>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11 }}>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
                       type="checkbox"
@@ -1992,24 +2020,24 @@ export default function LeadPipeline({ onPageChange }) {
                     <span>Contact Name</span>
                   </div>
                 </th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Phone Number</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Alternate Number</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Email</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Company Name</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Contact Owner</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>City</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>State</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Country</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Lead Status</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Tags</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Lead Source</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Description</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Created Time</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Industry</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Created By</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Modified By</th>
-                <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Last Activity</th>
-                <th style={{ padding: '12px 12px', textAlign: 'center', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', width: '120px' }}>Actions</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Phone Number</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Alternate Number</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Email</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Company Name</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Contact Owner</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>City</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>State</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Country</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Lead Status</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Tags</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Lead Source</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Description</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Created Time</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Industry</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Created By</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Modified By</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Last Activity</th>
+                <th style={{ padding: '16px 16px', textAlign: 'center', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', width: '120px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2061,7 +2089,7 @@ export default function LeadPipeline({ onPageChange }) {
                       e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6 }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
                           type="checkbox"
@@ -2096,31 +2124,31 @@ export default function LeadPipeline({ onPageChange }) {
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.phoneNumber}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.alternateNumber}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.email}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.companyName}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.contactOwner}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.city}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.state}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.country}
                     </td>
-                    <td style={{ padding: '12px 8px' }}>
+                    <td style={{ padding: '16px 16px' }}>
                       <span style={{
                         display: 'inline-block',
                         padding: '4px 8px',
@@ -2133,12 +2161,12 @@ export default function LeadPipeline({ onPageChange }) {
                         {lead.leadStatus}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
                         {lead.tags}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.leadSource}
                     </td>
                     <td style={{ padding: '12px 8px', color: 'var(--text)', maxWidth: '200px' }}>
@@ -2150,7 +2178,7 @@ export default function LeadPipeline({ onPageChange }) {
                         {lead.description}
                       </div>
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
                         {new Date(lead.createdTime).toLocaleDateString('en-IN', {
                           day: 'numeric',
@@ -2159,16 +2187,16 @@ export default function LeadPipeline({ onPageChange }) {
                         })}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.industry}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.createdBy}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       {lead.modifiedBy}
                     </td>
-                    <td style={{ padding: '12px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
                         {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
                           day: 'numeric',
@@ -2177,7 +2205,7 @@ export default function LeadPipeline({ onPageChange }) {
                         })}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 8px' }}>
+                    <td style={{ padding: '16px 16px' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                         <button
                           onClick={() => handleDeleteLead(lead.id)}
@@ -2207,83 +2235,224 @@ export default function LeadPipeline({ onPageChange }) {
         </div>
         
         {/* Pagination */}
-        {filteredLeads.length > itemsPerPage && (
+        {!loading && !error && (
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '16px',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--gray-50)'
+            padding: '1px 10px',
+            borderTop: '1px solid #e5e7eb',
+            background: '#fff',
+            flexShrink: 0
           }}>
-            <div style={{ color: 'var(--text-3)', fontSize: '14px' }}>
-              Showing {indexOfFirstLead + 1} to {Math.min(indexOfLastLead, filteredLeads.length)} of {filteredLeads.length} leads
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 12px',
-                  background: currentPage === 1 ? 'var(--gray-200)' : 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--r)',
-                  color: currentPage === 1 ? 'var(--text-3)' : 'var(--text)',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  fontSize: '12px'
-                }}
-              >
-                <ChevronLeft size={14} />
-                Previous
-              </button>
-              
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    style={{
-                      padding: '6px 10px',
-                      background: currentPage === page ? 'var(--green-600)' : 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--r)',
-                      color: currentPage === page ? 'white' : 'var(--text)',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      minWidth: '32px'
-                    }}
-                  >
-                    {page}
-                  </button>
-                ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
+              <span>Records per page</span>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    padding: '6px 32px 6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid #d1d5db',
+                    background: '#fff',
+                    fontSize: '13px',
+                    color: '#374151',
+                    cursor: 'pointer',
+                    minWidth: '56px',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  {[10, 25, 50, 100].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: '#9ca3af'
+                  }}
+                />
               </div>
-              
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1 || filteredLeads.length === 0}
+                aria-label="Previous page"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 12px',
-                  background: currentPage === totalPages ? 'var(--gray-200)' : 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--r)',
-                  color: currentPage === totalPages ? 'var(--text-3)' : 'var(--text)',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  fontSize: '12px'
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  padding: 0,
+                  background: 'none',
+                  border: 'none',
+                  color: currentPage === 1 || filteredLeads.length === 0 ? '#d1d5db' : '#6b7280',
+                  cursor: currentPage === 1 || filteredLeads.length === 0 ? 'not-allowed' : 'pointer'
                 }}
               >
-                Next
-                <ChevronRight size={14} />
+                <ChevronLeft size={18} />
+              </button>
+
+              <span style={{
+                fontSize: '13px',
+                color: '#374151',
+                minWidth: '56px',
+                textAlign: 'center',
+                whiteSpace: 'nowrap'
+              }}>
+                {filteredLeads.length === 0
+                  ? '0 to 0'
+                  : `${indexOfFirstLead + 1} to ${Math.min(indexOfLastLead, filteredLeads.length)}`}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, Math.max(totalPages, 1)))}
+                disabled={currentPage >= totalPages || filteredLeads.length === 0}
+                aria-label="Next page"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  padding: 0,
+                  background: 'none',
+                  border: 'none',
+                  color: currentPage >= totalPages || filteredLeads.length === 0 ? '#d1d5db' : '#6b7280',
+                  cursor: currentPage >= totalPages || filteredLeads.length === 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <ChevronRight size={18} />
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Status summary — horizontal footer bar */}
+      {!loading && !error && (
+        <div style={{
+          marginTop: '0',
+          padding: '8px 16px',
+          background: '#fff',
+          borderTop: '1px solid #e5e7eb',
+          flexShrink: 0
+        }}>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '20px 28px',
+            fontSize: '13px',
+            color: '#4b5563',
+            lineHeight: 1.4
+          }}>
+            <span style={{ color: '#4b5563', whiteSpace: 'nowrap' }}>
+              Total Leads{' '}
+              <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+              <strong style={{ color: '#111827', fontWeight: 600 }}>{leads.length}</strong>
+            </span>
+
+            {statusSummary.map(({ status, count, label }) => {
+              const isActive = filterStatus === status;
+              const itemContent = (
+                <>
+                  {label}{' '}
+                  <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                  <strong style={{ color: '#111827', fontWeight: 600 }}>{count}</strong>
+                </>
+              );
+
+              if (isActive) {
+                return (
+                  <span
+                    key={status}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleStatusSummaryClick(status)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: 'none',
+                        background: '#dcfce7',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {itemContent}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterStatus('all');
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#2563eb',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </span>
+                );
+              }
+
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => handleStatusSummaryClick(status)}
+                  title={`Filter by ${label}`}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#4b5563',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#111827'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#4b5563'; }}
+                >
+                  {itemContent}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Sidebar */}
       {filterSidebarOpen && (
