@@ -747,7 +747,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Unlocking farm with plan:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method:'GET'
+        method:'POST'
       });
       
       if (!response.ok) {
@@ -1089,7 +1089,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Calling API:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method: 'GET'
+        method: 'POST'
       });
       
       if (!response.ok) {
@@ -1110,26 +1110,20 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
       
-      // Check if the API call was successful based on response data
-      if (data && data.status !== 'Failure') {
-        const statusText = status === 'lock' ? 'locked' : 'unlocked';
-        const successMessage = `Farm ID ${farmId.trim()} has been ${statusText} successfully!`;
+      const apiMessage = data?.message || `Farm ID ${farmId.trim()} has been ${status === 'lock' ? 'locked' : 'unlocked'} successfully!`;
+      const wasSuccessful = data?.status?.toLowerCase() === 'success';
+      
+      if (wasSuccessful) {
+        toast.success(apiMessage);
+        setMessage(apiMessage);
         
-        // Show toast message instead of alert
-        toast.success(successMessage);
-        
-        // Also set the message state for UI display
-        setMessage(successMessage);
-        
-        // Reset form
+        // Reset form only when the operation is truly completed or idempotent success
         setFarmId('');
         setStatus('unlock');
         setPaymentMode('cash');
         setExpiry('6');
         setCustomExpiry('');
       } else {
-        // Show the API message directly to the user
-        const apiMessage = data?.message || 'Farm already unlocked';
         console.log('API indicates failure:', apiMessage);
         setFormError(apiMessage);
         toast.error(apiMessage);
