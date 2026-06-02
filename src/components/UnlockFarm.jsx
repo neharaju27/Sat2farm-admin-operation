@@ -2141,19 +2141,25 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <td style={{padding: '10px 16px'}}>
                                 <div style={{display: 'flex', gap: '8px'}}>
                                   <button
-                                    onClick={() => unlockRecentFarm(farm.farmId)}
-                                    disabled={formLoading}
+                                    onClick={() => {
+                                      console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                      unlockRecentFarm(farm.farmId);
+                                    }}
+                                    disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
                                     className="btn btn-primary btn-sm"
-                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
                                   >
                                     {formLoading ? '...' : 'Unlock'}
                                   </button>
                                   {selectedView === 'added' && (
                                     <button
-                                      onClick={() => openDeleteModal(farm.farmId, startIdx + index)}
-                                      disabled={formLoading}
+                                      onClick={() => {
+                                        console.log('Delete button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                        openDeleteModal(farm.farmId, startIdx + index);
+                                      }}
+                                      disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
                                       className="btn btn-danger btn-sm"
-                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
                                     >
                                       Delete
                                     </button>
