@@ -35,12 +35,18 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
   const [farmDetailsError, setFarmDetailsError] = useState('');
   
-  // State for recently added farms
+  // State for recently added farms (for manager and client roles)
   const [recentFarms, setRecentFarms] = useState([]);
   const [recentFarmsLoading, setRecentFarmsLoading] = useState(false);
   const [recentFarmsError, setRecentFarmsError] = useState('');
   const [activePage, setActivePage] = useState(0);
   const [selectedView, setSelectedView] = useState('added'); // 'added' or 'expiring'
+  
+  // State for ops role recent farms
+  const [opsRecentFarms, setOpsRecentFarms] = useState([]);
+  const [opsRecentFarmsLoading, setOpsRecentFarmsLoading] = useState(false);
+  const [opsRecentFarmsError, setOpsRecentFarmsError] = useState('');
+  const [opsActivePage, setOpsActivePage] = useState(0);
   
   // State for expiring farms
   const [expiringFarms, setExpiringFarms] = useState([]);
@@ -486,8 +492,8 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // Function to fetch top 50 recently added farms
   const fetchRecentFarms = async () => {
-    // Only fetch for client and manager roles
-    if (currentRole !== 'client' && currentRole !== 'manager') {
+    // Fetch for client, manager, ops, and sales roles
+    if (currentRole !== 'client' && currentRole !== 'manager' && currentRole !== 'ops' && currentRole !== 'sales') {
       return;
     }
 
@@ -573,6 +579,82 @@ export default function UnlockFarm({ user, onPageChange }) {
       setRecentFarmsError('Failed to fetch recent farms');
     } finally {
       setRecentFarmsLoading(false);
+    }
+  };
+
+  // Function to fetch top 50 recently added farms for ops role
+  const fetchOpsRecentFarms = async () => {
+    // Only fetch for ops and sales roles
+    if (currentRole !== 'ops' && currentRole !== 'sales') {
+      return;
+    }
+
+    setOpsRecentFarmsLoading(true);
+    setOpsRecentFarmsError('');
+
+    try {
+      const apiUrl = import.meta.env.VITE_OPS_RECENT_FARMS_API_URL;
+      console.log('Fetching ops recent farms:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoint not found. Please check the API URL configuration.');
+        } else if (response.status === 500) {
+          throw new Error('Server error occurred. Please try again later or contact support.');
+        } else if (response.status === 401) {
+          throw new Error('Unauthorized access. Please login again.');
+        } else if (response.status === 403) {
+          throw new Error('Access forbidden. You do not have permission to access this resource.');
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      }
+      
+      const data = await response.json();
+      console.log('Ops recent farms API response:', data);
+      
+      if (data && Array.isArray(data)) {
+        // Format the API response data to match the expected structure
+        const formattedFarms = data.map((farm, index) => ({
+          farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
+          farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
+          region: farm.state || farm.region || 'Unknown Region',
+          area: farm.area ? `${farm.area} acre` : (farm.area ? `${farm.area} acre` : 'N/A'),
+          createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
+        }));
+        
+        setOpsRecentFarms(formattedFarms);
+        console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
+      } else if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
+        // Handle if API returns data in {status: "Success", data: [...]} format
+        const formattedFarms = data.data.map((farm, index) => ({
+          farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
+          farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
+          region: farm.state || farm.region || 'Unknown Region',
+          area: farm.area ? `${farm.area} acre` : 'N/A',
+          createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
+        }));
+        
+        setOpsRecentFarms(formattedFarms);
+        console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
+      } else {
+        console.log('API response structure:', data);
+        setOpsRecentFarmsError('No farms data received from server');
+      }
+    } catch (error) {
+      console.error('Error fetching ops recent farms:', error);
+      setOpsRecentFarmsError('Failed to fetch recent farms');
+    } finally {
+      setOpsRecentFarmsLoading(false);
     }
   };
 
@@ -1145,12 +1227,16 @@ export default function UnlockFarm({ user, onPageChange }) {
     fetchFarmDetails(farmId);
   }, [farmId]);
 
-  // useEffect to fetch recent farms on component load for client and manager roles
+  // useEffect to fetch recent farms on component load
   useEffect(() => {
-    if (selectedView === 'added') {
-      fetchRecentFarms();
-    } else {
-      fetchExpiringFarms();
+    if (currentRole === 'ops' || currentRole === 'sales') {
+      fetchOpsRecentFarms();
+    } else if (currentRole === 'client' || currentRole === 'manager') {
+      if (selectedView === 'added') {
+        fetchRecentFarms();
+      } else {
+        fetchExpiringFarms();
+      }
     }
   }, [currentRole, selectedView]);
 
@@ -2038,6 +2124,103 @@ export default function UnlockFarm({ user, onPageChange }) {
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-body" style={{textAlign: 'center', padding: '24px'}}>
             <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{farmDetailsError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 50 Recently Added Farms Section - Only for Ops and Sales */}
+      {(currentRole === 'ops' || currentRole === 'sales') && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-head">
+            <span className="card-title">50 Recently Added Farm</span>
+          </div>
+          <div className="card-body">
+            {opsRecentFarmsLoading && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recently added farms...</p>
+              </div>
+            )}
+            {opsRecentFarmsError && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{opsRecentFarmsError}</p>
+              </div>
+            )}
+            {!opsRecentFarmsLoading && !opsRecentFarmsError && opsRecentFarms.length > 0 && (
+              <div>
+                {(() => {
+                  const startIdx = opsActivePage * 10;
+                  const endIdx = Math.min(startIdx + 10, opsRecentFarms.length);
+                  const groupFarms = opsRecentFarms.slice(startIdx, endIdx);
+                  const groupNumber = opsActivePage + 1;
+
+                  return (
+                    <div>
+                      <div style={{backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        <span style={{fontWeight: '600', color: 'var(--text-1)', fontSize: '13px'}}>
+                          {startIdx + 1} to {endIdx} farm ids in {groupNumber}
+                        </span>
+                      </div>
+                      <div style={{overflowX: 'auto'}}>
+                        <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+                          <thead>
+                            <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm Name</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Region</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Added Time</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Client ID</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {groupFarms.map((farm, index) => (
+                              <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmId}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmName}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.region}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.area}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.createdTime}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Pagination Buttons */}
+                      <div style={{display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        {Array.from({ length: Math.ceil(opsRecentFarms.length / 10) }, (_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setOpsActivePage(index)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '14px',
+                              borderRadius: '20px',
+                              backgroundColor: opsActivePage === index ? '#2d7a3d' : '#ffffff',
+                              color: opsActivePage === index ? '#ffffff' : '#333333',
+                              border: opsActivePage === index ? 'none' : '1px solid #cccccc',
+                              cursor: 'pointer',
+                              fontWeight: opsActivePage === index ? '600' : '400',
+                              minWidth: '36px',
+                              height: '36px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {index + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            {!opsRecentFarmsLoading && !opsRecentFarmsError && opsRecentFarms.length === 0 && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No recently added farms found</p>
+              </div>
+            )}
           </div>
         </div>
       )}
