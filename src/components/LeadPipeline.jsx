@@ -179,8 +179,9 @@ export default function LeadPipeline({ onPageChange }) {
       const originalText = button.textContent;
       button.textContent = 'Downloading...';
       button.disabled = true;
-
-      const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}`, {
+      
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
