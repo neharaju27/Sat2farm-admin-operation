@@ -584,8 +584,8 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // Function to fetch top 50 recently added farms for ops role
   const fetchOpsRecentFarms = async () => {
-    // Only fetch for ops and sales roles
-    if (currentRole !== 'ops' && currentRole !== 'sales') {
+    // Only fetch for ops role
+    if (currentRole !== 'ops') {
       return;
     }
 
@@ -2128,8 +2128,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       )}
 
-      {/* 50 Recently Added Farms Section - Only for Ops and Sales */}
-      {(currentRole === 'ops' || currentRole === 'sales') && (
+      {/* 50 Recently Added Farms Section - Only for Ops */}
+      {currentRole === 'ops' && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
             <span className="card-title">50 Recently Added Farm</span>

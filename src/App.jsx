@@ -65,12 +65,14 @@ function App() {
     if (hasRedirected) return;
 
     const savedPage = localStorage.getItem('currentPage');
+    let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
+
+    console.log('App.jsx - User role detected:', role);
+    console.log('App.jsx - Saved page from localStorage:', savedPage);
 
     // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
       // Check if user is manager and saved page is lead-pipeline
-      let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
-      
       if (role === 'manager' && savedPage === 'lead-pipeline') {
         // Manager trying to access lead-pipeline - redirect to unlock-farm instead
         console.log('Manager user trying to access lead-pipeline, redirecting to unlock-farm');
@@ -82,7 +84,7 @@ function App() {
         setCurrentPage('client-monthly-report');
         localStorage.setItem('currentPage', 'client-monthly-report');
       } else {
-        // Normal page restore
+        // Normal page restore - stay on the current page
         setCurrentPage(savedPage);
       }
       setHasRedirected(true);
@@ -90,8 +92,6 @@ function App() {
     }
 
     // Fresh login — redirect based on role
-    let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
-
     console.log('User logged in, detected role:', role);
 
     if (role === 'sales') {

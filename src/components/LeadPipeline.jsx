@@ -997,7 +997,8 @@ export default function LeadPipeline({ onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      if (result.success) {
+      // Check if lead was deleted successfully (either success=true or message contains "deleted")
+      if (result.success || (result.message && result.message.toLowerCase().includes('deleted'))) {
         console.log('Lead deletion successful');
         // Remove lead from local state
         setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
@@ -1010,14 +1011,14 @@ export default function LeadPipeline({ onPageChange }) {
           setSelectedUser(null);
         }
         
-        alert('Lead deleted successfully!');
+        toast.success('Lead deleted successfully!');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to delete lead: ${result.message || 'Unknown error'}`);
+        toast.error(`Failed to delete lead: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Network error deleting lead:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      toast.error(`Network error: ${err.message || 'Unknown error occurred'}`);
     }
   };
 
@@ -1257,7 +1258,8 @@ export default function LeadPipeline({ onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      if (result.success) {
+      // Check if lead was created successfully (either success=true or message contains "Lead created")
+      if (result.success || (result.message && result.message.toLowerCase().includes('lead created'))) {
         console.log('Lead creation successful');
         // Refresh the leads list
         fetchLeads();
@@ -1265,11 +1267,11 @@ export default function LeadPipeline({ onPageChange }) {
         toast.success('Lead created successfully!');
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to create lead: ${result.message || 'Unknown error'}`);
+        toast.error(`Failed to create lead: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Network error creating lead:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      toast.error(`Network error: ${err.message || 'Unknown error occurred'}`);
     }
   };
 
