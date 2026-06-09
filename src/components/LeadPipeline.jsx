@@ -1586,11 +1586,16 @@ export default function LeadPipeline({ onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      if (result.success) {
+      if (result.success || (result.message && result.message.toLowerCase().includes('csv processed'))) {
         console.log('CSV import successful');
         // Refresh leads data to show newly imported leads
         await fetchLeads();
-        alert(`Successfully imported ${result.imported_count || result.count || 'unknown number of'} leads!`);
+        const count = result.imported_count || result.count;
+        if (count) {
+          alert(`Successfully imported ${count} leads!`);
+        } else {
+          alert('CSV processed successfully!');
+        }
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to import CSV: ${result.message || 'Unknown error'}`);
