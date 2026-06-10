@@ -980,7 +980,8 @@ export default function LeadPipeline({ onPageChange }) {
     }
     
     try {
-      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}`;
+      const currentUserName = user?.name || '';
+      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
@@ -1193,7 +1194,8 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating contact name:', { leadId, newContactName });
     
     try {
-      const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newContactName)}&user=admin`;
+      const currentUserName = user?.name || '';
+      const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newContactName)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
@@ -1244,7 +1246,8 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Creating new lead:', leadData);
     
     try {
-      const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}`;
+      const currentUserName = user?.name || '';
+      const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}?user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
