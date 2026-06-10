@@ -15,7 +15,7 @@ export default function LeadPipeline({ onPageChange }) {
     const fetchLeads = async () => {
       try {
         setLoading(true);
-        const currentUserName = user?.name || user?.phone_number || 'operation';
+        const currentUserName = user?.name || '';
         const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
         
         if (!response.ok) {
@@ -94,6 +94,11 @@ export default function LeadPipeline({ onPageChange }) {
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]); // Array of {property, value, operator} objects
   const [currentProperty, setCurrentProperty] = useState('');
+
+  // Reset page to 1 when filters, search terms, or leads change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, newThisWeekFilter, isFilterApplied, leads]);
 
   // Get unique values for a specific property from leads data
   const getUniqueValues = (property) => {
@@ -180,7 +185,7 @@ export default function LeadPipeline({ onPageChange }) {
       button.textContent = 'Downloading...';
       button.disabled = true;
       
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = user?.name || '';
       const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`, {
         method: 'GET',
         headers: {
@@ -267,7 +272,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating lead status:', { leadId, newStatus });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -319,7 +324,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating lead owner:', { leadId, newOwner });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newOwner)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -374,7 +379,7 @@ export default function LeadPipeline({ onPageChange }) {
       let url;
       let successMessage;
       
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       
       // Use specific API for contact name, phone number, email, and company name updates
       if (fieldName === 'contactName') {
@@ -543,7 +548,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating lead tags:', { leadId, newTags });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newTags)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -595,7 +600,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating lead source:', { leadId, newLeadSource });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newLeadSource)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -647,7 +652,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating city:', { leadId, newCity });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newCity)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -699,7 +704,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating state:', { leadId, newState });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newState)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -751,7 +756,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating country:', { leadId, newCountry });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newCountry)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -803,7 +808,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating industry:', { leadId, newIndustry });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newIndustry)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -855,7 +860,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating lead status from Lead Information modal:', { leadId, newStatus });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -912,7 +917,7 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Updating alternate phone number from Lead Information modal:', { leadId, newAlternateNumber });
     
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newAlternateNumber)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -1109,7 +1114,7 @@ export default function LeadPipeline({ onPageChange }) {
       const urlParams = [];
       
       // Add current user parameter
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = user?.name || '';
       urlParams.push(`user=${encodeURIComponent(currentUser)}`);
       
       // Build URL parameters for all filters
@@ -1287,7 +1292,7 @@ export default function LeadPipeline({ onPageChange }) {
       const urlParams = [];
       
       // Add base parameters
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
       urlParams.push('status_is_not=junk');
       
@@ -1568,11 +1573,11 @@ export default function LeadPipeline({ onPageChange }) {
     try {
       const formData = new FormData();
       formData.append('csv_file', file);
-      formData.append('user', user?.name || user?.phone_number || 'operation');
-      formData.append('contact_owner', user?.name || user?.phone_number || 'operation');
+      formData.append('user', user?.name || '');
+      formData.append('contact_owner', user?.name || '');
       
       console.log('Uploading CSV to API...');
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}?user=${encodeURIComponent(currentUserName)}`, {
         method: 'POST',
         body: formData
@@ -1613,7 +1618,7 @@ export default function LeadPipeline({ onPageChange }) {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = user?.name || '';
       const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
       
       if (!response.ok) {
@@ -5880,7 +5885,7 @@ export default function LeadPipeline({ onPageChange }) {
                     <input
                       type="text"
                       name="createdBy"
-                      value={user?.name || user?.phone_number || 'operation'}
+                      value={user?.name || ''}
                       readOnly
                       style={{
                         width: '100%',
@@ -5898,7 +5903,7 @@ export default function LeadPipeline({ onPageChange }) {
                     <input
                       type="text"
                       name="modifiedBy"
-                      value={user?.name || user?.phone_number || 'operation'}
+                      value={user?.name || ''}
                       readOnly
                       style={{
                         width: '100%',
@@ -5959,8 +5964,8 @@ export default function LeadPipeline({ onPageChange }) {
                     lead_source: formData.get('leadSource') || '',
                     description: formData.get('description') || '',
                     industry: formData.get('industry') || '',
-                    created_by: user?.name || user?.phone_number || 'operation',
-                    modified_by: user?.name || user?.phone_number || 'operation',
+                    created_by: user?.name || '',
+                    modified_by: user?.name || '',
                     last_activity: formData.get('lastActivity') || new Date().toISOString()
                   };
                   
