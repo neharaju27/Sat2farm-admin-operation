@@ -1108,6 +1108,10 @@ export default function LeadPipeline({ onPageChange }) {
       let url = `${import.meta.env.VITE_LEADS_API_URL}/download?`;
       const urlParams = [];
       
+      // Add current user parameter
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      urlParams.push(`user=${encodeURIComponent(currentUser)}`);
+      
       // Build URL parameters for all filters
       filters.forEach(filter => {
         if (filter.property === 'contact_owner' && filter.value) {
