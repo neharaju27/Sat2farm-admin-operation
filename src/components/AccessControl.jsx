@@ -3,18 +3,34 @@ import { AlertCircle, Lock } from 'lucide-react';
 export default function AccessControl({ user, currentPage, onPageChange, children }) {
   const isSalesUser = user?.role === 'sales' || user?.role === 'Sales';
   
-  // Sales users now have access to all pages
-  // No restrictions applied
-  const isPageRestricted = false;
+  // List of sales users BLOCKED from accessing unlock-farm and assign-acreage
+  const blockedSalesUsers = [
+    'Chaturya',
+    'Priyanshu',
+    'Bhagwati',
+    'Harshitha',
+    'Shurti',
+    'Vijay K B',
+    'Mustaqeem'
+  ];
+  
+  // Get user name from various possible fields
+  const userName = user?.name || user?.full_name || user?.first_name || user?.username || '';
+  
+  // Check if current sales user is in the blocked list
+  const isBlockedSalesUser = blockedSalesUsers.some(blockedName => 
+    userName.toLowerCase().includes(blockedName.toLowerCase())
+  );
+  
+  // Restrict access to unlock-farm and assign-acreages for sales users in blocked list
+  const isPageRestricted = isSalesUser && 
+    (currentPage === 'unlock-farm' || currentPage === 'assign-acreages') && 
+    isBlockedSalesUser;
   
   if (!isPageRestricted) {
     // No restriction, render the children normally
     return children;
   }
-  
-  const handleRedirectToUnlockFarm = () => {
-    onPageChange('unlock-farm');
-  };
   
   return (
     <div style={{
@@ -64,7 +80,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
           lineHeight: '1.5',
           marginBottom: '24px'
         }}>
-          This page is only accessible to Operations users. As a Sales user, you only have access to the Unlock Farm functionality.
+          This page is only accessible to specific authorized Sales users. Please contact your administrator if you believe you should have access.
         </p>
         
         <div style={{
@@ -87,32 +103,6 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
             </div>
           </div>
         </div>
-        
-        <button
-          onClick={handleRedirectToUnlockFarm}
-          style={{
-            backgroundColor: '#184876',
-            color: 'white',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontSize: '16px',
-            fontWeight: '500',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            width: '100%'
-          }}
-          onMouseOver={(e) => {
-            e.target.style.backgroundColor = '#1a5490';
-            e.target.style.transform = 'translateY(-1px)';
-          }}
-          onMouseOut={(e) => {
-            e.target.style.backgroundColor = '#184876';
-            e.target.style.transform = 'translateY(0)';
-          }}
-        >
-          Go to Unlock Farm
-        </button>
       </div>
     </div>
   );
