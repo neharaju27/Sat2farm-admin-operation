@@ -44,7 +44,7 @@ export default function LeadPipeline({ onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
+          lastActivity: lead.last_activity || lead.created_time || ''
         }));
         
         setLeads(transformedLeads);
@@ -1084,7 +1084,7 @@ export default function LeadPipeline({ onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
+          lastActivity: lead.last_activity || lead.created_time || ''
         }));
         
         setLeads(transformedLeads);
@@ -1380,7 +1380,7 @@ export default function LeadPipeline({ onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
+          lastActivity: lead.last_activity || lead.created_time || ''
         }));
         
         console.log('Setting filtered leads:', transformedLeads.length);
@@ -1650,7 +1650,7 @@ export default function LeadPipeline({ onPageChange }) {
         industry: lead.industry || '',
         createdBy: lead.created_by || 'System',
         modifiedBy: lead.modified_by || 'System',
-        lastActivity: lead.last_activity || new Date().toISOString()
+        lastActivity: lead.last_activity || lead.created_time || ''
       }));
       
       setLeads(transformedLeads);
