@@ -4,8 +4,7 @@ import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin,
 import toast from 'react-hot-toast';
 import '../styles/Sat2FarmAdminPortal.css';
 
-export default function LeadPipeline({ onPageChange }) {
-  const { user } = useAuth();
+export default function LeadPipeline({ user, onPageChange }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
