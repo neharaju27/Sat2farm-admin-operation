@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '../styles/Sat2FarmAdminPortal.css';
 
-export default function LeadPipeline({ user, onPageChange }) {
+export default function LeadPipeline({ onPageChange }) {
+  const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,7 +15,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     const fetchLeads = async () => {
       try {
         setLoading(true);
-        const currentUserName = user?.name || '';
+        const currentUserName = user?.name || user?.phone_number || 'operation';
         const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
         
         if (!response.ok) {
@@ -43,7 +44,7 @@ export default function LeadPipeline({ user, onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || lead.created_time || ''
+          lastActivity: lead.last_activity || new Date().toISOString()
         }));
         
         setLeads(transformedLeads);
@@ -80,6 +81,33 @@ export default function LeadPipeline({ user, onPageChange }) {
   const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
   const [customIndustry, setCustomIndustry] = useState('');
   const [showCustomIndustryInput, setShowCustomIndustryInput] = useState(false);
+
+  // ── Close all dropdowns when one is opened ─────────────────────────────────
+  const closeAllDropdowns = () => {
+    setStatusDropdownOpen(false);
+    setOwnerDropdownOpen(false);
+    setTagsDropdownOpen(false);
+    setLeadSourceDropdownOpen(false);
+    setIndustryDropdownOpen(false);
+  };
+
+  // ── Tab state for modal right panel ──────────────────────────────────────
+  const [activeModalTab, setActiveModalTab] = useState('timeline');
+  const [showCreateDealModal, setShowCreateDealModal] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [timelineData, setTimelineData] = useState([]); // Timeline data
+  const [timelineLoading, setTimelineLoading] = useState(false); // Timeline loading state
+  const [taskName, setTaskName] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskOwner, setTaskOwner] = useState('');
+  const [taskStatus, setTaskStatus] = useState('Pending');
+  const [noteInput, setNoteInput] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [addingNote, setAddingNote] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
+  
   const [contactOwnerFilter, setContactOwnerFilter] = useState('');
   const [contactOwnerFilterOperator, setContactOwnerFilterOperator] = useState('is');
   const [isFilterApplied, setIsFilterApplied] = useState(false);
@@ -93,11 +121,18 @@ export default function LeadPipeline({ user, onPageChange }) {
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]); // Array of {property, value, operator} objects
   const [currentProperty, setCurrentProperty] = useState('');
-
-  // Reset page to 1 when filters, search terms, or leads change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterStatus, newThisWeekFilter, isFilterApplied, leads]);
+  const [showMoreDropdown, setShowMoreDropdown] = useState(false);
+  const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedFieldToUpdate, setSelectedFieldToUpdate] = useState('');
+  const [updateFieldValue, setUpdateFieldValue] = useState('');
+  const [updateNewFieldValue, setUpdateNewFieldValue] = useState('');
+  const [convertAccountName, setConvertAccountName] = useState('');
+  const [convertWebsite, setConvertWebsite] = useState('');
+  const [convertAccountType, setConvertAccountType] = useState('');
 
   // Get unique values for a specific property from leads data
   const getUniqueValues = (property) => {
@@ -128,19 +163,254 @@ export default function LeadPipeline({ user, onPageChange }) {
     return getUniqueValues('contact_owner');
   };
 
-  const statusConfig = {
-    'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
-    'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
-    'Contacted': { color: '#8b5cf6', label: 'Contacted' },
-    'Starter': { color: '#14b8a6', label: 'Starter' },
-    'Growth': { color: '#0ea5e9', label: 'Growth' },
-    'Enterprise': { color: '#6366f1', label: 'Enterprise' },
-    'Follow-up 1': { color: '#10b981', label: 'Follow-up 1' },
-    'Follow-up 2': { color: '#06b6d4', label: 'Follow-up 2' },
-    'In Discussion': { color: '#8b5cf6', label: 'In Discussion' },
-    'Interested': { color: '#10b981', label: 'Interested' },
-    'Junk': { color: '#ef4444', label: 'Junk' }
+  // Get unique tags from leads data
+  const getUniqueTags = () => {
+    const allTags = leads.flatMap(lead => {
+      if (lead.tags && lead.tags.trim()) {
+        return lead.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+      return [];
+    });
+    return [...new Set(allTags)].sort();
   };
+
+  // Get icon for timeline field
+  const getTimelineIcon = (field) => {
+    const iconMap = {
+      'contactName': User,
+      'phoneNumber': Phone,
+      'email': Mail,
+      'companyName': Building,
+      'alternateNumber': Phone,
+      'city': MapPin,
+      'state': Map,
+      'country': Globe,
+      'leadStatus': Activity,
+      'industry': Briefcase,
+      'contactOwner': UserCheck,
+      'leadSource': TrendingUp,
+      'tags': Tag,
+      'notes': MessageSquare,
+      'description': FileText
+    };
+    const IconComponent = iconMap[field] || FileEdit;
+    return IconComponent;
+  };
+
+  // Add note using API
+  const handleAddNote = async () => {
+    if (!noteInput.trim()) {
+      toast.error('Please enter a note');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No lead selected');
+      return;
+    }
+
+    setAddingNote(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=note&message=${encodeURIComponent(noteInput)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding note:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Note added successfully:', result);
+
+      if (result.success || result.message) {
+        toast.success('Note added successfully');
+        setNoteInput('');
+        // Refresh timeline to show the new note
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new note
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to add note');
+      }
+    } catch (err) {
+      console.error('Error adding note:', err);
+      toast.error('Failed to add note');
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  // Add task using API
+  const handleAddTask = async () => {
+    if (!taskName.trim()) {
+      toast.error('Please enter task name');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No lead selected');
+      return;
+    }
+
+    setAddingTask(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Task added successfully:', result);
+
+      if (result.success || result.message) {
+        toast.success('Task created successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskStatus('Pending');
+        setShowCreateTaskModal(false);
+        // Refresh timeline to show the new task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to create task');
+      }
+    } catch (err) {
+      console.error('Error adding task:', err);
+      toast.error('Failed to create task');
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  // Edit task - populate form with task data
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setTaskName(task.task_name);
+    setTaskDueDate(task.due_date);
+    setTaskStatus(task.status);
+    setShowEditTaskModal(true);
+  };
+
+  // Update task using API
+  const handleUpdateTask = async () => {
+    if (!taskName.trim()) {
+      toast.error('Please enter task name');
+      return;
+    }
+
+    if (!editingTask) {
+      toast.error('No task selected');
+      return;
+    }
+
+    setAddingTask(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${editingTask.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Task updated successfully:', result);
+
+      if (result.success || result.message) {
+        toast.success('Task updated successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskStatus('Pending');
+        setEditingTask(null);
+        setShowEditTaskModal(false);
+        // Refresh timeline to show the updated task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the updated task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to update task');
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
+      toast.error('Failed to update task');
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  // Fetch activities from API
+  const fetchActivities = async (leadId) => {
+    try {
+      const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${leadId}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Error fetching activities:', response.status);
+        return;
+      }
+
+      const result = await response.json();
+      console.log('Activities fetched:', result);
+      setActivities(result || []);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  };
+
+  const [statusConfig, setStatusConfig] = useState(() => {
+    const saved = localStorage.getItem('statusConfig');
+    return saved ? JSON.parse(saved) : {
+      'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
+      'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
+      'Contacted': { color: '#8b5cf6', label: 'Contacted' },
+      'Starter': { color: '#14b8a6', label: 'Starter' },
+      'Growth': { color: '#0ea5e9', label: 'Growth' },
+      'Enterprise': { color: '#6366f1', label: 'Enterprise' },
+      'Follow-up 1': { color: '#10b981', label: 'Follow-up 1' },
+      'Follow-up 2': { color: '#06b6d4', label: 'Follow-up 2' },
+      'In Discussion': { color: '#8b5cf6', label: 'In Discussion' },
+      'Interested': { color: '#10b981', label: 'Interested' },
+      'Junk': { color: '#ef4444', label: 'Junk' }
+    };
+  });
+
+  // Save to localStorage when statusConfig changes
+  useEffect(() => {
+    localStorage.setItem('statusConfig', JSON.stringify(statusConfig));
+  }, [statusConfig]);
 
   const getLeadsByStatus = (status) => {
     return leads.filter(lead => lead.leadStatus === status);
@@ -183,8 +453,8 @@ export default function LeadPipeline({ user, onPageChange }) {
       const originalText = button.textContent;
       button.textContent = 'Downloading...';
       button.disabled = true;
-      
-      const currentUser = user?.name || '';
+
+      const currentUser = user?.name || user?.phone_number || 'operation';
       const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`, {
         method: 'GET',
         headers: {
@@ -271,7 +541,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating lead status:', { leadId, newStatus });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -323,7 +593,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating lead owner:', { leadId, newOwner });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newOwner)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -373,12 +643,15 @@ export default function LeadPipeline({ user, onPageChange }) {
 
   const handleFieldUpdate = async (leadId, fieldName, newValue) => {
     console.log('Updating lead field:', { leadId, fieldName, newValue });
-    
+
+    // Show updating message
+    toast.loading('Updating...', { id: 'field-update' });
+
     try {
       let url;
       let successMessage;
       
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       
       // Use specific API for contact name, phone number, email, and company name updates
       if (fieldName === 'contactName') {
@@ -420,6 +693,9 @@ export default function LeadPipeline({ user, onPageChange }) {
       } else if (fieldName === 'tags') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
         successMessage = `Tags updated to ${newValue} successfully!`;
+      } else if (fieldName === 'description') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_DESCRIPTION_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}`;
+        successMessage = `Description updated successfully!`;
       } else {
         // Use generic update approach for other fields
         url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
@@ -450,15 +726,17 @@ export default function LeadPipeline({ user, onPageChange }) {
       if (result.success) {
         console.log('Field update successful');
         // Update local state
-        setLeads(prevLeads => 
-          prevLeads.map(lead => 
+        setLeads(prevLeads =>
+          prevLeads.map(lead =>
             lead.id === leadId ? { ...lead, [fieldName]: newValue } : lead
           )
         );
-        
+
         // Update selected user if modal is open
         if (selectedUser && selectedUser.id === leadId) {
           setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
+          // Auto-refresh timeline for this lead
+          fetchTimeline(leadId);
         }
         
         // Show field-specific toast message
@@ -477,7 +755,7 @@ export default function LeadPipeline({ user, onPageChange }) {
           'leadSource': 'Lead source updated',
           'tags': 'Tags updated'
         };
-        toast.success(fieldMessages[fieldName] || `${fieldName} updated`);
+        toast.success(fieldMessages[fieldName] || `${fieldName} updated`, { id: 'field-update' });
       } else {
         console.error('API returned failure:', result);
         // Check if the message contains "updated" or "success" despite success=false
@@ -495,6 +773,8 @@ export default function LeadPipeline({ user, onPageChange }) {
           // Update selected user if modal is open
           if (selectedUser && selectedUser.id === leadId) {
             setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
+            // Auto-refresh timeline for this lead
+            fetchTimeline(leadId);
           }
           
           // Show field-specific toast message
@@ -513,7 +793,7 @@ export default function LeadPipeline({ user, onPageChange }) {
             'leadSource': 'Lead source updated',
             'tags': 'Tags updated'
           };
-          toast.success(fieldMessages[fieldName] || `${fieldName} updated`);
+          toast.success(fieldMessages[fieldName] || `${fieldName} updated`, { id: 'field-update' });
         } else {
           // Genuine error
           // alert(`Failed to update lead ${fieldName}: ${message}`); // Removed alert
@@ -521,7 +801,7 @@ export default function LeadPipeline({ user, onPageChange }) {
       }
     } catch (err) {
       console.error('Network error updating lead field:', err);
-      // alert(`Network error: ${err.message || 'Unknown error occurred'}`); // Removed alert
+      toast.error('Failed to update field', { id: 'field-update' });
     }
   };
 
@@ -543,11 +823,30 @@ export default function LeadPipeline({ user, onPageChange }) {
     setEditValue('');
   };
 
+  // ── Fetch timeline data for a lead ─────────────────────────────────────────
+  const fetchTimeline = async (leadId) => {
+    setTimelineLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_LEAD_TIMELINE_API_URL}?lead_id=${leadId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch timeline');
+      }
+      const data = await response.json();
+      setTimelineData(data);
+    } catch (error) {
+      console.error('Error fetching timeline:', error);
+      toast.error('Failed to fetch timeline');
+      setTimelineData([]);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
   const handleTagsUpdate = async (leadId, newTags) => {
     console.log('Updating lead tags:', { leadId, newTags });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newTags)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -599,7 +898,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating lead source:', { leadId, newLeadSource });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newLeadSource)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -651,7 +950,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating city:', { leadId, newCity });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newCity)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -703,7 +1002,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating state:', { leadId, newState });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newState)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -755,7 +1054,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating country:', { leadId, newCountry });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newCountry)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -807,7 +1106,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating industry:', { leadId, newIndustry });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newIndustry)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -859,7 +1158,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating lead status from Lead Information modal:', { leadId, newStatus });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -916,7 +1215,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating alternate phone number from Lead Information modal:', { leadId, newAlternateNumber });
     
     try {
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newAlternateNumber)}&user=${encodeURIComponent(currentUserName)}`;
       console.log('Full API URL:', url);
       
@@ -979,8 +1278,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     }
     
     try {
-      const currentUserName = user?.name || '';
-      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}&user=${encodeURIComponent(currentUserName)}`;
+      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
@@ -1002,8 +1300,7 @@ export default function LeadPipeline({ user, onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      // Check if lead was deleted successfully (either success=true or message contains "deleted")
-      if (result.success || (result.message && result.message.toLowerCase().includes('deleted'))) {
+      if (result.success) {
         console.log('Lead deletion successful');
         // Remove lead from local state
         setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
@@ -1016,14 +1313,14 @@ export default function LeadPipeline({ user, onPageChange }) {
           setSelectedUser(null);
         }
         
-        toast.success('Lead deleted successfully!');
+        alert('Lead deleted successfully!');
       } else {
         console.error('API returned failure:', result);
-        toast.error(`Failed to delete lead: ${result.message || 'Unknown error'}`);
+        alert(`Failed to delete lead: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Network error deleting lead:', err);
-      toast.error(`Network error: ${err.message || 'Unknown error occurred'}`);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
     }
   };
 
@@ -1083,7 +1380,7 @@ export default function LeadPipeline({ user, onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || lead.created_time || ''
+          lastActivity: lead.last_activity || new Date().toISOString()
         }));
         
         setLeads(transformedLeads);
@@ -1110,12 +1407,9 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Downloading filtered CSV with filters:', filters);
     
     try {
-      let url = `${import.meta.env.VITE_LEADS_API_URL}/download?`;
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      let url = `${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`;
       const urlParams = [];
-      
-      // Add current user parameter
-      const currentUser = user?.name || '';
-      urlParams.push(`user=${encodeURIComponent(currentUser)}`);
       
       // Build URL parameters for all filters
       filters.forEach(filter => {
@@ -1142,7 +1436,9 @@ export default function LeadPipeline({ user, onPageChange }) {
         }
       });
       
-      url += urlParams.join('&');
+      if (urlParams.length > 0) {
+        url += '&' + urlParams.join('&');
+      }
       console.log('Download CSV URL:', url);
       
       const response = await fetch(url, {
@@ -1193,8 +1489,7 @@ export default function LeadPipeline({ user, onPageChange }) {
     console.log('Updating contact name:', { leadId, newContactName });
     
     try {
-      const currentUserName = user?.name || '';
-      const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newContactName)}&user=${encodeURIComponent(currentUserName)}`;
+      const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newContactName)}&user=admin`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
@@ -1243,10 +1538,10 @@ export default function LeadPipeline({ user, onPageChange }) {
 
   const handleCreateLead = async (leadData) => {
     console.log('Creating new lead:', leadData);
+    toast.loading('Adding lead...', { id: 'create-lead' });
     
     try {
-      const currentUserName = user?.name || '';
-      const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}?user=${encodeURIComponent(currentUserName)}`;
+      const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}`;
       console.log('Full API URL:', url);
       
       const response = await fetch(url, {
@@ -1263,26 +1558,29 @@ export default function LeadPipeline({ user, onPageChange }) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
+        toast.dismiss('create-lead');
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
       
       const result = await response.json();
       console.log('API result:', result);
       
-      // Check if lead was created successfully (either success=true or message contains "Lead created")
-      if (result.success || (result.message && result.message.toLowerCase().includes('lead created'))) {
+      if (result.success || result.message || response.ok) {
         console.log('Lead creation successful');
         // Refresh the leads list
         fetchLeads();
         setShowAddModal(false);
+        toast.dismiss('create-lead');
         toast.success('Lead created successfully!');
       } else {
         console.error('API returned failure:', result);
-        toast.error(`Failed to create lead: ${result.message || 'Unknown error'}`);
+        toast.dismiss('create-lead');
+        toast.error('Failed to create lead');
       }
     } catch (err) {
       console.error('Network error creating lead:', err);
-      toast.error(`Network error: ${err.message || 'Unknown error occurred'}`);
+      toast.dismiss('create-lead');
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
     }
   };
 
@@ -1294,7 +1592,7 @@ export default function LeadPipeline({ user, onPageChange }) {
       const urlParams = [];
       
       // Add base parameters
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
       urlParams.push('status_is_not=junk');
       
@@ -1320,11 +1618,34 @@ export default function LeadPipeline({ user, onPageChange }) {
           const operator = filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `country_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_by' && filter.value) {
+          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
+          const paramName = `created_by_${operator}`;
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'modified_by' && filter.value) {
+          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
+          const paramName = `modified_by_${operator}`;
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'mailing_city' && filter.value) {
+          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
+          const paramName = `city_${operator}`;
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'lead_source' && filter.value) {
+          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
+          const paramName = `lead_source_${operator}`;
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'description' && filter.value) {
+          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
+          const paramName = `description_${operator}`;
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
           urlParams.push(`date_type=on`);
           urlParams.push(`date=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
           urlParams.push(`date_type=before`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && filter.value) {
+          urlParams.push(`date_type=after`);
           urlParams.push(`date=${encodeURIComponent(filter.value)}`);
         } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
           urlParams.push(`date_type=between`);
@@ -1379,7 +1700,7 @@ export default function LeadPipeline({ user, onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || lead.created_time || ''
+          lastActivity: lead.last_activity || new Date().toISOString()
         }));
         
         console.log('Setting filtered leads:', transformedLeads.length);
@@ -1424,38 +1745,45 @@ export default function LeadPipeline({ user, onPageChange }) {
   };
 
   // Predefined tags options
-  const predefinedTags = [
-    'Sat2Farm Recurring',
-    'Sat2Farm Non Recurring',
-    'Sat2Farm Exclusivity',
-    'Sat4Agri',
-    'Sat4Risk',
-    'Project',
-    'WhiteLabelling',
-    'API Client'
-  ];
+  const [predefinedTags, setPredefinedTags] = useState(() => {
+    const saved = localStorage.getItem('predefinedTags');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client'];
+  });
 
   // Predefined lead source options
-  const predefinedLeadSources = [
-    'FB Campaign',
-    'Website Inbound',
-    'Sales Inbound',
-    'Mail Inbound',
-    'External Referral',
-    'Cold Call',
-    'Event'
-  ];
+  const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
+    const saved = localStorage.getItem('predefinedLeadSources');
+    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
+  });
 
   // Predefined industry options
-  const predefinedIndustries = [
-    'Farmer',
-    'FPO',
-    'NGO',
-    'Government',
-    'Enterprise',
-    'Agri Input',
-    'Agri Output'
-  ];
+  const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
+    const saved = localStorage.getItem('predefinedIndustries');
+    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
+  });
+
+  // Predefined contact owner options
+  const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
+    const saved = localStorage.getItem('predefinedContactOwners');
+    return saved ? JSON.parse(saved) : ['Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem'];
+  });
+
+  // Save to localStorage when predefined values change
+  useEffect(() => {
+    localStorage.setItem('predefinedTags', JSON.stringify(predefinedTags));
+  }, [predefinedTags]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedLeadSources', JSON.stringify(predefinedLeadSources));
+  }, [predefinedLeadSources]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedIndustries', JSON.stringify(predefinedIndustries));
+  }, [predefinedIndustries]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedContactOwners', JSON.stringify(predefinedContactOwners));
+  }, [predefinedContactOwners]);
 
   // Editable field component
   const EditableField = ({ label, value, fieldName, type = 'text' }) => {
@@ -1575,11 +1903,11 @@ export default function LeadPipeline({ user, onPageChange }) {
     try {
       const formData = new FormData();
       formData.append('csv_file', file);
-      formData.append('user', user?.name || '');
-      formData.append('contact_owner', user?.name || '');
+      formData.append('user', user?.name || user?.phone_number || 'operation');
+      formData.append('contact_owner', user?.name || user?.phone_number || 'operation');
       
       console.log('Uploading CSV to API...');
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}?user=${encodeURIComponent(currentUserName)}`, {
         method: 'POST',
         body: formData
@@ -1597,16 +1925,11 @@ export default function LeadPipeline({ user, onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      if (result.success || (result.message && result.message.toLowerCase().includes('csv processed'))) {
+      if (result.success) {
         console.log('CSV import successful');
         // Refresh leads data to show newly imported leads
         await fetchLeads();
-        const count = result.imported_count || result.count;
-        if (count) {
-          alert(`Successfully imported ${count} leads!`);
-        } else {
-          alert('CSV processed successfully!');
-        }
+        alert(`Successfully imported ${result.imported_count || result.count || 'unknown number of'} leads!`);
       } else {
         console.error('API returned failure:', result);
         alert(`Failed to import CSV: ${result.message || 'Unknown error'}`);
@@ -1620,7 +1943,7 @@ export default function LeadPipeline({ user, onPageChange }) {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const currentUserName = user?.name || '';
+      const currentUserName = user?.name || user?.phone_number || 'operation';
       const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
       
       if (!response.ok) {
@@ -1649,7 +1972,7 @@ export default function LeadPipeline({ user, onPageChange }) {
         industry: lead.industry || '',
         createdBy: lead.created_by || 'System',
         modifiedBy: lead.modified_by || 'System',
-        lastActivity: lead.last_activity || lead.created_time || ''
+        lastActivity: lead.last_activity || new Date().toISOString()
       }));
       
       setLeads(transformedLeads);
@@ -1937,6 +2260,69 @@ export default function LeadPipeline({ user, onPageChange }) {
         </label>
       </div>
 
+      {/* More Dropdown Button - Shows when items are selected */}
+      {selectedRows.length > 0 && (
+        <div style={{ marginBottom: '16px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>{selectedRows.length} item(s) selected</span>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowMoreDropdown(!showMoreDropdown)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                More <ChevronDown size={16} />
+              </button>
+              {showMoreDropdown && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, minWidth: '160px' }}>
+                  {selectedRows.length === 1 && (
+                    <button
+                      onClick={() => {
+                        setShowMoreDropdown(false);
+                        setShowConvertModal(true);
+                        setConvertAccountName('');
+                        setConvertWebsite('');
+                        setConvertAccountType('');
+                      }}
+                      style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-100)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      Convert
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowMoreDropdown(false);
+                      setShowUpdateFieldsModal(true);
+                      setSelectedFieldToUpdate('');
+                      setUpdateFieldValue('');
+                    }}
+                    style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-100)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    Update Fields
+                  </button>
+                  {user?.role === 'operation' && (
+                    <button
+                      onClick={() => {
+                        setShowMoreDropdown(false);
+                        setShowDeleteConfirmModal(true);
+                      }}
+                      style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--red-50)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter Status Indicator */}
       {isFilterApplied && (
         <div style={{
@@ -2026,12 +2412,12 @@ export default function LeadPipeline({ user, onPageChange }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
                       type="checkbox"
-                      checked={selectedRows.length === filteredLeads.length && filteredLeads.length > 0}
+                      checked={selectedRows.length === currentLeads.length && currentLeads.length > 0 && currentLeads.every(lead => selectedRows.includes(lead.id))}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedRows(filteredLeads.map(lead => lead.id));
+                          setSelectedRows(currentLeads.map(lead => lead.id));
                         } else {
-                          setSelectedRows([]);
+                          setSelectedRows(selectedRows.filter(id => !currentLeads.find(lead => lead.id === id)));
                         }
                       }}
                       style={{ cursor: 'pointer' }}
@@ -2055,14 +2441,14 @@ export default function LeadPipeline({ user, onPageChange }) {
                 <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Industry</th>
                 <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Created By</th>
                 <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Modified By</th>
+                <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Modified Time</th>
                 <th style={{ padding: '16px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>Last Activity</th>
-                <th style={{ padding: '16px 16px', textAlign: 'center', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', width: '120px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="20" style={{
+                  <td colSpan="19" style={{
                     textAlign: 'center',
                     padding: '40px',
                     color: 'var(--text-3)',
@@ -2073,7 +2459,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="20" style={{
+                  <td colSpan="19" style={{
                     textAlign: 'center',
                     padding: '40px',
                     color: 'var(--red-600)',
@@ -2084,7 +2470,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                 </tr>
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan="20" style={{
+                  <td colSpan="19" style={{
                     textAlign: 'center',
                     padding: '40px',
                     color: 'var(--text-3)',
@@ -2126,6 +2512,8 @@ export default function LeadPipeline({ user, onPageChange }) {
                           onClick={() => {
                             setSelectedUser(lead);
                             setShowUserModal(true);
+                            fetchTimeline(lead.id);
+                            fetchActivities(lead.id);
                           }}
                           style={{
                             background: 'none',
@@ -2224,27 +2612,14 @@ export default function LeadPipeline({ user, onPageChange }) {
                         })}
                       </span>
                     </td>
-                    <td style={{ padding: '16px 16px' }}>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                        <button
-                          onClick={() => handleDeleteLead(lead.id)}
-                          style={{
-                            padding: '4px 6px',
-                            background: 'var(--red-100)',
-                            color: 'var(--red-600)',
-                            border: '1px solid var(--red-200)',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px'
-                          }}
-                          title="Delete"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
+                    <td style={{ padding: '16px 16px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                        {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -2520,10 +2895,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                   onChange={(e) => {
                     const property = e.target.value;
                     if (property && !selectedProperties.find(p => p.property === property)) {
-                      const newProperty = { 
-                        property, 
-                        value: '', 
-                        operator: property === 'contact_name' ? 'is' : '' 
+                      const newProperty = {
+                        property,
+                        value: '',
+                        operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
                       };
                       
                       // Set default dateOperator for created_time
@@ -2550,21 +2925,21 @@ export default function LeadPipeline({ user, onPageChange }) {
                   <option value="created_time">Created Time</option>
                   <option value="lead_status">Lead Status</option>
                   <option value="tag">Tag</option>
-                  <option value="untouched_records">Untouched Records</option>
+                  
                   <option value="mailing_country">Mailing Country</option>
                   <option value="mailing_state">Mailing State</option>
-                  <option value="activities">Activities</option>
-                  <option value="notes">Notes</option>
-                  <option value="pipelines">Pipelines</option>
-                  <option value="pipeline_stage">Pipeline Stage</option>
+                  
+       
+                 
+                  
                   <option value="created_by">Created By</option>
-                  <option value="description">Description</option>
+                 
                   <option value="lead_source">Lead Source</option>
                   <option value="mailing_city">Mailing City</option>
-                  <option value="mailing_street">Mailing Street</option>
+                  
                   <option value="modified_by">Modified By</option>
-                  <option value="contact_name">Contact Name</option>
-                  <option value="modified_time">Modified Time</option>
+                
+                 
                 </select>
               </div>
               
@@ -3584,29 +3959,266 @@ export default function LeadPipeline({ user, onPageChange }) {
                   )}
                   
                   {/* Other properties with dropdown options */}
-                  {['mailing_city', 'created_by', 'modified_by', 'lead_source'].includes(prop.property) && (
-                    <select
-                      value={prop.value}
-                      onChange={(e) => {
-                        const updated = [...selectedProperties];
-                        updated[index].value = e.target.value;
-                        setSelectedProperties(updated);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--r)',
-                        fontSize: '13px',
-                        background: 'var(--surface)',
-                        color: 'var(--text)'
-                      }}
-                    >
-                      <option value="">All {prop.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
-                      {getUniqueValues(prop.property).map(value => (
-                        <option key={value} value={value}>{value}</option>
-                      ))}
-                    </select>
+                  {prop.property === 'mailing_city' && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ minWidth: '100px' }}>
+                          <select
+                            value={prop.operator || 'is'}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].operator = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="is">Is</option>
+                            <option value="is not">Is Not</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <select
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="">All Cities</option>
+                            {getUniqueValues(prop.property).map(value => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {prop.property === 'created_by' && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ minWidth: '100px' }}>
+                          <select
+                            value={prop.operator || 'is'}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].operator = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="is">Is</option>
+                            <option value="is not">Is Not</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <select
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="">All Created By</option>
+                            {getUniqueValues(prop.property).map(value => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {prop.property === 'modified_by' && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ minWidth: '100px' }}>
+                          <select
+                            value={prop.operator || 'is'}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].operator = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="is">Is</option>
+                            <option value="is not">Is Not</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <select
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="">All Modified By</option>
+                            {getUniqueValues(prop.property).map(value => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {prop.property === 'lead_source' && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ minWidth: '100px' }}>
+                          <select
+                            value={prop.operator || 'is'}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].operator = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="is">Is</option>
+                            <option value="is not">Is Not</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <select
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="">All Lead Sources</option>
+                            {getUniqueValues(prop.property).map(value => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {prop.property === 'description' && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ minWidth: '100px' }}>
+                          <select
+                            value={prop.operator || 'is'}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].operator = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="is">Is</option>
+                            <option value="is not">Is Not</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input
+                            type="text"
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            placeholder="Enter description..."
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   )}
                   
                   {/* Created Time special case with advanced date filtering */}
@@ -4128,11 +4740,61 @@ export default function LeadPipeline({ user, onPageChange }) {
                         });
                       }
                     }
-                    
+
+                    // Add created_by filter if configured
+                    const createdByProp = selectedProperties.find(prop => prop.property === 'created_by');
+                    if (createdByProp && createdByProp.value) {
+                      activeFilters.push({
+                        property: 'created_by',
+                        value: createdByProp.value,
+                        operator: createdByProp.operator || 'is'
+                      });
+                    }
+
+                    // Add modified_by filter if configured
+                    const modifiedByProp = selectedProperties.find(prop => prop.property === 'modified_by');
+                    if (modifiedByProp && modifiedByProp.value) {
+                      activeFilters.push({
+                        property: 'modified_by',
+                        value: modifiedByProp.value,
+                        operator: modifiedByProp.operator || 'is'
+                      });
+                    }
+
+                    // Add city filter if configured
+                    const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
+                    if (cityProp && cityProp.value) {
+                      activeFilters.push({
+                        property: 'mailing_city',
+                        value: cityProp.value,
+                        operator: cityProp.operator || 'is'
+                      });
+                    }
+
+                    // Add lead_source filter if configured
+                    const leadSourceProp = selectedProperties.find(prop => prop.property === 'lead_source');
+                    if (leadSourceProp && leadSourceProp.value) {
+                      activeFilters.push({
+                        property: 'lead_source',
+                        value: leadSourceProp.value,
+                        operator: leadSourceProp.operator || 'is'
+                      });
+                    }
+
+                    // Add description filter if configured
+                    const descriptionProp = selectedProperties.find(prop => prop.property === 'description');
+                    if (descriptionProp && descriptionProp.value) {
+                      activeFilters.push({
+                        property: 'description',
+                        value: descriptionProp.value,
+                        operator: descriptionProp.operator || 'is'
+                      });
+                    }
+
                     // Add created_time filter if configured
                     const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
                     if (createdTimeProp) {
-                      if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before') && createdTimeProp.value) {
+                      if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before' || createdTimeProp.dateOperator === 'after') && createdTimeProp.value) {
                         activeFilters.push({
                           property: 'created_time',
                           value: createdTimeProp.value,
@@ -4205,12 +4867,13 @@ export default function LeadPipeline({ user, onPageChange }) {
           <div style={{
             position: 'relative',
             background: 'var(--surface)',
-            borderRadius: 'var(--r-xl)',
-            width: '95%',
-            maxWidth: '1200px',
+            borderRadius: '0',
+            width: '85%',
             height: '90vh',
             overflowY: 'auto',
-            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)'
+            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <div style={{
               display: 'flex',
@@ -4228,24 +4891,50 @@ export default function LeadPipeline({ user, onPageChange }) {
               }}>
                 Lead Information
               </h2>
-              <button
-                onClick={() => {
-                  setShowUserModal(false);
-                  setSelectedUser(null);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-3)',
-                  cursor: 'pointer',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => {
+                    setShowConvertModal(true);
+                    setConvertAccountName('');
+                    setConvertWebsite('');
+                    setConvertAccountType('');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'var(--green-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Convert
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserModal(false);
+                    setSelectedUser(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-3)',
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             
-            <div style={{ padding: '24px' }}>
+            {/* Modal body: two-column layout */}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+              {/* ── Left panel: all editable sections ── */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Contact Information Section */}
               <div style={{ 
                 marginBottom: '24px', 
@@ -4333,7 +5022,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                           color: 'var(--text)',
                           transition: 'background-color 0.2s ease'
                         }}
-                        onClick={() => setIndustryDropdownOpen(!industryDropdownOpen)}
+                        onClick={() => {
+                          closeAllDropdowns();
+                          setIndustryDropdownOpen(!industryDropdownOpen);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--gray-100)';
                         }}
@@ -4389,6 +5081,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                             </button>
                           ))}
                           
+                          {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
                           <button
                             onClick={() => {
                               setShowCustomIndustryInput(true);
@@ -4414,6 +5107,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           >
                             + Custom
                           </button>
+                          )}
                         </div>
                       )}
                       
@@ -4446,6 +5140,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                               onClick={() => {
                                 if (customIndustry.trim()) {
                                   handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim());
+                                  setPredefinedIndustries([...predefinedIndustries, customIndustry.trim()]);
                                   setCustomIndustry('');
                                   setShowCustomIndustryInput(false);
                                 }
@@ -4562,7 +5257,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                           color: 'var(--text)',
                           transition: 'background-color 0.2s ease'
                         }}
-                        onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                        onClick={() => {
+                          closeAllDropdowns();
+                          setStatusDropdownOpen(!statusDropdownOpen);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--gray-100)';
                         }}
@@ -4616,6 +5314,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                             </button>
                           ))}
                           
+                          {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
                           <button
                             onClick={() => {
                               setShowCustomStatusInput(true);
@@ -4642,6 +5341,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           >
                             + Custom Status
                           </button>
+                          )}
                         </div>
                       )}
                       
@@ -4674,6 +5374,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                               onClick={() => {
                                 if (customStatus.trim()) {
                                   handleFieldUpdate(selectedUser.id, 'leadStatus', customStatus.trim());
+                                  setStatusConfig({ ...statusConfig, [customStatus.trim()]: { color: '#6b7280', label: customStatus.trim() } });
                                   setCustomStatus('');
                                   setShowCustomStatusInput(false);
                                 }
@@ -4732,7 +5433,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                           color: 'var(--text)',
                           transition: 'background-color 0.2s ease'
                         }}
-                        onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
+                        onClick={() => {
+                          closeAllDropdowns();
+                          setOwnerDropdownOpen(!ownerDropdownOpen);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--gray-100)';
                         }}
@@ -4759,7 +5463,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           maxHeight: '200px',
                           overflowY: 'auto'
                         }}>
-                          {getUniqueContactOwners().map(owner => (
+                          {predefinedContactOwners.map(owner => (
                             <button
                               key={owner}
                               onClick={() => {
@@ -4788,6 +5492,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                             </button>
                           ))}
                           
+                          {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
                           <button
                             onClick={() => {
                               setShowCustomOwnerInput(true);
@@ -4813,6 +5518,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           >
                             + Custom Owner
                           </button>
+                          )}
                         </div>
                       )}
                       
@@ -4845,6 +5551,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                               onClick={() => {
                                 if (customOwner.trim()) {
                                   handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim());
+                                  setPredefinedContactOwners([...predefinedContactOwners, customOwner.trim()]);
                                   setCustomOwner('');
                                   setShowCustomOwnerInput(false);
                                 }
@@ -4903,7 +5610,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                           color: 'var(--text)',
                           transition: 'background-color 0.2s ease'
                         }}
-                        onClick={() => setLeadSourceDropdownOpen(!leadSourceDropdownOpen)}
+                        onClick={() => {
+                          closeAllDropdowns();
+                          setLeadSourceDropdownOpen(!leadSourceDropdownOpen);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--gray-100)';
                         }}
@@ -4959,6 +5669,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                             </button>
                           ))}
                           
+                          {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
                           <button
                             onClick={() => {
                               setShowCustomLeadSourceInput(true);
@@ -4984,6 +5695,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           >
                             + Custom
                           </button>
+                          )}
                         </div>
                       )}
                       
@@ -5016,6 +5728,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                               onClick={() => {
                                 if (customLeadSource.trim()) {
                                   handleFieldUpdate(selectedUser.id, 'leadSource', customLeadSource.trim());
+                                  setPredefinedLeadSources([...predefinedLeadSources, customLeadSource.trim()]);
                                   setCustomLeadSource('');
                                   setShowCustomLeadSourceInput(false);
                                 }
@@ -5074,7 +5787,10 @@ export default function LeadPipeline({ user, onPageChange }) {
                           color: 'var(--text)',
                           transition: 'background-color 0.2s ease'
                         }}
-                        onClick={() => setTagsDropdownOpen(!tagsDropdownOpen)}
+                        onClick={() => {
+                          closeAllDropdowns();
+                          setTagsDropdownOpen(!tagsDropdownOpen);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'var(--gray-100)';
                         }}
@@ -5130,6 +5846,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                             </button>
                           ))}
                           
+                          {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
                           <button
                             onClick={() => {
                               setShowCustomTagsInput(true);
@@ -5155,6 +5872,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                           >
                             + Custom Tag
                           </button>
+                          )}
                         </div>
                       )}
                       
@@ -5187,6 +5905,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                               onClick={() => {
                                 if (customTags.trim()) {
                                   handleFieldUpdate(selectedUser.id, 'tags', customTags.trim());
+                                  setPredefinedTags([...predefinedTags, customTags.trim()]);
                                   setCustomTags('');
                                   setShowCustomTagsInput(false);
                                 }
@@ -5248,11 +5967,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                   Additional Information
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                  <EditableField 
-                    label="Notes" 
-                    value={selectedUser.notes} 
-                    fieldName="notes" 
-                  />
+                  
                   <EditableField 
                     label="Description" 
                     value={selectedUser.description} 
@@ -5287,7 +6002,13 @@ export default function LeadPipeline({ user, onPageChange }) {
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity Time</label>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                    <div style={{ color: 'var(--text)' }}>
+                      {new Date(selectedUser.lastActivity).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
                     <div style={{ color: 'var(--text)' }}>
                       {new Date(selectedUser.lastActivity).toLocaleString('en-IN')}
                     </div>
@@ -5302,6 +6023,277 @@ export default function LeadPipeline({ user, onPageChange }) {
                   </div>
                 </div>
               </div>
+
+              </div>{/* end left panel */}
+
+              {/* ── Right panel: tabs (Timeline / Notes / Activities / Pipelines) ── */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 20px', flexShrink: 0 }}>
+                  {[
+                    { id: 'timeline', label: 'Timeline' },
+                    { id: 'notes', label: 'Notes'},
+                    { id: 'activities', label: 'Activities' },
+                 
+                  ].map(tab => (
+                    <button key={tab.id} onClick={() => setActiveModalTab(tab.id)}
+                      style={{ padding: '14px 16px', border: 'none', borderBottom: activeModalTab === tab.id ? '2px solid var(--green-600)' : '2px solid transparent', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', color: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--text-3)', fontWeight: activeModalTab === tab.id ? '600' : '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {tab.label}
+                      {tab.count && (
+                        <span style={{ backgroundColor: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--gray-200)', color: activeModalTab === tab.id ? '#fff' : 'var(--text-3)', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '600' }}>{tab.count}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Content */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+
+                  {activeModalTab === 'timeline' && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '600', fontSize: '16px' }}>
+                          {selectedUser?.contactName?.charAt(0) || 'L'}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text)' }}>{selectedUser?.contactName || 'Lead'}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>Created on {new Date(selectedUser?.createdTime || Date.now()).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                      {timelineLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Loading timeline...</div>
+                      ) : timelineData.length > 0 ? (
+                        <div style={{ paddingLeft: '32px', borderLeft: '2px solid var(--border)', marginLeft: '20px' }}>
+                          {timelineData.map((item, index) => {
+                            const IconComponent = getTimelineIcon(item.field);
+                            return (
+                              <div key={item.id} style={{ paddingBottom: index < timelineData.length - 1 ? '20px' : '0' }}>
+                                <div style={{ marginLeft: '-36px', marginBottom: '12px' }}>
+                                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--green-100)', border: '2px solid var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <IconComponent size={16} style={{ color: 'var(--green-600)' }} />
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
+                                  {item.field === 'note' ? (
+                                    <span>Note added by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
+                                  ) : item.field === 'task' ? (
+                                    <span>Task added by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
+                                  ) : (
+                                    <span>{item.field} updated by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '14px', color: 'var(--text)', fontStyle: 'Georgia' }}>
+                                  {item.field === 'note' ? (
+                                    <span>' {item.new_value} '</span>
+                                  ) : item.field === 'task' ? (
+                                    <span>' {item.new_value} '</span>
+                                  ) : item.old_value === null || item.old_value === '' ? (
+                                    <span>' {item.new_value} '</span>
+                                  ) : (
+                                    <span>{`' ${item.old_value} '  to  ' ${item.new_value} '`}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>No timeline data available</div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeModalTab === 'notes' && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                      <div style={{ marginBottom: '16px' }}>
+                        <textarea placeholder="Add a note..." rows={3}
+                          value={noteInput}
+                          onChange={(e) => setNoteInput(e.target.value)}
+                          style={{ width: '100%', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', resize: 'vertical', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }} />
+                        <button onClick={handleAddNote} disabled={addingNote} style={{ marginTop: '8px', backgroundColor: addingNote ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: addingNote ? 'not-allowed' : 'pointer' }}>{addingNote ? 'Adding...' : 'Add Note'}</button>
+                      </div>
+                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                        {activities.filter(activity => activity.message).length > 0 ? (
+                          activities.filter(activity => activity.message).map((activity) => (
+                            <div key={activity.id} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px',fontWeight:'bold' }}>
+                                {activity.created_by}</div>
+                                <div style={{fontSize: '10px', color: 'var(--text)', margBottom: '4px'}}>
+
+                                {new Date(activity.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                              <div style={{ fontSize: '15px', color: 'var(--text-3)',fontWeight:'bold' }}>{activity.message}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>No notes yet</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeModalTab === 'activities' && (
+                    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                        <h3 style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Activities</h3>
+                        <button onClick={() => setShowCreateTaskModal(true)}
+                          style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Plus size={14} /> Task
+                        </button>
+                      </div>
+                      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                            {['Task Name','Due Date','Status','Task Owner','Actions'].map(h => (
+                              <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).map((activity) => (
+                            <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_name}</td>
+                              <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                              <td style={{ padding: '10px 8px' }}>
+                                <span style={{
+                                  backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
+                                  color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
+                                  padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                }}>{activity.status}</span>
+                              </td>
+                              <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_owner || '-'}</td>
+                              <td style={{ padding: '10px 8px' }}>
+                                <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).length === 0 && (
+                            <tr>
+                              <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No tasks yet</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                 
+
+                </div>
+              </div>{/* end right panel */}
+            </div>{/* end two-column layout */}
+          </div>
+        </div>
+      )}
+
+      {/* ── Create Task Modal ── */}
+      {showCreateTaskModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+          <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Create Task</h3>
+              <button onClick={() => setShowCreateTaskModal(false)} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
+                <select
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                >
+                  <option value="">Select task type</option>
+                  <option value="mail">Mail</option>
+                  <option value="call">Call</option>
+                  <option value="meet">Meet</option>
+                  <option value="proposal">Proposal</option>
+
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
+                <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
+                <select
+                  value={taskStatus}
+                  onChange={(e) => setTaskStatus(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                >
+                 <option>Choose a Task Stage</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Due For">Due For</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
+                <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
+              </div>
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
+              <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleAddTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Saving...' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Task Modal ── */}
+      {showEditTaskModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+          <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Edit Task</h3>
+              <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
+                <select
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                >
+                  <option value="">Select task type</option>
+                  <option value="mail">Mail</option>
+                  <option value="call">Call</option>
+                  <option value="meet">Meet</option>
+                  <option value="proposal">Proposal</option>
+
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
+                <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
+                <select
+                  value={taskStatus}
+                  onChange={(e) => setTaskStatus(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Due For">Due For</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
+                <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
+              </div>
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
+              <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleUpdateTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Updating...' : 'Update'}</button>
             </div>
           </div>
         </div>
@@ -5496,6 +6488,12 @@ export default function LeadPipeline({ user, onPageChange }) {
               </div>
               
               <div>
+                <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                <div style={{ color: 'var(--text)', fontWeight: '500' }}>
+                  {new Date(selectedLead.lastActivity).toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div>
                 <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
                 <div style={{ color: 'var(--text)', fontWeight: '500' }}>
                   {new Date(selectedLead.lastActivity).toLocaleString('en-IN')}
@@ -5603,7 +6601,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number</label>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number *</label>
                     <input
                       type="tel"
                       name="phone"
@@ -5684,15 +6682,17 @@ export default function LeadPipeline({ user, onPageChange }) {
                     <input
                       type="text"
                       name="contactOwner"
-                      placeholder="Enter contact owner"
+                      defaultValue={user?.name || user?.phone_number || 'operation'}
+                      readOnly
                       style={{
                         width: '100%',
                         padding: '10px',
-                        background: 'var(--surface)',
+                        background: 'var(--gray-100)',
                         border: '1px solid var(--border)',
                         borderRadius: 'var(--r)',
                         color: 'var(--text)',
-                        fontSize: '14px'
+                        fontSize: '14px',
+                        cursor: 'not-allowed'
                       }}
                     />
                   </div>
@@ -5813,10 +6813,8 @@ export default function LeadPipeline({ user, onPageChange }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
-                    <input
-                      type="text"
+                    <select
                       name="tags"
-                      placeholder="Enter tags (comma separated)"
                       style={{
                         width: '100%',
                         padding: '10px',
@@ -5826,7 +6824,12 @@ export default function LeadPipeline({ user, onPageChange }) {
                         color: 'var(--text)',
                         fontSize: '14px'
                       }}
-                    />
+                    >
+                      <option value="">Select a tag</option>
+                      {getUniqueTags().map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Source</label>
@@ -5887,7 +6890,7 @@ export default function LeadPipeline({ user, onPageChange }) {
                     <input
                       type="text"
                       name="createdBy"
-                      value={user?.name || ''}
+                      value={user?.name || user?.phone_number || 'operation'}
                       readOnly
                       style={{
                         width: '100%',
@@ -5905,7 +6908,25 @@ export default function LeadPipeline({ user, onPageChange }) {
                     <input
                       type="text"
                       name="modifiedBy"
-                      value={user?.name || ''}
+                      value={user?.name || user?.phone_number || 'operation'}
+                      readOnly
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: 'var(--gray-100)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        color: 'var(--text-3)',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                    <input
+                      type="text"
+                      name="lastActivity"
+                      value={new Date().toISOString()}
                       readOnly
                       style={{
                         width: '100%',
@@ -5966,8 +6987,8 @@ export default function LeadPipeline({ user, onPageChange }) {
                     lead_source: formData.get('leadSource') || '',
                     description: formData.get('description') || '',
                     industry: formData.get('industry') || '',
-                    created_by: user?.name || '',
-                    modified_by: user?.name || '',
+                    created_by: user?.name || user?.phone_number || 'operation',
+                    modified_by: user?.name || user?.phone_number || 'operation',
                     last_activity: formData.get('lastActivity') || new Date().toISOString()
                   };
                   
@@ -6013,6 +7034,471 @@ export default function LeadPipeline({ user, onPageChange }) {
                 }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Fields Modal */}
+      {showUpdateFieldsModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Update Fields</h2>
+              <button onClick={() => setShowUpdateFieldsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Field selector */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Select Field to Update</label>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={selectedFieldToUpdate}
+                    onChange={(e) => { setSelectedFieldToUpdate(e.target.value); setUpdateFieldValue(''); }}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">Choose a field...</option>
+                    <option value="tags">Tags</option>
+                    <option value="industry">Industry</option>
+                    <option value="state">State</option>
+                    <option value="country">Country</option>
+                    <option value="leadStatus">Lead Status</option>
+                    <option value="contactOwner">Contact Owner</option>
+                  </select>
+                  <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                </div>
+              </div>
+
+                {/* Current value and new value */}
+                {selectedFieldToUpdate && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Current value */}
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change From</label>
+                      <div style={{ position: 'relative' }}>
+                        {selectedFieldToUpdate === 'leadStatus' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.leadStatus))].filter(Boolean).sort().map(status => (
+                              <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'contactOwner' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.contactOwner))].filter(Boolean).sort().map(owner => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'state' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.state))].filter(Boolean).sort().map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'country' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.country))].filter(Boolean).sort().map(country => (
+                              <option key={country} value={country}>{country}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'industry' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.industry))].filter(Boolean).sort().map(industry => (
+                              <option key={industry} value={industry}>{industry}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'tags' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.tags))].filter(Boolean).sort().map(tag => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                      </div>
+                    </div>
+
+                    {/* New value */}
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change To</label>
+                      <div style={{ position: 'relative' }}>
+                        {selectedFieldToUpdate === 'leadStatus' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select new status...</option>
+                            {Object.keys(statusConfig).map(status => (
+                              <option key={status} value={status}>{statusConfig[status].label}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'contactOwner' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select owner...</option>
+                            {[...new Set(leads.map(l => l.contactOwner))].filter(Boolean).sort().map(owner => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'state' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select state...</option>
+                            {[...new Set(leads.map(l => l.state))].filter(Boolean).sort().map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'country' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select country...</option>
+                            {[...new Set(leads.map(l => l.country))].filter(Boolean).sort().map(country => (
+                              <option key={country} value={country}>{country}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'industry' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select industry...</option>
+                            {[...new Set(leads.map(l => l.industry))].filter(Boolean).sort().map(industry => (
+                              <option key={industry} value={industry}>{industry}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'tags' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select tags...</option>
+                            {[...new Set(leads.map(l => l.tags))].filter(Boolean).sort().map(tag => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* Modal footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowUpdateFieldsModal(false)}
+                style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!selectedFieldToUpdate || !updateNewFieldValue) {
+                    toast.error('Please select a field and enter a new value');
+                    return;
+                  }
+                  const fieldMap = {
+                    tags: 'tags',
+                    industry: 'industry',
+                    state: 'state',
+                    country: 'country',
+                    leadStatus: 'status',
+                    contactOwner: 'owner'
+                  };
+                  const field = fieldMap[selectedFieldToUpdate];
+                  const currentUserName = user?.name || user?.phone_number || 'operation';
+                  const ids = selectedRows.join(',');
+                  
+                  setIsUpdating(true);
+                  try {
+                    const valueParam = updateFieldValue ? updateFieldValue : 'all';
+                    const url = `${import.meta.env.VITE_BULK_UPDATE_LEADS_API_URL}?ids=${ids}&field=${field}&value=${encodeURIComponent(valueParam)}&update_value=${encodeURIComponent(updateNewFieldValue)}&user=${encodeURIComponent(currentUserName)}`;
+                    
+                    const response = await fetch(url, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      }
+                    });
+
+                    if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    setLeads(prev => prev.map(lead => {
+                      if (!selectedRows.includes(lead.id)) return lead;
+                      // If "Change From" is empty, update all selected items
+                      if (!updateFieldValue) {
+                        return { ...lead, [field]: updateNewFieldValue };
+                      }
+                      // Only update items that match the "Change From" value
+                      if (lead[field] === updateFieldValue) {
+                        return { ...lead, [field]: updateNewFieldValue };
+                      }
+                      return lead;
+                    }));
+                    
+                    const updatedCount = leads.filter(lead => 
+                      selectedRows.includes(lead.id) && (!updateFieldValue || lead[field] === updateFieldValue)
+                    ).length;
+                    
+                    toast.success(`Updated ${selectedFieldToUpdate} for ${updatedCount} item(s)`);
+                    setShowUpdateFieldsModal(false);
+                    setSelectedRows([]);
+                    setUpdateFieldValue('');
+                    setUpdateNewFieldValue('');
+                  } catch (error) {
+                    console.error('Error updating fields:', error);
+                    toast.error('Failed to update fields. Please try again.');
+                  } finally {
+                    setIsUpdating(false);
+                  }
+                }}
+                disabled={!selectedFieldToUpdate || !updateNewFieldValue || isUpdating}
+                style={{ padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: (!selectedFieldToUpdate || !updateNewFieldValue || isUpdating) ? 0.5 : 1 }}
+              >
+                {isUpdating ? 'Updating...' : 'Update'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert Modal */}
+      {showConvertModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Convert Lead</h2>
+              <button onClick={() => setShowConvertModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Account Name *</label>
+                <input
+                  type="text"
+                  value={convertAccountName}
+                  onChange={(e) => setConvertAccountName(e.target.value)}
+                  placeholder="Enter account name"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Website</label>
+                <input
+                  type="text"
+                  value={convertWebsite}
+                  onChange={(e) => setConvertWebsite(e.target.value)}
+                  placeholder="Enter website"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Account Type</label>
+                <select
+                  value={convertAccountType}
+                  onChange={(e) => setConvertAccountType(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                >
+                  <option value="">Select account type</option>
+                  <option value="Sat2Farm Recurring">Sat2Farm Recurring</option>
+                  <option value="Sat2Farm Non Recurring">Sat2Farm Non Recurring</option>
+                  <option value="Sat2Farm Exclusivity">Sat2Farm Exclusivity</option>
+                  <option value="Sat4Agri">Sat4Agri</option>
+                  <option value="Sat4Risk">Sat4Risk</option>
+                  <option value="Project">Project</option>
+                  <option value="WhiteLabelling">WhiteLabelling</option>
+                  <option value="API Client">API Client</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowConvertModal(false)}
+                style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!convertAccountName) {
+                    toast.error('Please enter account name');
+                    return;
+                  }
+                  const currentUserName = user?.name || user?.phone_number || 'operation';
+                  const leadId = selectedRows.length === 1 ? selectedRows[0] : (selectedLead?.id || selectedUser?.id);
+                  if (!leadId) {
+                    toast.error('No lead selected');
+                    return;
+                  }
+                  try {
+                    const apiUrl = import.meta.env.VITE_MOVE_TO_ACCOUNT_API_URL;
+                    if (!apiUrl) {
+                      toast.error('Move to account API URL not configured');
+                      return;
+                    }
+                    const url = `${apiUrl}?id=${leadId}&account_name=${encodeURIComponent(convertAccountName)}&website=${encodeURIComponent(convertWebsite)}&account_type=${encodeURIComponent(convertAccountType)}&user=${encodeURIComponent(currentUserName)}`;
+                    const response = await fetch(url, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      }
+                    });
+                    if (!response.ok) {
+                      const errorText = await response.text();
+                      console.error('Error moving to account:', errorText);
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const result = await response.json();
+                    console.log('Lead moved to account successfully:', result);
+                    if (result.success || result.message) {
+                      toast.success('Lead converted successfully');
+                      setShowConvertModal(false);
+                      setConvertAccountName('');
+                      setConvertWebsite('');
+                      setConvertAccountType('');
+                      setSelectedRows([]);
+                      fetchLeads();
+                    } else {
+                      toast.error('Failed to convert lead');
+                    }
+                  } catch (err) {
+                    console.error('Error moving to account:', err);
+                    toast.error('Failed to convert lead');
+                  }
+                }}
+                disabled={!convertAccountName}
+                style={{ padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: !convertAccountName ? 0.5 : 1 }}
+              >
+                Convert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '400px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Confirm Delete</h2>
+              <button onClick={() => setShowDeleteConfirmModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: '24px' }}>
+              <p style={{ margin: 0, color: 'var(--text)', fontSize: '14px' }}>
+                Are you sure you want to delete {selectedRows.length} item(s)? This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Modal footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowDeleteConfirmModal(false)}
+                style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                No
+              </button>
+              <button
+                onClick={async () => {
+                  const currentUserName = user?.name || user?.phone_number || 'operation';
+                  const ids = selectedRows.join(',');
+                  
+                  setIsDeleting(true);
+                  try {
+                    const url = `${import.meta.env.VITE_BULK_DELETE_LEADS_API_URL}?ids=${ids}&user=${encodeURIComponent(currentUserName)}&confirm=Yes`;
+                    
+                    const response = await fetch(url, {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      }
+                    });
+
+                    if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // Delete selected items from local state
+                    setLeads(prev => prev.filter(lead => !selectedRows.includes(lead.id)));
+                    setSelectedRows([]);
+                    setShowDeleteConfirmModal(false);
+                    toast.success(`Deleted ${selectedRows.length} item(s)`);
+                  } catch (error) {
+                    console.error('Error deleting items:', error);
+                    toast.error('Failed to delete items. Please try again.');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                disabled={isDeleting}
+                style={{ padding: '10px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: isDeleting ? 0.5 : 1 }}
+              >
+                {isDeleting ? 'Deleting...' : 'Yes'}
               </button>
             </div>
           </div>

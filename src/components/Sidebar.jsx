@@ -47,7 +47,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline'];
+      const allowedOperationsPages = ['monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -55,7 +55,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isSalesUser) {
       // Sales users can only access sales pages and unlock-farm
-      const allowedSalesPages = ['sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm'];
+      const allowedSalesPages = ['sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities'];
       if (allowedSalesPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -128,6 +128,18 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
                   Lead Pipeline
+                </div>
+                <div 
+                  className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('opportunities')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                  </svg>
+                  Opportunities
                 </div>
               </div>
             )}
