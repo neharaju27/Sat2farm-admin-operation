@@ -173,43 +173,7 @@ export default function SuperAdminDashboard({ user, onPageChange }) {
                 </div>
               ))}
 
-              {/* Area Data Card */}
-              {areaData && (
-                <div className="sa-card bg-white rounded-2xl p-7 border border-gray-200 shadow-sm">
-                  <div className="sa-card-accent sa-card-accent-green"></div>
-                  <div className="sa-card-content">
-                    <div className="sa-card-header">
-                      <div className="sa-icon-badge sa-icon-badge-green">
-                        <Map style={{ width: '20px', height: '20px' }} className="sa-icon-green" />
-                      </div>
-                    </div>
-                    
-                    {/* Total Area */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Total Area</p>
-                      <h3 className="sa-card-value m-0">
-                        {areaData?.total_area || 'N/A'}
-                      </h3>
-                    </div>
-
-                    {/* Available Area */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Available Area</p>
-                      <div className="text-base font-semibold text-gray-900 m-0">
-                        {areaData?.available_area || 'N/A'}
-                      </div>
-                    </div>
-
-                    {/* Used Area */}
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Used Area</p>
-                      <div className="text-base font-semibold text-gray-900 m-0">
-                        {areaData?.used_area || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              
             </div>
           )}
         </div>
