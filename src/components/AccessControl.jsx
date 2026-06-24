@@ -3,7 +3,6 @@ import { AlertCircle, Lock } from 'lucide-react';
 export default function AccessControl({ user, currentPage, onPageChange, children }) {
   const isSalesUser = user?.role === 'sales' || user?.role === 'Sales';
   
-<<<<<<< HEAD
   // List of sales users BLOCKED from accessing unlock-farm and assign-acreage
   const blockedSalesUsers = [
     'Chaturya',
@@ -27,11 +26,6 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
   const isPageRestricted = isSalesUser && 
     (currentPage === 'unlock-farm' || currentPage === 'assign-acreages') && 
     isBlockedSalesUser;
-=======
-  // Sales users now have access to all pages
-  // No restrictions applied
-  const isPageRestricted = false;
->>>>>>> origin/lead-opportunities
   
   if (!isPageRestricted) {
     // No restriction, render the children normally
