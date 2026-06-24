@@ -32,13 +32,6 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     return children;
   }
   
-<<<<<<< HEAD
-=======
-  const handleRedirectToUnlockFarm = () => {
-    onPageChange('unlock-farm');
-  };
-  
->>>>>>> origin/lead-opportunities
   return (
     <div style={{
       display: 'flex',
@@ -87,11 +80,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
           lineHeight: '1.5',
           marginBottom: '24px'
         }}>
-<<<<<<< HEAD
           This page is only accessible to specific authorized Sales users. Please contact your administrator if you believe you should have access.
-=======
-          This page is only accessible to Operations users. As a Sales user, you only have access to the Unlock Farm functionality.
->>>>>>> origin/lead-opportunities
         </p>
         
         <div style={{
@@ -114,35 +103,6 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
             </div>
           </div>
         </div>
-<<<<<<< HEAD
-=======
-        
-        <button
-          onClick={handleRedirectToUnlockFarm}
-          style={{
-            backgroundColor: '#184876',
-            color: 'white',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontSize: '16px',
-            fontWeight: '500',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            width: '100%'
-          }}
-          onMouseOver={(e) => {
-            e.target.style.backgroundColor = '#1a5490';
-            e.target.style.transform = 'translateY(-1px)';
-          }}
-          onMouseOut={(e) => {
-            e.target.style.backgroundColor = '#184876';
-            e.target.style.transform = 'translateY(0)';
-          }}
-        >
-          Go to Unlock Farm
-        </button>
->>>>>>> origin/lead-opportunities
       </div>
     </div>
   );
