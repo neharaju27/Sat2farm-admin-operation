@@ -10,10 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
-=======
     "@hello-pangea/dnd": "^18.0.1",
->>>>>>> origin/lead-opportunities
     "axios": "^1.13.6",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
