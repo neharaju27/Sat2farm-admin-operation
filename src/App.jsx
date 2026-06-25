@@ -43,10 +43,15 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handlePageChange = (page) => {
+  const [selectedManagerMobile, setSelectedManagerMobile] = useState(null);
+  const handlePageChange = (page,mobileNo = null) => {
     setCurrentPage(page);
     localStorage.setItem('currentPage', page);
+
     setIsSidebarOpen(false); // Close sidebar on mobile navigation
+    if (mobileNo) {
+    setSelectedManagerMobile(mobileNo);
+  }
   };
 
   const handleLogout = () => {
@@ -200,7 +205,10 @@ function App() {
         case 'client-monthly-report':
           return <ClientMonthlyReport user={userDisplay} onPageChange={handlePageChange} />;
         case 'manager-monthly-report':
-          return <ManagerMonthlyReport user={userDisplay} onPageChange={handlePageChange} />;
+          return <ManagerMonthlyReport
+      user={userDisplay}
+      onPageChange={handlePageChange}
+      selectedMobile={selectedManagerMobile} />;
         case 'lead-pipeline':
           return <LeadPipeline user={userDisplay} onPageChange={handlePageChange} />;
         case 'opportunities':

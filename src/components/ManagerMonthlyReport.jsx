@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Download, Calendar, FileText, TrendingUp, BarChart3, Users, MapPin, Phone, Mail, Search, Filter, Eye, Edit, Lock, Unlock, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Download, Calendar, FileText, TrendingUp, BarChart3, Users, MapPin, Phone, Mail, Search, Filter, Eye, Edit, Lock, Unlock, AlertCircle, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
 import '../styles/Sat2FarmAdminPortal.css';
 import { toast } from 'react-hot-toast';
 
-export default function ManagerMonthlyReport({ user, onPageChange }) {
+export default function ManagerMonthlyReport({ user, onPageChange, selectedMobile })  {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [monthlyData, setMonthlyData] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -20,6 +20,17 @@ export default function ManagerMonthlyReport({ user, onPageChange }) {
 
   // Helper to extract the logged-in user's mobile number
   const getLoggedInMobileNo = () => {
+    // First check if selectedMobile prop is provided
+    if (selectedMobile) return selectedMobile;
+    
+    // Check user role - only use selectedManagerPhone if user is a partner
+    const userRole = user?.role || user?.user_role;
+    if (userRole === 'partner') {
+      const selectedManagerPhone = localStorage.getItem('selectedManagerPhone');
+      if (selectedManagerPhone) return selectedManagerPhone;
+    }
+    
+    // For manager role or fallback, use logged-in user's mobile number
     const storedAuth = localStorage.getItem('sat2farm_auth');
     if (storedAuth) {
       try {
@@ -282,21 +293,8 @@ export default function ManagerMonthlyReport({ user, onPageChange }) {
     try {
       setLoadingMetrics(true);
 
-      // Get mobile number from user or localStorage
-      const storedAuth = localStorage.getItem('sat2farm_auth');
-      let mobileNo = null;
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          mobileNo = authData.mobile_no || authData.phone_number || authData.phoneNumber;
-        } catch (e) {
-          console.error('Error parsing auth data:', e);
-        }
-      }
-
-      if (!mobileNo) {
-        mobileNo = user?.phone_number || user?.phoneNumber || user?.pNumber;
-      }
+      // Get mobile number using the helper function (checks selectedManagerPhone for partner role)
+      const mobileNo = getLoggedInMobileNo();
 
       // Use query parameter from labeling API response and normalize to the expected lowercase format
       const monthQuery = getMonthQuery(month);
@@ -380,20 +378,8 @@ export default function ManagerMonthlyReport({ user, onPageChange }) {
     setReportError('');
 
     try {
-      const storedAuth = localStorage.getItem('sat2farm_auth');
-      let mobileNo = null;
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          mobileNo = authData.mobile_no || authData.phone_number || authData.phoneNumber;
-        } catch (e) {
-          console.error('Error parsing auth data:', e);
-        }
-      }
-      
-      if (!mobileNo) {
-        mobileNo = user?.phone_number || user?.phoneNumber || user?.pNumber || '9986121824';
-      }
+      // Get mobile number using the helper function (checks selectedManagerPhone for partner role)
+      const mobileNo = getLoggedInMobileNo();
 
       // Format month query exactly like in fetchMetricsForMonth
       const monthQuery = getMonthQuery(selectedMonth);
@@ -476,9 +462,39 @@ export default function ManagerMonthlyReport({ user, onPageChange }) {
         {/* TOPBAR */}
         <div className="topbar" style={{ backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)' }}>
           <div className="tb-left">
-            <div>
-              <div className="tb-page">Manager Monthly Report</div>
-              <div className="tb-sub">Manager · Reporting</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {(user?.role === 'partner' || user?.user_role === 'partner') && (
+                <button
+                  onClick={() => onPageChange('super-admin-dashboard')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    backgroundColor: '#304b31',
+                    border: '#111827',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#ffffff',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#3d7113';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = '#304b31';
+                  }}
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </button>
+              )}
+              <div>
+                <div className="tb-page">Manager Monthly Report</div>
+                <div className="tb-sub">Manager · Reporting</div>
+              </div>
             </div>
           </div>
         </div>

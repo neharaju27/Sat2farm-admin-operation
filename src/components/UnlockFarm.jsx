@@ -987,8 +987,55 @@ export default function UnlockFarm({ user, onPageChange }) {
     setFarmDetailsError('');
 
     try {
-      // Step 1: Validate referral code for manager and client roles
-      if (currentRole === 'manager' || currentRole === 'client') {
+      // Step 1: Validate farm access for partner role (check first)
+      if (user?.role === 'partner' || user?.user_role === 'partner') {
+        // Get user data from AuthContext storage
+        const storedAuth = localStorage.getItem('sat2farm_auth');
+        let userMobileNumber = null;
+        
+        if (storedAuth) {
+          try {
+            const authData = JSON.parse(storedAuth);
+            userMobileNumber = authData.phone_number;
+          } catch (e) {
+            console.error('Error parsing auth data:', e);
+          }
+        }
+        
+        if (!userMobileNumber) {
+          setFarmDetailsError('User mobile number not found. Please login again.');
+          return;
+        }
+
+        // Check if farm ID is under super admin access
+        const superFarmCheckUrl = import.meta.env.VITE_FETCH_SUPER_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue.trim()}`;
+        console.log('Checking super admin farm access:', superFarmCheckUrl);
+        
+        const superFarmResponse = await fetch(superFarmCheckUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const superFarmData = await superFarmResponse.json();
+        console.log('Super admin farm access response:', superFarmData);
+        
+        // Check if access is granted - look for success indicators (case-insensitive)
+        const isAccessGranted = superFarmData.message?.toLowerCase() === "access granted" || 
+                              superFarmData.status?.toLowerCase() === "success" || 
+                              superFarmData.success === true ||
+                              (superFarmData.data && superFarmData.data.access === true);
+        
+        if (!isAccessGranted) {
+          setFarmDetailsError('Access denied: This farm ID is not under your super admin access.');
+          return;
+        }
+        
+        console.log('Super admin farm access validation successful');
+      }
+      // Step 2: Validate referral code for manager and client roles (non-partner)
+      else if (currentRole === 'manager' || currentRole === 'client') {
         // Get user data from AuthContext storage
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;

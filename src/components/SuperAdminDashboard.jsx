@@ -19,7 +19,9 @@ export default function SuperAdminDashboard({ user, onPageChange }) {
         setError(null);
         
         // Get phone number from user
-        const phoneNumber = user?.phone_number || user?.phone;
+        const phoneNumber = user?.phone_number || user?.phoneNumber || user?.pNumber || user?.phone;
+        console.log('User object:', user);
+        console.log('Extracted phone number:', phoneNumber);
         if (!phoneNumber) {
           setError('Phone number not available');
           setLoading(false);
@@ -98,6 +100,21 @@ export default function SuperAdminDashboard({ user, onPageChange }) {
     fetchAdminInfo();
   }, [user]);
 
+  // Handle card click - set selected manager phone and navigate
+  const handleCardClick = (admin) => {
+    const mobileNo = admin?.mobile_no;
+    if (!mobileNo) {
+      console.error('No mobile number found for admin');
+      return;
+    }
+
+    // Set the selected manager phone in localStorage
+    localStorage.setItem('selectedManagerPhone', mobileNo);
+    
+    // Navigate to manager monthly report page
+    onPageChange('manager-monthly-report');
+  };
+
   return (
     <div className="main-full" style={{ background: '#ffffff' }}>
       {/* Top Header */}
@@ -128,7 +145,7 @@ export default function SuperAdminDashboard({ user, onPageChange }) {
                 <div 
                   key={index} 
                   className="sa-card bg-white rounded-2xl p-7 border border-gray-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                  onClick={() => onPageChange('manager-monthly-report')}
+                  onClick={() => handleCardClick(admin)}
                 >
                   <div className="sa-card-accent sa-card-accent-blue"></div>
                   <div className="sa-card-content">
