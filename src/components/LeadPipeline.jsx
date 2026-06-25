@@ -1765,7 +1765,7 @@ export default function LeadPipeline({ onPageChange }) {
   // Predefined contact owner options
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
     const saved = localStorage.getItem('predefinedContactOwners');
-    return saved ? JSON.parse(saved) : ['Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem'];
+    return saved ? JSON.parse(saved) : ['Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem','Amith'];
   });
 
   // Save to localStorage when predefined values change
