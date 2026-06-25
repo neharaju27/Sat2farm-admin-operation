@@ -11,7 +11,8 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     'Harshitha',
     'Shurti',
     'Vijay K B',
-    'Mustaqeem'
+    'Mustaqeem',
+    'Amith'
   ];
   
   // Get user name from various possible fields
