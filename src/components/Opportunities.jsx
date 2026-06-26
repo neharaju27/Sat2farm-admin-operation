@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 import '../styles/Sat2FarmAdminPortal.css';
 
 export default function Opportunities({ onPageChange }) {
@@ -1390,57 +1390,59 @@ export default function Opportunities({ onPageChange }) {
     setEditValue('');
   };
 
-  // ── Drag and drop handler for Kanban board ───────────────────────────────
-  const handleDragEnd = async (result) => {
-    const { destination, source, draggableId } = result;
-
-    // Reset cursor immediately
-    document.body.style.cursor = 'default';
-
-    // If dropped outside any droppable area or in the same position, do nothing
-    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
+  // ── Drag and drop handler for Kanban board (Pragmatic DnD) ───────────────
+  const handleKanbanDealMove = async ({
+    dealId,
+    sourceColumnId,
+    destinationColumnId,
+    sourceIndex,
+    destinationIndex,
+  }) => {
+    if (
+      sourceColumnId === destinationColumnId &&
+      sourceIndex === destinationIndex
+    ) {
       return;
     }
 
-    // Map column IDs to deal_stage values
     const columnToStageMap = {
-      'opportunity': 'Opportunity',
-      'proposal': 'Proposal',
-      'negotiation': 'Negotiation',
+      opportunity: 'Opportunity',
+      proposal: 'Proposal',
+      negotiation: 'Negotiation',
       'closed-won': 'Closed Won',
       'closed-lost': 'Closed Lost',
-      'invoiced': 'Invoiced',
-      'paid': 'Paid'
+      invoiced: 'Invoiced',
+      paid: 'Paid',
     };
 
-    const newStage = columnToStageMap[destination.droppableId];
-    const oldStage = columnToStageMap[source.droppableId];
+    const newStage = columnToStageMap[destinationColumnId];
+    const oldStage = columnToStageMap[sourceColumnId];
 
     if (!newStage) {
       toast.error('Invalid destination column');
       return;
     }
 
-    // Optimistic update: Move the card immediately in local state
     const updatedKanbanDeals = { ...kanbanDeals };
     const sourceDeals = [...updatedKanbanDeals[oldStage]];
-    const [movedDeal] = sourceDeals.splice(source.index, 1);
+    const [movedDeal] = sourceDeals.splice(sourceIndex, 1);
 
     if (movedDeal) {
       movedDeal.deal_stage = newStage;
       const destDeals = [...updatedKanbanDeals[newStage]];
-      destDeals.splice(destination.index, 0, movedDeal);
+      destDeals.splice(destinationIndex, 0, movedDeal);
       updatedKanbanDeals[oldStage] = sourceDeals;
       updatedKanbanDeals[newStage] = destDeals;
       setKanbanDeals(updatedKanbanDeals);
-      // Force a re-render by updating a timestamp
       setKanbanUpdateTimestamp(Date.now());
     }
 
-    // Show updating message
+    if (sourceColumnId === destinationColumnId) {
+      return;
+    }
+
     toast.loading('Updating deal stage...');
 
-    // Update the deal stage via API in background
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
@@ -1448,7 +1450,6 @@ export default function Opportunities({ onPageChange }) {
         console.log('Update deal API URL not configured');
         toast.dismiss();
         toast.error('Update Deal API URL not configured');
-        // Revert the optimistic update
         fetchAllKanbanDeals();
         return;
       }
@@ -1459,10 +1460,10 @@ export default function Opportunities({ onPageChange }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          deal_id: draggableId,
+          deal_id: dealId,
           deal_stage: newStage,
-          user: currentUserName
-        })
+          user: currentUserName,
+        }),
       });
 
       if (!response.ok) {
@@ -1477,16 +1478,36 @@ export default function Opportunities({ onPageChange }) {
         toast.success('Deal stage updated successfully');
       } else {
         toast.error('Failed to update deal stage');
-        // Revert the optimistic update
         fetchAllKanbanDeals();
       }
     } catch (err) {
       console.error('Error updating deal stage:', err);
       toast.dismiss();
       toast.error('Failed to update deal stage');
-      // Revert the optimistic update
       fetchAllKanbanDeals();
     }
+  };
+
+  const handleKanbanDealClick = (deal) => {
+    setSelectedDeal({
+      deal_id: deal.deal_id,
+      deal_name: deal.deal_name,
+      contact_name: deal.full_name || 'John Smith',
+      amount: `₹${deal.deal_amount}`,
+      closing_date: deal.deal_close_date
+        ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })
+        : '-',
+      description: deal.description || '',
+      deal_type: deal.deal_type || '',
+      deal_stage: deal.deal_stage || '',
+      contact_owner: deal.deal_owner || '',
+      probability: `${deal.deal_probability}%`,
+    });
+    setShowDealInfoModal(true);
   };
 
   // ── Fetch timeline data for a lead ─────────────────────────────────────────
@@ -5156,941 +5177,17 @@ export default function Opportunities({ onPageChange }) {
 
                   {/* Kanban Board */}
                   {pipelineViewMode === 'kanban' && (
-                    <DragDropContext
-                      onDragStart={() => document.body.style.cursor = 'grabbing'}
-                      onDragEnd={handleDragEnd}
-                    >
-                    <div style={{ flex: 1, maxHeight: 'calc(100vh - 200px)', overflowX: 'auto', overflowY: 'hidden', padding: '20px', background: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', gap: '12px', minWidth: 'fit-content', height: '100%', alignItems: 'flex-start' }}>
-                    {/* Opportunity Column */}
-                    <div style={{ 
-                      width: columnWidths['opportunity'] || '200px', 
-                      background: 'white', 
-                      borderRadius: '8px', 
-                      border: '1px solid #e0e0e0', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      maxHeight: 'calc(100vh - 200px)', 
-                      minHeight: 0,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      position: 'relative'
-                    }}>
-                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button 
-                              onClick={() => setCollapsedStages(prev => ({ ...prev, 'opportunity': !prev['opportunity'] }))} 
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                            >
-                              {collapsedStages['opportunity'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Opportunity</span>
-                          </div>
-                          <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Opportunity'] || []).length}</span>
-                        </div>
-                        {!collapsedStages['opportunity'] && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                            <span>Total Value</span>
-                            <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(filteredKanbanDeals['Opportunity'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                      {!collapsedStages['opportunity'] && (
-                        <Droppable droppableId="opportunity">
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              style={{ padding: '12px', overflowY:'auto',paddingBottom: '40px', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                            >
-                              {(filteredKanbanDeals['Opportunity'] || []).map((deal, index) => (
-                                <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      style={{
-                                        ...provided.draggableProps.style,
-                                        background: 'white',
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        marginBottom: '10px',
-                                        cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                        minHeight: '90px',
-                                        boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                        transition: 'box-shadow 0.2s ease'
-                                      }}
-                                    >
-                                      <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                        <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      )}
-                      {/* Resize handle */}
-                      <div 
-                        style={{ 
-                          width: '5px', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                          position: 'absolute', 
-                          right: 0, 
-                          top: 0, 
-                          cursor: 'col-resize', 
-                          background: 'transparent' 
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const startX = e.clientX;
-                          const startWidth = columnWidths['opportunity'] || 320;
-                          
-                          const handleMouseMove = (moveEvent) => {
-                            const diff = moveEvent.clientX - startX;
-                            const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                            setColumnWidths(prev => ({ ...prev, 'opportunity': newWidth }));
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      />
-                    </div>
-
-                    {/* Proposal/Price Quote Column */}
-                    <div style={{ 
-                      width: columnWidths['proposal'] || '200px', 
-                      background: 'white', 
-                      borderRadius: '8px', 
-                      border: '1px solid #e0e0e0', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                      
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      position: 'relative'
-                    }}>
-                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button 
-                              onClick={() => setCollapsedStages(prev => ({ ...prev, 'proposal': !prev['proposal'] }))} 
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                            >
-                              {collapsedStages['proposal'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Proposal</span>
-                          </div>
-                          <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Proposal'] || []).length}</span>
-                        </div>
-                        {!collapsedStages['proposal'] && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                            <span>Total Value</span>
-                            <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(filteredKanbanDeals['Proposal'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                      {!collapsedStages['proposal'] && (
-                        <Droppable droppableId="proposal">
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                            >
-                              {(filteredKanbanDeals['Proposal'] || []).map((deal, index) => (
-                                <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      style={{
-                                        ...provided.draggableProps.style,
-                                        background: 'white',
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        marginBottom: '10px',
-                                        cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                        minHeight: '90px',
-                                        boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                        transition: 'box-shadow 0.2s ease'
-                                      }}
-                                    >
-                                      <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                        <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      )}
-                      {/* Resize handle */}
-                      <div 
-                        style={{ 
-                          width: '5px', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                          position: 'absolute', 
-                          right: 0, 
-                          top: 0, 
-                          cursor: 'col-resize', 
-                          background: 'transparent' 
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const startX = e.clientX;
-                          const startWidth = columnWidths['proposal'] || 320;
-                          
-                          const handleMouseMove = (moveEvent) => {
-                            const diff = moveEvent.clientX - startX;
-                            const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                            setColumnWidths(prev => ({ ...prev, 'proposal': newWidth }));
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      />
-                    </div>
-
-                    {/* Negotiation/Review Column */}
-                    <div style={{ 
-                      width: columnWidths['negotiation'] || '200px', 
-                      background: 'white', 
-                      borderRadius: '8px', 
-                      border: '1px solid #e0e0e0', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                    
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      position: 'relative'
-                    }}>
-                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button 
-                              onClick={() => setCollapsedStages(prev => ({ ...prev, 'negotiation': !prev['negotiation'] }))} 
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                            >
-                              {collapsedStages['negotiation'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Negotiation</span>
-                          </div>
-                          <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Negotiation'] || []).length}</span>
-                        </div>
-                        {!collapsedStages['negotiation'] && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                            <span>Total Value</span>
-                            <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(filteredKanbanDeals['Negotiation'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                      {!collapsedStages['negotiation'] && (
-                        <Droppable droppableId="negotiation">
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                            >
-                              {(filteredKanbanDeals['Negotiation'] || []).map((deal, index) => (
-                                <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      style={{
-                                        ...provided.draggableProps.style,
-                                        background: 'white',
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        marginBottom: '10px',
-                                        cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                        minHeight: '90px',
-                                        boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                        transition: 'box-shadow 0.2s ease'
-                                      }}
-                                    >
-                                      <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                        <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      )}
-                      {/* Resize handle */}
-                      <div 
-                        style={{ 
-                          width: '5px', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                          position: 'absolute', 
-                          right: 0, 
-                          top: 0, 
-                          cursor: 'col-resize', 
-                          background: 'transparent' 
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const startX = e.clientX;
-                          const startWidth = columnWidths['negotiation'] || 320;
-                          
-                          const handleMouseMove = (moveEvent) => {
-                            const diff = moveEvent.clientX - startX;
-                            const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                            setColumnWidths(prev => ({ ...prev, 'negotiation': newWidth }));
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      />
-                    </div>
-
-                    {/* Closed Won Column */}
-                    <div style={{ 
-                      width: columnWidths['closed-won'] || '200px', 
-                      background: 'white', 
-                      borderRadius: '8px', 
-                      border: '1px solid #e0e0e0', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                      
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      position: 'relative'
-                    }}>
-                      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button 
-                              onClick={() => setCollapsedStages(prev => ({ ...prev, 'closed-won': !prev['closed-won'] }))} 
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                            >
-                              {collapsedStages['closed-won'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Closed Won</span>
-                          </div>
-                          <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Closed Won'] || []).length}</span>
-                        </div>
-                        {!collapsedStages['closed-won'] && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                            <span>Total Value</span>
-                            <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(filteredKanbanDeals['Closed Won'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </div>
-                      {!collapsedStages['closed-won'] && (
-                        <Droppable droppableId="closed-won">
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                            >
-                              {(filteredKanbanDeals['Closed Won'] || []).map((deal, index) => (
-                                <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      style={{
-                                        ...provided.draggableProps.style,
-                                        background: 'white',
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '6px',
-                                        padding: '12px',
-                                        marginBottom: '10px',
-                                        cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                        minHeight: '90px',
-                                        boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                        transition: 'box-shadow 0.2s ease'
-                                      }}
-                                    >
-                                      <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                        <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      )}
-                      {/* Resize handle */}
-                      <div 
-                        style={{ 
-                          width: '5px', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                          position: 'absolute', 
-                          right: 0, 
-                          top: 0, 
-                          cursor: 'col-resize', 
-                          background: 'transparent' 
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const startX = e.clientX;
-                          const startWidth = columnWidths['closed-won'] || 320;
-                          
-                          const handleMouseMove = (moveEvent) => {
-                            const diff = moveEvent.clientX - startX;
-                            const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                            setColumnWidths(prev => ({ ...prev, 'closed-won': newWidth }));
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      />
-                    </div>
-
-                    {/* Closed Lost Column */}
-                    <div style={{ position: 'relative' }}>
-                      <div
-                        style={{ 
-                          width: columnWidths['closed-lost'] || '200px', 
-                          background: 'white', 
-                          borderRadius: '8px', 
-                          border: '1px solid #e0e0e0', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                     
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <button 
-                                onClick={() => setCollapsedStages(prev => ({ ...prev, 'closed-lost': !prev['closed-lost'] }))} 
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                              >
-                                {collapsedStages['closed-lost'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                              </button>
-                              <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Closed Lost</span>
-                            </div>
-                            <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Closed Lost'] || []).length}</span>
-                          </div>
-                          {!collapsedStages['closed-lost'] && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                              <span>Total Value</span>
-                              <span style={{ fontWeight: '600', color: '#ef4444' }}>₹{(filteredKanbanDeals['Closed Lost'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                        {!collapsedStages['closed-lost'] && (
-                          <Droppable droppableId="closed-lost">
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                              >
-                                {(filteredKanbanDeals['Closed Lost'] || []).map((deal, index) => (
-                                  <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        style={{
-                                          ...provided.draggableProps.style,
-                                          background: 'white',
-                                          border: '1px solid #e0e0e0',
-                                          borderRadius: '6px',
-                                          padding: '12px',
-                                          marginBottom: '10px',
-                                          cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                          minHeight: '90px',
-                                          boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                          transition: 'box-shadow 0.2s ease'
-                                        }}
-                                      >
-                                        <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                          <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                          <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
-                        )}
-                        {/* Resize handle */}
-                        <div 
-                          style={{ 
-                            width: '5px', 
-                            maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                            position: 'absolute', 
-                            right: 0, 
-                            top: 0, 
-                            cursor: 'col-resize', 
-                            background: 'transparent' 
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const startX = e.clientX;
-                            const startWidth = columnWidths['closed-lost'] || 320;
-                            
-                            const handleMouseMove = (moveEvent) => {
-                              const diff = moveEvent.clientX - startX;
-                              const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                              setColumnWidths(prev => ({ ...prev, 'closed-lost': newWidth }));
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Invoiced Column */}
-                    <div style={{ position: 'relative' }}>
-                      <div
-                        style={{ 
-                          width: columnWidths['invoiced'] || '200px', 
-                          background: 'white', 
-                          borderRadius: '8px', 
-                          border: '1px solid #e0e0e0', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                         
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <button 
-                                onClick={() => setCollapsedStages(prev => ({ ...prev, 'invoiced': !prev['invoiced'] }))} 
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                              >
-                                {collapsedStages['invoiced'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                              </button>
-                              <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Invoiced</span>
-                            </div>
-                            <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(kanbanDeals['Invoiced'] || []).length}</span>
-                          </div>
-                          {!collapsedStages['invoiced'] && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                              <span>Total Value</span>
-                              <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(kanbanDeals['Invoiced'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                        {!collapsedStages['invoiced'] && (
-                          <Droppable droppableId="invoiced">
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                              >
-                                {(kanbanDeals['Invoiced'] || []).map((deal, index) => (
-                                  <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        style={{
-                                          ...provided.draggableProps.style,
-                                          background: 'white',
-                                          border: '1px solid #e0e0e0',
-                                          borderRadius: '6px',
-                                          padding: '12px',
-                                          marginBottom: '10px',
-                                          cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                          minHeight: '90px',
-                                          boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                          transition: 'box-shadow 0.2s ease'
-                                        }}
-                                      >
-                                        <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                          <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                          <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
-                        )}
-                        {/* Resize handle */}
-                        <div 
-                          style={{ 
-                            width: '5px', 
-                            maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                            position: 'absolute', 
-                            right: 0, 
-                            top: 0, 
-                            cursor: 'col-resize', 
-                            background: 'transparent' 
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const startX = e.clientX;
-                            const startWidth = columnWidths['invoiced'] || 320;
-                            
-                            const handleMouseMove = (moveEvent) => {
-                              const diff = moveEvent.clientX - startX;
-                              const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                              setColumnWidths(prev => ({ ...prev, 'invoiced': newWidth }));
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Paid Column */}
-                    <div style={{ position: 'relative' }}>
-                      <div
-                        style={{ 
-                          width: columnWidths['paid'] || '200px', 
-                          background: 'white', 
-                          borderRadius: '8px', 
-                          border: '1px solid #e0e0e0', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                         
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0e0e0', background: '#f8f9fa', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <button 
-                                onClick={() => setCollapsedStages(prev => ({ ...prev, 'paid': !prev['paid'] }))} 
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '4px', color: '#666' }}
-                              >
-                                {collapsedStages['paid'] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                              </button>
-                              <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Paid</span>
-                            </div>
-                            <span style={{ fontSize: '12px', background: '#e0e0e0', color: '#333', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>{(filteredKanbanDeals['Paid'] || []).length}</span>
-                          </div>
-                          {!collapsedStages['paid'] && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#666' }}>
-                              <span>Total Value</span>
-                              <span style={{ fontWeight: '600', color: '#14B474' }}>₹{(filteredKanbanDeals['Paid'] || []).reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0).toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                        {!collapsedStages['paid'] && (
-                          <Droppable droppableId="paid">
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                style={{ padding: '12px', paddingBottom: '40px', overflowY: 'auto', flex: 1, minHeight: 0, backgroundColor: snapshot.isDraggingOver ? '#f0f9ff' : 'transparent' }}
-                              >
-                                {(filteredKanbanDeals['Paid'] || []).map((deal, index) => (
-                                  <Draggable key={deal.deal_id} draggableId={deal.deal_id.toString()} index={index}>
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        style={{
-                                          ...provided.draggableProps.style,
-                                          background: 'white',
-                                          border: '1px solid #e0e0e0',
-                                          borderRadius: '6px',
-                                          padding: '12px',
-                                          marginBottom: '10px',
-                                          cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                                          minHeight: '90px',
-                                          boxShadow: snapshot.isDragging ? '0 8px 20px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
-                                          transition: 'box-shadow 0.2s ease'
-                                        }}
-                                      >
-                                        <div 
-                                        style={{ fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px', cursor: 'pointer', transition: 'color 0.2s ease' }}
-                                        onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                        onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: deal.full_name || 'John Smith',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner ||'',
-                                            probability: `${deal.deal_probability}%`
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </div>
-                                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{deal.deal_type}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                          <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                                          <span style={{ fontSize: '11px', color: '#14B474', fontWeight: '600' }}>₹{parseFloat(deal.deal_amount || 0).toLocaleString()}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
-                        )}
-                        {/* Resize handle */}
-                        <div 
-                          style={{ 
-                            width: '5px', 
-                            maxHeight: 'calc(100vh - 200px)', minHeight: 0, 
-                            position: 'absolute', 
-                            right: 0, 
-                            top: 0, 
-                            cursor: 'col-resize', 
-                            background: 'transparent' 
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const startX = e.clientX;
-                            const startWidth = columnWidths['paid'] || 320;
-                            
-                            const handleMouseMove = (moveEvent) => {
-                              const diff = moveEvent.clientX - startX;
-                              const newWidth = Math.max(250, Math.min(500, startWidth + diff));
-                              setColumnWidths(prev => ({ ...prev, 'paid': newWidth }));
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </DragDropContext>
-              )}
+                    <SalesPipelineKanbanBoard
+                      filteredKanbanDeals={filteredKanbanDeals}
+                      kanbanDeals={kanbanDeals}
+                      collapsedStages={collapsedStages}
+                      setCollapsedStages={setCollapsedStages}
+                      columnWidths={columnWidths}
+                      setColumnWidths={setColumnWidths}
+                      onDealMove={handleKanbanDealMove}
+                      onDealClick={handleKanbanDealClick}
+                    />
+                  )}
                 </div>
               </div>
                 )}
