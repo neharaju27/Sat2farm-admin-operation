@@ -1747,7 +1747,7 @@ export default function LeadPipeline({ onPageChange }) {
   // Predefined tags options
   const [predefinedTags, setPredefinedTags] = useState(() => {
     const saved = localStorage.getItem('predefinedTags');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client'];
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client','Positive response'];
   });
 
   // Predefined lead source options
@@ -3501,7 +3501,8 @@ export default function LeadPipeline({ onPageChange }) {
                                   'Sat4Risk',
                                   'Project',
                                   'WhiteLabelling',
-                                  'API Client'
+                                  'API Client',
+                                'Positive response'
                                 ].filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                 .map(tag => (
                                   <div
@@ -7364,6 +7365,7 @@ export default function LeadPipeline({ onPageChange }) {
                   <option value="Project">Project</option>
                   <option value="WhiteLabelling">WhiteLabelling</option>
                   <option value="API Client">API Client</option>
+                  <option value="Positive response">Positive response</option>
                 </select>
               </div>
             </div>
