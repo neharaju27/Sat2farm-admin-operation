@@ -1049,7 +1049,7 @@ export default function Opportunities({ onPageChange }) {
 
   const [predefinedTags, setPredefinedTags] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedTags');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client'];
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client','Positive response'];
   });
 
   const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
@@ -1064,7 +1064,7 @@ export default function Opportunities({ onPageChange }) {
 
   const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedAccountTypes');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client'];
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client','Positive response'];
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
