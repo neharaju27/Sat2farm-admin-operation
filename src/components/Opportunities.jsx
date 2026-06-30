@@ -12,7 +12,7 @@ export default function Opportunities({ onPageChange }) {
   const [error, setError] = useState(null);
 
   // Fetch opportunities from API
-  useEffect(() => {
+  
     const fetchOpportunities = async () => {
       try {
         setLoading(true);
@@ -76,6 +76,8 @@ export default function Opportunities({ onPageChange }) {
         setLoading(false);
       }
     };
+    useEffect(() => {
+
 
     fetchOpportunities();
     fetchAllKanbanDeals();
@@ -200,6 +202,18 @@ export default function Opportunities({ onPageChange }) {
   setIndustryDropdownOpen(false);
   setAccountTypeDropdownOpen(false);
 };
+
+// Handle click outside to close dropdowns
+React.useEffect(() => {
+  const handleClickOutside = (event) => {
+    const isDropdownClick = event.target.closest('[data-dropdown="true"]');
+    if (!isDropdownClick) {
+      closeAllDropdowns();
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   // ── Table / filter state ──────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
@@ -1476,6 +1490,7 @@ export default function Opportunities({ onPageChange }) {
       toast.dismiss();
       if (result.success || result.message) {
         toast.success('Deal stage updated successfully');
+        fetchAllKanbanDeals();
       } else {
         toast.error('Failed to update deal stage');
         fetchAllKanbanDeals();
@@ -1532,8 +1547,22 @@ export default function Opportunities({ onPageChange }) {
   // ── Editable field component (identical to LeadPipeline) ─────────────────
   const EditableField = ({ label, value, fieldName, type = 'text' }) => {
     const isEditing = editingField === fieldName;
+    const containerRef = React.useRef(null);
+
+    React.useEffect(() => {
+      if (isEditing) {
+        const handleClickOutside = (event) => {
+          if (containerRef.current && !containerRef.current.contains(event.target)) {
+            cancelEdit();
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
+
     return (
-      <div>
+      <div ref={containerRef}>
         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
           {label}
         </label>
@@ -1773,6 +1802,7 @@ export default function Opportunities({ onPageChange }) {
       setSelectedDeal(null);
       setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 1) - 1 }));
       fetchDeals(selectedUser?.id);
+      fetchAllKanbanDeals();
     } catch (err) {
       console.error('Error deleting deal:', err);
       toast.dismiss();
@@ -1819,7 +1849,7 @@ export default function Opportunities({ onPageChange }) {
           toast.success('CSV uploaded successfully');
           
           // Refresh the data
-          fetchAccounts();
+          fetchOpportunities();
         } catch (err) {
           console.error('Error uploading CSV:', err);
           toast.dismiss();
@@ -1940,6 +1970,7 @@ export default function Opportunities({ onPageChange }) {
   const EditableDealField = ({ label, value, fieldName, type = 'text', options = [] }) => {
     const isEditing = editingDealField === fieldName;
     const textareaRef = React.useRef(null);
+    const containerRef = React.useRef(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [localTextareaValue, setLocalTextareaValue] = useState('');
 
@@ -1956,6 +1987,20 @@ export default function Opportunities({ onPageChange }) {
         setLocalTextareaValue('');
       }
     }, [isEditing, type]);
+
+    // Handle click outside to close editing
+    React.useEffect(() => {
+      if (isEditing) {
+        const handleClickOutside = (event) => {
+          if (containerRef.current && !containerRef.current.contains(event.target)) {
+            cancelDealEdit();
+            setDropdownOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
 
     const handleTextareaChange = (e) => {
       setLocalTextareaValue(e.target.value);
@@ -1977,14 +2022,14 @@ export default function Opportunities({ onPageChange }) {
                               fieldName === 'contact_owner' ? setShowCustomDealOwnerInput : null;
     
     return (
-      <div>
+      <div ref={containerRef}>
         {label && <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>{label}</label>}
         <div style={{ display: 'flex', alignItems: type === 'textarea' ? 'flex-start' : 'center', gap: '8px' }}>
           {isEditing ? (
             <>
               {type === 'select' ? (
                 <div style={{ position: 'relative', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                  <div data-dropdown="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
                     onClick={() => setDropdownOpen(!dropdownOpen)}>
                     <span>{editDealValue || 'Select...'}</span><ChevronDown size={14} />
                   </div>
@@ -2294,10 +2339,10 @@ export default function Opportunities({ onPageChange }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="main-full">
-      <div style={{ padding: '16px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div style={{ padding: '8px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>
           <div>
             <h1 style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 8px 0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               Opportunities
@@ -5594,6 +5639,7 @@ export default function Opportunities({ onPageChange }) {
   <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Type</label>
   <div style={{ position: 'relative' }}>
     <div
+      data-dropdown="true"
       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
       onClick={() => {
         closeAllDropdowns();
@@ -5606,7 +5652,7 @@ export default function Opportunities({ onPageChange }) {
       <ChevronDown size={14} />
     </div>
     {accountTypeDropdownOpen && (
-      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+      <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
         {predefinedAccountTypes.map(accountType => (
           <button key={accountType} onClick={() => { handleFieldUpdate(selectedUser.id, 'accountType', accountType); setAccountTypeDropdownOpen(false); }}
             style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
@@ -5642,6 +5688,7 @@ export default function Opportunities({ onPageChange }) {
                         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry</label>
                         <div style={{ position: 'relative' }}>
                           <div
+                            data-dropdown="true"
                             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
                             onClick={() => {
                               closeAllDropdowns();
@@ -5654,7 +5701,7 @@ export default function Opportunities({ onPageChange }) {
                             <ChevronDown size={14} />
                           </div>
                           {industryDropdownOpen && (
-                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
                               {predefinedIndustries.map(industry => (
                                 <button key={industry} onClick={() => { handleFieldUpdate(selectedUser.id, 'industry', industry); setIndustryDropdownOpen(false); }}
                                   style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
@@ -5707,7 +5754,9 @@ export default function Opportunities({ onPageChange }) {
                       <div>
                         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Owner</label>
                         <div style={{ position: 'relative' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                          <div 
+                          data-dropdown="true"
+                           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
                             onClick={() => {
                               closeAllDropdowns();
                               setOwnerDropdownOpen(!ownerDropdownOpen);
@@ -5717,7 +5766,7 @@ export default function Opportunities({ onPageChange }) {
                             <span>{selectedUser.contactOwner}</span><ChevronDown size={14} />
                           </div>
                           {ownerDropdownOpen && (
-                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
                               {predefinedContactOwners.map(owner => (
                                 <button key={owner} onClick={() => { handleFieldUpdate(selectedUser.id, 'contactOwner', owner); setOwnerDropdownOpen(false); }}
                                   style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
@@ -5753,7 +5802,9 @@ export default function Opportunities({ onPageChange }) {
                       <div>
                         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
                         <div style={{ position: 'relative' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                          <div 
+                          data-dropdown="true" 
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
                             onClick={() => {
                               closeAllDropdowns();
                               setTagsDropdownOpen(!tagsDropdownOpen);
@@ -5763,7 +5814,7 @@ export default function Opportunities({ onPageChange }) {
                             <span>{selectedUser.tags || 'Select tag'}</span><ChevronDown size={14} />
                           </div>
                           {tagsDropdownOpen && (
-                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
                               {predefinedTags.map(tag => (
                                 <button key={tag} onClick={() => { handleFieldUpdate(selectedUser.id, 'tags', tag); setTagsDropdownOpen(false); }}
                                   style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
@@ -6185,6 +6236,8 @@ export default function Opportunities({ onPageChange }) {
                       setDealDescription('');
                       setDealType('');
                       fetchDeals(selectedUser?.id);
+                      fetchAllKanbanDeals();
+
                     } catch (err) {
                       console.error('Error creating deal:', err);
                       toast.dismiss();

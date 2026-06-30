@@ -91,6 +91,23 @@ export default function LeadPipeline({ onPageChange }) {
     setIndustryDropdownOpen(false);
   };
 
+  // ── Close dropdowns when clicking outside ─────────────────────────────────
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('[data-dropdown]')) {
+        closeAllDropdowns();
+      }
+      if (!event.target.closest('[data-editable-field]') && editingField) {
+        cancelEdit();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingField]);
+
   // ── Tab state for modal right panel ──────────────────────────────────────
   const [activeModalTab, setActiveModalTab] = useState('timeline');
   const [showCreateDealModal, setShowCreateDealModal] = useState(false);
@@ -806,6 +823,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const startEditing = (fieldName, currentValue) => {
+    closeAllDropdowns();
     setEditingField(fieldName);
     setEditValue(currentValue || '');
   };
@@ -1790,7 +1808,7 @@ export default function LeadPipeline({ onPageChange }) {
     const isEditing = editingField === fieldName;
     
     return (
-      <div>
+      <div data-editable-field>
         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
           {label}
         </label>
@@ -1901,6 +1919,8 @@ export default function LeadPipeline({ onPageChange }) {
     console.log('Starting CSV import for file:', file.name);
     
     try {
+      toast.loading('Uploading CSV...');
+      
       const formData = new FormData();
       formData.append('csv_file', file);
       formData.append('user', user?.name || user?.phone_number || 'operation');
@@ -1925,18 +1945,21 @@ export default function LeadPipeline({ onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
       
-      if (result.success) {
+      if (result.message === 'CSV processed' || result.success || result.total_added !== undefined) {
         console.log('CSV import successful');
         // Refresh leads data to show newly imported leads
         await fetchLeads();
-        alert(`Successfully imported ${result.imported_count || result.count || 'unknown number of'} leads!`);
+        toast.dismiss();
+        toast.success(`Successfully imported ${result.total_added || result.imported_count || result.count || 'unknown number of'} leads!`);
       } else {
         console.error('API returned failure:', result);
-        alert(`Failed to import CSV: ${result.message || 'Unknown error'}`);
+        toast.dismiss();
+        toast.error(`Failed to import CSV: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Error uploading CSV:', err);
-      alert(`Error uploading CSV: ${err.message || 'Unknown error occurred'}`);
+      toast.dismiss();
+      toast.error(`Error uploading CSV: ${err.message || 'Unknown error occurred'}`);
     }
   };
   
@@ -1993,15 +2016,15 @@ export default function LeadPipeline({ onPageChange }) {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: '32px',
-        paddingBottom: '16px',
+        marginBottom: '4px',
+        paddingBottom: '4px',
         borderBottom: '1px solid var(--border)'
       }}>
         <div>
           <h1 style={{ 
             fontSize: '28px', 
             fontWeight: '700', 
-            margin: '0 0 8px 0',
+            margin: '0 0 4px 0',
             background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -5039,7 +5062,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </div>
                       
                       {industryDropdownOpen && (
-                        <div style={{
+                        <div data-dropdown style={{
                           position: 'absolute',
                           top: '100%',
                           left: 0,
@@ -5274,7 +5297,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </div>
                       
                       {statusDropdownOpen && (
-                        <div style={{
+                        <div data-dropdown style={{
                           position: 'absolute',
                           top: '100%',
                           left: 0,
@@ -5450,7 +5473,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </div>
                       
                       {ownerDropdownOpen && (
-                        <div style={{
+                        <div data-dropdown style={{
                           position: 'absolute',
                           top: '100%',
                           left: 0,
@@ -5627,7 +5650,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </div>
                       
                       {leadSourceDropdownOpen && (
-                        <div style={{
+                        <div data-dropdown style={{
                           position: 'absolute',
                           top: '100%',
                           left: 0,
@@ -5804,7 +5827,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </div>
                       
                       {tagsDropdownOpen && (
-                        <div style={{
+                        <div data-dropdown style={{
                           position: 'absolute',
                           top: '100%',
                           left: 0,
