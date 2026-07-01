@@ -1,196 +1,333 @@
-import { useState, useEffect } from 'react';
-import { Users, Phone, Calendar, User, Map } from 'lucide-react';
-import '../styles/Sat2FarmAdminPortal.css';
+import { useState, useEffect, useMemo } from "react";
+import {
+  Search,
+  Filter,
+  Building2,
+  Eye,
+} from "lucide-react";
+import "../styles/Sat2FarmAdminPortal.css";
 
-const GET_ADMIN_KEY_API_URL = import.meta.env.VITE_GET_ADMIN_KEY_API_URL;
-const GET_ADMIN_INFO_API_URL = import.meta.env.VITE_GET_ADMIN_INFO_API_URL;
-const FETCH_SUPERADMIN_AREA_API_URL = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL;
+const GET_ADMIN_KEY_API_URL =
+  import.meta.env.VITE_GET_ADMIN_KEY_API_URL;
 
-export default function SuperAdminDashboard({ user, onPageChange }) {
+const GET_ADMIN_INFO_API_URL =
+  import.meta.env.VITE_GET_ADMIN_INFO_API_URL;
+
+const FETCH_SUPERADMIN_AREA_API_URL =
+  import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL;
+
+export default function SuperAdminDashboard({
+  user,
+  onPageChange,
+}) {
   const [adminInfo, setAdminInfo] = useState([]);
   const [areaData, setAreaData] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+
   useEffect(() => {
-    const fetchAdminInfo = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Get phone number from user
-        const phoneNumber = user?.phone_number || user?.phoneNumber || user?.pNumber || user?.phone;
-        console.log('User object:', user);
-        console.log('Extracted phone number:', phoneNumber);
-        if (!phoneNumber) {
-          setError('Phone number not available');
-          setLoading(false);
-          return;
-        }
-
-        // Step 1: Fetch key using phone number
-        const keyResponse = await fetch(`${GET_ADMIN_KEY_API_URL}?mobile_no=${phoneNumber}`);
-        
-        if (!keyResponse.ok) {
-          throw new Error('Failed to fetch admin key');
-        }
-
-        const keyData = await keyResponse.json();
-        console.log('Admin Key API Response:', keyData);
-        
-        // Extract api_key from response
-        const adminKey = keyData?.api_key;
-        
-        console.log('Extracted Admin Key:', adminKey);
-        
-        if (!adminKey) {
-          throw new Error('Admin key not found in response');
-        }
-
-        // Step 2: Fetch admin info using the fetched key
-        console.log('Fetching admin info with key:', adminKey);
-        const adminInfoResponse = await fetch(`${GET_ADMIN_INFO_API_URL}?key=${adminKey}`);
-        
-        console.log('Admin Info Response Status:', adminInfoResponse.status);
-        console.log('Admin Info Response OK:', adminInfoResponse.ok);
-        
-        if (!adminInfoResponse.ok) {
-          const errorText = await adminInfoResponse.text();
-          console.log('Admin Info Error Response:', errorText);
-          throw new Error(`Failed to fetch admin info: ${adminInfoResponse.status} - ${errorText}`);
-        }
-
-        const adminData = await adminInfoResponse.json();
-        console.log('Admin Info API Response:', adminData);
-        
-        // Handle array response
-        if (Array.isArray(adminData)) {
-          setAdminInfo(adminData);
-        } else {
-          // If single object, wrap in array
-          setAdminInfo([adminData]);
-        }
-
-        // Step 3: Fetch superadmin area data
-        console.log('Fetching superadmin area data with phone:', phoneNumber);
-        const areaResponse = await fetch(`${FETCH_SUPERADMIN_AREA_API_URL}?mobile_no=${phoneNumber}`);
-        
-        console.log('Area Response Status:', areaResponse.status);
-        console.log('Area Response OK:', areaResponse.ok);
-        
-        if (!areaResponse.ok) {
-          const errorText = await areaResponse.text();
-          console.log('Area Error Response:', errorText);
-          throw new Error(`Failed to fetch area data: ${areaResponse.status} - ${errorText}`);
-        }
-
-        const areaResult = await areaResponse.json();
-        console.log('Area API Response:', areaResult);
-        
-        if (areaResult?.status === 'success' && areaResult?.data) {
-          setAreaData(areaResult.data);
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAdminInfo();
+    fetchManagers();
   }, [user]);
 
-  // Handle card click - set selected manager phone and navigate
-  const handleCardClick = (admin) => {
-    const mobileNo = admin?.mobile_no;
-    if (!mobileNo) {
-      console.error('No mobile number found for admin');
-      return;
+  async function fetchManagers() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const phoneNumber =
+        user?.phone_number ||
+        user?.phoneNumber ||
+        user?.phone ||
+        user?.pNumber;
+
+      if (!phoneNumber) {
+        setError("Phone number not available");
+        return;
+      }
+
+      // Get Admin Key
+      const keyResponse = await fetch(
+        `${GET_ADMIN_KEY_API_URL}?mobile_no=${phoneNumber}`
+      );
+
+      if (!keyResponse.ok) {
+        throw new Error("Unable to fetch admin key");
+      }
+
+      const keyData = await keyResponse.json();
+      const adminKey = keyData.api_key;
+
+      if (!adminKey) {
+        throw new Error("Admin key missing");
+      }
+
+      // Get Managers
+      const managerResponse = await fetch(
+        `${GET_ADMIN_INFO_API_URL}?key=${adminKey}`
+      );
+
+      if (!managerResponse.ok) {
+        throw new Error("Unable to fetch managers");
+      }
+
+      const managerData = await managerResponse.json();
+
+      setAdminInfo(
+        Array.isArray(managerData)
+          ? managerData
+          : [managerData]
+      );
+
+      // Company Details
+      const areaResponse = await fetch(
+        `${FETCH_SUPERADMIN_AREA_API_URL}?mobile_no=${phoneNumber}`
+      );
+
+      if (areaResponse.ok) {
+        const areaResult = await areaResponse.json();
+
+        if (
+          areaResult.status === "success" &&
+          areaResult.data
+        ) {
+          setAreaData(areaResult.data);
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const displayName =
+    user?.name ||
+    user?.fullName ||
+    areaData?.company_name ||
+    areaData?.organization_name ||
+    areaData?.name ||
+    "AGRICORE LTD";
+
+  const formatDate = (date) => {
+    if (!date) return "-";
+
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const filteredManagers = useMemo(() => {
+    let list = [...adminInfo];
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+
+      list = list.filter((m) => {
+        return (
+          m.full_name?.toLowerCase().includes(q) ||
+          m.mobile_no?.includes(q) ||
+          m.sub_admin_id?.toString().includes(q)
+        );
+      });
     }
 
-    // Set the selected manager phone in localStorage
-    localStorage.setItem('selectedManagerPhone', mobileNo);
-    
-    // Navigate to manager monthly report page
-    onPageChange('manager-monthly-report');
+    list.sort((a, b) => {
+      if (sortBy === "oldest") {
+        return (
+          new Date(a.reg_date) -
+          new Date(b.reg_date)
+        );
+      }
+
+      return (
+        new Date(b.reg_date) -
+        new Date(a.reg_date)
+      );
+    });
+
+    return list;
+  }, [adminInfo, searchTerm, sortBy]);
+
+  const handleCardClick = (manager) => {
+    localStorage.setItem(
+      "selectedManagerPhone",
+      manager.mobile_no
+    );
+
+    onPageChange("manager-monthly-report");
   };
 
   return (
-    <div className="main-full" style={{ background: '#ffffff' }}>
-      {/* Top Header */}
+    <div className="main-full" style={{ background: "#f8fafc" }}>
+      {/* Header */}
       <div className="topbar">
         <div className="tb-left">
           <div className="tb-page">Super Admin Dashboard</div>
         </div>
+
         <div className="tb-right">
           <div className="badge badge-green">Overview</div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="content-area ">
+      <div className="content-area">
         <div className="sa-container">
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-              Loading admin information...
+          {/* ================= Welcome ================= */}
+          <div className="sa-welcome">
+            <div>
+              <h1 className="sa-welcome-title">
+                Welcome back,
+                <span className="sa-company-name">
+                  {" "}
+                  {displayName}
+                </span>
+              </h1>
+              <p className="sa-welcome-subtitle">
+                Manage and monitor all your managers from one place.
+              </p>
             </div>
-          ) : error ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>
-              Error: {error}
+
+            <div className="sa-overview-pill">
+              <Building2 size={18} />
+              <span>
+                {filteredManagers.length} Managers
+              </span>
             </div>
-          ) : (
-            /* Stats Cards - One card per admin with name, phone, and date */
-            <div className="sa-stats-grid">
-              {adminInfo.map((admin, index) => (
-                <div 
-                  key={index} 
-                  className="sa-card bg-white rounded-2xl p-7 border border-gray-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                  onClick={() => handleCardClick(admin)}
-                >
-                  <div className="sa-card-accent sa-card-accent-blue"></div>
-                  <div className="sa-card-content">
-                    <div className="sa-card-header">
-                      <div className="sa-icon-badge sa-icon-badge-blue">
-                        <User style={{ width: '20px', height: '20px' }} className="sa-icon-blue" />
-                      </div>
-                    </div>
-                    
-                    {/* Full Name */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1"></p>
-                      <h3 className="sa-card-value m-0">
-                        {admin?.full_name || 'N/A'}
-                      </h3>
-                    </div>
+          </div>
 
-                    {/* Sub Admin ID */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">ID</p>
-                      <div className="text-base font-semibold text-gray-900 m-0">
-                        {admin?.sub_admin_id || 'N/A'}
-                      </div>
-                    </div>
+          {/* ================= Toolbar ================= */}
+          <div className="sa-toolbar">
+            <div className="sa-search">
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Search manager by name, phone or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-                    {/* Phone Number */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Phone</p>
-                      <div className="text-base font-semibold text-gray-900 m-0">
-                        {admin?.mobile_no || 'N/A'}
-                      </div>
-                    </div>
+            <div className="sa-sort">
+              <Filter size={16} />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+            </div>
+          </div>
 
-                    {/* Registered Date */}
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Registered Date</p>
-                      <div className="text-base font-semibold text-gray-900 m-0">
-                        {admin?.reg_date || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* ================= Loading ================= */}
+          {loading && (
+            <div className="sa-empty">
+              Loading managers...
+            </div>
+          )}
 
-              
+          {/* ================= Error ================= */}
+          {!loading && error && (
+            <div className="sa-error">
+              {error}
+            </div>
+          )}
+
+          {/* ================= Table ================= */}
+          {!loading && !error && (
+            <div className="sa-table-card">
+              <table className="sa-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "25%" }}>Manager</th>
+                    <th style={{ width: "10%" }}>Manager ID</th>
+                    <th style={{ width: "15%" }}>Phone Number</th>
+                    <th style={{ width: "15%" }}>Registered Date</th>
+                    <th style={{ width: "10%" }}>Status</th>
+                    <th style={{ width: "25%", textAlign: "center" }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredManagers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan="6"
+                        style={{
+                          textAlign: "center",
+                          padding: "60px",
+                          color: "#64748b",
+                        }}
+                      >
+                        No managers found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredManagers.map((manager, index) => (
+                      <tr
+                        key={manager.mobile_no || index}
+                        className="sa-table-row"
+                      >
+                        {/* Manager */}
+                        <td>
+                          <div className="sa-manager-cell">
+                            <div className="sa-avatar">
+                              {manager.full_name
+                                ?.charAt(0)
+                                ?.toUpperCase() || "M"}
+                            </div>
+                            <div>
+                              <div className="sa-manager-name">
+                                {manager.full_name}
+                              </div>
+                              <div className="sa-manager-role">
+                                Manager
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Manager ID */}
+                        <td>
+                          <span className="sa-table-id">
+                            {manager.sub_admin_id}
+                          </span>
+                        </td>
+
+                        {/* Phone */}
+                        <td>{manager.mobile_no}</td>
+
+                        {/* Registered */}
+                        <td>{formatDate(manager.reg_date)}</td>
+
+                        {/* Status */}
+                        <td>
+                          <span className="sa-status-pill">
+                            <span className="sa-status-dot"></span>
+                            Active
+                          </span>
+                        </td>
+
+                        {/* Action */}
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            className="sa-action-btn"
+                            onClick={() => handleCardClick(manager)}
+                          >
+                            <Eye size={16} />
+                            View Report
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
