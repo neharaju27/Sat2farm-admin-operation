@@ -86,14 +86,15 @@ export default function Registration({ user, onPageChange }) {
     setLoading(true);
 
     // Validate phone number
-    if (formData.pNumber && !/^\d{10}$/.test(formData.pNumber)) {
-      const errorMessage = "Phone number must be exactly 10 digits";
-      setError(errorMessage);
-      toast.error(errorMessage);
-      setShowErrorModal(true);
-      setLoading(false);
-      return;
-    }
+    // NEW - accepts 8 to 15 digits (covers most international mobile number lengths)
+if (formData.pNumber && !/^\d{7,15}$/.test(formData.pNumber)) {
+  const errorMessage = "Phone number must be between 8 and 15 digits";
+  setError(errorMessage);
+  toast.error(errorMessage);
+  setShowErrorModal(true);
+  setLoading(false);
+  return;
+}
 
     // Validate email
     if (formData.user_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.user_email)) {
