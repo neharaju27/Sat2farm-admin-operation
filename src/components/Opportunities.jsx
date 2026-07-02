@@ -1083,7 +1083,7 @@ React.useEffect(() => {
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
-    return saved ? JSON.parse(saved) : ['Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Operation','Amith'];
+    return saved ? JSON.parse(saved) : ['Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Operation','Amith','Rohini'];
   });
 
   const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
