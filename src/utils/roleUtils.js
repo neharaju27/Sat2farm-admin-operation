@@ -16,9 +16,10 @@ export const normalizeUserRole = (user) => {
     return 'sales';
   } else if (normalizedRole === 'client' || normalizedRole === 'customer') {
     return 'client';
-  } else if (normalizedRole === 'partner' || normalizedRole === 'manager' || 
-             normalizedRole === 'admin' || normalizedRole === 'administrator') {
+  } else if (normalizedRole === 'manager') {
     return 'manager';
+  } else if (normalizedRole === 'partner') {
+    return 'partner';
   }
   
   return normalizedRole;

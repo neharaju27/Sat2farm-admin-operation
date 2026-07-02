@@ -5,7 +5,7 @@ import 'react-phone-input-2/lib/style.css';
 import '../styles/Sat2FarmAdminPortal.css';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_USER_REGISTRATION_API_URL;
+const API_URL = import.meta.env.VITE_BUSINESS_PORTAL_REGISTER_API_URL;
 const MANAGER_RESTRICT_API_URL = import.meta.env.VITE_MANAGER_RESTRICT_API_URL;
 
 export default function Registration({ user, onPageChange }) {
@@ -29,14 +29,12 @@ export default function Registration({ user, onPageChange }) {
     acc_id: "",
     referal_code: "",
     category: "",
-    new_password: "",
     country_code: "+91"
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registeredUsers, setRegisteredUsers] = useState([]);
-  const [showPassword, setShowPassword] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
@@ -85,17 +83,7 @@ export default function Registration({ user, onPageChange }) {
     setSuccess(false);
     setLoading(true);
 
-    // Validate phone number
-    if (formData.pNumber && !/^\d{10}$/.test(formData.pNumber)) {
-      const errorMessage = "Phone number must be exactly 10 digits";
-      setError(errorMessage);
-      toast.error(errorMessage);
-      setShowErrorModal(true);
-      setLoading(false);
-      return;
-    }
-
-    // Validate email
+    // Validate email (only if provided)
     if (formData.user_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.user_email)) {
       const errorMessage = "Please enter a valid email address";
       setError(errorMessage);
@@ -168,16 +156,29 @@ export default function Registration({ user, onPageChange }) {
       console.log('Form data being sent:', formData);
       console.log('Category value:', formData.category);
       console.log('Category type:', typeof formData.category);
-      
-      const apiUrl = `${API_URL}?fName=${encodeURIComponent(formData.fName)}&lName=${encodeURIComponent(formData.lName)}&user_email=${encodeURIComponent(formData.user_email)}&pNumber=${encodeURIComponent(formData.pNumber)}&acc_id=${encodeURIComponent(formData.acc_id)}&referal_code=${encodeURIComponent(formData.referal_code)}&category=${encodeURIComponent(formData.category)}&new_password=${encodeURIComponent(formData.new_password)}&country_code=${encodeURIComponent(formData.country_code)}`;
-      console.log('Complete API URL:', apiUrl); // Debug: Show full URL
-      console.log('Category in URL:', apiUrl.split('category=')[1]?.split('&')[0]); // Extract category from URL
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
+
+      // Prepare request body for new business portal API
+      const requestBody = {
+        type: "user",
+        fName: formData.fName,
+        lName: formData.lName,
+        pNumber: formData.pNumber,
+        category: formData.category,
+        referal_code: formData.referal_code,
+        country_code: formData.country_code,
+        acc_id: formData.acc_id,
+        user_email: formData.user_email
+      };
+
+      console.log('Request body:', JSON.stringify(requestBody));
+      console.log('API URL:', API_URL);
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify(requestBody)
       });
 
       const data = await response.json();
@@ -207,12 +208,11 @@ export default function Registration({ user, onPageChange }) {
           lastName: formData.lName,
           email: formData.user_email,
           phone: formData.pNumber,
-          
+
           countryCode: formData.country_code,
           accountId: formData.acc_id,
           referralCode: formData.referal_code || '-',
           category: formData.category,
-          password: formData.new_password,
           registrationDate: new Date().toLocaleDateString()
         };
         setRegisteredUsers(prev => [...prev, newUser]);
@@ -402,14 +402,13 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <User className="input-icon" />
-                    <label>Last Name *</label>
+                    <label>Last Name</label>
                   </div>
                   <input
                     type="text"
                     name="lName"
                     value={formData.lName}
                     onChange={handleChange}
-                    required
                     placeholder="Enter last name"
                   />
                 </div>
@@ -420,14 +419,13 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Mail className="input-icon" />
-                    <label>Email Address *</label>
+                    <label>Email Address</label>
                   </div>
                   <input
                     type="email"
                     name="user_email"
                     value={formData.user_email}
                     onChange={handleChange}
-                    required
                     placeholder="Enter email address"
                   />
                 </div>
@@ -454,12 +452,15 @@ export default function Registration({ user, onPageChange }) {
                       borderRadius: '8px',
                       border: '1px solid var(--border)',
                       fontSize: '14px',
-                      paddingLeft: '48px'
+                      paddingLeft: '95px'
                     }}
                     buttonStyle={{
                       borderRadius: '8px 0 0 8px',
                       border: '1px solid var(--border)',
-                      backgroundColor: 'var(--bg-2)'
+                      backgroundColor: 'var(--bg-2)',
+                      width: '80px',
+                      height: '40px',
+                      fontSize: '14px'
                     }}
                     containerStyle={{
                       marginTop: '8px'
@@ -473,15 +474,14 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
-                    <label>Referral Code *</label>
+                    <label>Referral Code</label>
                   </div>
                   <input
                     type="text"
                     name="referal_code"
                     value={formData.referal_code}
                     onChange={handleChange}
-                    placeholder="Enter referral code (required)"
-                    required
+                    placeholder="Enter referral code (optional)"
                   />
                 </div>
               ) : (
@@ -490,14 +490,13 @@ export default function Registration({ user, onPageChange }) {
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       <Building className="input-icon" />
-                      <label>Account ID *</label>
+                      <label>Account ID</label>
                     </div>
                     <input
                       type="text"
                       name="acc_id"
                       value={formData.acc_id}
                       onChange={handleChange}
-                      required
                       placeholder="Enter account ID"
                     />
                   </div>
@@ -518,73 +517,41 @@ export default function Registration({ user, onPageChange }) {
                 </div>
               )}
 
-              {/* Category and Password */}
-              <div className="two-col" style={{marginBottom: '24px'}}>
-                <div className="form-group">
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <Tag className="input-icon" />
-                    <label>Category *</label>
-                  </div>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Choose a role...</option>
-                    {currentRole === 'client' || currentRole === 'manager' ? (
-                      <>
-                        <option value="farmer">Farmer</option>
-                        <option value="Franchise">Manager</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="farmer">Farmer</option>
-                        <option value="Admin">Partner</option>
-                        <option value="Franchise">Manager</option>
-                      </>
-                    )}
-                  </select>
+              {/* Category */}
+              <div className="form-group" style={{marginBottom: '24px'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                  <Tag className="input-icon" />
+                  <label>Category *</label>
                 </div>
-                
-                <div className="form-group">
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <Tag className="input-icon" />
-                    <label>Password *</label>
-                  </div>
-                  <div style={{position: 'relative'}}>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="new_password"
-                      value={formData.new_password}
-                      onChange={handleChange}
-                      required
-                      placeholder="Enter password"
-                      style={{width: '100%', paddingRight: '40px'}}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        color: 'var(--text-2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      tabIndex="-1"
-                    >
-                      {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
-                    </button>
-                  </div>
-                </div>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Choose a role...</option>
+                  {currentRole === 'partner' ? (
+                    <>
+                      <option value="Manager">Manager</option>
+                      <option value="Farmer">Farmer</option>
+                    </>
+                  ) : currentRole === 'manager' ? (
+                    <>
+                      <option value="Farmer">Farmer</option>
+                    </>
+                  ) : currentRole === 'client' ? (
+                    <>
+                      <option value="Farmer">Farmer</option>
+                      <option value="Manager">Manager</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Farmer">Farmer</option>
+                      <option value="Partner">Partner</option>
+                      <option value="Manager">Manager</option>
+                    </>
+                  )}
+                </select>
               </div>
 
               {/* Submit Button */}

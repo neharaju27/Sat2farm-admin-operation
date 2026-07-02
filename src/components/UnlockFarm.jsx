@@ -493,7 +493,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   // Function to fetch top 50 recently added farms
   const fetchRecentFarms = async () => {
     // Fetch for client, manager, ops, sales, and partner roles
-    if (currentRole !== 'client' && currentRole !== 'manager' && currentRole !== 'ops' && currentRole !== 'sales') {
+    if (currentRole !== 'client' && currentRole !== 'manager' && currentRole !== 'ops' && currentRole !== 'sales' && currentRole !== 'partner') {
       return;
     }
 
@@ -582,7 +582,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           expiryTime: farm.expiry_time || farm.expiry || farm.expiry_date || 'N/A',
-          status: farm.farm_status || 'N/A'
+          status: farm.farm_status || 'N/A',
+          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined
         }));
         
         setRecentFarms(formattedFarms);
@@ -677,8 +678,8 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // Function to fetch top 50 expiring farms
   const fetchExpiringFarms = async () => {
-    // Only fetch for client and manager roles
-    if (currentRole !== 'client' && currentRole !== 'manager') {
+    // Only fetch for client, manager, and partner roles
+    if (currentRole !== 'client' && currentRole !== 'manager' && currentRole !== 'partner') {
       return;
     }
 
@@ -690,7 +691,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       const storedAuth = localStorage.getItem('sat2farm_auth');
       let userMobileNumber = null;
       let authToken = null;
-      
+
       if (storedAuth) {
         try {
           const authData = JSON.parse(storedAuth);
@@ -700,14 +701,23 @@ export default function UnlockFarm({ user, onPageChange }) {
           console.error('Error parsing auth data:', e);
         }
       }
-      
+
       if (!userMobileNumber) {
         setExpiringFarmsError('User mobile number not found. Please login again.');
         return;
       }
 
-      // Call real API to fetch expiring farms
-      const apiUrl = import.meta.env.VITE_EXPIRING_FARMS_API_URL + `?mobile_no=${userMobileNumber}`;
+      // Check if original user role is partner to use partner API
+      const originalRole = user?.role || user?.user_role || '';
+      const isPartner = originalRole.toLowerCase() === 'partner';
+
+      // Call appropriate API based on role
+      let apiUrl;
+      if (isPartner) {
+        apiUrl = import.meta.env.VITE_EXPIRING_FARMS_PARTNER_API_URL + `?phone_number=${userMobileNumber}`;
+      } else {
+        apiUrl = import.meta.env.VITE_EXPIRING_FARMS_API_URL + `?mobile_no=${userMobileNumber}`;
+      }
       console.log('Fetching expiring farms:', apiUrl);
       
       // Prepare headers - only add Authorization if token exists to avoid CORS issues
@@ -750,7 +760,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || 'N/A',
           expiryTime: farm.date_of_expiry || 'N/A',
-          status: farm.farm_status || 'N/A'
+          status: farm.farm_status || 'N/A',
+          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined
         }));
         
         setExpiringFarms(formattedFarms);
@@ -876,8 +887,26 @@ export default function UnlockFarm({ user, onPageChange }) {
         setSelectedPlan('');
       } else {
         const errorMessage = data?.message || 'Farm already unlocked';
-        setFormError(errorMessage);
-        toast.error(errorMessage);
+        // Check if the farm is already unlocked - treat this as success since farm is in desired state
+        if (errorMessage.toLowerCase().includes('already unlock') || errorMessage.toLowerCase().includes('already unlocked')) {
+          toast.success(`Farm ID ${selectedFarmId} is already unlocked!`);
+          setMessage(`Farm ID ${selectedFarmId} is already unlocked!`);
+          
+          // Remove the farm from the list since it's already unlocked
+          if (selectedView === 'added') {
+            setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
+          } else {
+            setExpiringFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
+          }
+          
+          // Close the modal
+          setShowPlanModal(false);
+          setSelectedFarmId('');
+          setSelectedPlan('');
+        } else {
+          setFormError(errorMessage);
+          toast.error(errorMessage);
+        }
       }
     } catch (err) {
       console.error('API Error:', err);
@@ -1239,10 +1268,26 @@ export default function UnlockFarm({ user, onPageChange }) {
       });
       
       if (!response.ok) {
-        if (response.status === 500 || response.status === 503 || response.status === 502) {
-          throw new Error('Service unavailable');
+        // Try to get the error message from the response body
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          errorDetails = errorData?.message || JSON.stringify(errorData);
+        } catch {
+          try {
+            errorDetails = await response.text();
+          } catch {
+            errorDetails = 'No error details available';
+          }
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        
+        if (response.status === 500 || response.status === 503 || response.status === 502) {
+          throw new Error(`Service unavailable: ${errorDetails}`);
+        }
+        if (response.status === 400) {
+          throw new Error(`Bad Request - ${errorDetails}`);
+        }
+        throw new Error(`HTTP error! status: ${response.status} - ${errorDetails}`);
       }
       
       const data = await response.json().catch(err => {
@@ -1295,7 +1340,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   useEffect(() => {
     if (currentRole === 'ops' || currentRole === 'sales') {
       fetchOpsRecentFarms();
-    } else if (currentRole === 'client' || currentRole === 'manager') {
+    } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
       if (selectedView === 'added') {
         fetchRecentFarms();
       } else {
@@ -2289,8 +2334,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       )}
 
-      {/* Recently Added Farms Table - Only for Client and Manager */}
-      {(currentRole === 'client' || currentRole === 'manager') && (
+      {/* Recently Added Farms Table - Only for Client, Manager, and Partner */}
+      {(currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             <span className="card-title">Top 50 Farms</span>
@@ -2371,6 +2416,9 @@ export default function UnlockFarm({ user, onPageChange }) {
                             {selectedView === 'added' && (
                               <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
                             )}
+                            {currentRole === 'partner' && (
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Admin Name</th>
+                            )}
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
                           </tr>
                         </thead>
@@ -2384,6 +2432,9 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
                               {selectedView === 'added' && (
                                 <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.status}</td>
+                              )}
+                              {currentRole === 'partner' && (
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.adminName || 'N/A'}</td>
                               )}
                               <td style={{padding: '10px 16px'}}>
                                 <div style={{display: 'flex', gap: '8px'}}>

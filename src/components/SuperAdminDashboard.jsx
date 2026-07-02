@@ -59,43 +59,81 @@ export default function SuperAdminDashboard({
       }
 
       const keyData = await keyResponse.json();
-      const adminKey = keyData.api_key;
-
+      console.log('Admin Key API Response:', keyData);
+      
+      // Extract api_key from response
+      const adminKey = keyData?.api_key;
+      
+      console.log('Extracted Admin Key:', adminKey);
+      
       if (!adminKey) {
-        throw new Error("Admin key missing");
+        throw new Error('Admin key not found in response');
       }
 
-      // Get Managers
-      const managerResponse = await fetch(
-        `${GET_ADMIN_INFO_API_URL}?key=${adminKey}`
-      );
-
-      if (!managerResponse.ok) {
-        throw new Error("Unable to fetch managers");
-      }
-
-      const managerData = await managerResponse.json();
-
-      setAdminInfo(
-        Array.isArray(managerData)
-          ? managerData
-          : [managerData]
-      );
-
-      // Company Details
-      const areaResponse = await fetch(
-        `${FETCH_SUPERADMIN_AREA_API_URL}?mobile_no=${phoneNumber}`
-      );
-
-      if (areaResponse.ok) {
-        const areaResult = await areaResponse.json();
-
-        if (
-          areaResult.status === "success" &&
-          areaResult.data
-        ) {
-          setAreaData(areaResult.data);
+      // Step 2: Fetch admin info using the fetched key
+      console.log('Fetching admin info with key:', adminKey);
+      const adminInfoResponse = await fetch(`${GET_ADMIN_INFO_API_URL}?key=${adminKey}`);
+      
+      console.log('Admin Info Response Status:', adminInfoResponse.status);
+      console.log('Admin Info Response OK:', adminInfoResponse.ok);
+      
+      if (!adminInfoResponse.ok) {
+        // Try to parse as JSON first
+        let errorText = '';
+        try {
+          const errorJson = await adminInfoResponse.json();
+          errorText = JSON.stringify(errorJson);
+          console.log('Admin Info Error Response (JSON):', errorJson);
+          // Check if the error is "no sub admin" - treat this as empty array instead of error
+          if (errorJson?.error?.toLowerCase().includes('no sub admin') || 
+              errorJson?.error?.toLowerCase().includes('no sub-admin')) {
+            setAdminInfo([]);
+            return;
+          }
+        } catch {
+          // If not JSON, get as text
+          errorText = await adminInfoResponse.text();
+          console.log('Admin Info Error Response (Text):', errorText);
+          // Check if the error is "no sub admin" - treat this as empty array instead of error
+          if (errorText.toLowerCase().includes('no sub admin') || errorText.toLowerCase().includes('no sub-admin')) {
+            setAdminInfo([]);
+            return;
+          }
         }
+        throw new Error(`Failed to fetch admin info: ${adminInfoResponse.status} - ${errorText}`);
+      }
+
+      const adminData = await adminInfoResponse.json();
+      console.log('Admin Info API Response:', adminData);
+      
+      // Handle array response
+      if (Array.isArray(adminData)) {
+        setAdminInfo(adminData);
+      } else {
+        // If single object, wrap in array
+        setAdminInfo([adminData]);
+      }
+
+      // Step 3: Fetch superadmin area data
+      console.log('Fetching superadmin area data with phone:', phoneNumber);
+      const areaResponse = await fetch(`${FETCH_SUPERADMIN_AREA_API_URL}?mobile_no=${phoneNumber}`);
+      
+      console.log('Area Response Status:', areaResponse.status);
+      console.log('Area Response OK:', areaResponse.ok);
+      
+      if (!areaResponse.ok) {
+        const errorText = await areaResponse.text();
+        console.log('Area Error Response:', errorText);
+        throw new Error(`Failed to fetch area data: ${areaResponse.status} - ${errorText}`);
+      }
+
+      const areaResult = await areaResponse.json();
+
+      if (
+        areaResult.status === "success" &&
+        areaResult.data
+      ) {
+        setAreaData(areaResult.data);
       }
     } catch (err) {
       setError(err.message);
@@ -191,26 +229,6 @@ export default function SuperAdminDashboard({
               <p className="sa-welcome-subtitle">
                 Manage and monitor all your managers from one place.
               </p>
-            </div>
-
-            <div className="sa-overview-pill">
-              <Building2 size={18} />
-              <span>
-                {filteredManagers.length} Managers
-              </span>
-            </div>
-          </div>
-
-          {/* ================= Toolbar ================= */}
-          <div className="sa-toolbar">
-            <div className="sa-search">
-              <Search size={18} />
-              <input
-                type="text"
-                placeholder="Search manager by name, phone or ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
             </div>
 
             <div className="sa-sort">
