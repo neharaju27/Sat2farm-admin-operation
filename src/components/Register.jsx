@@ -7,7 +7,8 @@ import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_BUSINESS_PORTAL_REGISTER_API_URL;
 const MANAGER_RESTRICT_API_URL = import.meta.env.VITE_MANAGER_RESTRICT_API_URL;
-const GET_USER_ID_API_URL = 'https://api.sat2farm.com/get_user_id/prod';
+const GET_USER_ID_API_URL=import.meta.env.VITE_GET_USER_ID_API_URL;
+
 
 export default function Registration({ user, onPageChange }) {
   // Set currentRole based on actual user role
