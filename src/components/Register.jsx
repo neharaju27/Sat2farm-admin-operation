@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_BUSINESS_PORTAL_REGISTER_API_URL;
 const MANAGER_RESTRICT_API_URL = import.meta.env.VITE_MANAGER_RESTRICT_API_URL;
+const GET_USER_ID_API_URL = 'https://api.sat2farm.com/get_user_id/prod';
 
 export default function Registration({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -37,8 +38,68 @@ export default function Registration({ user, onPageChange }) {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
+  // Helper function to get logged-in mobile number with localStorage fallback
+  const getLoggedInMobileNumber = () => {
+    const fallback = user?.phone_number || user?.phoneNumber || user?.pNumber || '';
+    try {
+      const storedAuth = localStorage.getItem('sat2farm_auth');
+      if (!storedAuth) return fallback;
+      const authData = JSON.parse(storedAuth);
+      return authData?.phone_number || authData?.username || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   useEffect(() => {
     console.log('User prop in Registration component:', user);
+    
+    // Fetch client ID for referral code based on logged-in user's mobile number
+    const fetchClientId = async () => {
+      const loggedInPhoneNumber = getLoggedInMobileNumber();
+      console.log('=== REFERRAL CODE DEBUG ===');
+      console.log('Logged in phone number:', loggedInPhoneNumber);
+      console.log('User object:', user);
+
+      if (!loggedInPhoneNumber) {
+        console.warn('No logged-in mobile number found for referral code lookup.');
+        return;
+      }
+
+      try {
+        const apiUrl = `${GET_USER_ID_API_URL}?mobile_no=${encodeURIComponent(loggedInPhoneNumber)}`;
+        console.log('Fetching client ID from URL:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Full API response data:', JSON.stringify(data, null, 2));
+
+        const clientId = data?.user_id || data?.client_id || data?.data?.client_id || data?.clientid || data?.Client_ID;
+        console.log('Extracted client ID:', clientId);
+
+        if (clientId) {
+          setFormData(prev => ({
+            ...prev,
+            referal_code: clientId
+          }));
+          console.log('✅ Referral code auto-populated with client ID:', clientId);
+        } else {
+          console.warn('⚠️ No client_id found in response. Available keys:', Object.keys(data));
+        }
+      } catch (error) {
+        console.error('❌ Error fetching client ID:', error);
+      }
+      console.log('=== END REFERRAL CODE DEBUG ===');
+    };
+    
+    fetchClientId();
   }, [user]);
 
   // Function to check manager count for client/manager roles
@@ -482,10 +543,12 @@ export default function Registration({ user, onPageChange }) {
                     value={formData.referal_code}
                     onChange={handleChange}
                     placeholder="Enter referral code (optional)"
+                    disabled
+                    style={{backgroundColor: '#f3f4f6', cursor: 'not-allowed'}}
                   />
                 </div>
-              ) : (
-                /* Account ID and Referral Code for other roles */
+              ) : currentRole === 'ops' || currentRole === 'operation' || currentRole === 'operations' ? (
+                /* Account ID and Referral Code for Operations role (referral code enabled) */
                 <div className="two-col" style={{marginBottom: '24px'}}>
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
@@ -515,6 +578,39 @@ export default function Registration({ user, onPageChange }) {
                     />
                   </div>
                 </div>
+              ) : (
+                /* Account ID and Referral Code for Sales and Partner roles (referral code disabled) */
+                <div className="two-col" style={{marginBottom: '24px'}}>
+                  <div className="form-group">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <Building className="input-icon" />
+                      <label>Account ID</label>
+                    </div>
+                    <input
+                      type="text"
+                      name="acc_id"
+                      value={formData.acc_id}
+                      onChange={handleChange}
+                      placeholder="Enter account ID"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <Tag className="input-icon" />
+                      <label>Referral Code</label>
+                    </div>
+                    <input
+                      type="text"
+                      name="referal_code"
+                      value={formData.referal_code}
+                      onChange={handleChange}
+                      placeholder="Fetching referral code..."
+                      disabled
+                      style={{backgroundColor: '#f3f4f6', cursor: 'not-allowed'}}
+                    />
+                  </div>
+                </div>
               )}
 
               {/* Category */}
@@ -533,7 +629,6 @@ export default function Registration({ user, onPageChange }) {
                   {currentRole === 'partner' ? (
                     <>
                       <option value="Manager">Manager</option>
-                      <option value="Farmer">Farmer</option>
                     </>
                   ) : currentRole === 'manager' ? (
                     <>

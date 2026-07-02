@@ -42,7 +42,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
   const isClientActive = currentPage === 'unlock-farm' || currentPage === 'register';
   const isManagerActive = currentPage === 'unlock-farm' || currentPage === 'register';
-  const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'register';
+  const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'register';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -81,7 +81,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isPartnerUser) {
       // Partner users can only access specific pages
-      const allowedPartnerPages = ['super-admin-dashboard', 'unlock-farm', 'assign-acreages', 'register'];
+      const allowedPartnerPages = ['super-admin-dashboard', 'unlock-farm', 'register'];
       if (allowedPartnerPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -356,16 +356,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               New Registration
-              <span className="sb-dot"></span>
-            </div>
-            <div 
-              className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('assign-acreages')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Assign Acreages
               <span className="sb-dot"></span>
             </div>
           </>

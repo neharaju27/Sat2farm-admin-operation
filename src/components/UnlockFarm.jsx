@@ -590,7 +590,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} farms`);
       } else {
         console.log('API response structure:', data);
-        setRecentFarmsError('No farms data received from server');
+        setRecentFarms([]); // Set empty array instead of error when no farms found
       }
     } catch (error) {
       console.error('Error fetching recent farms:', error);
@@ -666,7 +666,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
       } else {
         console.log('API response structure:', data);
-        setOpsRecentFarmsError('No farms data received from server');
+        setOpsRecentFarms([]); // Set empty array instead of error when no farms found
       }
     } catch (error) {
       console.error('Error fetching ops recent farms:', error);
@@ -768,7 +768,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} expiring farms`);
       } else {
         console.log('API response structure:', data);
-        setExpiringFarmsError('No expiring farms data received from server');
+        setExpiringFarms([]); // Set empty array instead of error when no farms found
       }
     } catch (error) {
       console.error('Error fetching expiring farms:', error);
@@ -2438,17 +2438,29 @@ export default function UnlockFarm({ user, onPageChange }) {
                               )}
                               <td style={{padding: '10px 16px'}}>
                                 <div style={{display: 'flex', gap: '8px'}}>
-                                  <button
-                                    onClick={() => {
-                                      console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-                                      unlockRecentFarm(farm.farmId);
-                                    }}
-                                    disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
-                                    className="btn btn-primary btn-sm"
-                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
-                                  >
-                                    {formLoading ? '...' : 'Unlock'}
-                                  </button>
+                                  {(() => {
+  const isUnlockDisabled = formLoading || ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked');
+  return (
+    <button
+      onClick={() => {
+        console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+        unlockRecentFarm(farm.farmId);
+      }}
+      disabled={isUnlockDisabled}
+      className="btn btn-primary btn-sm"
+      style={{
+        fontSize: '12px',
+        padding: '6px 12px',
+        height: '32px',
+        width: '80px',
+        cursor: isUnlockDisabled ? 'not-allowed' : 'pointer',
+        opacity: isUnlockDisabled ? 0.5 : 1
+      }}
+    >
+      {formLoading ? '...' : 'Unlock'}
+    </button>
+  );
+})()}
                                   {selectedView === 'added' && (
                                     <button
                                       onClick={() => {
@@ -2501,7 +2513,14 @@ export default function UnlockFarm({ user, onPageChange }) {
             )}
             
             {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
-             ((selectedView === 'added' && recentFarms.length === 0) || (selectedView === 'expiring' && expiringFarms.length === 0)) && (
+             selectedView === 'added' && recentFarms.length === 0 && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
+              </div>
+            )}
+            
+            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
+             selectedView === 'expiring' && expiringFarms.length === 0 && (
               <div style={{textAlign: 'center', padding: '24px'}}>
                 <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
               </div>
