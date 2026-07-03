@@ -1447,22 +1447,30 @@ export default function UnlockFarm({ user, onPageChange }) {
       {/* Acreages Cards - Only for Manager */}
       {currentRole === 'manager' && (
         <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
-          <div className="card" style={{flex: 1}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Acreages</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : availableAcreage}
+                  {acreageLoading ? '...' : (
+                    <>
+                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{flex: 1}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Acreages</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : usedAcreage}
+                  {acreageLoading ? '...' : (
+                    <>
+                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1473,32 +1481,44 @@ export default function UnlockFarm({ user, onPageChange }) {
       {/* Acreages Cards - Only for Partner */}
       {currentRole === 'partner' && (
         <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
-          <div className="card" style={{flex: 1}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Total Area</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : totalAcreage}
+                  {acreageLoading ? '...' : (
+                    <>
+                      {Number(totalAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{flex: 1}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Area</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : availableAcreage}
+                  {acreageLoading ? '...' : (
+                    <>
+                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{flex: 1}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Area</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : usedAcreage}
+                  {acreageLoading ? '...' : (
+                    <>
+                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -2538,9 +2558,9 @@ export default function UnlockFarm({ user, onPageChange }) {
                                       console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
                                       unlockRecentFarm(farm.farmId);
                                     }}
-                                    disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
+                                    disabled={formLoading || ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked')}
                                     className="btn btn-primary btn-sm"
-                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
+                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
                                   >
                                     {formLoading ? '...' : 'Unlock'}
                                   </button>
