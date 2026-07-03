@@ -54,6 +54,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [expiringFarmsError, setExpiringFarmsError] = useState('');
   
   // State for acreages
+  const [totalAcreage, setTotalAcreage] = useState(0);
   const [availableAcreage, setAvailableAcreage] = useState(0);
   const [usedAcreage, setUsedAcreage] = useState(0);
   const [acreageLoading, setAcreageLoading] = useState(false);
@@ -590,7 +591,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} farms`);
       } else {
         console.log('API response structure:', data);
-        setRecentFarms([]); // Set empty array instead of error when no farms found
+        setRecentFarmsError('No farms data received from server');
       }
     } catch (error) {
       console.error('Error fetching recent farms:', error);
@@ -666,7 +667,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
       } else {
         console.log('API response structure:', data);
-        setOpsRecentFarms([]); // Set empty array instead of error when no farms found
+        setOpsRecentFarmsError('No farms data received from server');
       }
     } catch (error) {
       console.error('Error fetching ops recent farms:', error);
@@ -768,7 +769,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log(`Successfully loaded ${formattedFarms.length} expiring farms`);
       } else {
         console.log('API response structure:', data);
-        setExpiringFarms([]); // Set empty array instead of error when no farms found
+        setExpiringFarmsError('No expiring farms data received from server');
       }
     } catch (error) {
       console.error('Error fetching expiring farms:', error);
@@ -828,6 +829,60 @@ export default function UnlockFarm({ user, onPageChange }) {
       }
     } catch (error) {
       console.error('Error fetching acreages:', error);
+    } finally {
+      setAcreageLoading(false);
+    }
+  };
+
+  // Function to fetch superadmin area data for partner role
+  const fetchSuperadminArea = async () => {
+    setAcreageLoading(true);
+    
+    try {
+      // Get user mobile number from login storage
+      const storedAuth = localStorage.getItem('sat2farm_auth');
+      let userMobileNumber = null;
+      
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          userMobileNumber = authData.phone_number;
+        } catch (e) {
+          console.error('Error parsing auth data:', e);
+        }
+      }
+      
+      if (!userMobileNumber) {
+        console.error('User mobile number not found');
+        return;
+      }
+
+      // Call API to fetch superadmin area data
+      const apiUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL + `?mobile_no=${userMobileNumber}`;
+      console.log('Fetching superadmin area:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to fetch superadmin area:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Superadmin area API response:', data);
+      
+      if (data && data.data) {
+        setTotalAcreage(data.data.total_area || 0);
+        setAvailableAcreage(data.data.available_area || 0);
+        setUsedAcreage(data.data.used_area || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching superadmin area:', error);
     } finally {
       setAcreageLoading(false);
     }
@@ -1351,8 +1406,12 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // useEffect to fetch acreages on component load
   useEffect(() => {
-    fetchAcreages();
-  }, []);
+    if (currentRole === 'partner') {
+      fetchSuperadminArea();
+    } else {
+      fetchAcreages();
+    }
+  }, [currentRole]);
 
   
   return (
@@ -1402,6 +1461,42 @@ export default function UnlockFarm({ user, onPageChange }) {
             <div className="card-body" style={{padding: '16px'}}>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Acreages</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
+                  {acreageLoading ? '...' : usedAcreage}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Acreages Cards - Only for Partner */}
+      {currentRole === 'partner' && (
+        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
+          <div className="card" style={{flex: 1}}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Total Area</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
+                  {acreageLoading ? '...' : totalAcreage}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="card" style={{flex: 1}}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Area</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
+                  {acreageLoading ? '...' : availableAcreage}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="card" style={{flex: 1}}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Area</div>
                 <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : usedAcreage}
                 </div>
@@ -2438,29 +2533,17 @@ export default function UnlockFarm({ user, onPageChange }) {
                               )}
                               <td style={{padding: '10px 16px'}}>
                                 <div style={{display: 'flex', gap: '8px'}}>
-                                  {(() => {
-  const isUnlockDisabled = formLoading || ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked');
-  return (
-    <button
-      onClick={() => {
-        console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-        unlockRecentFarm(farm.farmId);
-      }}
-      disabled={isUnlockDisabled}
-      className="btn btn-primary btn-sm"
-      style={{
-        fontSize: '12px',
-        padding: '6px 12px',
-        height: '32px',
-        width: '80px',
-        cursor: isUnlockDisabled ? 'not-allowed' : 'pointer',
-        opacity: isUnlockDisabled ? 0.5 : 1
-      }}
-    >
-      {formLoading ? '...' : 'Unlock'}
-    </button>
-  );
-})()}
+                                  <button
+                                    onClick={() => {
+                                      console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                      unlockRecentFarm(farm.farmId);
+                                    }}
+                                    disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
+                                    className="btn btn-primary btn-sm"
+                                    style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
+                                  >
+                                    {formLoading ? '...' : 'Unlock'}
+                                  </button>
                                   {selectedView === 'added' && (
                                     <button
                                       onClick={() => {
@@ -2513,14 +2596,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             )}
             
             {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
-             selectedView === 'added' && recentFarms.length === 0 && (
-              <div style={{textAlign: 'center', padding: '24px'}}>
-                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
-              </div>
-            )}
-            
-            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
-             selectedView === 'expiring' && expiringFarms.length === 0 && (
+             ((selectedView === 'added' && recentFarms.length === 0) || (selectedView === 'expiring' && expiringFarms.length === 0)) && (
               <div style={{textAlign: 'center', padding: '24px'}}>
                 <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
               </div>
