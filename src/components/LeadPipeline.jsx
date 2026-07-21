@@ -9,6 +9,9 @@ export default function LeadPipeline({ onPageChange }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(100);
+  const [totalLeads, setTotalLeads] = useState(0);
 
   // Fetch leads from API
   useEffect(() => {
@@ -16,7 +19,7 @@ export default function LeadPipeline({ onPageChange }) {
       try {
         setLoading(true);
         const currentUserName = user?.name || user?.phone_number || 'operation';
-        const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
+        const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${limit}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -24,8 +27,42 @@ export default function LeadPipeline({ onPageChange }) {
         
         const data = await response.json();
         
+        console.log('API Response structure:', data);
+        
+        // Handle paginated API response structure
+        let leadsArray = data;
+        let totalCount = 0;
+        
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          // API returns paginated response object with metadata
+          console.log('API response keys:', Object.keys(data));
+          leadsArray = data.data || data.results || data.leads || data.items || data.records || data.rows || [];
+          
+          // Fallback: find the first array property in the response
+          if (!Array.isArray(leadsArray) || leadsArray.length === 0) {
+            for (const key in data) {
+              if (Array.isArray(data[key]) && data[key].length > 0) {
+                console.log(`Found leads array in property: ${key}`);
+                leadsArray = data[key];
+                break;
+              }
+            }
+          }
+          
+          totalCount = data.total || data.count || data.total_count || 0;
+          setTotalLeads(totalCount);
+        }
+        
+        // Validate that data is an array before mapping
+        if (!Array.isArray(leadsArray)) {
+          console.error('API response is not an array:', data);
+          setLeads([]);
+          setError('Invalid data format received from server');
+          return;
+        }
+        
         // Transform API data to match component structure
-        const transformedLeads = data.map(lead => ({
+        const transformedLeads = leadsArray.map(lead => ({
           id: lead.id,
           contactName: lead.full_name || 'Unknown',
           phoneNumber: lead.phone || '',
@@ -58,7 +95,7 @@ export default function LeadPipeline({ onPageChange }) {
     };
 
     fetchLeads();
-  }, []);
+  }, [offset, limit, user]);
 
   const [selectedLead, setSelectedLead] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -214,8 +251,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]); // Array of {property, value, operator} objects
@@ -536,7 +572,7 @@ export default function LeadPipeline({ onPageChange }) {
 
   const handleStatusSummaryClick = (status) => {
     setFilterStatus(prev => (prev === status ? 'all' : status));
-    setCurrentPage(1);
+    setOffset(0);
   };
 
   const getTotalValue = (status) => {
@@ -613,11 +649,9 @@ export default function LeadPipeline({ onPageChange }) {
 
   const statusSummary = getStatusSummary();  
 
-  // Pagination
-  const indexOfLastLead = currentPage * itemsPerPage;
-  const indexOfFirstLead = indexOfLastLead - itemsPerPage;
-  const currentLeads = filteredLeads.slice(indexOfFirstLead, indexOfLastLead);
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  // Pagination - using server-side pagination
+  const totalPages = Math.ceil(totalLeads / limit);
+  const currentPage = Math.floor(offset / limit) + 1;
 
 
   const formatCurrency = (value) => {
@@ -2513,16 +2547,16 @@ export default function LeadPipeline({ onPageChange }) {
                 background: 'var(--gray-100)',
                 borderBottom: '2px solid var(--border)'
               }}>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11, minWidth: '150px' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11, width: '150px', maxWidth: '150px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <input
                       type="checkbox"
-                      checked={selectedRows.length === currentLeads.length && currentLeads.length > 0 && currentLeads.every(lead => selectedRows.includes(lead.id))}
+                      checked={selectedRows.length === leads.length && leads.length > 0 && leads.every(lead => selectedRows.includes(lead.id))}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedRows(currentLeads.map(lead => lead.id));
+                          setSelectedRows(leads.map(lead => lead.id));
                         } else {
-                          setSelectedRows(selectedRows.filter(id => !currentLeads.find(lead => lead.id === id)));
+                          setSelectedRows(selectedRows.filter(id => !leads.find(lead => lead.id === id)));
                         }
                       }}
                       style={{ cursor: 'pointer' }}
@@ -2530,24 +2564,24 @@ export default function LeadPipeline({ onPageChange }) {
                     <span>Contact Name</span>
                   </div>
                 </th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Alternate Number</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '180px' }}>Email</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Company Name</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Contact Owner</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>City</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>State</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>Country</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Lead Status</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>Tags</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Lead Source</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '200px' }}>Description</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Created Time</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Industry</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Created By</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Modified By</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Modified Time</th>
-                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Last Activity</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Phone Number</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Alternate Number</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px' }}>Email</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px' }}>Company Name</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Contact Owner</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>City</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>State</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>Country</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Lead Status</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>Tags</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Lead Source</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '200px', maxWidth: '200px' }}>Description</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Created Time</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Industry</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Created By</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Modified By</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Modified Time</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Last Activity</th>
               </tr>
             </thead>
             <tbody>
@@ -2585,7 +2619,7 @@ export default function LeadPipeline({ onPageChange }) {
                   </td>
                 </tr>
               ) : (
-                currentLeads.map(lead => (
+                leads.map(lead => (
                   <tr
                     key={lead.id}
                     style={{
@@ -2599,7 +2633,7 @@ export default function LeadPipeline({ onPageChange }) {
                       e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6, minWidth: '150px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
                         <input
                           type="checkbox"
@@ -2629,7 +2663,10 @@ export default function LeadPipeline({ onPageChange }) {
                             fontSize: '13px',
                             fontWeight: '500',
                             padding: '0',
-                            textAlign: 'left'
+                            textAlign: 'left',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {lead.contactName}
@@ -2639,71 +2676,71 @@ export default function LeadPipeline({ onPageChange }) {
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.phoneNumber}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.phoneNumber}</span>
                         <button onClick={() => openEditDialog(lead.id, 'phoneNumber', lead.phoneNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit phone number">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.alternateNumber}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.alternateNumber}</span>
                         <button onClick={() => openEditDialog(lead.id, 'alternateNumber', lead.alternateNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit alternate number">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '180px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.email}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email}</span>
                         <button onClick={() => openEditDialog(lead.id, 'email', lead.email)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit email">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '150px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.companyName}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.companyName}</span>
                         <button onClick={() => openEditDialog(lead.id, 'companyName', lead.companyName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit company name">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.contactOwner}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.contactOwner}</span>
                         <button onClick={() => openEditDialog(lead.id, 'contactOwner', lead.contactOwner)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit contact owner">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.city}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.city}</span>
                         <button onClick={() => openEditDialog(lead.id, 'city', lead.city)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit city">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.state}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.state}</span>
                         <button onClick={() => openEditDialog(lead.id, 'state', lead.state)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit state">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.country}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.country}</span>
                         <button onClick={() => openEditDialog(lead.id, 'country', lead.country)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit country">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', minWidth: '120px' }}>
+                    <td style={{ padding: '8px 12px', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <span style={{
                           display: 'inline-block',
@@ -2721,9 +2758,9 @@ export default function LeadPipeline({ onPageChange }) {
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {lead.tags}
                         </span>
                         <button onClick={() => openEditDialog(lead.id, 'tags', lead.tags)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit tags">
@@ -2731,15 +2768,15 @@ export default function LeadPipeline({ onPageChange }) {
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.leadSource}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.leadSource}</span>
                         <button onClick={() => openEditDialog(lead.id, 'leadSource', lead.leadSource)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit lead source">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', minWidth: '200px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', width: '200px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{
                           overflow: 'hidden',
@@ -2753,8 +2790,8 @@ export default function LeadPipeline({ onPageChange }) {
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {new Date(lead.createdTime).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -2762,22 +2799,22 @@ export default function LeadPipeline({ onPageChange }) {
                         })}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{lead.industry}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.industry}</span>
                         <button onClick={() => openEditDialog(lead.id, 'industry', lead.industry)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit industry">
                           <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
-                      {lead.createdBy}
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.createdBy}</span>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
-                      {lead.modifiedBy}
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.modifiedBy}</span>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -2785,8 +2822,8 @@ export default function LeadPipeline({ onPageChange }) {
                         })}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -2818,8 +2855,10 @@ export default function LeadPipeline({ onPageChange }) {
                 <select
                   value={itemsPerPage}
                   onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
+                    const newItemsPerPage = Number(e.target.value);
+                    setItemsPerPage(newItemsPerPage);
+                    setLimit(newItemsPerPage);
+                    setOffset(0);
                   }}
                   style={{
                     appearance: 'none',
@@ -2856,8 +2895,10 @@ export default function LeadPipeline({ onPageChange }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1 || filteredLeads.length === 0}
+                onClick={() => {
+                  setOffset((prev) => Math.max(prev - limit, 0));
+                }}
+                disabled={offset === 0 || leads.length === 0}
                 aria-label="Previous page"
                 style={{
                   display: 'flex',
@@ -2882,15 +2923,17 @@ export default function LeadPipeline({ onPageChange }) {
                 textAlign: 'center',
                 whiteSpace: 'nowrap'
               }}>
-                {filteredLeads.length === 0
+                {leads.length === 0
                   ? '0 to 0'
-                  : `${indexOfFirstLead + 1} to ${Math.min(indexOfLastLead, filteredLeads.length)}`}
+                  : `${offset + 1} to ${Math.min(offset + limit, totalLeads)}`}
               </span>
 
               <button
                 type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, Math.max(totalPages, 1)))}
-                disabled={currentPage >= totalPages || filteredLeads.length === 0}
+                onClick={() => {
+                  setOffset((prev) => prev + limit);
+                }}
+                disabled={offset + limit >= totalLeads || leads.length === 0}
                 aria-label="Next page"
                 style={{
                   display: 'flex',
@@ -2975,7 +3018,7 @@ export default function LeadPipeline({ onPageChange }) {
                       type="button"
                       onClick={() => {
                         setFilterStatus('all');
-                        setCurrentPage(1);
+                        setOffset(0);
                       }}
                       style={{
                         background: 'none',
@@ -3786,7 +3829,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'mailing_country' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -3961,7 +4004,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'mailing_state' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4136,7 +4179,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'mailing_city' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4189,7 +4232,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'created_by' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4242,7 +4285,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'modified_by' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4295,7 +4338,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'lead_source' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4348,7 +4391,7 @@ export default function LeadPipeline({ onPageChange }) {
                   {prop.property === 'description' && (
                     <div>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ minWidth: '100px' }}>
+                        <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <select
                             value={prop.operator || 'is'}
                             onChange={(e) => {
@@ -4816,6 +4859,7 @@ export default function LeadPipeline({ onPageChange }) {
                     setSelectedProperties([]);
                     setCurrentProperty('');
                     setIsFilterApplied(false);
+                    setOffset(0);
                     setCurrentFilterCriteria('');
                     setContactOwnerFilter('');
                     setContactOwnerFilterOperator('is');
