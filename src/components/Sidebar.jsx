@@ -24,6 +24,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isClientUser = userRole === 'client' || userRole === 'test' || userRole === 'user';
   const isManagerUser = userRole === 'manager' || userRole === 'admin';
   const isPartnerUser = userRole === 'partner';
+  const isMarketingUser = userRole === 'marketing';
   
   // Debug: Log what should be visible
   console.log('Sidebar - User data:', user);
@@ -43,6 +44,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isClientActive = currentPage === 'unlock-farm' || currentPage === 'register';
   const isManagerActive = currentPage === 'unlock-farm' || currentPage === 'register';
   const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'register';
+  const isMarketingActive = currentPage === 'marketing-dashboard';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -87,6 +89,14 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       } else {
         alert('Access denied: Partner users cannot access this page');
       }
+    } else if (isMarketingUser) {
+      // Marketing users can only access specific pages
+      const allowedMarketingPages = ['marketing-dashboard'];
+      if (allowedMarketingPages.includes(page)) {
+        onPageChange(page);
+      } else {
+        alert('Access denied: Marketing users cannot access this page');
+      }
     } else {
       // Default fallback
       onPageChange(page);
@@ -107,6 +117,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         user?.role === 'client' || user?.role === 'Client' ? 'Client' : 
         user?.role === 'manager' || user?.role === 'Manager' ? 'Manager' :
         user?.role === 'partner' || user?.role === 'Partner' ? 'Partner' :
+        user?.role === 'marketing' || user?.role === 'Marketing' ? 'Marketing' :
         'Operations'
       }</span></div>
       
@@ -356,6 +367,24 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               New Registration
+              <span className="sb-dot"></span>
+            </div>
+          </>
+        )}
+
+        {/* Marketing Section - Only for Marketing Users */}
+        {isMarketingUser && (
+          <>
+            <div className="sb-section">Marketing</div>
+            <div 
+              className={`sb-item ${currentPage === 'marketing-dashboard' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('marketing-dashboard')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 6h6M5 8h6M5 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Dashboard
               <span className="sb-dot"></span>
             </div>
           </>

@@ -18,6 +18,7 @@ import LeadPipeline from "./components/LeadPipeline";
 import Opportunities from "./components/Opportunities";
 import AccessControl from "./components/AccessControl";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
+import MarketingDashboard from "./components/MarketingDashboard";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -112,6 +113,10 @@ function App() {
       console.log('Redirecting to super-admin-dashboard (partner)');
       setCurrentPage('super-admin-dashboard');
       localStorage.setItem('currentPage', 'super-admin-dashboard');
+    } else if (role === 'marketing') {
+      console.log('Redirecting to marketing-dashboard (marketing)');
+      setCurrentPage('marketing-dashboard');
+      localStorage.setItem('currentPage', 'marketing-dashboard');
     } else if (role === 'sales') {
       console.log('Redirecting to assign-acreages (sales)');
       setCurrentPage('assign-acreages');
@@ -215,6 +220,8 @@ function App() {
           return <Opportunities user={userDisplay} onPageChange={handlePageChange} />;
         case 'super-admin-dashboard':
           return <SuperAdminDashboard user={userDisplay} onPageChange={handlePageChange} />;
+        case 'marketing-dashboard':
+          return <MarketingDashboard user={userDisplay} onPageChange={handlePageChange} />;
         default:
           return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
       }

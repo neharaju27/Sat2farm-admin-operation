@@ -395,15 +395,29 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 16px 18px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.metric:hover {
+  background: var(--green-50);
+  border-color: var(--green-400);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 109, 17, 0.15);
+}
+
+.metric:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(59, 109, 17, 0.1);
 }
 
 .metric-label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-3);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .metric-val {
