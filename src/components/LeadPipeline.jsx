@@ -7746,9 +7746,11 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select new status...</option>
-                            {Object.keys(statusConfig).map(status => (
-                              <option key={status} value={status}>{statusConfig[status].label}</option>
-                            ))}
+                            {Object.keys(statusConfig)
+                              .filter(status => status !== updateFieldValue)
+                              .map(status => (
+                                <option key={status} value={status}>{statusConfig[status].label}</option>
+                              ))}
                           </select>
                         ) : selectedFieldToUpdate === 'contactOwner' ? (
                           <select
@@ -7757,7 +7759,10 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select owner...</option>
-                            {[...new Set(leads.map(l => l.contactOwner))].filter(Boolean).sort().map(owner => (
+                            {[...new Set([
+                              ...getUniqueValues('contact_owner'),
+                              ...leads.map(l => l.contactOwner)
+                            ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                               <option key={owner} value={owner}>{owner}</option>
                             ))}
                           </select>
@@ -7768,7 +7773,10 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select state...</option>
-                            {[...new Set(leads.map(l => l.state))].filter(Boolean).sort().map(state => (
+                            {[...new Set([
+                              ...getUniqueValues('mailing_state'),
+                              ...leads.map(l => l.state)
+                            ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
                               <option key={state} value={state}>{state}</option>
                             ))}
                           </select>
@@ -7779,7 +7787,10 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select country...</option>
-                            {[...new Set(leads.map(l => l.country))].filter(Boolean).sort().map(country => (
+                            {[...new Set([
+                              ...getUniqueValues('mailing_country'),
+                              ...leads.map(l => l.country)
+                            ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
                               <option key={country} value={country}>{country}</option>
                             ))}
                           </select>
@@ -7790,7 +7801,10 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select industry...</option>
-                            {[...new Set(leads.map(l => l.industry))].filter(Boolean).sort().map(industry => (
+                            {[...new Set([
+                              ...getUniqueValues('industry'),
+                              ...leads.map(l => l.industry)
+                            ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
                               <option key={industry} value={industry}>{industry}</option>
                             ))}
                           </select>
@@ -7801,7 +7815,10 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select tags...</option>
-                            {[...new Set(leads.map(l => l.tags))].filter(Boolean).sort().map(tag => (
+                            {[...new Set([
+                              ...getUniqueValues('tag'),
+                              ...leads.map(l => l.tags)
+                            ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
                               <option key={tag} value={tag}>{tag}</option>
                             ))}
                           </select>

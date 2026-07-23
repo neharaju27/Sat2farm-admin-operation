@@ -5975,9 +5975,11 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select new status...</option>
-                              {Object.keys(statusConfig).map(status => (
-                                <option key={status} value={status}>{statusConfig[status].label}</option>
-                              ))}
+                              {Object.keys(statusConfig)
+                                .filter(status => status !== updateFieldValue)
+                                .map(status => (
+                                  <option key={status} value={status}>{statusConfig[status].label}</option>
+                                ))}
                             </select>
                           ) : selectedFieldToUpdate === 'industry' ? (
                             <select
@@ -5986,7 +5988,11 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select industry...</option>
-                              {predefinedIndustries.map(industry => (
+                              {[...new Set([
+                                ...getUniqueValues('industry'),
+                                ...predefinedIndustries,
+                                ...opportunities.map(o => o.industry)
+                              ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
                                 <option key={industry} value={industry}>{industry}</option>
                               ))}
                             </select>
@@ -5997,7 +6003,10 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select owner...</option>
-                              {[...new Set(opportunities.map(o => o.contactOwner))].filter(Boolean).sort().map(owner => (
+                              {[...new Set([
+                                ...getUniqueValues('contact_owner'),
+                                ...opportunities.map(o => o.contactOwner)
+                              ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                                 <option key={owner} value={owner}>{owner}</option>
                               ))}
                             </select>
@@ -6008,7 +6017,10 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select state...</option>
-                              {[...new Set(opportunities.map(o => o.state))].filter(Boolean).sort().map(state => (
+                              {[...new Set([
+                                ...getUniqueValues('mailing_state'),
+                                ...opportunities.map(o => o.state)
+                              ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
                                 <option key={state} value={state}>{state}</option>
                               ))}
                             </select>
@@ -6019,7 +6031,10 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select country...</option>
-                              {[...new Set(opportunities.map(o => o.country))].filter(Boolean).sort().map(country => (
+                              {[...new Set([
+                                ...getUniqueValues('mailing_country'),
+                                ...opportunities.map(o => o.country)
+                              ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
                                 <option key={country} value={country}>{country}</option>
                               ))}
                             </select>
@@ -6030,7 +6045,10 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select tags...</option>
-                              {[...new Set(opportunities.map(o => o.tags))].filter(Boolean).sort().map(tag => (
+                              {[...new Set([
+                                ...getUniqueValues('tag'),
+                                ...opportunities.map(o => o.tags)
+                              ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
                                 <option key={tag} value={tag}>{tag}</option>
                               ))}
                             </select>
