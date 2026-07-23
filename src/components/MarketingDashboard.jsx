@@ -1715,16 +1715,6 @@ useEffect(() => {
                           fontWeight: 500,
                           color: '#1a1c17'
                         }
-                      },
-                      tooltip: {
-                        trigger: 'axis',
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        borderColor: '#e5e7eb',
-                        borderWidth: 1,
-                        textStyle: {
-                          color: '#1a1c17',
-                          fontSize: 13
-                        }
                       }
                     }}
                     style={{ height: '350px', width: '100%' }}
