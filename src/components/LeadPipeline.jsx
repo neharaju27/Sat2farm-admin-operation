@@ -7786,10 +7786,9 @@ export default function LeadPipeline({ onPageChange }) {
                             onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
-                            <option value="">{isFetchingFilterOptions ? `Please wait...` : 'Select owner...'}</option>
+                            <option value="">Select owner...</option>
                             {[...new Set([
                               ...predefinedContactOwners,
-                              ...getUniqueValues('contact_owner'),
                               ...leads.map(l => l.contactOwner)
                             ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                               <option key={owner} value={owner}>{owner}</option>
