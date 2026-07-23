@@ -1506,8 +1506,17 @@ export default function Opportunities({ onPageChange }) {
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
+    const defaultOwners = ['Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
-    return saved ? JSON.parse(saved) : ['Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Operation', 'Amith', , 'Hemanth', 'Likhitha', 'Rohini'];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return Array.from(new Set([...defaultOwners, ...parsed]));
+        }
+      } catch (e) {}
+    }
+    return defaultOwners;
   });
 
   const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
