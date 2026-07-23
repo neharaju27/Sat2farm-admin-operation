@@ -349,7 +349,8 @@ export default function Opportunities({ onPageChange }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [isLast50Mode, setIsLast50Mode] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
@@ -785,7 +786,7 @@ export default function Opportunities({ onPageChange }) {
   const [apiDealTotals, setApiDealTotals] = useState({ with_deals: 0, without_deals: 0 });
 
   // ── Sales Pipeline List View Pagination State ───────────────────────────────
-  const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(10);
+  const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(100);
   const [salesPipelineCurrentPage, setSalesPipelineCurrentPage] = useState(1);
 
   // Handle deal filter click
@@ -3565,9 +3566,27 @@ export default function Opportunities({ onPageChange }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
                     <span>Records per page</span>
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                      <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                      <select value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'last50') {
+                            setIsLast50Mode(true);
+                            setItemsPerPage(50);
+                            const total = effectiveTotalCount || totalCount || 0;
+                            const lastPage = Math.max(Math.ceil(total / 50), 1);
+                            setCurrentPage(lastPage);
+                          } else {
+                            setIsLast50Mode(false);
+                            setItemsPerPage(Number(val));
+                            setCurrentPage(1);
+                          }
+                        }}
                         style={{ appearance: 'none', WebkitAppearance: 'none', padding: '6px 32px 6px 14px', borderRadius: '20px', border: '1px solid #d1d5db', background: '#fff', fontSize: '13px', color: '#374151', cursor: 'pointer', minWidth: '56px', fontFamily: 'inherit' }}>
-                        {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value="last50">Last 50</option>
                       </select>
                       <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
                     </div>
@@ -5694,10 +5713,20 @@ export default function Opportunities({ onPageChange }) {
                         <span style={{ fontSize: '13px', color: '#6b7280' }}>Records per page</span>
                         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                           <select
-                            value={salesPipelineItemsPerPage}
+                            value={isLast50Mode && salesPipelineItemsPerPage === 50 ? 'last50' : salesPipelineItemsPerPage}
                             onChange={(e) => {
-                              setSalesPipelineItemsPerPage(Number(e.target.value));
-                              setSalesPipelineCurrentPage(1);
+                              const val = e.target.value;
+                              if (val === 'last50') {
+                                setIsLast50Mode(true);
+                                setSalesPipelineItemsPerPage(50);
+                                const total = (filteredKanbanDeals && Object.values(filteredKanbanDeals).flat().length) || (dealMetrics && dealMetrics.total) || 50;
+                                const lastPage = Math.max(Math.ceil(total / 50), 1);
+                                setSalesPipelineCurrentPage(lastPage);
+                              } else {
+                                setIsLast50Mode(false);
+                                setSalesPipelineItemsPerPage(Number(val));
+                                setSalesPipelineCurrentPage(1);
+                              }
                             }}
                             style={{
                               appearance: 'none',
@@ -5713,7 +5742,11 @@ export default function Opportunities({ onPageChange }) {
                               fontFamily: 'inherit'
                             }}
                           >
-                            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value="last50">Last 50</option>
                           </select>
                           <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
                         </div>
@@ -5987,7 +6020,7 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">Select industry...</option>
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select industry...'}</option>
                               {[...new Set([
                                 ...getUniqueValues('industry'),
                                 ...predefinedIndustries,
@@ -6002,8 +6035,9 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">Select owner...</option>
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select owner...'}</option>
                               {[...new Set([
+                                'Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini',
                                 ...getUniqueValues('contact_owner'),
                                 ...opportunities.map(o => o.contactOwner)
                               ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
@@ -6016,7 +6050,7 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">Select state...</option>
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select state...'}</option>
                               {[...new Set([
                                 ...getUniqueValues('mailing_state'),
                                 ...opportunities.map(o => o.state)
@@ -6030,7 +6064,7 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">Select country...</option>
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select country...'}</option>
                               {[...new Set([
                                 ...getUniqueValues('mailing_country'),
                                 ...opportunities.map(o => o.country)
