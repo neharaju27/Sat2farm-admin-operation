@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { useKanbanDnd } from './KanbanDndContext';
 
-export default function KanbanColumnDropZone({ columnId, style, children }) {
+export default function KanbanColumnDropZone({ columnId, style, children, onScroll }) {
   const ref = useRef(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const { instanceId } = useKanbanDnd();
@@ -27,6 +27,7 @@ export default function KanbanColumnDropZone({ columnId, style, children }) {
   return (
     <div
       ref={ref}
+      onScroll={onScroll}
       style={{
         ...style,
         backgroundColor: isDraggingOver ? '#f0f9ff' : style?.backgroundColor || 'transparent',

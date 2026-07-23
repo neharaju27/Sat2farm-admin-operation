@@ -33,6 +33,9 @@ export default function SalesPipelineKanbanBoard({
   setColumnWidths,
   onDealMove,
   onDealClick,
+  stageTotals = {},
+  onLoadMoreStage,
+  loadingMoreStages = {}
 }) {
   const getDealsForColumn = useCallback(
     (columnId) => {
@@ -54,6 +57,15 @@ export default function SalesPipelineKanbanBoard({
     column.useFiltered
       ? filteredKanbanDeals[column.stage] || []
       : kanbanDeals[column.stage] || [];
+
+  const handleColumnScroll = (stage, e) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.target;
+    if (scrollTop + clientHeight >= scrollHeight - 60) {
+      if (onLoadMoreStage) {
+        onLoadMoreStage(stage);
+      }
+    }
+  };
 
   return (
     <KanbanDndProvider getDealsForColumn={getDealsForColumn} onDealMove={onDealMove}>
@@ -84,6 +96,7 @@ export default function SalesPipelineKanbanBoard({
               (sum, deal) => sum + (parseFloat(deal.deal_amount) || 0),
               0,
             );
+            const totalStageCount = stageTotals[column.stage] !== undefined ? stageTotals[column.stage] : deals.length;
 
             return (
               <div
@@ -155,7 +168,7 @@ export default function SalesPipelineKanbanBoard({
                         fontWeight: '600',
                       }}
                     >
-                      {deals.length}
+                      {totalStageCount}
                     </span>
                   </div>
                   {!collapsedStages[column.id] && (
@@ -177,11 +190,15 @@ export default function SalesPipelineKanbanBoard({
                 </div>
 
                 {!collapsedStages[column.id] && (
-                  <KanbanColumnDropZone columnId={column.id} style={dropZoneStyle}>
+                  <KanbanColumnDropZone
+                    columnId={column.id}
+                    style={dropZoneStyle}
+                    onScroll={(e) => handleColumnScroll(column.stage, e)}
+                  >
                     {deals.map((deal) => (
                       <KanbanDraggableCard
-                        key={deal.deal_id}
-                        dealId={deal.deal_id}
+                        key={deal.deal_id || deal.id}
+                        dealId={deal.deal_id || deal.id}
                         columnId={column.id}
                         style={cardStyle}
                         onClick={() => onDealClick(deal)}
@@ -219,6 +236,11 @@ export default function SalesPipelineKanbanBoard({
                         </div>
                       </KanbanDraggableCard>
                     ))}
+                    {loadingMoreStages[column.stage] && (
+                      <div style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#6b7280' }}>
+                        Loading more deals...
+                      </div>
+                    )}
                   </KanbanColumnDropZone>
                 )}
 

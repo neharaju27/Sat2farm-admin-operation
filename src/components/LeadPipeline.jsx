@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -220,20 +220,24 @@ export default function LeadPipeline({ onPageChange }) {
         const currentUserName = user?.name || user?.phone_number || 'operation';
         
         let url;
+        const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
+        const fetchLimit = isSearching ? 1000 : limit;
+        const fetchOffset = isSearching ? 0 : offset;
+
         const hasActiveFilter = (typeof isFilterApplied !== 'undefined' && isFilterApplied) || 
                                 (typeof filterStatus !== 'undefined' && filterStatus !== 'all') || 
-                                (typeof searchTerm !== 'undefined' && searchTerm.trim() !== '') || 
+                                isSearching || 
                                 (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) || 
                                 (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter !== '') || 
-                                (typeof selectedProperties !== 'undefined' && selectedProperties.length > 0);
+                                (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0);
 
         let response;
         if (hasActiveFilter && import.meta.env.VITE_FILTER_LEADS_API_URL) {
           try {
             const params = new URLSearchParams({
               user: currentUserName,
-              offset: offset.toString(),
-              limit: limit.toString()
+              offset: fetchOffset.toString(),
+              limit: fetchLimit.toString()
             });
 
             if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
@@ -249,9 +253,10 @@ export default function LeadPipeline({ onPageChange }) {
               params.append(ownerKey, contactOwnerFilter);
             }
             if (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) {
-              params.append('new_this_week', 'true');
+              const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              params.append('created_time_after', sevenDaysAgoStr);
             }
-            if (typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
+            if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
                 if (p.property && p.value) {
                   const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
@@ -268,7 +273,7 @@ export default function LeadPipeline({ onPageChange }) {
 
         // If no active filter or if filter API request failed/returned non-ok status, call main leads URL
         if (!response || !response.ok) {
-          url = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${limit}`;
+          url = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${fetchOffset}&limit=${fetchLimit}`;
           response = await fetch(url);
         }
         
@@ -349,31 +354,216 @@ export default function LeadPipeline({ onPageChange }) {
     };
 
     fetchLeads();
-  }, [offset, limit, user, isFilterApplied, filterStatus, searchTerm, newThisWeekFilter, contactOwnerFilter, selectedProperties]);
+  }, [offset, limit, user, isFilterApplied, filterStatus, searchTerm, newThisWeekFilter, contactOwnerFilter]);
 
-  // Get unique values for a specific property from leads data
-  const getUniqueValues = (property) => {
-    const propertyMap = {
-      'contact_owner': 'contactOwner',
-      'lead_status': 'leadStatus',
-      'tag': 'tags',
-      'mailing_country': 'country',
-      'mailing_state': 'state',
-      'mailing_city': 'city',
-      'mailing_street': 'companyName', // Using companyName as mailing street
-      'created_by': 'createdBy',
-      'modified_by': 'modifiedBy',
-      'lead_source': 'leadSource',
-      'pipeline_stage': 'leadStatus', // Using leadStatus as pipeline stage
-      'contact_name': 'contactName' // Add contact_name mapping
+  const [allLeadsData, setAllLeadsData] = useState([]);
+
+  const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
+  const [filterFetchProgress, setFilterFetchProgress] = useState(0);
+
+  // Optimized: parallel batch fetching — all remaining batches fire simultaneously
+  // after first response reveals total count. Reduces N×RTT to ~2×RTT.
+  useEffect(() => {
+    let active = true;
+
+    const fetchAllLeadsForFilters = async () => {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const apiUrl = import.meta.env.VITE_LEADS_API_URL;
+      if (!apiUrl) {
+        if (active) setIsFetchingFilterOptions(false);
+        return;
+      }
+
+      const batchLimit = 1000;
+      const buildUrl = (offset) =>
+        `${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${batchLimit}`;
+      const parseItems = (data) =>
+        Array.isArray(data) ? data : (data.data || data.results || data.leads || data.records || data.items || []);
+
+      try {
+        if (active) {
+          setIsFetchingFilterOptions(true);
+          setFilterFetchProgress(10);
+        }
+
+        // --- Step 1: First batch ---
+        const firstRes = await fetch(buildUrl(0));
+        if (!firstRes.ok || !active) return;
+        const firstData = await firstRes.json();
+        if (!active) return;
+
+        const firstItems = parseItems(firstData);
+        if (!firstItems.length) {
+          if (active) {
+            setFilterFetchProgress(100);
+            setIsFetchingFilterOptions(false);
+          }
+          return;
+        }
+
+        let allFetched = [...firstItems];
+        const totalCount = firstData.total || firstData.count || firstData.total_count || 0;
+
+        if (totalCount > batchLimit) {
+          const offsets = [];
+          for (let o = batchLimit; o < Math.min(totalCount, 30000); o += batchLimit) {
+            offsets.push(o);
+          }
+
+          if (active) setFilterFetchProgress(30);
+
+          const batchResponses = await Promise.all(
+            offsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
+          );
+
+          if (!active) return;
+
+          for (const batchData of batchResponses) {
+            if (batchData) {
+              const items = parseItems(batchData);
+              allFetched = allFetched.concat(items);
+            }
+          }
+        } else if (firstItems.length === batchLimit) {
+          // Fetch subsequent batches in parallel chunks of 5
+          let currentOffset = batchLimit;
+          let keepGoing = true;
+
+          while (keepGoing && currentOffset < 30000 && active) {
+            const chunkOffsets = [
+              currentOffset,
+              currentOffset + batchLimit,
+              currentOffset + batchLimit * 2,
+              currentOffset + batchLimit * 3,
+              currentOffset + batchLimit * 4
+            ];
+
+            if (active) {
+              const approxProgress = Math.min(Math.round((allFetched.length / (allFetched.length + 3000)) * 100), 95);
+              setFilterFetchProgress(approxProgress);
+            }
+
+            const chunkResults = await Promise.all(
+              chunkOffsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
+            );
+
+            if (!active) return;
+
+            for (const batchData of chunkResults) {
+              if (!batchData) {
+                keepGoing = false;
+                break;
+              }
+              const items = parseItems(batchData);
+              allFetched = allFetched.concat(items);
+              if (items.length < batchLimit) {
+                keepGoing = false;
+                break;
+              }
+            }
+
+            currentOffset += batchLimit * 5;
+          }
+        }
+
+        if (!active) return;
+
+        setFilterFetchProgress(99);
+
+        // --- Step 3: Transform ---
+        const transformed = allFetched.map(lead => ({
+          id: lead.id,
+          contactName: lead.full_name || lead.contact_name || lead.name || '',
+          phoneNumber: lead.phone || lead.phone_number || '',
+          alternateNumber: lead.alternate_number || '',
+          email: lead.email || '',
+          companyName: lead.company_name || lead.company || '',
+          contactOwner: lead.owner || lead.contact_owner || lead.owner_name || '',
+          city: lead.city || lead.mailing_city || '',
+          state: lead.state || lead.mailing_state || '',
+          country: lead.country || lead.mailing_country || 'IN',
+          leadStatus: lead.status || lead.lead_status || '',
+          tags: lead.tags || lead.tag || '',
+          leadSource: lead.lead_source || lead.source || '',
+          description: lead.description || '',
+          createdTime: lead.created_time || lead.created_at || '',
+          industry: lead.industry || '',
+          createdBy: lead.created_by || lead.createdBy || lead.created_user || lead.creator || lead.created_by_name || '',
+          modifiedBy: lead.modified_by || lead.modifiedBy || lead.modified_user || lead.modifier || lead.modified_by_name || '',
+          lastActivity: lead.last_activity || lead.updated_at || '',
+          _raw: lead
+        }));
+
+        if (active) {
+          setAllLeadsData(transformed);
+          setFilterFetchProgress(100);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch full leads dataset for filter options:', err);
+      } finally {
+        if (active) {
+          setIsFetchingFilterOptions(false);
+        }
+      }
     };
-    
-    const field = propertyMap[property];
-    if (!field) return [];
-    
-    const values = [...new Set(leads.map(lead => lead[field]).filter(value => value && value.toString().trim() !== ''))];
-    return values.sort();
-  };
+
+    fetchAllLeadsForFilters();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.name, user?.phone_number]);
+
+  // Memoized unique values map — recomputes only when allLeadsData changes, not on every render
+  const uniqueValuesMap = useMemo(() => {
+    const propertyMap = {
+      'contact_owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'lead_status':   ['leadStatus', 'status', 'lead_status'],
+      'tag':           ['tags', 'tag'],
+      'mailing_country': ['country', 'mailing_country'],
+      'mailing_state': ['state', 'mailing_state'],
+      'mailing_city':  ['city', 'mailing_city'],
+      'mailing_street':['companyName', 'company_name', 'street'],
+      'created_by':    ['createdBy', 'created_by', 'created_user', 'creator', 'created_by_name'],
+      'modified_by':   ['modifiedBy', 'modified_by', 'modified_user', 'modifier', 'modified_by_name'],
+      'lead_source':   ['leadSource', 'lead_source', 'source'],
+      'pipeline_stage':['leadStatus', 'status'],
+      'contact_name':  ['contactName', 'contact_name', 'full_name', 'name'],
+      'industry':      ['industry'],
+      'account_type':  ['accountType', 'account_type']
+    };
+
+    const sourceData = (allLeadsData && allLeadsData.length > 0) ? allLeadsData : leads;
+    const result = {};
+
+    for (const [property, possibleFields] of Object.entries(propertyMap)) {
+      if (property === 'tag') {
+        const allTags = sourceData.flatMap(item => {
+          const tagStr = item.tags || (item._raw && (item._raw.tags || item._raw.tag)) || '';
+          return (tagStr && typeof tagStr === 'string' && tagStr.trim())
+            ? tagStr.split(',').map(t => t.trim()).filter(Boolean)
+            : [];
+        });
+        result[property] = [...new Set(allTags)].sort((a, b) => String(a).localeCompare(String(b)));
+        continue;
+      }
+
+      const extracted = sourceData.flatMap(item => {
+        const vals = [];
+        for (const field of possibleFields) {
+          if (item[field]) vals.push(item[field]);
+          if (item._raw && item._raw[field]) vals.push(item._raw[field]);
+        }
+        return vals;
+      }).filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined');
+
+      result[property] = [...new Set(extracted)].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+    return result;
+  }, [allLeadsData, leads]);
+
+  // Get unique values for a property — reads from memoized cache
+  const getUniqueValues = (property) => uniqueValuesMap[property] || [];
 
   // Get unique contact owners from leads data
   const getUniqueContactOwners = () => {
@@ -712,27 +902,54 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       lead.phoneNumber.includes(searchTerm) ||
-                       lead.city.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = (searchTerm || '').toLowerCase().trim();
+    const matchesSearch = !term ||
+      (lead.contactName && lead.contactName.toLowerCase().includes(term)) ||
+      (lead.companyName && lead.companyName.toLowerCase().includes(term)) ||
+      (lead.email && lead.email.toLowerCase().includes(term)) ||
+      (lead.phoneNumber && lead.phoneNumber.toString().includes(term)) ||
+      (lead.alternateNumber && lead.alternateNumber.toString().includes(term)) ||
+      (lead.city && lead.city.toLowerCase().includes(term)) ||
+      (lead.state && lead.state.toLowerCase().includes(term)) ||
+      (lead.country && lead.country.toLowerCase().includes(term)) ||
+      (lead.contactOwner && lead.contactOwner.toLowerCase().includes(term)) ||
+      (lead.leadStatus && lead.leadStatus.toLowerCase().includes(term)) ||
+      (lead.tags && lead.tags.toLowerCase().includes(term)) ||
+      (lead.leadSource && lead.leadSource.toLowerCase().includes(term)) ||
+      (lead.description && lead.description.toLowerCase().includes(term));
     
     // New This Week filter
-    const createdDate = new Date(lead.createdTime);
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const isNewThisWeek = createdDate >= oneWeekAgo;
+    let isNewThisWeek = true;
+    if (newThisWeekFilter) {
+      if (!lead.createdTime) {
+        isNewThisWeek = false;
+      } else {
+        const str = String(lead.createdTime).trim().replace(' ', 'T');
+        const createdDate = new Date(str);
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        isNewThisWeek = !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
+      }
+    }
     
     const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
 
     return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
   });
 
+  const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
+  const isClientPaginated = isSearching || newThisWeekFilter || isFilterApplied;
+  const displayedLeads = isClientPaginated
+    ? filteredLeads.slice(offset, offset + limit)
+    : filteredLeads;
+  const effectiveTotalLeads = isClientPaginated
+    ? filteredLeads.length
+    : (totalLeads || leads.length);
+
   const statusSummary = getStatusSummary();  
 
   // Pagination - using server-side pagination
-  const totalPages = Math.ceil(totalLeads / limit);
+  const totalPages = Math.ceil(effectiveTotalLeads / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
 
@@ -2216,6 +2433,8 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
+
+
   return (
     <div className="main-full">
       <div style={{ padding: '16px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -2321,7 +2540,10 @@ export default function LeadPipeline({ onPageChange }) {
               type="text"
               placeholder="Search leads by name, company, or email..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setOffset(0);
+              }}
               style={{
                 width: '300px',
                 padding: '8px 12px 8px 36px',
@@ -2484,7 +2706,10 @@ export default function LeadPipeline({ onPageChange }) {
           <input
             type="checkbox"
             checked={newThisWeekFilter}
-            onChange={(e) => setNewThisWeekFilter(e.target.checked)}
+            onChange={(e) => {
+              setNewThisWeekFilter(e.target.checked);
+              setOffset(0);
+            }}
             style={{ cursor: 'pointer' }}
           />
           <span style={{ color: 'var(--text)', fontSize: '14px' }}>New This Week</span>
@@ -2642,12 +2867,12 @@ export default function LeadPipeline({ onPageChange }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <input
                       type="checkbox"
-                      checked={selectedRows.length === leads.length && leads.length > 0 && leads.every(lead => selectedRows.includes(lead.id))}
+                      checked={selectedRows.length === filteredLeads.length && filteredLeads.length > 0 && filteredLeads.every(lead => selectedRows.includes(lead.id))}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedRows(leads.map(lead => lead.id));
+                          setSelectedRows(filteredLeads.map(lead => lead.id));
                         } else {
-                          setSelectedRows(selectedRows.filter(id => !leads.find(lead => lead.id === id)));
+                          setSelectedRows(selectedRows.filter(id => !filteredLeads.find(lead => lead.id === id)));
                         }
                       }}
                       style={{ cursor: 'pointer' }}
@@ -2710,7 +2935,7 @@ export default function LeadPipeline({ onPageChange }) {
                   </td>
                 </tr>
               ) : (
-                leads.map(lead => (
+                displayedLeads.map(lead => (
                   <tr
                     key={lead.id}
                     style={{
@@ -3014,9 +3239,9 @@ export default function LeadPipeline({ onPageChange }) {
                 textAlign: 'center',
                 whiteSpace: 'nowrap'
               }}>
-                {leads.length === 0
+                {filteredLeads.length === 0
                   ? '0 to 0'
-                  : `${offset + 1} to ${Math.min(offset + limit, totalLeads || leads.length)}`}
+                  : `${offset + 1} to ${Math.min(offset + limit, effectiveTotalLeads)} of ${effectiveTotalLeads}`}
               </span>
 
               <button
@@ -3024,7 +3249,7 @@ export default function LeadPipeline({ onPageChange }) {
                 onClick={() => {
                   setOffset((prev) => prev + limit);
                 }}
-                disabled={offset + limit >= totalLeads || leads.length === 0}
+                disabled={offset + limit >= effectiveTotalLeads || leads.length === 0}
                 aria-label="Next page"
                 style={{
                   display: 'flex',
@@ -3195,61 +3420,98 @@ export default function LeadPipeline({ onPageChange }) {
             </div>
             
             <div style={{ padding: '20px' }}>
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
-                <select
-                  value={currentProperty}
-                  onChange={(e) => {
-                    const property = e.target.value;
-                    if (property && !selectedProperties.find(p => p.property === property)) {
-                      const newProperty = {
-                        property,
-                        value: '',
-                        operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
-                      };
-                      
-                      // Set default dateOperator for created_time
-                      if (property === 'created_time') {
-                        newProperty.dateOperator = 'on';
+              {isFetchingFilterOptions && (
+                <div style={{
+                  padding: '20px 16px',
+                  borderRadius: '10px',
+                  background: 'var(--gray-50, #f9fafb)',
+                  border: '1px solid var(--border)',
+                  marginTop: '4px'
+                }}>
+                  <style>{`@keyframes filterSpin { to { transform: rotate(360deg); } }`}</style>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{
+                      width: '16px', height: '16px', flexShrink: 0,
+                      border: '2px solid #3b82f6',
+                      borderTopColor: 'transparent',
+                      borderRadius: '50%',
+                      animation: 'filterSpin 0.7s linear infinite'
+                    }} />
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', flex: 1 }}>
+                      Loading filters...
+                    </span>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#3b82f6',
+                      minWidth: '36px',
+                      textAlign: 'right'
+                    }}>
+                      {filterFetchProgress}%
+                    </span>
+                  </div>
+                  <div style={{
+                    height: '5px',
+                    background: 'var(--border, #e5e7eb)',
+                    borderRadius: '99px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${filterFetchProgress}%`,
+                      background: 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                      borderRadius: '99px',
+                      transition: 'width 0.4s ease'
+                    }} />
+                  </div>
+                </div>
+              )}
+              {!isFetchingFilterOptions && (
+              <>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
+                  <select
+                    value={currentProperty}
+                    onChange={(e) => {
+                      const property = e.target.value;
+                      if (property && !selectedProperties.find(p => p.property === property)) {
+                        const newProperty = {
+                          property,
+                          value: '',
+                          operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                        };
+                        if (property === 'created_time') {
+                          newProperty.dateOperator = 'on';
+                        }
+                        setSelectedProperties([...selectedProperties, newProperty]);
                       }
-                      
-                      setSelectedProperties([...selectedProperties, newProperty]);
-                    }
-                    setCurrentProperty('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r)',
-                    fontSize: '13px',
-                    background: 'var(--surface)',
-                    color: 'var(--text)'
-                  }}
-                >
-                  <option value="">Choose Property</option>
-                  <option value="contact_owner">Contact Owner</option>
-                  <option value="created_time">Created Time</option>
-                  <option value="lead_status">Lead Status</option>
-                  <option value="tag">Tag</option>
-                  
-                  <option value="mailing_country">Mailing Country</option>
-                  <option value="mailing_state">Mailing State</option>
-                  
-       
-                 
-                  
-                  <option value="created_by">Created By</option>
-                 
-                  <option value="lead_source">Lead Source</option>
-                  <option value="mailing_city">Mailing City</option>
-                  
-                  <option value="modified_by">Modified By</option>
-                
-                 
-                </select>
-              </div>
-              
+                      setCurrentProperty('');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)',
+                      fontSize: '13px',
+                      background: 'var(--surface)',
+                      color: 'var(--text)'
+                    }}
+                  >
+                    <option value="">Choose Property</option>
+                    <option value="contact_owner">Contact Owner</option>
+                    <option value="created_time">Created Time</option>
+                    <option value="lead_status">Lead Status</option>
+                    <option value="tag">Tag</option>
+                    <option value="mailing_country">Mailing Country</option>
+                    <option value="mailing_state">Mailing State</option>
+                    <option value="created_by">Created By</option>
+                    <option value="lead_source">Lead Source</option>
+                    <option value="mailing_city">Mailing City</option>
+                    <option value="modified_by">Modified By</option>
+                  </select>
+                </div>
+
+
               {/* Selected Properties */}
               {selectedProperties.map((prop, index) => (
                 <div key={index} style={{ marginBottom: '24px', position: 'relative' }}>
@@ -4364,9 +4626,13 @@ export default function LeadPipeline({ onPageChange }) {
                             }}
                           >
                             <option value="">All Created By</option>
-                            {getUniqueValues(prop.property).map(value => (
-                              <option key={value} value={value}>{value}</option>
-                            ))}
+                            {isFetchingFilterOptions ? (
+                              <option value="" disabled>Loading options, please wait...</option>
+                            ) : (
+                              getUniqueValues(prop.property).map(value => (
+                                <option key={value} value={value}>{value}</option>
+                              ))
+                            )}
                           </select>
                         </div>
                       </div>
@@ -4417,9 +4683,13 @@ export default function LeadPipeline({ onPageChange }) {
                             }}
                           >
                             <option value="">All Modified By</option>
-                            {getUniqueValues(prop.property).map(value => (
-                              <option key={value} value={value}>{value}</option>
-                            ))}
+                            {isFetchingFilterOptions ? (
+                              <option value="" disabled>Loading options, please wait...</option>
+                            ) : (
+                              getUniqueValues(prop.property).map(value => (
+                                <option key={value} value={value}>{value}</option>
+                              ))
+                            )}
                           </select>
                         </div>
                       </div>
@@ -5140,6 +5410,7 @@ export default function LeadPipeline({ onPageChange }) {
                   Apply Filters
                 </button>
               </div>
+              </>)}
             </div>
           </div>
           

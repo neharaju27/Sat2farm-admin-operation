@@ -359,58 +359,223 @@ export default function Opportunities({ onPageChange }) {
   const [isFilterApplied, setIsFilterApplied] = useState(false);
   const [currentFilterCriteria, setCurrentFilterCriteria] = useState('');
 
-  // Get unique values for a specific property from opportunities data
-  const getUniqueValues = (property) => {
-    if (property === 'contact_owner' || property === 'owner') {
-      const predefined = (predefinedContactOwners || []).filter(Boolean);
-      const fromOpps = opportunities.map(opp => opp.contactOwner).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
-    if (property === 'lead_status' || property === 'status') {
-      const predefined = Object.keys(statusConfig);
-      const fromOpps = opportunities.map(opp => opp.leadStatus).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
-    if (property === 'tag' || property === 'tags') {
-      const predefined = (predefinedTags || []).filter(Boolean);
-      const fromOpps = opportunities.map(opp => opp.tags).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
-    if (property === 'lead_source') {
-      const predefined = (predefinedLeadSources || []).filter(Boolean);
-      const fromOpps = opportunities.map(opp => opp.leadSource).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
-    if (property === 'industry') {
-      const predefined = (predefinedIndustries || []).filter(Boolean);
-      const fromOpps = opportunities.map(opp => opp.industry).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
-    if (property === 'account_type') {
-      const predefined = (predefinedAccountTypes || []).filter(Boolean);
-      const fromOpps = opportunities.map(opp => opp.accountType).filter(Boolean);
-      return [...new Set([...predefined, ...fromOpps])].sort();
-    }
+  const [allAccountsData, setAllAccountsData] = useState([]);
 
-    const propertyMap = {
-      'mailing_country': 'country',
-      'mailing_state': 'state',
-      'mailing_city': 'city',
-      'mailing_street': 'companyName',
-      'created_by': 'createdBy',
-      'modified_by': 'modifiedBy',
-      'pipeline_stage': 'leadStatus',
-      'contact_name': 'contactName',
-      'industry': 'industry',
-      'account_type': 'accountType'
+  const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
+  const [filterFetchProgress, setFilterFetchProgress] = useState(0);
+
+  // Optimized: parallel batch fetching — all remaining batches fire simultaneously
+  // after first response reveals total count. Reduces N×RTT to ~2×RTT.
+  useEffect(() => {
+    let active = true;
+
+    const fetchAllAccountsForFilters = async () => {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+      if (!apiUrl) {
+        if (active) setIsFetchingFilterOptions(false);
+        return;
+      }
+
+      const batchLimit = 1000;
+      const buildUrl = (offset) =>
+        `${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${batchLimit}`;
+      const parseItems = (data) =>
+        Array.isArray(data) ? data : (data.data || data.results || data.accounts || data.records || data.items || []);
+
+      try {
+        if (active) {
+          setIsFetchingFilterOptions(true);
+          setFilterFetchProgress(10);
+        }
+
+        // --- Step 1: First batch ---
+        const firstRes = await fetch(buildUrl(0));
+        if (!firstRes.ok || !active) return;
+        const firstData = await firstRes.json();
+        if (!active) return;
+
+        const firstItems = parseItems(firstData);
+        if (!firstItems.length) {
+          if (active) {
+            setFilterFetchProgress(100);
+            setIsFetchingFilterOptions(false);
+          }
+          return;
+        }
+
+        let allFetched = [...firstItems];
+        const totalCount = firstData.total || firstData.count || firstData.total_count || 0;
+
+        if (totalCount > batchLimit) {
+          const offsets = [];
+          for (let o = batchLimit; o < Math.min(totalCount, 30000); o += batchLimit) {
+            offsets.push(o);
+          }
+
+          if (active) setFilterFetchProgress(30);
+
+          const batchResponses = await Promise.all(
+            offsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
+          );
+
+          if (!active) return;
+
+          for (const batchData of batchResponses) {
+            if (batchData) {
+              const items = parseItems(batchData);
+              allFetched = allFetched.concat(items);
+            }
+          }
+        } else if (firstItems.length === batchLimit) {
+          // Fetch subsequent batches in parallel chunks of 5
+          let currentOffset = batchLimit;
+          let keepGoing = true;
+
+          while (keepGoing && currentOffset < 30000 && active) {
+            const chunkOffsets = [
+              currentOffset,
+              currentOffset + batchLimit,
+              currentOffset + batchLimit * 2,
+              currentOffset + batchLimit * 3,
+              currentOffset + batchLimit * 4
+            ];
+
+            if (active) {
+              const approxProgress = Math.min(Math.round((allFetched.length / (allFetched.length + 3000)) * 100), 95);
+              setFilterFetchProgress(approxProgress);
+            }
+
+            const chunkResults = await Promise.all(
+              chunkOffsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
+            );
+
+            if (!active) return;
+
+            for (const batchData of chunkResults) {
+              if (!batchData) {
+                keepGoing = false;
+                break;
+              }
+              const items = parseItems(batchData);
+              allFetched = allFetched.concat(items);
+              if (items.length < batchLimit) {
+                keepGoing = false;
+                break;
+              }
+            }
+
+            currentOffset += batchLimit * 5;
+          }
+        }
+
+        if (!active) return;
+
+        setFilterFetchProgress(99);
+
+        // --- Step 3: Transform ---
+        const transformed = allFetched.map(opp => ({
+          id: opp.id,
+          contactName: opp.full_name || opp.contact_name || opp.name || '',
+          phoneNumber: opp.phone || opp.phone_number || '',
+          alternateNumber: opp.alternate_number || '',
+          email: opp.email || '',
+          companyName: opp.company_name || opp.company || '',
+          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || '',
+          city: opp.city || opp.mailing_city || '',
+          state: opp.state || opp.mailing_state || '',
+          country: opp.country || opp.mailing_country || 'IN',
+          leadStatus: opp.status || opp.lead_status || '',
+          tags: opp.tags || opp.tag || '',
+          leadSource: opp.lead_source || opp.source || '',
+          description: opp.description || '',
+          createdTime: opp.created_time || opp.created_at || '',
+          industry: opp.industry || '',
+          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || '',
+          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || '',
+          lastActivity: opp.last_activity || opp.updated_at || '',
+          accountName: opp.account_name || '',
+          accountNumber: opp.account_number || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: opp.modified_time || '',
+          _raw: opp
+        }));
+
+        if (active) {
+          setAllAccountsData(transformed);
+          setFilterFetchProgress(100);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch full accounts dataset for filter options:', err);
+      } finally {
+        if (active) {
+          setIsFetchingFilterOptions(false);
+        }
+      }
     };
 
-    const field = propertyMap[property];
-    if (!field) return [];
+    fetchAllAccountsForFilters();
 
-    const values = [...new Set(opportunities.map(opp => opp[field]).filter(value => value && value.toString().trim() !== ''))];
-    return values.sort();
-  };
+    return () => {
+      active = false;
+    };
+  }, [user?.name, user?.phone_number]);
+
+  // Memoized unique values map — recomputes only when allAccountsData changes, not on every render
+  const uniqueValuesMap = useMemo(() => {
+    const propertyMap = {
+      'contact_owner':  ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'owner':          ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'lead_status':    ['leadStatus', 'status', 'lead_status'],
+      'status':         ['leadStatus', 'status', 'lead_status'],
+      'tag':            ['tags', 'tag'],
+      'tags':           ['tags', 'tag'],
+      'mailing_country':['country', 'mailing_country'],
+      'mailing_state':  ['state', 'mailing_state'],
+      'mailing_city':   ['city', 'mailing_city'],
+      'mailing_street': ['companyName', 'company_name', 'street'],
+      'created_by':     ['createdBy', 'created_by', 'created_user', 'creator', 'created_by_name'],
+      'modified_by':    ['modifiedBy', 'modified_by', 'modified_user', 'modifier', 'modified_by_name'],
+      'lead_source':    ['leadSource', 'lead_source', 'source'],
+      'pipeline_stage': ['leadStatus', 'status'],
+      'contact_name':   ['contactName', 'contact_name', 'full_name', 'name'],
+      'industry':       ['industry'],
+      'account_type':   ['accountType', 'account_type']
+    };
+
+    const sourceData = (allAccountsData && allAccountsData.length > 0) ? allAccountsData : opportunities;
+    const result = {};
+
+    for (const [property, possibleFields] of Object.entries(propertyMap)) {
+      if (property === 'tag' || property === 'tags') {
+        const allTags = sourceData.flatMap(item => {
+          const tagStr = item.tags || (item._raw && (item._raw.tags || item._raw.tag)) || '';
+          return (tagStr && typeof tagStr === 'string' && tagStr.trim())
+            ? tagStr.split(',').map(t => t.trim()).filter(Boolean)
+            : [];
+        });
+        result[property] = [...new Set(allTags)].sort((a, b) => String(a).localeCompare(String(b)));
+        continue;
+      }
+
+      const extracted = sourceData.flatMap(item => {
+        const vals = [];
+        for (const field of possibleFields) {
+          if (item[field]) vals.push(item[field]);
+          if (item._raw && item._raw[field]) vals.push(item._raw[field]);
+        }
+        return vals;
+      }).filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined');
+
+      result[property] = [...new Set(extracted)].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+    return result;
+  }, [allAccountsData, opportunities]);
+
+  // Get unique values for a property — reads from memoized cache
+  const getUniqueValues = (property) => uniqueValuesMap[property] || [];
 
   // Helper to construct query parameter keys with _is or _is_not suffixes
   const getFilterQueryParamKey = (property, operator = 'is') => {
@@ -605,6 +770,8 @@ export default function Opportunities({ onPageChange }) {
   const [addingNote, setAddingNote] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
   const [kanbanDeals, setKanbanDeals] = useState({}); // Store deals by stage for Kanban
+  const [stageTotals, setStageTotals] = useState({}); // Store total deals count per stage from API
+  const [loadingMoreStages, setLoadingMoreStages] = useState({}); // Track infinite scroll loading per stage
   const [pipelineViewMode, setPipelineViewMode] = useState('kanban'); // Track sales pipeline view mode (kanban vs list)
 
   // ── Sales Pipeline Filter State ─────────────────────────────────────────────
@@ -627,81 +794,85 @@ export default function Opportunities({ onPageChange }) {
     setCurrentPage(1);
   };
 
-  // Fetch filtered opportunities based on deal filter
+  // Fetch filtered opportunities based on deal filter & search criteria across all server data
   useEffect(() => {
     const fetchFilteredOpportunities = async () => {
       const currentLimit = itemsPerPage || 10;
       const currentOffset = ((currentPage || 1) - 1) * currentLimit;
+      const currentUserName = user?.name || user?.phone_number || 'operation';
 
-      if (dealFilter === 'all') {
-        // Fetch all opportunities
-        const currentUserName = user?.name || user?.phone_number || 'operation';
-        const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
-        if (!apiUrl) {
-          setOpportunities(getMockOpportunities());
-          return;
+      const isSearching = (searchTerm && searchTerm.trim() !== '');
+      const fetchLimit = isSearching ? 1000 : currentLimit;
+      const fetchOffset = isSearching ? 0 : currentOffset;
+
+      const hasActiveFilter = (dealFilter && dealFilter !== 'all') ||
+                              isSearching ||
+                              newThisWeekFilter ||
+                              (isFilterApplied && selectedProperties && selectedProperties.length > 0) ||
+                              isFilterApplied;
+
+      const filterApiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
+      const accountsApiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+
+      try {
+        let response;
+        if (hasActiveFilter && filterApiUrl) {
+          const params = new URLSearchParams({
+            user: currentUserName,
+            offset: fetchOffset.toString(),
+            limit: fetchLimit.toString()
+          });
+
+          if (dealFilter && dealFilter !== 'all') {
+            params.append('deal_filter', dealFilter);
+          }
+          if (searchTerm && searchTerm.trim()) {
+            params.append('search', searchTerm.trim());
+          }
+          if (newThisWeekFilter) {
+            const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            params.append('created_time_after', sevenDaysAgoStr);
+          }
+          if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+            selectedProperties.forEach(p => {
+              if (p.property && p.value) {
+                const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+                params.append(paramKey, p.value);
+              }
+            });
+          }
+
+          response = await fetch(`${filterApiUrl}?${params.toString()}`);
         }
 
-        try {
-          const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${currentOffset}&limit=${currentLimit}`);
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          const data = await response.json();
-          const oppsList = Array.isArray(data) ? data : (data.data || data.results || data.accounts || []);
-          const transformedOpportunities = oppsList.map(opp => ({
-            id: opp.id,
-            contactName: opp.full_name || 'Unknown',
-            phoneNumber: opp.phone || '',
-            alternateNumber: opp.alternate_number || '',
-            email: opp.email || '',
-            companyName: opp.company_name || '',
-            contactOwner: opp.owner || 'Unassigned',
-            city: opp.city || '',
-            state: opp.state || '',
-            country: opp.country || 'IN',
-            leadStatus: opp.status || 'New',
-            tags: opp.tags || '',
-            leadSource: opp.lead_source || '',
-            description: opp.description || '',
-            createdTime: opp.created_time || new Date().toISOString(),
-            industry: opp.industry || '',
-            createdBy: opp.created_by || 'System',
-            modifiedBy: opp.modified_by || 'System',
-            lastActivity: opp.last_activity || new Date().toISOString(),
-            accountName: opp.account_name || '',
-            accountNumber: opp.account_number || '',
-            dealPresent: opp.deal_present || 0,
-            website: opp.website || '',
-            accountType: opp.account_type || '',
-            modifiedTime: opp.modified_time || ''
-          }));
-          setOpportunities(transformedOpportunities);
-        } catch (err) {
-          console.error('Error fetching opportunities:', err);
-          const mockOpps = getMockOpportunities();
-          setOpportunities(mockOpps);
-        }
-      } else {
-        // Fetch filtered opportunities
-        const currentUserName = user?.name || user?.phone_number || 'operation';
-        const apiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
-        if (!apiUrl) {
-          console.log('Filter API URL not configured');
-          return;
+        if (!response || !response.ok) {
+          if (accountsApiUrl) {
+            const params = new URLSearchParams({
+              user: currentUserName,
+              offset: fetchOffset.toString(),
+              limit: fetchLimit.toString()
+            });
+            if (searchTerm && searchTerm.trim()) {
+              params.append('search', searchTerm.trim());
+            }
+            response = await fetch(`${accountsApiUrl}?${params.toString()}`);
+          }
         }
 
-        try {
-          const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=${dealFilter}&limit=${currentLimit}&offset=${currentOffset}`);
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (response && response.ok) {
           const responseData = await response.json();
           const data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || []);
 
-          // Store API totals for with_deals and without_deals
-          if (responseData && responseData.total !== undefined) {
+          if (responseData && typeof responseData.total === 'number') {
             setTotalOpportunities(responseData.total);
-            setApiDealTotals(prev => ({
-              ...prev,
-              [dealFilter]: responseData.total
-            }));
+            if (dealFilter !== 'all') {
+              setApiDealTotals(prev => ({
+                ...prev,
+                [dealFilter]: responseData.total
+              }));
+            }
+          } else if (Array.isArray(responseData)) {
+            setTotalOpportunities(responseData.length);
           }
 
           const transformedOpportunities = data.map(opp => ({
@@ -732,14 +903,14 @@ export default function Opportunities({ onPageChange }) {
             modifiedTime: opp.modified_time || ''
           }));
           setOpportunities(transformedOpportunities);
-        } catch (err) {
-          console.error('Error fetching filtered opportunities:', err);
         }
+      } catch (err) {
+        console.error('Error fetching opportunities:', err);
       }
     };
 
     fetchFilteredOpportunities();
-  }, [dealFilter, currentPage, itemsPerPage]);
+  }, [dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied]);
 
   // ── Filter Logic ─────────────────────────────────────────────────────────────
   const applyFilters = (deals) => {
@@ -986,41 +1157,127 @@ export default function Opportunities({ onPageChange }) {
 
       // Apply search term filtering
       if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = searchTerm.toLowerCase().trim();
         filtered = filtered.filter(deal =>
           (deal.deal_name && deal.deal_name.toLowerCase().includes(searchLower)) ||
-          (deal.deal_amount && deal.deal_amount.toString().includes(searchLower)) ||
+          (deal.account_name && deal.account_name.toLowerCase().includes(searchLower)) ||
           (deal.deal_owner && deal.deal_owner.toLowerCase().includes(searchLower)) ||
-          (deal.full_name && deal.full_name.toLowerCase().includes(searchLower))
+          (deal.full_name && deal.full_name.toLowerCase().includes(searchLower)) ||
+          (deal.deal_type && deal.deal_type.toLowerCase().includes(searchLower)) ||
+          (deal.description && deal.description.toLowerCase().includes(searchLower)) ||
+          (deal.deal_amount && deal.deal_amount.toString().includes(searchLower))
         );
+      }
+
+      // Apply New This Week filter
+      if (newThisWeekFilter) {
+        filtered = filtered.filter(deal => {
+          const timeStr = deal.created_time || deal.createdTime;
+          if (!timeStr) return false;
+          const str = String(timeStr).trim().replace(' ', 'T');
+          const createdDate = new Date(str);
+          const now = new Date();
+          const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+          return !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
+        });
       }
 
       filteredByStage[stage] = filtered;
     }
 
     return filteredByStage;
-  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, searchTerm, kanbanUpdateTimestamp]);
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, searchTerm, newThisWeekFilter, kanbanUpdateTimestamp]);
+
+  // Dynamic summary metrics fetched directly from backend APIs:
+  // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
+  // - Total count fetched from VITE_DEALS_API_URL (deals)
+  const [dealSummaryMetrics, setDealSummaryMetrics] = useState({
+    total: 0,
+    open: 0,
+    won: 0,
+    closed: 0
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchDealsSummaryAndTotal = async () => {
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      const dealsSummaryApiUrl = import.meta.env.VITE_DEALS_SUMMARY_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals/summary';
+      const dealsApiUrl = import.meta.env.VITE_DEALS_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals';
+
+      try {
+        const [summaryRes, dealsRes] = await Promise.all([
+          fetch(`${dealsSummaryApiUrl}?user=${encodeURIComponent(currentUser)}`).catch(() => null),
+          fetch(`${dealsApiUrl}?user=${encodeURIComponent(currentUser)}&offset=0&limit=1`).catch(() => null)
+        ]);
+
+        let summaryData = null;
+        let dealsData = null;
+
+        if (summaryRes && summaryRes.ok) {
+          summaryData = await summaryRes.json();
+        }
+        if (dealsRes && dealsRes.ok) {
+          dealsData = await dealsRes.json();
+        }
+
+        if (!active) return;
+
+        const openCount = summaryData?.open ?? 0;
+        const wonCount = summaryData?.won ?? 0;
+        const closedCount = summaryData?.closed ?? 0;
+        const totalCount = dealsData?.total ?? dealsData?.count ?? dealsData?.total_count ?? (openCount + wonCount + closedCount);
+
+        setDealSummaryMetrics({
+          total: totalCount,
+          open: openCount,
+          won: wonCount,
+          closed: closedCount
+        });
+      } catch (err) {
+        console.error('Error fetching deals summary metrics:', err);
+      }
+    };
+
+    fetchDealsSummaryAndTotal();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.name, user?.phone_number, kanbanUpdateTimestamp]);
 
   // Calculate deal metrics for summary
   const dealMetrics = useMemo(() => {
-    const allDeals = Object.values(filteredKanbanDeals).flat();
-    const openDeals = allDeals.filter(deal =>
-      ['Opportunity', 'Proposal', 'Negotiation'].includes(deal.deal_stage)
-    );
-    const positiveDeals = allDeals.filter(deal =>
-      ['Closed Won', 'Invoiced', 'Paid'].includes(deal.deal_stage)
-    );
-    const negativeDeals = allDeals.filter(deal =>
-      deal.deal_stage === 'Closed Lost'
-    );
+    // If filters are applied, compute metrics from the filtered local list
+    if (salesFiltersApplied || searchTerm || newThisWeekFilter) {
+      const allDeals = Object.values(filteredKanbanDeals).flat();
+      const openDeals = allDeals.filter(deal =>
+        ['Opportunity', 'Proposal', 'Negotiation'].includes(deal.deal_stage)
+      );
+      const positiveDeals = allDeals.filter(deal =>
+        ['Closed Won', 'Invoiced', 'Paid'].includes(deal.deal_stage)
+      );
+      const negativeDeals = allDeals.filter(deal =>
+        deal.deal_stage === 'Closed Lost'
+      );
 
+      return {
+        total: allDeals.length,
+        open: openDeals.length,
+        positive: positiveDeals.length,
+        negative: negativeDeals.length
+      };
+    }
+
+    // Otherwise use exact counts fetched directly from backend APIs (deals/summary & deals total)
     return {
-      total: allDeals.length,
-      open: openDeals.length,
-      positive: positiveDeals.length,
-      negative: negativeDeals.length
+      total: dealSummaryMetrics.total,
+      open: dealSummaryMetrics.open,
+      positive: dealSummaryMetrics.won,
+      negative: dealSummaryMetrics.closed
     };
-  }, [filteredKanbanDeals]);
+  }, [filteredKanbanDeals, salesFiltersApplied, searchTerm, newThisWeekFilter, dealSummaryMetrics]);
 
   // Update filter applied indicator
   useEffect(() => {
@@ -1375,7 +1632,7 @@ export default function Opportunities({ onPageChange }) {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
       if (!apiUrl) {
         console.log('Deals API URL not configured');
-        return [];
+        return { deals: [], total: 0 };
       }
 
       const currentUser = user?.name || user?.phone_number || 'operation';
@@ -1387,9 +1644,10 @@ export default function Opportunities({ onPageChange }) {
 
       const result = await response.json();
       console.log(`Deals for stage ${stage}:`, result);
-      console.log(`First deal in ${stage}:`, result.data?.[0]);
 
       const dealsList = Array.isArray(result) ? result : (result.data || result.results || result.deals || []);
+      const totalCount = result.total !== undefined ? result.total : dealsList.length;
+
       const deals = dealsList.map(deal => ({
         ...deal,
         account_name: deal.account_name || '',
@@ -1397,24 +1655,66 @@ export default function Opportunities({ onPageChange }) {
         created_time: deal.created_time || '',
         created_by: deal.created_by || ''
       }));
-      return deals;
+
+      return { deals, total: totalCount };
     } catch (err) {
       console.error(`Error fetching deals for stage ${stage}:`, err);
-      return [];
+      return { deals: [], total: 0 };
     }
   };
 
-  // Fetch all deals for all stages
+  // Fetch all deals for all stages concurrently using Promise.all (initial batch offset=0, limit=50)
   const fetchAllKanbanDeals = async () => {
     const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
-    const dealsByStage = {};
 
-    for (const stage of stages) {
-      const deals = await fetchDealsByStage(stage);
-      dealsByStage[stage] = deals;
+    try {
+      const results = await Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50)));
+      const dealsByStage = {};
+      const totalsByStage = {};
+
+      stages.forEach((stage, index) => {
+        dealsByStage[stage] = results[index].deals;
+        totalsByStage[stage] = results[index].total;
+      });
+
+      setKanbanDeals(dealsByStage);
+      setStageTotals(totalsByStage);
+    } catch (err) {
+      console.error('Error fetching all kanban deals:', err);
     }
+  };
 
-    setKanbanDeals(dealsByStage);
+  // Infinite scroll: fetch next batch of 50 deals for a specific stage when user scrolls near column bottom
+  const handleLoadMoreStageDeals = async (stage) => {
+    if (loadingMoreStages[stage]) return;
+
+    const currentDeals = kanbanDeals[stage] || [];
+    const totalForStage = stageTotals[stage] || 0;
+
+    if (currentDeals.length >= totalForStage) return;
+
+    try {
+      setLoadingMoreStages(prev => ({ ...prev, [stage]: true }));
+
+      const nextOffset = currentDeals.length;
+      const { deals: newDeals } = await fetchDealsByStage(stage, nextOffset, 50);
+
+      if (newDeals.length > 0) {
+        setKanbanDeals(prev => {
+          const existing = prev[stage] || [];
+          const existingIds = new Set(existing.map(d => String(d.deal_id || d.id)));
+          const uniqueNewDeals = newDeals.filter(d => !existingIds.has(String(d.deal_id || d.id)));
+          return {
+            ...prev,
+            [stage]: [...existing, ...uniqueNewDeals]
+          };
+        });
+      }
+    } catch (err) {
+      console.error(`Error loading more deals for stage ${stage}:`, err);
+    } finally {
+      setLoadingMoreStages(prev => ({ ...prev, [stage]: false }));
+    }
   };
 
   // Add task using API
@@ -2463,30 +2763,59 @@ export default function Opportunities({ onPageChange }) {
 
   // ── Filtering ─────────────────────────────────────────────────────────────
   const filteredOpportunities = opportunities.filter(opp => {
-    const matchesSearch =
-      opp.contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opp.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opp.phoneNumber.includes(searchTerm) ||
-      opp.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opp.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opp.contactOwner.toLowerCase().includes(searchTerm.toLowerCase());
-    const createdDate = new Date(opp.createdTime);
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const isNewThisWeek = createdDate >= oneWeekAgo;
+    const term = (searchTerm || '').toLowerCase().trim();
+    const matchesSearch = !term ||
+      (opp.contactName && opp.contactName.toLowerCase().includes(term)) ||
+      (opp.companyName && opp.companyName.toLowerCase().includes(term)) ||
+      (opp.email && opp.email.toLowerCase().includes(term)) ||
+      (opp.phoneNumber && opp.phoneNumber.toString().includes(term)) ||
+      (opp.alternateNumber && opp.alternateNumber.toString().includes(term)) ||
+      (opp.city && opp.city.toLowerCase().includes(term)) ||
+      (opp.state && opp.state.toLowerCase().includes(term)) ||
+      (opp.country && opp.country.toLowerCase().includes(term)) ||
+      (opp.accountName && opp.accountName.toLowerCase().includes(term)) ||
+      (opp.accountNumber && opp.accountNumber.toString().includes(term)) ||
+      (opp.contactOwner && opp.contactOwner.toLowerCase().includes(term)) ||
+      (opp.leadStatus && opp.leadStatus.toLowerCase().includes(term)) ||
+      (opp.tags && opp.tags.toLowerCase().includes(term)) ||
+      (opp.leadSource && opp.leadSource.toLowerCase().includes(term)) ||
+      (opp.description && opp.description.toLowerCase().includes(term));
+
+    let isNewThisWeek = true;
+    if (newThisWeekFilter) {
+      if (!opp.createdTime) {
+        isNewThisWeek = false;
+      } else {
+        const str = String(opp.createdTime).trim().replace(' ', 'T');
+        const createdDate = new Date(str);
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        isNewThisWeek = !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
+      }
+    }
+
     const matchesStatus = filterStatus === 'all' || opp.leadStatus === filterStatus;
-    return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
+    return matchesSearch && isNewThisWeek && matchesStatus;
   });
+
+
+
+  const isSearching = (searchTerm && searchTerm.trim() !== '');
+  const isClientPaginated = isSearching || newThisWeekFilter || isFilterApplied;
 
   const totalCount = (dealFilter !== 'all' && apiDealTotals[dealFilter] !== undefined)
     ? apiDealTotals[dealFilter]
     : (totalOpportunities || filteredOpportunities.length);
 
-  const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
-  const currentOpportunities = filteredOpportunities;
+  const effectiveTotalCount = isClientPaginated ? filteredOpportunities.length : totalCount;
+
+  const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
   const startRecord = filteredOpportunities.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-  const endRecord = Math.min(currentPage * itemsPerPage, totalCount);
+  const endRecord = Math.min(currentPage * itemsPerPage, effectiveTotalCount);
+
+  const currentOpportunities = isClientPaginated
+    ? filteredOpportunities.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : filteredOpportunities;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -2535,7 +2864,10 @@ export default function Opportunities({ onPageChange }) {
                     type="text"
                     placeholder="Search opportunities by name, company, or email..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     style={{ width: '300px', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
                   />
                 </div>
@@ -2740,7 +3072,16 @@ export default function Opportunities({ onPageChange }) {
                 Download CSV
               </button>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={newThisWeekFilter} onChange={(e) => setNewThisWeekFilter(e.target.checked)} style={{ cursor: 'pointer' }} />
+                <input
+                  type="checkbox"
+                  checked={newThisWeekFilter}
+                  onChange={(e) => {
+                    setNewThisWeekFilter(e.target.checked);
+                    setCurrentPage(1);
+                    setSalesPipelineCurrentPage(1);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
                 <span style={{ color: 'var(--text)', fontSize: '14px' }}>New This Week</span>
               </label>
             </div>
@@ -3275,7 +3616,10 @@ export default function Opportunities({ onPageChange }) {
                       type="text"
                       placeholder="Search deals..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setSalesPipelineCurrentPage(1);
+                      }}
                       style={{
                         width: '250px',
                         padding: '8px 12px 8px 36px',
@@ -5496,6 +5840,9 @@ export default function Opportunities({ onPageChange }) {
                     setColumnWidths={setColumnWidths}
                     onDealMove={handleKanbanDealMove}
                     onDealClick={handleKanbanDealClick}
+                    stageTotals={stageTotals}
+                    onLoadMoreStage={handleLoadMoreStageDeals}
+                    loadingMoreStages={loadingMoreStages}
                   />
                 )}
               </div>
@@ -6869,48 +7216,97 @@ export default function Opportunities({ onPageChange }) {
               </div>
 
               <div style={{ padding: '20px' }}>
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
-                  <select
-                    value={currentProperty}
-                    onChange={(e) => {
-                      const property = e.target.value;
-                      if (property && !selectedProperties.find(p => p.property === property)) {
-                        const newProperty = {
-                          property,
-                          value: '',
-                          operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
-                        };
+                {isFetchingFilterOptions && (
+                  <div style={{
+                    padding: '20px 16px',
+                    borderRadius: '10px',
+                    background: 'var(--gray-50, #f9fafb)',
+                    border: '1px solid var(--border)',
+                    marginTop: '4px'
+                  }}>
+                    <style>{`@keyframes filterSpin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{
+                        width: '16px', height: '16px', flexShrink: 0,
+                        border: '2px solid #3b82f6',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'filterSpin 0.7s linear infinite'
+                      }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', flex: 1 }}>
+                        Loading filters...
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#3b82f6',
+                        minWidth: '36px',
+                        textAlign: 'right'
+                      }}>
+                        {filterFetchProgress}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '5px',
+                      background: 'var(--border, #e5e7eb)',
+                      borderRadius: '99px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${filterFetchProgress}%`,
+                        background: 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                        borderRadius: '99px',
+                        transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
+                {!isFetchingFilterOptions && (
+                <>
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
+                    <select
+                      value={currentProperty}
+                      onChange={(e) => {
+                        const property = e.target.value;
+                        if (property && !selectedProperties.find(p => p.property === property)) {
+                          const newProperty = {
+                            property,
+                            value: '',
+                            operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                          };
 
-                        if (property === 'created_time' || property === 'modified_time') {
-                          newProperty.dateOperator = 'on';
+                          if (property === 'created_time' || property === 'modified_time') {
+                            newProperty.dateOperator = 'on';
+                          }
+
+                          setSelectedProperties([...selectedProperties, newProperty]);
                         }
+                        setCurrentProperty('');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        fontSize: '13px',
+                        background: 'var(--surface)',
+                        color: 'var(--text)'
+                      }}
+                    >
+                      <option value="">Choose Property</option>
+                      <option value="contact_owner">Contact Owner</option>
+                      <option value="created_time">Created Time</option>
+                      <option value="tag">Tags</option>
+                      <option value="mailing_country">Country</option>
+                      <option value="mailing_state">State</option>
+                      <option value="mailing_city">City</option>
+                      <option value="created_by">Created By</option>
+                      <option value="modified_by">Modified By</option>
+                    </select>
+                  </div>
 
-                        setSelectedProperties([...selectedProperties, newProperty]);
-                      }
-                      setCurrentProperty('');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--r)',
-                      fontSize: '13px',
-                      background: 'var(--surface)',
-                      color: 'var(--text)'
-                    }}
-                  >
-                    <option value="">Choose Property</option>
-                    <option value="contact_owner">Contact Owner</option>
-                    <option value="created_time">Created Time</option>
-                    <option value="tag">Tags</option>
-                    <option value="mailing_country">Country</option>
-                    <option value="mailing_state">State</option>
-                    <option value="mailing_city">City</option>
-                    <option value="created_by">Created By</option>
-                    <option value="modified_by">Modified By</option>
-                  </select>
-                </div>
 
                 {selectedProperties.map((prop, index) => (
                   <div key={index} style={{ marginBottom: '24px', position: 'relative' }}>
@@ -7156,9 +7552,13 @@ export default function Opportunities({ onPageChange }) {
                               }}
                             >
                               <option value="">All Cities</option>
-                              {getUniqueValues(prop.property).map(value => (
-                                <option key={value} value={value}>{value}</option>
-                              ))}
+                              {isFetchingFilterOptions ? (
+                                <option value="" disabled>Loading options, please wait...</option>
+                              ) : (
+                                getUniqueValues(prop.property).map(value => (
+                                  <option key={value} value={value}>{value}</option>
+                                ))
+                              )}
                             </select>
                           </div>
                         </div>
@@ -7209,9 +7609,13 @@ export default function Opportunities({ onPageChange }) {
                               }}
                             >
                               <option value="">All Created By</option>
-                              {getUniqueValues(prop.property).map(value => (
-                                <option key={value} value={value}>{value}</option>
-                              ))}
+                              {isFetchingFilterOptions ? (
+                                <option value="" disabled>Loading options, please wait...</option>
+                              ) : (
+                                getUniqueValues(prop.property).map(value => (
+                                  <option key={value} value={value}>{value}</option>
+                                ))
+                              )}
                             </select>
                           </div>
                         </div>
@@ -7262,9 +7666,13 @@ export default function Opportunities({ onPageChange }) {
                               }}
                             >
                               <option value="">All Modified By</option>
-                              {getUniqueValues(prop.property).map(value => (
-                                <option key={value} value={value}>{value}</option>
-                              ))}
+                              {isFetchingFilterOptions ? (
+                                <option value="" disabled>Loading options, please wait...</option>
+                              ) : (
+                                getUniqueValues(prop.property).map(value => (
+                                  <option key={value} value={value}>{value}</option>
+                                ))
+                              )}
                             </select>
                           </div>
                         </div>
@@ -8224,6 +8632,7 @@ export default function Opportunities({ onPageChange }) {
                     Apply Filters
                   </button>
                 </div>
+                </>)}
               </div>
             </div>
 
