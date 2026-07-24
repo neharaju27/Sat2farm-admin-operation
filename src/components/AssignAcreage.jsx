@@ -188,7 +188,10 @@ export default function AssignAcreage({ user, onPageChange }) {
       const date = new Date(formData.expiryDate);
       const formattedDate = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
 
-      const apiUrl = `${API_URL}?clientID=${clientID}&one_month=${formData.addAcreage}&date_of_expiry=${formattedDate}`;
+      // Get user name for updated_by parameter
+      const updatedBy = user?.name || user?.full_name || user?.username || user?.phone_number || 'operation';
+
+      const apiUrl = `${API_URL}?clientID=${clientID}&one_month=${formData.addAcreage}&date_of_expiry=${formattedDate}&updated_by=${updatedBy}`;
       
       console.log('Assign API URL:', apiUrl);
       
