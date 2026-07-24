@@ -632,6 +632,13 @@ export default function MonthlyAcreages({ user, onPageChange }) {
                   {role.charAt(0).toUpperCase() + role.slice(1)}
                 </button>
               ))}
+              <button
+                key="marketing"
+                onClick={() => onPageChange('marketing-dashboard')}
+                className="role-btn"
+              >
+                Marketing
+              </button>
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => openModal('new-modal')}>+ New</button>
           </div>
