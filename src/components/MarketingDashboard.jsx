@@ -50,6 +50,19 @@ export default function MarketingDashboard({ user, onPageChange }) {
   const [status, setStatus] = useState('all');
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  
+  // Track initial values to detect manual filter changes
+  const [initialMonth, setInitialMonth] = useState('Mar 26');
+  const [initialYear, setInitialYear] = useState('all');
+  const [initialContactOwner, setInitialContactOwner] = useState('all');
+  const [initialLeadSource, setInitialLeadSource] = useState('all');
+  const [initialRegion, setInitialRegion] = useState([]);
+  const [initialStatus, setInitialStatus] = useState('all');
+  const [initialIsLast6Months, setInitialIsLast6Months] = useState(false);
+  const [initialIsCustom, setInitialIsCustom] = useState(false);
+  const [initialFromDate, setInitialFromDate] = useState('');
+  const [initialToDate, setInitialToDate] = useState('');
+  
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
   const getFilteredRegions = () => {
   if (!regionSearchTerm) return uniqueRegions;
@@ -143,8 +156,11 @@ export default function MarketingDashboard({ user, onPageChange }) {
   }, [filterSidebarOpen, contactOwner, leadSource, region, status, selectedMonth, selectedYear, isCustom, isLast6Months, fromDate, toDate, regionOperator]);
 
   const clearFilters = () => {
-    setSelectedMonth('Mar 26');
-    setSelectedYear('all');
+    const clearedMonth = initialMonth;
+    const clearedYear = initialYear;
+    
+    setSelectedMonth(clearedMonth);
+    setSelectedYear(clearedYear);
     setIsCustom(false);
     setIsLast6Months(false);
     setFromDate('');
@@ -159,16 +175,33 @@ export default function MarketingDashboard({ user, onPageChange }) {
     setPendingRegion([]);
     setPendingRegionOperator('contains');
     setPendingStatus('all');
-    setPendingSelectedMonth('Mar 26');
-    setPendingSelectedYear('all');
+    setPendingSelectedMonth(clearedMonth);
+    setPendingSelectedYear(clearedYear);
     setPendingIsCustom(false);
     setPendingIsLast6Months(false);
     setPendingFromDate('');
     setPendingToDate('');
     setRegionSearchTerm('');
+    
+    // Update initial values to match cleared state
+    setInitialMonth(clearedMonth);
+    setInitialYear(clearedYear);
+    setInitialContactOwner('all');
+    setInitialLeadSource('all');
+    setInitialRegion([]);
+    setInitialStatus('all');
+    setInitialIsLast6Months(false);
+    setInitialIsCustom(false);
+    setInitialFromDate('');
+    setInitialToDate('');
+    
     toast.success('Filters cleared');
+    
+    // Trigger data refresh
+    fetchMarketingData();
   };
   const regionFilterRef = useRef(null);
+  
 
 useEffect(() => {
   const handleClickOutside = (event) => {
@@ -222,8 +255,17 @@ useEffect(() => {
   }
 };
 
-  const hasActiveFilters = selectedMonth !== 'Mar 26' || leadSource !== 'all' || region.length > 0 || status !== 'all' || contactOwner !== 'all';
-
+  const hasActiveFilters = 
+    selectedMonth !== initialMonth || 
+    selectedYear !== initialYear ||
+    leadSource !== initialLeadSource || 
+    region.length !== initialRegion.length || 
+    status !== initialStatus || 
+    contactOwner !== initialContactOwner ||
+    isLast6Months !== initialIsLast6Months ||
+    isCustom !== initialIsCustom ||
+    fromDate !== initialFromDate ||
+    toDate !== initialToDate;
   // Fetch month list from dedicated endpoint
   useEffect(() => {
     const fetchMonthList = async () => {
@@ -252,6 +294,7 @@ useEffect(() => {
             const defaultMonth = months.find(m => m.query === response.data.default);
             if (defaultMonth) {
               setSelectedMonth(defaultMonth.label);
+              setInitialMonth(defaultMonth.label); // Set initial value to match API default
             }
           }
           
@@ -661,6 +704,7 @@ useEffect(() => {
       color: colors[index % colors.length]
     }));
   };
+ 
 
 
 
@@ -734,7 +778,7 @@ useEffect(() => {
           <div className="sa-welcome" style={{ marginBottom: '16px' }}>
             <div>
               <h1 className="sa-welcome-title">
-                Welcome back,
+                Welcome!
                 <span className="sa-company-name"> {displayName}</span>
               </h1>
               <p className="sa-welcome-subtitle">
@@ -746,6 +790,94 @@ useEffect(() => {
           {/* Filter Section */}
           <div className="sa-toolbar" style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+              {/* Active Filter Bar - shows when filters are applied */}
+{hasActiveFilters && (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    backgroundColor: '#f0fdf4',
+    border: '1px solid #86efac',
+    borderRadius: '6px',
+    marginTop: '8px'
+  }}>
+    {/* Active filter chips */}
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {contactOwner !== 'all' && (
+        <span style={{
+          padding: '2px 10px',
+          backgroundColor: '#27500a',
+          color: '#fff',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          Owner: {contactOwner}
+        </span>
+      )}
+      {leadSource !== 'all' && (
+        <span style={{
+          padding: '2px 10px',
+          backgroundColor: '#27500a',
+          color: '#fff',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          Source: {leadSource}
+        </span>
+      )}
+      {region.length > 0 && (
+        <span style={{
+          padding: '2px 10px',
+          backgroundColor: '#27500a',
+          color: '#fff',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          Region: {region.join(', ')}
+        </span>
+      )}
+      {status !== 'all' && (
+        <span style={{
+          padding: '2px 10px',
+          backgroundColor: '#27500a',
+          color: '#fff',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          Status: {status}
+        </span>
+      )}
+    </div>
+
+    {/* Clear Filter button - right side like in screenshot */}
+    <button
+      onClick={clearFilters}
+      style={{
+        padding: '4px 12px',
+        backgroundColor: '#ffffff',
+        color: '#374151',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        whiteSpace: 'nowrap',
+        flexShrink: 0
+      }}
+    >
+      <X size={14} />
+      Clear Filter
+    </button>
+  </div>
+)}
               {/* Month Filter */}
 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1194,8 +1326,8 @@ useEffect(() => {
     }}
   >
     <option value="contains">Contains</option>
-    <option value="is">Is</option>
-    <option value="is_not">Is Not</option>
+    {/*<option value="is">Is</option>
+    <option value="is_not">Is Not</option>*/}
   </select>
 
   {/* Search input - opens dropdown on click/focus */}
@@ -1439,11 +1571,11 @@ useEffect(() => {
                   <div className="metric-label">Total Leads</div>
                   <div className="metric-val">{formatNumber(metrics.totalLeads)}</div>
                   <div className="metric-sub">
-                    <span className={`metric-up ${metrics.leadsGrowth >= 0 ? 'metric-up' : 'metric-down'}`}>
+                    {/*<span className={`metric-up ${metrics.leadsGrowth >= 0 ? 'metric-up' : 'metric-down'}`}>
                       {metrics.leadsGrowth >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                       {Math.abs(metrics.leadsGrowth)}%
                     </span>
-                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>
+                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>*/}
                   </div>
                 </div>
 
@@ -1452,11 +1584,11 @@ useEffect(() => {
                   <div className="metric-label">Converted Accounts</div>
                   <div className="metric-val">{formatNumber(metrics.convertedLeads)}</div>
                   <div className="metric-sub">
-                    <span className="metric-up">
+                    {/*<span className="metric-up">
                       <ArrowUpRight size={12} />
                       8.7%
                     </span>
-                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>
+                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>*/}
                   </div>
                 </div>
 
@@ -1477,11 +1609,12 @@ useEffect(() => {
                   <div className="metric-label">Conversion Rate</div>
                   <div className="metric-val">{metrics.conversionRate}%</div>
                   <div className="metric-sub">
-                    <span className="metric-up">
+                    {/*<span className="metric-up">
                       <ArrowUpRight size={12} />
                       2.3%
                     </span>
                     <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>
+                    */}
                   </div>
                 </div>
 
@@ -1490,11 +1623,11 @@ useEffect(() => {
                   <div className="metric-label">Total Revenue</div>
                   <div className="metric-val">{formatCurrency(metrics.totalRevenue)}</div>
                   <div className="metric-sub">
-                    <span className={`metric-up ${metrics.revenueGrowth >= 0 ? 'metric-up' : 'metric-down'}`}>
+                    {/*<span className={`metric-up ${metrics.revenueGrowth >= 0 ? 'metric-up' : 'metric-down'}`}>
                       {metrics.revenueGrowth >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                       {Math.abs(metrics.revenueGrowth)}%
                     </span>
-                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>
+                    <span style={{ marginLeft: '4px', color: '#888780' }}>vs last month</span>*/}
                   </div>
                 </div>
               </div>
