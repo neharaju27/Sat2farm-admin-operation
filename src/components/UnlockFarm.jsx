@@ -1296,21 +1296,22 @@ export default function UnlockFarm({ user, onPageChange }) {
       
       const data = await response.json();
       console.log('Farm details API response:', data);
+      const farmRecord = Array.isArray(data?.data) ? data.data[0] : data?.data;
       
-      if (data.success && data.data) {
+      if (data?.status=='Success' && farmRecord) {
         // Clear any previous error messages
         setFarmDetailsError('');
         
         // Handle null values and format the data
         const farmData = {
-          farmId: data.data.farm_id || farmIdValue.trim(),
-          cropType: data.data.croptype || 'N/A',
-          area: data.data.area ? `${data.data.area} acre` : 'N/A',
-          district: data.data.district || 'N/A',
-          state: data.data.state || 'N/A',
-          country: data.data.country || 'N/A',
-          timeOfRegistration: data.data.time || 'N/A'
-        };
+    farmId: farmRecord.farm_id ?? farmIdValue.trim(),
+    cropType: farmRecord.croptype || 'N/A',
+    area: farmRecord.area ? `${farmRecord.area} acre` : 'N/A',
+    district: farmRecord.district || 'N/A',
+    state: farmRecord.state || 'N/A',
+    country: farmRecord.country || 'N/A',
+    timeOfRegistration: farmRecord.created_time || farmRecord.time || 'N/A'
+  };
         
         setFarmDetails(farmData);
       } else {
