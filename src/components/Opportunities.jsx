@@ -346,6 +346,7 @@ export default function Opportunities({ onPageChange }) {
 
   // ── Table / filter state ──────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -390,7 +391,7 @@ export default function Opportunities({ onPageChange }) {
           setFilterFetchProgress(10);
         }
 
-        // --- Step 1: First batch ---
+        // Fetch first batch of 1000 accounts for filter options (single request)
         const firstRes = await fetch(buildUrl(0));
         if (!firstRes.ok || !active) return;
         const firstData = await firstRes.json();
@@ -406,69 +407,6 @@ export default function Opportunities({ onPageChange }) {
         }
 
         let allFetched = [...firstItems];
-        const totalCount = firstData.total || firstData.count || firstData.total_count || 0;
-
-        if (totalCount > batchLimit) {
-          const offsets = [];
-          for (let o = batchLimit; o < Math.min(totalCount, 30000); o += batchLimit) {
-            offsets.push(o);
-          }
-
-          if (active) setFilterFetchProgress(30);
-
-          const batchResponses = await Promise.all(
-            offsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
-          );
-
-          if (!active) return;
-
-          for (const batchData of batchResponses) {
-            if (batchData) {
-              const items = parseItems(batchData);
-              allFetched = allFetched.concat(items);
-            }
-          }
-        } else if (firstItems.length === batchLimit) {
-          // Fetch subsequent batches in parallel chunks of 5
-          let currentOffset = batchLimit;
-          let keepGoing = true;
-
-          while (keepGoing && currentOffset < 30000 && active) {
-            const chunkOffsets = [
-              currentOffset,
-              currentOffset + batchLimit,
-              currentOffset + batchLimit * 2,
-              currentOffset + batchLimit * 3,
-              currentOffset + batchLimit * 4
-            ];
-
-            if (active) {
-              const approxProgress = Math.min(Math.round((allFetched.length / (allFetched.length + 3000)) * 100), 95);
-              setFilterFetchProgress(approxProgress);
-            }
-
-            const chunkResults = await Promise.all(
-              chunkOffsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
-            );
-
-            if (!active) return;
-
-            for (const batchData of chunkResults) {
-              if (!batchData) {
-                keepGoing = false;
-                break;
-              }
-              const items = parseItems(batchData);
-              allFetched = allFetched.concat(items);
-              if (items.length < batchLimit) {
-                keepGoing = false;
-                break;
-              }
-            }
-
-            currentOffset += batchLimit * 5;
-          }
-        }
 
         if (!active) return;
 
@@ -789,6 +727,8 @@ export default function Opportunities({ onPageChange }) {
   const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(100);
   const [salesPipelineCurrentPage, setSalesPipelineCurrentPage] = useState(1);
 
+  const isSearching = Boolean(searchTerm && searchTerm.trim() !== '');
+
   // Handle deal filter click
   const handleDealFilterClick = async (filter) => {
     setDealFilter(prev => (prev === filter ? 'all' : filter));
@@ -814,10 +754,24 @@ export default function Opportunities({ onPageChange }) {
 
       const filterApiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
       const accountsApiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
 
       try {
+        setLoading(true);
         let response;
-        if (hasActiveFilter && filterApiUrl) {
+
+        // 1. If searching, call dedicated search endpoint: /search?user=...&type=account&query=...
+        if (isSearching && searchApiUrl) {
+          try {
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}`;
+            response = await fetch(searchUrl);
+          } catch (searchErr) {
+            console.warn('Dedicated account search API failed:', searchErr);
+          }
+        }
+
+        // 2. If not searching or search failed, call filter API if filters active
+        if ((!response || !response.ok) && hasActiveFilter && filterApiUrl) {
           const params = new URLSearchParams({
             user: currentUserName,
             offset: fetchOffset.toString(),
@@ -827,16 +781,34 @@ export default function Opportunities({ onPageChange }) {
           if (dealFilter && dealFilter !== 'all') {
             params.append('deal_filter', dealFilter);
           }
-          if (searchTerm && searchTerm.trim()) {
-            params.append('search', searchTerm.trim());
-          }
           if (newThisWeekFilter) {
             const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             params.append('created_time_after', sevenDaysAgoStr);
           }
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
-              if (p.property && p.value) {
+              if (p.property === 'created_time' || p.property === 'createdTime') {
+                if (p.dateOperator === 'between' && p.fromDate && p.toDate) {
+                  params.append('date_type', 'between');
+                  params.append('from', p.fromDate);
+                  params.append('to', p.toDate);
+                } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+                  params.append('date_type', 'on');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+                  params.append('date_type', 'before');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+                  params.append('date_type', 'after');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+                  const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+                  const count = p.count ? parseInt(p.count) : 1;
+                  params.append('date_type', 'in_last');
+                  params.append('last_count', count.toString());
+                  params.append('last_unit', unitMap[p.period] || 'days');
+                }
+              } else if (p.property && p.value) {
                 const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
                 params.append(paramKey, p.value);
               }
@@ -846,6 +818,7 @@ export default function Opportunities({ onPageChange }) {
           response = await fetch(`${filterApiUrl}?${params.toString()}`);
         }
 
+        // 3. Fallback to main accounts API
         if (!response || !response.ok) {
           if (accountsApiUrl) {
             const params = new URLSearchParams({
@@ -853,16 +826,14 @@ export default function Opportunities({ onPageChange }) {
               offset: fetchOffset.toString(),
               limit: fetchLimit.toString()
             });
-            if (searchTerm && searchTerm.trim()) {
-              params.append('search', searchTerm.trim());
-            }
             response = await fetch(`${accountsApiUrl}?${params.toString()}`);
           }
         }
 
+        let data = [];
         if (response && response.ok) {
           const responseData = await response.json();
-          const data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || []);
+          data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || []);
 
           if (responseData && typeof responseData.total === 'number') {
             setTotalOpportunities(responseData.total);
@@ -875,38 +846,58 @@ export default function Opportunities({ onPageChange }) {
           } else if (Array.isArray(responseData)) {
             setTotalOpportunities(responseData.length);
           }
-
-          const transformedOpportunities = data.map(opp => ({
-            id: opp.id,
-            contactName: opp.full_name || 'Unknown',
-            phoneNumber: opp.phone || '',
-            alternateNumber: opp.alternate_number || '',
-            email: opp.email || '',
-            companyName: opp.company_name || '',
-            contactOwner: opp.owner || 'Unassigned',
-            city: opp.city || '',
-            state: opp.state || '',
-            country: opp.country || 'IN',
-            leadStatus: opp.status || 'New',
-            tags: opp.tags || '',
-            leadSource: opp.lead_source || '',
-            description: opp.description || '',
-            createdTime: opp.created_time || new Date().toISOString(),
-            industry: opp.industry || '',
-            createdBy: opp.created_by || 'System',
-            modifiedBy: opp.modified_by || 'System',
-            lastActivity: opp.last_activity || new Date().toISOString(),
-            accountName: opp.account_name || '',
-            accountNumber: opp.account_number || '',
-            dealPresent: opp.deal_present || 0,
-            website: opp.website || '',
-            accountType: opp.account_type || '',
-            modifiedTime: opp.modified_time || ''
-          }));
-          setOpportunities(transformedOpportunities);
         }
+
+        // Fallback: If searching and backend search returned 0 items, fetch full accounts list so client-side 15-field search can match
+        if (isSearching && data.length === 0 && accountsApiUrl) {
+          try {
+            const fallbackParams = new URLSearchParams({
+              user: currentUserName,
+              offset: '0',
+              limit: '1000'
+            });
+            const fallbackRes = await fetch(`${accountsApiUrl}?${fallbackParams.toString()}`);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              data = Array.isArray(fallbackData) ? fallbackData : (fallbackData.data || fallbackData.results || fallbackData.accounts || []);
+            }
+          } catch (fbErr) {
+            console.warn('Fallback search fetch failed:', fbErr);
+          }
+        }
+
+        const transformedOpportunities = data.map(opp => ({
+          id: opp.id,
+          contactName: opp.full_name || opp.contact_name || opp.name || 'Unknown',
+          phoneNumber: opp.phone || opp.phone_number || '',
+          alternateNumber: opp.alternate_number || opp.alternateNumber || opp.mobile || '',
+          email: opp.email || '',
+          companyName: opp.company_name || opp.companyName || opp.company || '',
+          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || 'Unassigned',
+          city: opp.city || opp.mailing_city || '',
+          state: opp.state || opp.mailing_state || '',
+          country: opp.country || opp.mailing_country || 'IN',
+          leadStatus: opp.status || opp.lead_status || opp.leadStatus || 'New',
+          tags: opp.tags || opp.tag || '',
+          leadSource: opp.lead_source || opp.leadSource || opp.source || '',
+          description: opp.description || '',
+          createdTime: opp.created_time || opp.created_at || new Date().toISOString(),
+          industry: opp.industry || '',
+          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || 'System',
+          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || 'System',
+          lastActivity: opp.last_activity || opp.updated_at || new Date().toISOString(),
+          accountName: opp.account_name || opp.accountName || '',
+          accountNumber: opp.account_number || opp.accountNumber || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: opp.modified_time || ''
+        }));
+        setOpportunities(transformedOpportunities);
       } catch (err) {
         console.error('Error fetching opportunities:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -1143,51 +1134,24 @@ export default function Opportunities({ onPageChange }) {
 
   // Compute filtered kanban deals
   const filteredKanbanDeals = useMemo(() => {
-    // If filters are applied via API, return kanbanDeals directly (already filtered by API)
-    if (salesFiltersApplied) {
-      return kanbanDeals;
+    const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
+    const filteredByStage = {};
+
+    stages.forEach(stage => {
+      filteredByStage[stage] = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+    });
+
+    if (isSearching || salesFiltersApplied) {
+      return filteredByStage;
     }
 
-    // Otherwise, apply client-side filtering
-    const filteredByStage = {};
-    const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
-
     for (const stage of stages) {
-      const stageDeals = kanbanDeals[stage] || [];
-      let filtered = applyFilters(stageDeals);
-
-      // Apply search term filtering
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase().trim();
-        filtered = filtered.filter(deal =>
-          (deal.deal_name && deal.deal_name.toLowerCase().includes(searchLower)) ||
-          (deal.account_name && deal.account_name.toLowerCase().includes(searchLower)) ||
-          (deal.deal_owner && deal.deal_owner.toLowerCase().includes(searchLower)) ||
-          (deal.full_name && deal.full_name.toLowerCase().includes(searchLower)) ||
-          (deal.deal_type && deal.deal_type.toLowerCase().includes(searchLower)) ||
-          (deal.description && deal.description.toLowerCase().includes(searchLower)) ||
-          (deal.deal_amount && deal.deal_amount.toString().includes(searchLower))
-        );
-      }
-
-      // Apply New This Week filter
-      if (newThisWeekFilter) {
-        filtered = filtered.filter(deal => {
-          const timeStr = deal.created_time || deal.createdTime;
-          if (!timeStr) return false;
-          const str = String(timeStr).trim().replace(' ', 'T');
-          const createdDate = new Date(str);
-          const now = new Date();
-          const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-          return !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
-        });
-      }
-
-      filteredByStage[stage] = filtered;
+      const stageDeals = filteredByStage[stage];
+      filteredByStage[stage] = applyFilters(stageDeals);
     }
 
     return filteredByStage;
-  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, searchTerm, newThisWeekFilter, kanbanUpdateTimestamp]);
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, kanbanUpdateTimestamp]);
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -1423,18 +1387,32 @@ export default function Opportunities({ onPageChange }) {
         }
       });
 
-      if (urlParams.length > 0) {
-        url += '&' + urlParams.join('&');
+      let response;
+      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+
+      if (searchTerm && searchTerm.trim() && searchApiUrl) {
+        try {
+          const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUser)}&type=deal&query=${encodeURIComponent(searchTerm.trim())}`;
+          response = await fetch(searchUrl);
+        } catch (searchErr) {
+          console.warn('Dedicated deal search API failed:', searchErr);
+        }
       }
 
-      console.log('Filter API URL:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      if (!response || !response.ok) {
+        if (urlParams.length > 0) {
+          url += '&' + urlParams.join('&');
         }
-      });
+
+        console.log('Filter API URL:', url);
+
+        response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+      }
 
       console.log('Filter response status:', response.status);
 
@@ -2772,25 +2750,7 @@ export default function Opportunities({ onPageChange }) {
   };
 
   // ── Filtering ─────────────────────────────────────────────────────────────
-  const filteredOpportunities = opportunities.filter(opp => {
-    const term = (searchTerm || '').toLowerCase().trim();
-    const matchesSearch = !term ||
-      (opp.contactName && opp.contactName.toLowerCase().includes(term)) ||
-      (opp.companyName && opp.companyName.toLowerCase().includes(term)) ||
-      (opp.email && opp.email.toLowerCase().includes(term)) ||
-      (opp.phoneNumber && opp.phoneNumber.toString().includes(term)) ||
-      (opp.alternateNumber && opp.alternateNumber.toString().includes(term)) ||
-      (opp.city && opp.city.toLowerCase().includes(term)) ||
-      (opp.state && opp.state.toLowerCase().includes(term)) ||
-      (opp.country && opp.country.toLowerCase().includes(term)) ||
-      (opp.accountName && opp.accountName.toLowerCase().includes(term)) ||
-      (opp.accountNumber && opp.accountNumber.toString().includes(term)) ||
-      (opp.contactOwner && opp.contactOwner.toLowerCase().includes(term)) ||
-      (opp.leadStatus && opp.leadStatus.toLowerCase().includes(term)) ||
-      (opp.tags && opp.tags.toLowerCase().includes(term)) ||
-      (opp.leadSource && opp.leadSource.toLowerCase().includes(term)) ||
-      (opp.description && opp.description.toLowerCase().includes(term));
-
+  const filteredOpportunities = isSearching ? opportunities : opportunities.filter(opp => {
     let isNewThisWeek = true;
     if (newThisWeekFilter) {
       if (!opp.createdTime) {
@@ -2804,20 +2764,18 @@ export default function Opportunities({ onPageChange }) {
       }
     }
 
-    const matchesStatus = filterStatus === 'all' || opp.leadStatus === filterStatus;
-    return matchesSearch && isNewThisWeek && matchesStatus;
+    return isNewThisWeek;
   });
 
-
-
-  const isSearching = (searchTerm && searchTerm.trim() !== '');
-  const isClientPaginated = isSearching || newThisWeekFilter || isFilterApplied;
+  const isClientPaginated = isSearching || newThisWeekFilter;
 
   const totalCount = (dealFilter !== 'all' && apiDealTotals[dealFilter] !== undefined)
     ? apiDealTotals[dealFilter]
     : (totalOpportunities || filteredOpportunities.length);
 
-  const effectiveTotalCount = isClientPaginated ? filteredOpportunities.length : totalCount;
+  const effectiveTotalCount = isSearching
+    ? filteredOpportunities.length
+    : (isClientPaginated ? filteredOpportunities.length : totalCount);
 
   const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
   const startRecord = filteredOpportunities.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
@@ -2868,19 +2826,54 @@ export default function Opportunities({ onPageChange }) {
                 >
                   <Filter size={16} />
                 </button>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
                   <input
                     type="text"
-                    placeholder="Search opportunities by name, company, or email..."
-                    value={searchTerm}
+                    placeholder="Search opportunities..."
+                    value={searchInput}
                     onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
+                      setSearchInput(e.target.value);
+                      // If user clears the input, also clear the actual search
+                      if (!e.target.value.trim()) {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }
                     }}
-                    style={{ width: '300px', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchTerm(searchInput.trim());
+                        setCurrentPage(1);
+                      }
+                    }}
+                    style={{ width: '220px', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', height: '36px', boxSizing: 'border-box' }}
                   />
                 </div>
+                <button
+                  onClick={() => {
+                    setSearchTerm(searchInput.trim());
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: '0 14px',
+                    height: '36px',
+                    background: '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                  title="Search"
+                >
+                  <Search size={14} /> Search
+                </button>
               </div>
 
               <button
@@ -3097,8 +3090,43 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
+          {/* Search Results Banner */}
+          {isSearching && !loading && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 'var(--r)',
+              padding: '10px 16px',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Search size={15} style={{ color: '#16a34a' }} />
+                <span style={{ color: '#15803d', fontSize: '14px', fontWeight: '500' }}>
+                  Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+                </span>
+                <span style={{ color: '#4ade80', fontSize: '13px' }}>
+                  — {effectiveTotalCount.toLocaleString()} {effectiveTotalCount === 1 ? 'record' : 'records'} found
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSearchInput('');
+                  setCurrentPage(1);
+                }}
+                style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          )}
+
           {/* Filtered Results Display */}
-          {isFilterApplied && (
+          {isFilterApplied && !isSearching && (
             <div style={{
               background: 'var(--blue-50)',
               border: '1px solid var(--blue-200)',
@@ -3291,112 +3319,112 @@ export default function Opportunities({ onPageChange }) {
                           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 6, minWidth: '150px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
                               <input type="checkbox" checked={selectedRows.includes(opp.id)} onChange={(e) => { if (e.target.checked) setSelectedRows([...selectedRows, opp.id]); else setSelectedRows(selectedRows.filter(id => id !== opp.id)); }} style={{ cursor: 'pointer' }} />
-                              <button onClick={() => { setSelectedUser(opp); setShowUserModal(true); fetchTimeline(opp.id); fetchActivities(opp.id); fetchDeals(opp.id); }} style={{ background: 'none', border: 'none', color: 'var(--blue-600)', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, textAlign: 'left' }}>
+                              <button onClick={() => { setSelectedUser(opp); setShowUserModal(true); fetchTimeline(opp.id); fetchActivities(opp.id); fetchDeals(opp.id); }} style={{ background: 'none', border: 'none', color: 'var(--blue-600)', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.contactName}>
                                 {opp.contactName}
                               </button>
-                              <button onClick={() => openEditDialog(opp.id, 'contactName', opp.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto' }} title="Edit contact name">
+                              <button onClick={() => openEditDialog(opp.id, 'contactName', opp.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }} title="Edit contact name">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.phoneNumber}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'phoneNumber', opp.phoneNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit phone number">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.phoneNumber}>{opp.phoneNumber}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'phoneNumber', opp.phoneNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit phone number">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.alternateNumber}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'alternateNumber', opp.alternateNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit alternate number">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.alternateNumber}>{opp.alternateNumber}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'alternateNumber', opp.alternateNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit alternate number">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '180px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.email}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'email', opp.email)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit email">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.email}>{opp.email}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'email', opp.email)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit email">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '150px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.companyName}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'companyName', opp.companyName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit company name">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.companyName}>{opp.companyName}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'companyName', opp.companyName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit company name">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '150px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.accountName}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'accountName', opp.accountName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit account name">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountName}>{opp.accountName}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'accountName', opp.accountName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit account name">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>{opp.accountNumber}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountNumber}>{opp.accountNumber}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>
                             <span style={{ color: opp.dealPresent ? '#10b981' : '#ef4444', fontSize: '13px', fontWeight: '500' }}>
                               {opp.dealPresent ? opp.dealPresent : 0}
                             </span>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.accountType || '-'}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'accountType', opp.accountType)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit account type">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountType || '-'}>{opp.accountType || '-'}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'accountType', opp.accountType)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit account type">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '130px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.contactOwner}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'contactOwner', opp.contactOwner)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit contact owner">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.contactOwner}>{opp.contactOwner}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'contactOwner', opp.contactOwner)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit contact owner">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.city}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'city', opp.city)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit city">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.city}>{opp.city}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'city', opp.city)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit city">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.state}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'state', opp.state)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit state">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.state}>{opp.state}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'state', opp.state)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit state">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.country}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'country', opp.country)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit country">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.country}>{opp.country}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'country', opp.country)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit country">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '100px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{opp.tags}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'tags', opp.tags)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit tags">
+                              <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.tags}>{opp.tags}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'tags', opp.tags)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit tags">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', minWidth: '200px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', width: '200px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.description}>{opp.description}</div>
                               <button onClick={() => openEditDialog(opp.id, 'description', opp.description)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit description">
@@ -3404,23 +3432,23 @@ export default function Opportunities({ onPageChange }) {
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{new Date(opp.createdTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span>{opp.industry}</span>
-                              <button onClick={() => openEditDialog(opp.id, 'industry', opp.industry)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit industry">
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.industry}>{opp.industry}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'industry', opp.industry)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit industry">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>
                             </div>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>{opp.createdBy}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>{opp.modifiedBy}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', minWidth: '120px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.createdBy}>{opp.createdBy}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.modifiedBy}>{opp.modifiedBy}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{new Date(opp.lastActivity).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', minWidth: '120px' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{opp.modifiedTime ? new Date(opp.modifiedTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
                           </td>
                         </tr>
@@ -5780,7 +5808,8 @@ export default function Opportunities({ onPageChange }) {
                             .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
                             .map((deal) => (
                               <tr key={deal.deal_id} style={{ borderBottom: '1px solid #e0e0e0', '&:hover': { background: '#f8f9fa' } }}>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease' }}
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={deal.deal_name}
                                   onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
                                   onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
                                   onClick={(e) => {

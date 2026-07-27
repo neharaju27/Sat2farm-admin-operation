@@ -165,6 +165,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [isFilterApplied, setIsFilterApplied] = useState(false);
   const [currentFilterCriteria, setCurrentFilterCriteria] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -233,7 +234,20 @@ export default function LeadPipeline({ onPageChange }) {
           (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0);
 
         let response;
-        if (hasActiveFilter && import.meta.env.VITE_FILTER_LEADS_API_URL) {
+        const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+
+        // 1. If searching, call dedicated search endpoint: /search?user=...&type=lead&query=...
+        if (isSearching && searchApiUrl) {
+          try {
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&query=${encodeURIComponent(searchTerm.trim())}`;
+            response = await fetch(searchUrl);
+          } catch (searchErr) {
+            console.warn('Dedicated search API failed, falling back to filter/leads API:', searchErr);
+          }
+        }
+
+        // 2. If not searching or dedicated search failed, call filter API if filters active
+        if ((!response || !response.ok) && hasActiveFilter && import.meta.env.VITE_FILTER_LEADS_API_URL) {
           try {
             const params = new URLSearchParams({
               user: currentUserName,
@@ -243,9 +257,6 @@ export default function LeadPipeline({ onPageChange }) {
 
             if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
               params.append('status_is', filterStatus);
-            }
-            if (typeof searchTerm !== 'undefined' && searchTerm.trim()) {
-              params.append('search', searchTerm.trim());
             }
             if (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter) {
               const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
@@ -259,7 +270,28 @@ export default function LeadPipeline({ onPageChange }) {
             }
             if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
-                if (p.property && p.value) {
+                if (p.property === 'created_time' || p.property === 'createdTime') {
+                  if (p.dateOperator === 'between' && p.fromDate && p.toDate) {
+                    params.append('date_type', 'between');
+                    params.append('from', p.fromDate);
+                    params.append('to', p.toDate);
+                  } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+                    params.append('date_type', 'on');
+                    params.append('date', p.value || p.date);
+                  } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+                    params.append('date_type', 'before');
+                    params.append('date', p.value || p.date);
+                  } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+                    params.append('date_type', 'after');
+                    params.append('date', p.value || p.date);
+                  } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+                    const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+                    const count = p.count ? parseInt(p.count) : 1;
+                    params.append('date_type', 'in_last');
+                    params.append('last_count', count.toString());
+                    params.append('last_unit', unitMap[p.period] || 'days');
+                  }
+                } else if (p.property && p.value) {
                   const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
                   params.append(paramKey, p.value);
                 }
@@ -272,7 +304,7 @@ export default function LeadPipeline({ onPageChange }) {
           }
         }
 
-        // If no active filter or if filter API request failed/returned non-ok status, call main leads URL
+        // 3. Fallback to main leads URL
         if (!response || !response.ok) {
           url = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${fetchOffset}&limit=${fetchLimit}`;
           response = await fetch(url);
@@ -317,6 +349,26 @@ export default function LeadPipeline({ onPageChange }) {
         } else if (Array.isArray(data)) {
           totalCount = data.length;
           setTotalLeads(totalCount);
+        }
+
+        // Fallback: If searching and backend search returned 0 items, fetch full leads list so client-side 13-field search can match
+        if (isSearching && (!Array.isArray(leadsArray) || leadsArray.length === 0)) {
+          try {
+            const fallbackUrl = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=0&limit=1000`;
+            const fallbackResponse = await fetch(fallbackUrl);
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              let fbArray = fallbackData;
+              if (fallbackData && typeof fallbackData === 'object' && !Array.isArray(fallbackData)) {
+                fbArray = fallbackData.data || fallbackData.results || fallbackData.leads || fallbackData.items || fallbackData.records || fallbackData.rows || [];
+              }
+              if (Array.isArray(fbArray) && fbArray.length > 0) {
+                leadsArray = fbArray;
+              }
+            }
+          } catch (fbErr) {
+            console.warn('Fallback leads fetch failed:', fbErr);
+          }
         }
 
         // Validate that data is an array before mapping
@@ -393,7 +445,7 @@ export default function LeadPipeline({ onPageChange }) {
           setFilterFetchProgress(10);
         }
 
-        // --- Step 1: First batch ---
+        // Fetch first batch of 1000 leads for filter options (single request)
         const firstRes = await fetch(buildUrl(0));
         if (!firstRes.ok || !active) return;
         const firstData = await firstRes.json();
@@ -409,69 +461,6 @@ export default function LeadPipeline({ onPageChange }) {
         }
 
         let allFetched = [...firstItems];
-        const totalCount = firstData.total || firstData.count || firstData.total_count || 0;
-
-        if (totalCount > batchLimit) {
-          const offsets = [];
-          for (let o = batchLimit; o < Math.min(totalCount, 30000); o += batchLimit) {
-            offsets.push(o);
-          }
-
-          if (active) setFilterFetchProgress(30);
-
-          const batchResponses = await Promise.all(
-            offsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
-          );
-
-          if (!active) return;
-
-          for (const batchData of batchResponses) {
-            if (batchData) {
-              const items = parseItems(batchData);
-              allFetched = allFetched.concat(items);
-            }
-          }
-        } else if (firstItems.length === batchLimit) {
-          // Fetch subsequent batches in parallel chunks of 5
-          let currentOffset = batchLimit;
-          let keepGoing = true;
-
-          while (keepGoing && currentOffset < 30000 && active) {
-            const chunkOffsets = [
-              currentOffset,
-              currentOffset + batchLimit,
-              currentOffset + batchLimit * 2,
-              currentOffset + batchLimit * 3,
-              currentOffset + batchLimit * 4
-            ];
-
-            if (active) {
-              const approxProgress = Math.min(Math.round((allFetched.length / (allFetched.length + 3000)) * 100), 95);
-              setFilterFetchProgress(approxProgress);
-            }
-
-            const chunkResults = await Promise.all(
-              chunkOffsets.map(o => fetch(buildUrl(o)).then(r => (r.ok ? r.json() : null)).catch(() => null))
-            );
-
-            if (!active) return;
-
-            for (const batchData of chunkResults) {
-              if (!batchData) {
-                keepGoing = false;
-                break;
-              }
-              const items = parseItems(batchData);
-              allFetched = allFetched.concat(items);
-              if (items.length < batchLimit) {
-                keepGoing = false;
-                break;
-              }
-            }
-
-            currentOffset += batchLimit * 5;
-          }
-        }
 
         if (!active) return;
 
@@ -908,23 +897,9 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
-  const filteredLeads = leads.filter(lead => {
-    const term = (searchTerm || '').toLowerCase().trim();
-    const matchesSearch = !term ||
-      (lead.contactName && lead.contactName.toLowerCase().includes(term)) ||
-      (lead.companyName && lead.companyName.toLowerCase().includes(term)) ||
-      (lead.email && lead.email.toLowerCase().includes(term)) ||
-      (lead.phoneNumber && lead.phoneNumber.toString().includes(term)) ||
-      (lead.alternateNumber && lead.alternateNumber.toString().includes(term)) ||
-      (lead.city && lead.city.toLowerCase().includes(term)) ||
-      (lead.state && lead.state.toLowerCase().includes(term)) ||
-      (lead.country && lead.country.toLowerCase().includes(term)) ||
-      (lead.contactOwner && lead.contactOwner.toLowerCase().includes(term)) ||
-      (lead.leadStatus && lead.leadStatus.toLowerCase().includes(term)) ||
-      (lead.tags && lead.tags.toLowerCase().includes(term)) ||
-      (lead.leadSource && lead.leadSource.toLowerCase().includes(term)) ||
-      (lead.description && lead.description.toLowerCase().includes(term));
+  const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
 
+  const filteredLeads = isSearching ? leads : leads.filter(lead => {
     // New This Week filter
     let isNewThisWeek = true;
     if (newThisWeekFilter) {
@@ -940,18 +915,15 @@ export default function LeadPipeline({ onPageChange }) {
     }
 
     const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
-
-    return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
+    return (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
   });
-
-  const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
-  const isClientPaginated = isSearching || newThisWeekFilter || isFilterApplied;
+  const isClientPaginated = isSearching || newThisWeekFilter;
   const displayedLeads = isClientPaginated
     ? filteredLeads.slice(offset, offset + limit)
     : filteredLeads;
-  const effectiveTotalLeads = isClientPaginated
+  const effectiveTotalLeads = isSearching
     ? filteredLeads.length
-    : (totalLeads || leads.length);
+    : (isClientPaginated ? filteredLeads.length : (totalLeads || leads.length));
 
   const statusSummary = getStatusSummary();
 
@@ -2078,19 +2050,25 @@ export default function LeadPipeline({ onPageChange }) {
           const operator = filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `description_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && (filter.value || filter.date)) {
           urlParams.push(`date_type=on`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
+          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && (filter.value || filter.date)) {
           urlParams.push(`date_type=before`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && filter.value) {
+          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && (filter.value || filter.date)) {
           urlParams.push(`date_type=after`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
         } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
           urlParams.push(`date_type=between`);
           urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
           urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+        } else if (filter.property === 'created_time' && (filter.dateOperator === 'in_the_last' || filter.dateOperator === 'in_last')) {
+          const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+          const count = filter.count ? parseInt(filter.count) : 1;
+          urlParams.push(`date_type=in_last`);
+          urlParams.push(`last_count=${count}`);
+          urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
         }
       });
 
@@ -2544,33 +2522,71 @@ export default function LeadPipeline({ onPageChange }) {
             >
               <Filter size={16} />
             </button>
-            <div style={{ position: 'relative', flex: 1 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
               <Search size={16} style={{
                 position: 'absolute',
                 left: '12px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#64748b'
+                color: '#64748b',
+                pointerEvents: 'none'
               }} />
               <input
                 type="text"
-                placeholder="Search leads by name, company, or email..."
-                value={searchTerm}
+                placeholder="Search leads..."
+                value={searchInput}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setOffset(0);
+                  setSearchInput(e.target.value);
+                  // If user clears the input, also clear the actual search
+                  if (!e.target.value.trim()) {
+                    setSearchTerm('');
+                    setOffset(0);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchTerm(searchInput.trim());
+                    setOffset(0);
+                  }
                 }}
                 style={{
-                  width: '300px',
+                  width: '220px',
+                  height: '36px',
                   padding: '8px 12px 8px 36px',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--r)',
                   fontSize: '14px',
                   background: 'var(--surface)',
-                  color: 'var(--text)'
+                  color: 'var(--text)',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
+            <button
+              onClick={() => {
+                setSearchTerm(searchInput.trim());
+                setOffset(0);
+              }}
+              style={{
+                padding: '0 14px',
+                height: '36px',
+                background: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+              title="Search"
+            >
+              <Search size={14} /> Search
+            </button>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -2795,8 +2811,43 @@ export default function LeadPipeline({ onPageChange }) {
           </div>
         )}
 
+        {/* Search Results Banner */}
+        {isSearching && !loading && (
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: 'var(--r)',
+            padding: '10px 16px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Search size={15} style={{ color: '#16a34a' }} />
+              <span style={{ color: '#15803d', fontSize: '14px', fontWeight: '500' }}>
+                Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+              </span>
+              <span style={{ color: '#4ade80', fontSize: '13px' }}>
+                — {effectiveTotalLeads.toLocaleString()} {effectiveTotalLeads === 1 ? 'record' : 'records'} found
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSearchInput('');
+                setOffset(0);
+              }}
+              style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
+            >
+              ✕ Clear
+            </button>
+          </div>
+        )}
+
         {/* Filter Status Indicator */}
-        {isFilterApplied && (
+        {isFilterApplied && !isSearching && (
           <div style={{
             background: 'var(--blue-50)',
             border: '1px solid var(--blue-200)',
@@ -2813,7 +2864,7 @@ export default function LeadPipeline({ onPageChange }) {
                 Filtered Results: {currentFilterCriteria}
               </span>
               <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
-                ({leads.length} records found)
+                ({(totalLeads || leads.length).toLocaleString()} records found)
               </span>
             </div>
             <button
@@ -3288,8 +3339,8 @@ export default function LeadPipeline({ onPageChange }) {
                     padding: 0,
                     background: 'none',
                     border: 'none',
-                    color: offset + limit >= totalLeads || leads.length === 0 ? '#d1d5db' : '#6b7280',
-                    cursor: offset + limit >= totalLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                    color: offset + limit >= effectiveTotalLeads || leads.length === 0 ? '#d1d5db' : '#6b7280',
+                    cursor: offset + limit >= effectiveTotalLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
                   }}
                 >
                   <ChevronRight size={18} />
@@ -3318,9 +3369,13 @@ export default function LeadPipeline({ onPageChange }) {
               lineHeight: 1.4
             }}>
               <span style={{ color: '#4b5563', whiteSpace: 'nowrap' }}>
-                Total Leads{' '}
-                <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                <strong style={{ color: '#111827', fontWeight: 600 }}>{totalLeads || leads.length}</strong>
+                {isSearching ? '' : (
+                  <>
+                    Total Leads{' '}
+                    <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{effectiveTotalLeads}</strong>
+                  </>
+                )}
               </span>
 
               {statusSummary.map(({ status, count, label }) => {
