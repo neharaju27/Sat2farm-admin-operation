@@ -3,7 +3,49 @@ import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
-import '../styles/Sat2FarmAdminPortal.css';
+// Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
+const parseDateRobust = (dateStr) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+  const str = String(dateStr).trim();
+  if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
+
+  // 1. Try DD-MM-YYYY HH:mm:ss or DD-MM-YYYY HH:mm or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dmyMatch) {
+    const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 2. Try YYYY-MM-DD HH:mm:ss or YYYY-MM-DD HH:mm
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (ymdMatch) {
+    const [, year, month, day, hours = '0', minutes = '0', seconds = '0'] = ymdMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 3. Try standard JS Date parsing
+  let d = new Date(str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str);
+  if (!isNaN(d.getTime())) return d;
+
+  d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
+};
+
+const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', year: 'numeric' }, formatType = 'date') => {
+  if (!dateStr) return '-';
+  const d = parseDateRobust(dateStr);
+  if (!d) return (dateStr === 'Invalid Date' ? '-' : dateStr) || '-';
+  try {
+    return formatType === 'datetime' ? d.toLocaleString('en-IN', options) : d.toLocaleDateString('en-IN', options);
+  } catch (err) {
+    return dateStr || '-';
+  }
+};
 
 export default function Opportunities({ onPageChange }) {
   const { user } = useAuth();
@@ -2756,11 +2798,10 @@ export default function Opportunities({ onPageChange }) {
       if (!opp.createdTime) {
         isNewThisWeek = false;
       } else {
-        const str = String(opp.createdTime).trim().replace(' ', 'T');
-        const createdDate = new Date(str);
+        const createdDate = parseDateRobust(opp.createdTime);
         const now = new Date();
         const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        isNewThisWeek = !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
+        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
       }
     }
 
@@ -3433,7 +3474,7 @@ export default function Opportunities({ onPageChange }) {
                             </div>
                           </td>
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{new Date(opp.createdTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.createdTime)}</span>
                           </td>
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -3446,10 +3487,10 @@ export default function Opportunities({ onPageChange }) {
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.createdBy}>{opp.createdBy}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.modifiedBy}>{opp.modifiedBy}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{new Date(opp.lastActivity).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.lastActivity)}</span>
                           </td>
                           <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{opp.modifiedTime ? new Date(opp.modifiedTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.modifiedTime)}</span>
                           </td>
                         </tr>
                       ))
@@ -6563,23 +6604,23 @@ export default function Opportunities({ onPageChange }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
-                          <div style={{ color: 'var(--text)' }}>{new Date(selectedUser.createdTime).toLocaleString('en-IN')}</div>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.createdTime, undefined, 'datetime')}</div>
                         </div>
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
-                          <div style={{ color: 'var(--text)' }}>{new Date(selectedUser.lastActivity).toLocaleString('en-IN')}</div>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.lastActivity, undefined, 'datetime')}</div>
                         </div>
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
-                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser.createdBy}</div>
+                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser?.createdBy}</div>
                         </div>
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified By</label>
-                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser.modifiedBy}</div>
+                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser?.modifiedBy}</div>
                         </div>
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
-                          <div style={{ color: 'var(--text)' }}>{new Date(selectedUser.modifiedTime).toLocaleString('en-IN')}</div>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.modifiedTime, undefined, 'datetime')}</div>
                         </div>
                       </div>
                     </div>

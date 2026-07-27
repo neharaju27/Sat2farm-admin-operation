@@ -2,7 +2,49 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
-import '../styles/Sat2FarmAdminPortal.css';
+// Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
+const parseDateRobust = (dateStr) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+  const str = String(dateStr).trim();
+  if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
+
+  // 1. Try DD-MM-YYYY HH:mm:ss or DD-MM-YYYY HH:mm or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dmyMatch) {
+    const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 2. Try YYYY-MM-DD HH:mm:ss or YYYY-MM-DD HH:mm
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (ymdMatch) {
+    const [, year, month, day, hours = '0', minutes = '0', seconds = '0'] = ymdMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 3. Try standard JS Date parsing
+  let d = new Date(str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str);
+  if (!isNaN(d.getTime())) return d;
+
+  d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
+};
+
+const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', year: 'numeric' }, formatType = 'date') => {
+  if (!dateStr) return '-';
+  const d = parseDateRobust(dateStr);
+  if (!d) return (dateStr === 'Invalid Date' ? '-' : dateStr) || '-';
+  try {
+    return formatType === 'datetime' ? d.toLocaleString('en-IN', options) : d.toLocaleDateString('en-IN', options);
+  } catch (err) {
+    return dateStr || '-';
+  }
+};
 
 export default function LeadPipeline({ onPageChange }) {
   const { user } = useAuth();
@@ -906,11 +948,10 @@ export default function LeadPipeline({ onPageChange }) {
       if (!lead.createdTime) {
         isNewThisWeek = false;
       } else {
-        const str = String(lead.createdTime).trim().replace(' ', 'T');
-        const createdDate = new Date(str);
+        const createdDate = parseDateRobust(lead.createdTime);
         const now = new Date();
         const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        isNewThisWeek = !isNaN(createdDate.getTime()) && createdDate >= sevenDaysAgo;
+        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
       }
     }
 
@@ -941,11 +982,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return formatDateSafe(dateString);
   };
 
   const handleStatusUpdate = async (leadId, newStatus) => {
@@ -3175,11 +3212,7 @@ export default function LeadPipeline({ onPageChange }) {
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {new Date(lead.createdTime).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
+                          {formatDateSafe(lead.createdTime)}
                         </span>
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -3198,20 +3231,12 @@ export default function LeadPipeline({ onPageChange }) {
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
+                          {formatDateSafe(lead.lastActivity)}
                         </span>
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {new Date(lead.lastActivity).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
+                          {formatDateSafe(lead.modifiedTime || lead.lastActivity)}
                         </span>
                       </td>
                     </tr>
