@@ -191,7 +191,22 @@ export default function AssignAcreage({ user, onPageChange }) {
       // Get user name for updated_by parameter
       const updatedBy = user?.name || user?.full_name || user?.username || user?.phone_number || 'operation';
 
-      const apiUrl = `${API_URL}?clientID=${clientID}&one_month=${formData.addAcreage}&date_of_expiry=${formattedDate}&updated_by=${updatedBy}`;
+      // Determine the API parameter based on selected plan
+      let acreageParam = '';
+      const trimmedPlan = formData.plan.trim();
+      console.log('Selected plan:', formData.plan, 'Trimmed:', trimmedPlan);
+      
+      if (trimmedPlan === '1 month') {
+        acreageParam = `one_month=${formData.addAcreage}`;
+      } else if (trimmedPlan === '6 month') {
+        acreageParam = `six_month=${formData.addAcreage}`;
+      } else if (trimmedPlan === '12 month') {
+        acreageParam = `twelve_month=${formData.addAcreage}`;
+      } else {
+        acreageParam = `one_month=${formData.addAcreage}`; // fallback
+      }
+
+      const apiUrl = `${API_URL}?clientID=${clientID}&${acreageParam}&date_of_expiry=${formattedDate}&updated_by=${updatedBy}`;
       
       console.log('Assign API URL:', apiUrl);
       
