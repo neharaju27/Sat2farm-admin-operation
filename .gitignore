@@ -25,3 +25,7 @@ dist-ssr
 
 RSA_Key
 RSA_Key.pub
+
+# Agents & AI config (Local only)
+.agents/
+AGENTS.md
