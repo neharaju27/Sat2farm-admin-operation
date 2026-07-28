@@ -992,24 +992,6 @@ export default function Opportunities({ onPageChange }) {
           }
         }
 
-        // Fallback: If searching and backend search returned 0 items, fetch full accounts list so client-side 15-field search can match
-        if (isSearching && data.length === 0 && accountsApiUrl) {
-          try {
-            const fallbackParams = new URLSearchParams({
-              user: currentUserName,
-              offset: '0',
-              limit: '1000'
-            });
-            const fallbackRes = await fetch(`${accountsApiUrl}?${fallbackParams.toString()}`);
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              data = Array.isArray(fallbackData) ? fallbackData : (fallbackData.data || fallbackData.results || fallbackData.accounts || []);
-            }
-          } catch (fbErr) {
-            console.warn('Fallback search fetch failed:', fbErr);
-          }
-        }
-
         const transformedOpportunities = data.map(opp => ({
           id: opp.id,
           contactName: opp.full_name || opp.contact_name || opp.name || 'Unknown',
@@ -2889,7 +2871,26 @@ export default function Opportunities({ onPageChange }) {
   };
 
   // ── Filtering ─────────────────────────────────────────────────────────────
-  const filteredOpportunities = isSearching ? opportunities : opportunities.filter(opp => {
+  const filteredOpportunities = opportunities.filter(opp => {
+    let matchesSearch = true;
+    if (isSearching) {
+      const q = searchTerm.trim().toLowerCase();
+      const nameMatch = (opp.contactName || '').toLowerCase().includes(q);
+      const phoneMatch = (opp.phoneNumber || '').includes(q) || (opp.alternateNumber || '').includes(q);
+      const emailMatch = (opp.email || '').toLowerCase().includes(q);
+      const companyMatch = (opp.companyName || '').toLowerCase().includes(q);
+      const accountNameMatch = (opp.accountName || '').toLowerCase().includes(q);
+      const accountNumberMatch = (opp.accountNumber || '').toLowerCase().includes(q);
+      const ownerMatch = (opp.contactOwner || '').toLowerCase().includes(q);
+      const cityMatch = (opp.city || '').toLowerCase().includes(q);
+      const stateMatch = (opp.state || '').toLowerCase().includes(q);
+      const countryMatch = (opp.country || '').toLowerCase().includes(q);
+      const tagsMatch = (opp.tags || '').toLowerCase().includes(q);
+      const descMatch = (opp.description || '').toLowerCase().includes(q);
+
+      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || tagsMatch || descMatch;
+    }
+
     let isNewThisWeek = true;
     if (newThisWeekFilter) {
       if (!opp.createdTime) {
@@ -2902,7 +2903,7 @@ export default function Opportunities({ onPageChange }) {
       }
     }
 
-    return isNewThisWeek;
+    return matchesSearch && isNewThisWeek;
   });
 
   const isClientPaginated = isSearching || newThisWeekFilter;
@@ -2912,7 +2913,7 @@ export default function Opportunities({ onPageChange }) {
     : (totalOpportunities || filteredOpportunities.length);
 
   const effectiveTotalCount = isSearching
-    ? filteredOpportunities.length
+    ? (totalOpportunities === 0 ? 0 : (totalOpportunities || filteredOpportunities.length))
     : (isClientPaginated ? filteredOpportunities.length : totalCount);
 
   const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);

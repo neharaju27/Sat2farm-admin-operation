@@ -111,6 +111,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isConverting, setIsConverting] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [customStatus, setCustomStatus] = useState('');
   const [showCustomStatusInput, setShowCustomStatusInput] = useState(false);
@@ -494,26 +495,6 @@ export default function LeadPipeline({ onPageChange }) {
         } else if (Array.isArray(data)) {
           totalCount = data.length;
           setTotalLeads(totalCount);
-        }
-
-        // Fallback: If searching and backend search returned 0 items, fetch full leads list so client-side 13-field search can match
-        if (isSearching && (!Array.isArray(leadsArray) || leadsArray.length === 0)) {
-          try {
-            const fallbackUrl = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=0&limit=1000`;
-            const fallbackResponse = await fetch(fallbackUrl);
-            if (fallbackResponse.ok) {
-              const fallbackData = await fallbackResponse.json();
-              let fbArray = fallbackData;
-              if (fallbackData && typeof fallbackData === 'object' && !Array.isArray(fallbackData)) {
-                fbArray = fallbackData.data || fallbackData.results || fallbackData.leads || fallbackData.items || fallbackData.records || fallbackData.rows || [];
-              }
-              if (Array.isArray(fbArray) && fbArray.length > 0) {
-                leadsArray = fbArray;
-              }
-            }
-          } catch (fbErr) {
-            console.warn('Fallback leads fetch failed:', fbErr);
-          }
         }
 
         // Validate that data is an array before mapping
@@ -1044,8 +1025,28 @@ export default function LeadPipeline({ onPageChange }) {
 
   const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
 
-  const filteredLeads = isSearching ? leads : leads.filter(lead => {
-    // New This Week filter
+  const filteredLeads = leads.filter(lead => {
+    // 1. Search term matching across fields if client-side filtering needed
+    let matchesSearch = true;
+    if (isSearching) {
+      const q = searchTerm.trim().toLowerCase();
+      const nameMatch = (lead.contactName || '').toLowerCase().includes(q);
+      const phoneMatch = (lead.phoneNumber || '').includes(q) || (lead.alternateNumber || '').includes(q);
+      const emailMatch = (lead.email || '').toLowerCase().includes(q);
+      const companyMatch = (lead.companyName || '').toLowerCase().includes(q);
+      const ownerMatch = (lead.contactOwner || '').toLowerCase().includes(q);
+      const cityMatch = (lead.city || '').toLowerCase().includes(q);
+      const stateMatch = (lead.state || '').toLowerCase().includes(q);
+      const countryMatch = (lead.country || '').toLowerCase().includes(q);
+      const statusMatch = (lead.leadStatus || '').toLowerCase().includes(q);
+      const tagsMatch = (lead.tags || '').toLowerCase().includes(q);
+      const sourceMatch = (lead.leadSource || '').toLowerCase().includes(q);
+      const descMatch = (lead.description || '').toLowerCase().includes(q);
+
+      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || ownerMatch || cityMatch || stateMatch || countryMatch || statusMatch || tagsMatch || sourceMatch || descMatch;
+    }
+
+    // 2. New This Week filter
     let isNewThisWeek = true;
     if (newThisWeekFilter) {
       if (!lead.createdTime) {
@@ -1059,14 +1060,14 @@ export default function LeadPipeline({ onPageChange }) {
     }
 
     const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
-    return (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
+    return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
   });
   const isClientPaginated = isSearching || newThisWeekFilter;
   const displayedLeads = isClientPaginated
     ? filteredLeads.slice(offset, offset + limit)
     : filteredLeads;
   const effectiveTotalLeads = isSearching
-    ? filteredLeads.length
+    ? (totalLeads === 0 ? 0 : (totalLeads || filteredLeads.length))
     : (isClientPaginated ? filteredLeads.length : (totalLeads || leads.length));
 
   const statusSummary = getStatusSummary();
@@ -8155,6 +8156,7 @@ export default function LeadPipeline({ onPageChange }) {
                 </button>
                 <button
                   onClick={async () => {
+                    if (isConverting) return;
                     if (!convertAccountName) {
                       toast.error('Please enter account name');
                       return;
@@ -8165,10 +8167,23 @@ export default function LeadPipeline({ onPageChange }) {
                       toast.error('No lead selected');
                       return;
                     }
+
+                    setIsConverting(true);
+
+                    // Close both modals immediately so user returns to previous page view
+                    setShowConvertModal(false);
+                    setShowUserModal(false);
+                    setSelectedUser(null);
+                    setSelectedLead(null);
+
+                    toast.loading('Converting lead to account...', { id: 'convert-lead-toast' });
+
                     try {
                       const apiUrl = import.meta.env.VITE_MOVE_TO_ACCOUNT_API_URL;
                       if (!apiUrl) {
+                        toast.dismiss('convert-lead-toast');
                         toast.error('Move to account API URL not configured');
+                        setIsConverting(false);
                         return;
                       }
                       const url = `${apiUrl}?id=${leadId}&account_name=${encodeURIComponent(convertAccountName)}&website=${encodeURIComponent(convertWebsite)}&account_type=${encodeURIComponent(convertAccountType)}&user=${encodeURIComponent(currentUserName)}`;
@@ -8181,13 +8196,16 @@ export default function LeadPipeline({ onPageChange }) {
                       if (!response.ok) {
                         const errorText = await response.text();
                         console.error('Error moving to account:', errorText);
+                        toast.dismiss('convert-lead-toast');
                         throw new Error(`HTTP error! status: ${response.status}`);
                       }
                       const result = await response.json();
                       console.log('Lead moved to account successfully:', result);
+
+                      toast.dismiss('convert-lead-toast');
+
                       if (result.success || result.message) {
-                        toast.success('Lead converted successfully');
-                        setShowConvertModal(false);
+                        toast.success('Lead converted successfully!');
                         setConvertAccountName('');
                         setConvertWebsite('');
                         setConvertAccountType('');
@@ -8198,13 +8216,26 @@ export default function LeadPipeline({ onPageChange }) {
                       }
                     } catch (err) {
                       console.error('Error moving to account:', err);
-                      toast.error('Failed to convert lead');
+                      toast.dismiss('convert-lead-toast');
+                      toast.error(`Failed to convert lead: ${err.message || 'Unknown error'}`);
+                    } finally {
+                      setIsConverting(false);
                     }
                   }}
-                  disabled={!convertAccountName}
-                  style={{ padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: !convertAccountName ? 0.5 : 1 }}
+                  disabled={isConverting || !convertAccountName}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'var(--green-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: isConverting || !convertAccountName ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    opacity: isConverting || !convertAccountName ? 0.5 : 1
+                  }}
                 >
-                  Convert
+                  {isConverting ? 'Converting...' : 'Convert'}
                 </button>
               </div>
             </div>
