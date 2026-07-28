@@ -138,6 +138,25 @@ export default function LeadPipeline({ onPageChange }) {
   const [showEditDialogCustomInput, setShowEditDialogCustomInput] = useState(false);
   const [editDialogCustomValue, setEditDialogCustomValue] = useState('');
 
+  // Close filter property dropdowns when clicking anywhere outside
+  useEffect(() => {
+    const handleClickOutsidePropertyDropdown = (event) => {
+      if (!event.target.closest('.filter-property-dropdown-container')) {
+        setSelectedProperties(prevProps => {
+          if (prevProps.some(p => p && p.dropdownOpen)) {
+            return prevProps.map(p => ({ ...p, dropdownOpen: false }));
+          }
+          return prevProps;
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutsidePropertyDropdown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsidePropertyDropdown);
+    };
+  }, []);
+
   // ── Get predefined options for field ───────────────────────────────────────────
   const getFieldOptions = (fieldName) => {
     const optionMap = {
@@ -2460,6 +2479,10 @@ export default function LeadPipeline({ onPageChange }) {
 
   const handleCSVImport = async (file) => {
     console.log('Starting CSV import for file:', file.name);
+    toast('Note: Contact Name, Phone Number, Email, and Country are required fields in the CSV.', {
+      icon: 'ℹ️',
+      duration: 5000
+    });
 
     try {
       toast.loading('Uploading CSV...');
@@ -2594,6 +2617,10 @@ export default function LeadPipeline({ onPageChange }) {
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={() => {
+                toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
+                  icon: 'ℹ️',
+                  duration: 5000
+                });
                 // Create file input element
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
@@ -3890,7 +3917,7 @@ export default function LeadPipeline({ onPageChange }) {
                               </select>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ position: 'relative' }}>
+                              <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
                                 <input
                                   type="text"
                                   placeholder="Search contact owners..."
@@ -4063,7 +4090,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search lead status..."
@@ -4248,7 +4275,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search tags..."
@@ -4432,7 +4459,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search countries..."
@@ -4607,7 +4634,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search states..."
@@ -7273,7 +7300,7 @@ export default function LeadPipeline({ onPageChange }) {
               maxHeight: '80vh',
               overflowY: 'auto'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h2 style={{ margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Add New Lead</h2>
                 <button
                   onClick={() => setShowAddModal(false)}
@@ -7287,6 +7314,25 @@ export default function LeadPipeline({ onPageChange }) {
                 >
                   <X size={20} />
                 </button>
+              </div>
+
+              {/* Required Fields Info Notice */}
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: 'var(--r)',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: '#15803d',
+                fontSize: '13px'
+              }}>
+                <AlertCircle size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                <span>
+                  <strong>Note:</strong> Contact Name, Phone Number, Email, and Country are required fields.
+                </span>
               </div>
 
               <form id="addLeadForm" style={{ display: 'grid', gap: '16px' }}>
@@ -7703,14 +7749,16 @@ export default function LeadPipeline({ onPageChange }) {
                       last_activity: formData.get('lastActivity') || new Date().toISOString()
                     };
 
-                    // Basic validation
-                    if (!leadData.full_name.trim()) {
-                      alert('Contact Name is required');
-                      return;
-                    }
+                    // Required fields validation
+                    const missingFields = [];
+                    if (!leadData.full_name.trim()) missingFields.push('Contact Name');
+                    if (!leadData.phone.trim()) missingFields.push('Phone Number');
+                    if (!leadData.email.trim()) missingFields.push('Email');
+                    if (!leadData.country.trim()) missingFields.push('Country');
 
-                    if (!leadData.email.trim() && !leadData.phone.trim()) {
-                      alert('Either Email or Phone Number is required');
+                    if (missingFields.length > 0) {
+                      toast.error(`Required fields missing: ${missingFields.join(', ')}`);
+                      alert(`Please fill in required fields: ${missingFields.join(', ')}`);
                       return;
                     }
 
