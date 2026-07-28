@@ -1205,6 +1205,195 @@ textarea {
     gap: 12px;
   }
 }
+/* ── Satyukt Full Page Loading Screen (Matching User Design) ── */
+.satyukt-full-loader-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 70px 20px;
+  width: 100%;
+  text-align: center;
+  background: #ffffff;
+}
 
+.satyukt-logo-spinner-outer {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
 
+@keyframes spinnerArc {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
+.satyukt-logo-spinner-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4px solid #e2e8f0;
+  border-top-color: #16a34a;
+  border-right-color: #22c55e;
+  animation: spinnerArc 1.2s linear infinite;
+  box-shadow: 0 0 25px rgba(22, 163, 74, 0.2);
+}
+
+.satyukt-logo-spinner-core {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.satyukt-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.satyukt-loader-headline {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.satyukt-loader-subtext {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 24px 0;
+}
+
+@keyframes fillProgress {
+  0% { width: 0%; left: 0%; }
+  50% { width: 70%; left: 15%; }
+  100% { width: 100%; left: 0%; }
+}
+
+.satyukt-loader-progress-track {
+  width: 260px;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.satyukt-loader-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+  border-radius: 9999px;
+  position: absolute;
+  animation: fillProgress 1.8s ease-in-out infinite;
+}
+
+.satyukt-loader-caution {
+  font-size: 12.5px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.satyukt-dot-green {
+  color: #22c55e;
+  font-size: 18px;
+}
+
+/* ── Satyukt Empty State Screen (Matching User Design) ── */
+.satyukt-empty-state-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  width: 100%;
+  text-align: center;
+}
+
+.satyukt-empty-icon-box {
+  margin-bottom: 16px;
+}
+
+.satyukt-empty-title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+}
+
+.satyukt-empty-subtext {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 20px 0;
+}
+
+.satyukt-empty-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px;
+  background: #ffffff;
+  border: 1.5px solid #16a34a;
+  border-radius: 8px;
+  color: #16a34a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.satyukt-empty-refresh-btn:hover {
+  background: #f0fdf4;
+  transform: translateY(-1px);
+}
+
+/* ── UI & UX Aesthetics Polish ── */
+input[type="text"]:focus,
+input[type="date"]:focus,
+select:focus {
+  outline: none !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15) !important;
+  transition: all 0.2s ease !important;
+}
+
+button:active {
+  transform: scale(0.98) !important;
+}
+
+.sa-filter-banner {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  border: 1px solid #86efac !important;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.08) !important;
+  border-radius: var(--r) !important;
+  padding: 10px 16px !important;
+}
+
+.sa-edit-pencil-icon {
+  opacity: 0.4;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sa-edit-pencil-icon:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  color: #16a34a !important;
+}

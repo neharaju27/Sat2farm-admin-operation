@@ -2,6 +2,58 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
+import satyuktLogo from '../assets/satyukt.webp';
+
+// Satyukt Full Page Loading Component (Matching User Mockup)
+const SatyuktLoader = ({ message, subtitle }) => (
+  <div className="satyukt-full-loader-wrapper">
+    <div className="satyukt-logo-spinner-outer">
+      <div className="satyukt-logo-spinner-ring" />
+      <div className="satyukt-logo-spinner-core">
+        <img src={satyuktLogo} alt="Satyukt" className="satyukt-logo-img" />
+      </div>
+    </div>
+    <h2 className="satyukt-loader-headline">
+      {message || 'Loading leads from Satyukt CRM...'}
+    </h2>
+    <p className="satyukt-loader-subtext">
+      {subtitle || 'Fetching your latest leads. This may take a few seconds.'}
+    </p>
+    <div className="satyukt-loader-progress-track">
+      <div className="satyukt-loader-progress-fill" />
+    </div>
+    <div className="satyukt-loader-caution">
+      <span className="satyukt-dot-green">•</span> Please don't close or refresh this page
+    </div>
+  </div>
+);
+
+// Satyukt Empty State Component (Matching User Mockup)
+const SatyuktEmptyState = ({ title, subtitle, onRefresh }) => (
+  <div className="satyukt-empty-state-wrapper">
+    <div className="satyukt-empty-icon-box">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="20" width="48" height="34" rx="6" fill="#22c55e" fillOpacity="0.15"/>
+        <path d="M12 24C12 21.7909 13.7909 20 16 20H26L30 24H52C54.2091 24 56 25.7909 56 28V48C56 50.2091 54.2091 52 52 52H12V24Z" fill="#16a34a"/>
+        <path d="M18 16H30L34 20H46C48.2091 20 50 21.7909 50 24V26H14V20C14 17.7909 15.7909 16 18 16Z" fill="#86efac"/>
+        <circle cx="40" cy="40" r="9" fill="white" stroke="#0f172a" strokeWidth="3"/>
+        <line x1="46" y1="46" x2="54" y2="54" stroke="#0f172a" strokeWidth="4" strokeLinecap="round"/>
+      </svg>
+    </div>
+    <h3 className="satyukt-empty-title">{title || 'No leads to display'}</h3>
+    <p className="satyukt-empty-subtext">{subtitle || 'Leads from Satyukt CRM will appear here.'}</p>
+    {onRefresh && (
+      <button onClick={onRefresh} className="satyukt-empty-refresh-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+        Refresh
+      </button>
+    )}
+  </div>
+);
+
 // Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
 const parseDateRobust = (dateStr) => {
   if (!dateStr) return null;
@@ -202,10 +254,16 @@ export default function LeadPipeline({ onPageChange }) {
   const [addingNote, setAddingNote] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
 
-  const [contactOwnerFilter, setContactOwnerFilter] = useState('');
+  const [contactOwnerFilter, setContactOwnerFilter] = useState(() => {
+    try { return sessionStorage.getItem('lead_contactOwnerFilter') || ''; } catch (e) { return ''; }
+  });
   const [contactOwnerFilterOperator, setContactOwnerFilterOperator] = useState('is');
-  const [isFilterApplied, setIsFilterApplied] = useState(false);
-  const [currentFilterCriteria, setCurrentFilterCriteria] = useState('');
+  const [isFilterApplied, setIsFilterApplied] = useState(() => {
+    try { return sessionStorage.getItem('lead_isFilterApplied') === 'true'; } catch (e) { return false; }
+  });
+  const [currentFilterCriteria, setCurrentFilterCriteria] = useState(() => {
+    try { return sessionStorage.getItem('lead_currentFilterCriteria') || ''; } catch (e) { return ''; }
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
   const [filterStatus, setFilterStatus] = useState('all');
@@ -214,8 +272,30 @@ export default function LeadPipeline({ onPageChange }) {
   const [isLast50Mode, setIsLast50Mode] = useState(false);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
-  const [selectedProperties, setSelectedProperties] = useState([]); // Array of {property, value, operator} objects
+  const [selectedProperties, setSelectedProperties] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('lead_selectedProperties');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  }); // Array of {property, value, operator} objects
   const [currentProperty, setCurrentProperty] = useState('');
+
+  // Save filter state to sessionStorage
+  useEffect(() => {
+    try {
+      if (isFilterApplied) {
+        sessionStorage.setItem('lead_selectedProperties', JSON.stringify(selectedProperties));
+        sessionStorage.setItem('lead_isFilterApplied', 'true');
+        sessionStorage.setItem('lead_currentFilterCriteria', currentFilterCriteria);
+        sessionStorage.setItem('lead_contactOwnerFilter', contactOwnerFilter);
+      } else {
+        sessionStorage.removeItem('lead_selectedProperties');
+        sessionStorage.removeItem('lead_isFilterApplied');
+        sessionStorage.removeItem('lead_currentFilterCriteria');
+        sessionStorage.removeItem('lead_contactOwnerFilter');
+      }
+    } catch (e) {}
+  }, [selectedProperties, isFilterApplied, currentFilterCriteria, contactOwnerFilter]);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
   const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -313,10 +393,14 @@ export default function LeadPipeline({ onPageChange }) {
             if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
                 if (p.property === 'created_time' || p.property === 'createdTime') {
-                  if (p.dateOperator === 'between' && p.fromDate && p.toDate) {
-                    params.append('date_type', 'between');
-                    params.append('from', p.fromDate);
-                    params.append('to', p.toDate);
+                  if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+                    params.append('date_type', p.dateOperator);
+                    if (p.fromDate && p.toDate) {
+                      params.append('from', p.fromDate);
+                      params.append('to', p.toDate);
+                    } else if (p.value || p.date) {
+                      params.append('date', p.value || p.date);
+                    }
                   } else if (p.dateOperator === 'on' && (p.value || p.date)) {
                     params.append('date_type', 'on');
                     params.append('date', p.value || p.date);
@@ -1775,6 +1859,7 @@ export default function LeadPipeline({ onPageChange }) {
 
   const handleContactOwnerFilter = async (owner, operator) => {
     console.log('Filtering leads by contact owner:', { owner, operator });
+    setLoading(true);
 
     try {
       let url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?`;
@@ -1833,6 +1918,12 @@ export default function LeadPipeline({ onPageChange }) {
         }));
 
         setLeads(transformedLeads);
+        if (result && result.total !== undefined) {
+          setTotalLeads(result.total);
+        } else {
+          setTotalLeads(transformedLeads.length);
+        }
+        setOffset(0);
         setError(null);
 
         // Update filter state
@@ -1849,6 +1940,8 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Network error filtering leads:', err);
       alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2035,6 +2128,7 @@ export default function LeadPipeline({ onPageChange }) {
 
   const handleCombinedFilters = async (filters) => {
     console.log('Applying combined filters:', filters);
+    setLoading(true);
 
     try {
       let url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?`;
@@ -2087,19 +2181,14 @@ export default function LeadPipeline({ onPageChange }) {
           const operator = filter.operator === 'is not' ? 'is_not' : 'is';
           const paramName = `description_${operator}`;
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && (filter.value || filter.date)) {
-          urlParams.push(`date_type=on`);
-          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && (filter.value || filter.date)) {
-          urlParams.push(`date_type=before`);
-          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && (filter.value || filter.date)) {
-          urlParams.push(`date_type=after`);
-          urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
-          urlParams.push(`date_type=between`);
-          urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-          urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
+          urlParams.push(`date_type=${filter.dateOperator}`);
+          if (filter.fromDate && filter.toDate) {
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.value) {
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          }
         } else if (filter.property === 'created_time' && (filter.dateOperator === 'in_the_last' || filter.dateOperator === 'in_last')) {
           const unitMap = { day: 'days', week: 'weeks', month: 'months' };
           const count = filter.count ? parseInt(filter.count) : 1;
@@ -2171,6 +2260,12 @@ export default function LeadPipeline({ onPageChange }) {
         );
         console.log('Records with Karnataka in state:', karnatakaRecords.length);
         setLeads(transformedLeads);
+        if (result && result.total !== undefined) {
+          setTotalLeads(result.total);
+        } else {
+          setTotalLeads(transformedLeads.length);
+        }
+        setOffset(0);
         setError(null);
 
         // Update filter state with combined criteria
@@ -2196,6 +2291,8 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Network error filtering leads:', err);
       alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2953,8 +3050,10 @@ export default function LeadPipeline({ onPageChange }) {
           <div style={{
             overflowX: 'auto',
             maxWidth: '100%',
-            flex: 1
+            flex: 1,
+            position: 'relative'
           }}>
+            {loading && <div className="satyukt-top-loader-bar" />}
             <table style={{
               width: '100%',
               borderCollapse: 'separate',
@@ -3007,13 +3106,16 @@ export default function LeadPipeline({ onPageChange }) {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="19" style={{
-                      textAlign: 'center',
-                      padding: '40px',
-                      color: 'var(--text-3)',
-                      fontSize: '14px'
-                    }}>
-                      Loading leads...
+                    <td colSpan="19" style={{ padding: '0', background: '#fafafa' }}>
+                      <SatyuktLoader
+                        message={
+                          searchTerm
+                            ? `Searching leads for "${searchTerm}"...`
+                            : isFilterApplied
+                            ? `Filtering leads by applied criteria...`
+                            : `Loading leads from Satyukt CRM...`
+                        }
+                      />
                     </td>
                   </tr>
                 ) : error ? (
@@ -3029,13 +3131,17 @@ export default function LeadPipeline({ onPageChange }) {
                   </tr>
                 ) : filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan="19" style={{
-                      textAlign: 'center',
-                      padding: '40px',
-                      color: 'var(--text-3)',
-                      fontSize: '14px'
-                    }}>
-                      No leads found
+                    <td colSpan="19" style={{ padding: '0', background: '#ffffff' }}>
+                      <SatyuktEmptyState
+                        title="No leads to display"
+                        subtitle="Leads from Satyukt CRM will appear here."
+                        onRefresh={() => {
+                          setSearchTerm('');
+                          setSearchInput('');
+                          setIsFilterApplied(false);
+                          setOffset(0);
+                        }}
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -3491,6 +3597,18 @@ export default function LeadPipeline({ onPageChange }) {
         {/* Filter Sidebar */}
         {filterSidebarOpen && (
           <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                zIndex: 999
+              }}
+              onClick={() => setFilterSidebarOpen(false)}
+            />
             <div style={{
               position: 'absolute',
               top: 0,
@@ -4961,8 +5079,8 @@ export default function LeadPipeline({ onPageChange }) {
                               />
                             )}
 
-                            {/* Between - From Date and To Date */}
-                            {prop.dateOperator === 'between' && (
+                            {/* Between / Custom - From Date and To Date */}
+                            {(prop.dateOperator === 'between' || prop.dateOperator === 'custom') && (
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <div style={{ flex: 1 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
@@ -5009,55 +5127,7 @@ export default function LeadPipeline({ onPageChange }) {
                               </div>
                             )}
 
-                            {/* Custom - Advanced Range Picker with DateTime */}
-                            {prop.dateOperator === 'custom' && (
-                              <div>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From DateTime</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={prop.fromDateTime || ''}
-                                      onChange={(e) => {
-                                        const updated = [...selectedProperties];
-                                        updated[index].fromDateTime = e.target.value;
-                                        setSelectedProperties(updated);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '8px 12px',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 'var(--r)',
-                                        fontSize: '13px',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text)'
-                                      }}
-                                    />
-                                  </div>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To DateTime</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={prop.toDateTime || ''}
-                                      onChange={(e) => {
-                                        const updated = [...selectedProperties];
-                                        updated[index].toDateTime = e.target.value;
-                                        setSelectedProperties(updated);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '8px 12px',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 'var(--r)',
-                                        fontSize: '13px',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text)'
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+
                           </div>
                         )}
 
@@ -5159,56 +5229,6 @@ export default function LeadPipeline({ onPageChange }) {
                                       color: 'var(--text)'
                                     }}
                                   />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Custom - Advanced Range Picker with DateTime */}
-                            {prop.dateOperator === 'custom' && (
-                              <div>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From DateTime</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={prop.fromDateTime || ''}
-                                      onChange={(e) => {
-                                        const updated = [...selectedProperties];
-                                        updated[index].fromDateTime = e.target.value;
-                                        setSelectedProperties(updated);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '8px 12px',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 'var(--r)',
-                                        fontSize: '13px',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text)'
-                                      }}
-                                    />
-                                  </div>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To DateTime</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={prop.toDateTime || ''}
-                                      onChange={(e) => {
-                                        const updated = [...selectedProperties];
-                                        updated[index].toDateTime = e.target.value;
-                                        setSelectedProperties(updated);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '8px 12px',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 'var(--r)',
-                                        fontSize: '13px',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text)'
-                                      }}
-                                    />
-                                  </div>
                                 </div>
                               </div>
                             )}
@@ -5487,11 +5507,12 @@ export default function LeadPipeline({ onPageChange }) {
                                 value: createdTimeProp.value,
                                 dateOperator: createdTimeProp.dateOperator
                               });
-                            } else if (createdTimeProp.dateOperator === 'between' && createdTimeProp.fromDate && createdTimeProp.toDate) {
+                            } else if ((createdTimeProp.dateOperator === 'between' || createdTimeProp.dateOperator === 'custom') && (createdTimeProp.fromDate && createdTimeProp.toDate || createdTimeProp.value)) {
                               activeFilters.push({
                                 property: 'created_time',
                                 fromDate: createdTimeProp.fromDate,
                                 toDate: createdTimeProp.toDate,
+                                value: createdTimeProp.value,
                                 dateOperator: createdTimeProp.dateOperator
                               });
                             }

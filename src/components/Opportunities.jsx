@@ -3,6 +3,58 @@ import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
+import satyuktLogo from '../assets/satyukt.webp';
+
+// Satyukt Full Page Loading Component (Matching User Mockup)
+const SatyuktLoader = ({ message, subtitle }) => (
+  <div className="satyukt-full-loader-wrapper">
+    <div className="satyukt-logo-spinner-outer">
+      <div className="satyukt-logo-spinner-ring" />
+      <div className="satyukt-logo-spinner-core">
+        <img src={satyuktLogo} alt="Satyukt" className="satyukt-logo-img" />
+      </div>
+    </div>
+    <h2 className="satyukt-loader-headline">
+      {message || 'Loading accounts from Satyukt CRM...'}
+    </h2>
+    <p className="satyukt-loader-subtext">
+      {subtitle || 'Fetching your latest accounts. This may take a few seconds.'}
+    </p>
+    <div className="satyukt-loader-progress-track">
+      <div className="satyukt-loader-progress-fill" />
+    </div>
+    <div className="satyukt-loader-caution">
+      <span className="satyukt-dot-green">•</span> Please don't close or refresh this page
+    </div>
+  </div>
+);
+
+// Satyukt Empty State Component (Matching User Mockup)
+const SatyuktEmptyState = ({ title, subtitle, onRefresh }) => (
+  <div className="satyukt-empty-state-wrapper">
+    <div className="satyukt-empty-icon-box">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="20" width="48" height="34" rx="6" fill="#22c55e" fillOpacity="0.15"/>
+        <path d="M12 24C12 21.7909 13.7909 20 16 20H26L30 24H52C54.2091 24 56 25.7909 56 28V48C56 50.2091 54.2091 52 52 52H12V24Z" fill="#16a34a"/>
+        <path d="M18 16H30L34 20H46C48.2091 20 50 21.7909 50 24V26H14V20C14 17.7909 15.7909 16 18 16Z" fill="#86efac"/>
+        <circle cx="40" cy="40" r="9" fill="white" stroke="#0f172a" strokeWidth="3"/>
+        <line x1="46" y1="46" x2="54" y2="54" stroke="#0f172a" strokeWidth="4" strokeLinecap="round"/>
+      </svg>
+    </div>
+    <h3 className="satyukt-empty-title">{title || 'No accounts to display'}</h3>
+    <p className="satyukt-empty-subtext">{subtitle || 'Accounts from Satyukt CRM will appear here.'}</p>
+    {onRefresh && (
+      <button onClick={onRefresh} className="satyukt-empty-refresh-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+        Refresh
+      </button>
+    )}
+  </div>
+);
+
 // Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
 const parseDateRobust = (dateStr) => {
   if (!dateStr) return null;
@@ -10,7 +62,7 @@ const parseDateRobust = (dateStr) => {
   const str = String(dateStr).trim();
   if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
 
-  // 1. Try DD-MM-YYYY HH:mm:ss or DD-MM-YYYY HH:mm or DD-MM-YYYY
+  // 1. Try DD-MM-YYYY or DD/MM/YYYY with time or without
   const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
   if (dmyMatch) {
     const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
@@ -398,10 +450,38 @@ export default function Opportunities({ onPageChange }) {
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
   const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
-  const [selectedProperties, setSelectedProperties] = useState([]);
+  const [selectedProperties, setSelectedProperties] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('opp_selectedProperties');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  });
   const [currentProperty, setCurrentProperty] = useState('');
-  const [isFilterApplied, setIsFilterApplied] = useState(false);
-  const [currentFilterCriteria, setCurrentFilterCriteria] = useState('');
+  const [isFilterApplied, setIsFilterApplied] = useState(() => {
+    try {
+      return sessionStorage.getItem('opp_isFilterApplied') === 'true';
+    } catch (e) { return false; }
+  });
+  const [currentFilterCriteria, setCurrentFilterCriteria] = useState(() => {
+    try {
+      return sessionStorage.getItem('opp_currentFilterCriteria') || '';
+    } catch (e) { return ''; }
+  });
+
+  // Save filter state to sessionStorage
+  useEffect(() => {
+    try {
+      if (isFilterApplied) {
+        sessionStorage.setItem('opp_selectedProperties', JSON.stringify(selectedProperties));
+        sessionStorage.setItem('opp_isFilterApplied', 'true');
+        sessionStorage.setItem('opp_currentFilterCriteria', currentFilterCriteria);
+      } else {
+        sessionStorage.removeItem('opp_selectedProperties');
+        sessionStorage.removeItem('opp_isFilterApplied');
+        sessionStorage.removeItem('opp_currentFilterCriteria');
+      }
+    } catch (e) {}
+  }, [selectedProperties, isFilterApplied, currentFilterCriteria]);
 
   const [allAccountsData, setAllAccountsData] = useState([]);
 
@@ -588,6 +668,7 @@ export default function Opportunities({ onPageChange }) {
 
   const handleCombinedFilters = async (filters) => {
     console.log('Applying combined filters:', filters);
+    setLoading(true);
 
     try {
       setCurrentPage(1);
@@ -615,10 +696,14 @@ export default function Opportunities({ onPageChange }) {
         } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
           urlParams.push(`date_type=before`);
           urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
-          urlParams.push(`date_type=between`);
-          urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-          urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
+          urlParams.push(`date_type=${filter.dateOperator}`);
+          if (filter.fromDate && filter.toDate) {
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.value) {
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          }
         }
       });
 
@@ -648,7 +733,10 @@ export default function Opportunities({ onPageChange }) {
       const oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
       if (result && result.total !== undefined) {
         setTotalOpportunities(result.total);
+      } else {
+        setTotalOpportunities(oppsData.length);
       }
+      setCurrentPage(1);
 
       if (Array.isArray(oppsData)) {
         console.log('Combined filters successful');
@@ -699,6 +787,8 @@ export default function Opportunities({ onPageChange }) {
     } catch (err) {
       console.error('Error applying combined filters:', err);
       alert(`Error applying filters: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -830,10 +920,14 @@ export default function Opportunities({ onPageChange }) {
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
               if (p.property === 'created_time' || p.property === 'createdTime') {
-                if (p.dateOperator === 'between' && p.fromDate && p.toDate) {
-                  params.append('date_type', 'between');
-                  params.append('from', p.fromDate);
-                  params.append('to', p.toDate);
+                if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+                  params.append('date_type', p.dateOperator);
+                  if (p.fromDate && p.toDate) {
+                    params.append('from', p.fromDate);
+                    params.append('to', p.toDate);
+                  } else if (p.value || p.date) {
+                    params.append('date', p.value || p.date);
+                  }
                 } else if (p.dateOperator === 'on' && (p.value || p.date)) {
                   params.append('date_type', 'on');
                   params.append('date', p.value || p.date);
@@ -2390,19 +2484,14 @@ export default function Opportunities({ onPageChange }) {
         if (['contact_owner', 'lead_status', 'tag', 'mailing_state', 'mailing_country', 'created_by', 'modified_by', 'mailing_city', 'lead_source', 'description', 'account_type', 'owner', 'status', 'tags', 'city', 'state', 'country'].includes(filter.property) && filter.value) {
           const paramName = getFilterQueryParamKey(filter.property, filter.operator);
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
-          urlParams.push(`date_type=on`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
-          urlParams.push(`date_type=before`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && filter.value) {
-          urlParams.push(`date_type=after`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
-          urlParams.push(`date_type=between`);
-          urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-          urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
+          urlParams.push(`date_type=${filter.dateOperator}`);
+          if (filter.fromDate && filter.toDate) {
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.value) {
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          }
         }
       });
 
@@ -3317,7 +3406,8 @@ export default function Opportunities({ onPageChange }) {
           {/* Opportunity Table - Only show in table view */}
           {viewMode === 'table' && (
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)', overflowX: 'auto', maxWidth: '100%', flex: 1 }}>
-              <div style={{ overflowX: 'auto', maxWidth: '100%', flex: 1 }}>
+              <div style={{ overflowX: 'auto', maxWidth: '100%', flex: 1, position: 'relative' }}>
+                {loading && <div className="satyukt-top-loader-bar" />}
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px', height: '100%' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
@@ -3351,9 +3441,34 @@ export default function Opportunities({ onPageChange }) {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan="22" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-3)', fontSize: '14px' }}>Loading opportunities...</td></tr>
+                      <tr>
+                        <td colSpan="22" style={{ padding: '0', background: '#fafafa' }}>
+                          <SatyuktLoader
+                            message={
+                              searchTerm
+                                ? `Searching accounts for "${searchTerm}"...`
+                                : isFilterApplied
+                                ? `Filtering accounts by applied criteria...`
+                                : `Loading accounts from Satyukt CRM...`
+                            }
+                          />
+                        </td>
+                      </tr>
                     ) : filteredOpportunities.length === 0 ? (
-                      <tr><td colSpan="22" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-3)', fontSize: '14px' }}>No opportunities found</td></tr>
+                      <tr>
+                        <td colSpan="22" style={{ padding: '0', background: '#ffffff' }}>
+                          <SatyuktEmptyState
+                            title="No accounts to display"
+                            subtitle="Accounts from Satyukt CRM will appear here."
+                            onRefresh={() => {
+                              setSearchTerm('');
+                              setSearchInput('');
+                              setIsFilterApplied(false);
+                              setCurrentPage(1);
+                            }}
+                          />
+                        </td>
+                      </tr>
                     ) : (
                       currentOpportunities.map(opp => (
                         <tr key={opp.id} style={{ borderBottom: '1px solid var(--border-soft)', transition: 'all 0.2s ease' }}
@@ -3675,7 +3790,7 @@ export default function Opportunities({ onPageChange }) {
                       <ChevronLeft size={18} />
                     </button>
                     <span style={{ fontSize: '13px', color: '#374151', minWidth: '56px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      {filteredOpportunities.length === 0 ? '0 to 0' : `${startRecord} to ${endRecord} of ${totalCount}`}
+                      {filteredOpportunities.length === 0 ? '0 to 0' : `${startRecord} to ${endRecord} of ${effectiveTotalCount.toLocaleString()}`}
                     </span>
                     <button type="button" onClick={() => setCurrentPage(p => Math.min(p + 1, Math.max(totalPages, 1)))} disabled={currentPage >= totalPages || filteredOpportunities.length === 0}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', padding: 0, background: 'none', border: 'none', color: currentPage >= totalPages || filteredOpportunities.length === 0 ? '#d1d5db' : '#6b7280', cursor: currentPage >= totalPages || filteredOpportunities.length === 0 ? 'not-allowed' : 'pointer' }}>
@@ -7309,6 +7424,18 @@ export default function Opportunities({ onPageChange }) {
         {/* Filter Sidebar */}
         {filterSidebarOpen && (
           <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                zIndex: 999
+              }}
+              onClick={() => setFilterSidebarOpen(false)}
+            />
             <div style={{
               position: 'absolute',
               top: 0,
@@ -8731,11 +8858,12 @@ export default function Opportunities({ onPageChange }) {
                             value: createdTimeProp.value,
                             dateOperator: createdTimeProp.dateOperator
                           });
-                        } else if (createdTimeProp.dateOperator === 'between' && createdTimeProp.fromDate && createdTimeProp.toDate) {
+                        } else if ((createdTimeProp.dateOperator === 'between' || createdTimeProp.dateOperator === 'custom') && (createdTimeProp.fromDate && createdTimeProp.toDate || createdTimeProp.value)) {
                           activeFilters.push({
                             property: 'created_time',
                             fromDate: createdTimeProp.fromDate,
                             toDate: createdTimeProp.toDate,
+                            value: createdTimeProp.value,
                             dateOperator: createdTimeProp.dateOperator
                           });
                         }
