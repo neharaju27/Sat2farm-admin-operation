@@ -851,6 +851,7 @@ export default function Opportunities({ onPageChange }) {
   const [addingTask, setAddingTask] = useState(false);
   const [kanbanDeals, setKanbanDeals] = useState({}); // Store deals by stage for Kanban
   const [stageTotals, setStageTotals] = useState({}); // Store total deals count per stage from API
+  const [stageValues, setStageValues] = useState({}); // Store total deals value per stage from API
   const [loadingMoreStages, setLoadingMoreStages] = useState({}); // Track infinite scroll loading per stage
   const [pipelineViewMode, setPipelineViewMode] = useState('kanban'); // Track sales pipeline view mode (kanban vs list)
 
@@ -1776,7 +1777,8 @@ export default function Opportunities({ onPageChange }) {
       console.log(`Deals for stage ${stage}:`, result);
 
       const dealsList = Array.isArray(result) ? result : (result.data || result.results || result.deals || []);
-      const totalCount = result.total !== undefined ? result.total : dealsList.length;
+      const totalCount = result.total !== undefined ? result.total : (result.count !== undefined ? result.count : dealsList.length);
+      const totalVal = result.total_value || result.total_amount || result.sum_amount || result.total_val || null;
 
       const deals = dealsList.map(deal => ({
         ...deal,
@@ -1786,10 +1788,10 @@ export default function Opportunities({ onPageChange }) {
         created_by: deal.created_by || ''
       }));
 
-      return { deals, total: totalCount };
+      return { deals, total: totalCount, totalValue: totalVal };
     } catch (err) {
       console.error(`Error fetching deals for stage ${stage}:`, err);
-      return { deals: [], total: 0 };
+      return { deals: [], total: 0, totalValue: null };
     }
   };
 
@@ -1801,14 +1803,19 @@ export default function Opportunities({ onPageChange }) {
       const results = await Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50)));
       const dealsByStage = {};
       const totalsByStage = {};
+      const valuesByStage = {};
 
       stages.forEach((stage, index) => {
         dealsByStage[stage] = results[index].deals;
         totalsByStage[stage] = results[index].total;
+        if (results[index].totalValue !== null && results[index].totalValue !== undefined) {
+          valuesByStage[stage] = results[index].totalValue;
+        }
       });
 
       setKanbanDeals(dealsByStage);
       setStageTotals(totalsByStage);
+      setStageValues(valuesByStage);
     } catch (err) {
       console.error('Error fetching all kanban deals:', err);
     }
@@ -6129,6 +6136,9 @@ export default function Opportunities({ onPageChange }) {
                     onDealMove={handleKanbanDealMove}
                     onDealClick={handleKanbanDealClick}
                     stageTotals={stageTotals}
+                    stageValues={stageValues}
+                    isSearching={isSearching}
+                    salesFiltersApplied={salesFiltersApplied}
                     onLoadMoreStage={handleLoadMoreStageDeals}
                     loadingMoreStages={loadingMoreStages}
                   />

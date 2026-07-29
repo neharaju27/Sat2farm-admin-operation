@@ -34,6 +34,9 @@ export default function SalesPipelineKanbanBoard({
   onDealMove,
   onDealClick,
   stageTotals = {},
+  stageValues = {},
+  isSearching = false,
+  salesFiltersApplied = false,
   onLoadMoreStage,
   loadingMoreStages = {}
 }) {
@@ -92,11 +95,17 @@ export default function SalesPipelineKanbanBoard({
         >
           {KANBAN_COLUMNS.map((column) => {
             const deals = getColumnDeals(column);
-            const totalValue = deals.reduce(
+            const calculatedValue = deals.reduce(
               (sum, deal) => sum + (parseFloat(deal.deal_amount) || 0),
               0,
             );
-            const totalStageCount = deals.length;
+            const isSearchingOrFiltered = isSearching || salesFiltersApplied;
+            const totalStageCount = isSearchingOrFiltered
+              ? deals.length
+              : (stageTotals[column.stage] !== undefined ? stageTotals[column.stage] : deals.length);
+            const totalValue = (!isSearchingOrFiltered && stageValues[column.stage] !== undefined)
+              ? stageValues[column.stage]
+              : calculatedValue;
 
             return (
               <div
