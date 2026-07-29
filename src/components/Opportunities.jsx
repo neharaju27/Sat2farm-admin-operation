@@ -449,6 +449,7 @@ export default function Opportunities({ onPageChange }) {
   // ── Table / filter state ──────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
+  const [dealsSearchInput, setDealsSearchInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1264,20 +1265,35 @@ export default function Opportunities({ onPageChange }) {
     const filteredByStage = {};
 
     stages.forEach(stage => {
-      filteredByStage[stage] = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+      let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+
+      // 1. Search term filter across all deal fields
+      if (isSearching) {
+        const q = searchTerm.trim().toLowerCase();
+        stageDeals = stageDeals.filter(deal => {
+          const dealNameMatch = (deal.deal_name || deal.dealName || '').toLowerCase().includes(q);
+          const contactMatch = (deal.contact_name || deal.contactName || deal.full_name || '').toLowerCase().includes(q);
+          const accountMatch = (deal.account_name || deal.accountName || '').toLowerCase().includes(q);
+          const ownerMatch = (deal.owner || deal.contactOwner || deal.deal_owner || '').toLowerCase().includes(q);
+          const stageMatch = (deal.deal_stage || deal.stage || '').toLowerCase().includes(q);
+          const amountMatch = String(deal.deal_amount || deal.amount || '').includes(q);
+          const typeMatch = (deal.deal_type || deal.type || '').toLowerCase().includes(q);
+          const descMatch = (deal.description || '').toLowerCase().includes(q);
+
+          return dealNameMatch || contactMatch || accountMatch || ownerMatch || stageMatch || amountMatch || typeMatch || descMatch;
+        });
+      }
+
+      // 2. Sales Property filters if active
+      if (salesFiltersApplied && selectedSalesProperties.length > 0) {
+        stageDeals = applyFilters(stageDeals);
+      }
+
+      filteredByStage[stage] = stageDeals;
     });
 
-    if (isSearching || salesFiltersApplied) {
-      return filteredByStage;
-    }
-
-    for (const stage of stages) {
-      const stageDeals = filteredByStage[stage];
-      filteredByStage[stage] = applyFilters(stageDeals);
-    }
-
     return filteredByStage;
-  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, kanbanUpdateTimestamp]);
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -2411,9 +2427,13 @@ export default function Opportunities({ onPageChange }) {
 
   // CSV Import handler
   const handleCSVImport = () => {
+    toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
+      icon: 'ℹ️',
+      duration: 5000
+    });
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = '.csv';
+    fileInput.accept = '.csv,.xlsx,.xls';
     fileInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -3825,32 +3845,64 @@ export default function Opportunities({ onPageChange }) {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ position: 'relative' }}>
-                    <Search size={16} style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#64748b'
-                    }} />
-                    <input
-                      type="text"
-                      placeholder="Search deals..."
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={16} style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#64748b'
+                      }} />
+                      <input
+                        type="text"
+                        placeholder="Search deals..."
+                        value={dealsSearchInput}
+                        onChange={(e) => {
+                          setDealsSearchInput(e.target.value);
+                          if (!e.target.value.trim()) {
+                            setSearchTerm('');
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setSearchTerm(dealsSearchInput.trim());
+                            setSalesPipelineCurrentPage(1);
+                          }
+                        }}
+                        style={{
+                          width: '240px',
+                          padding: '8px 12px 8px 36px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: 'var(--r)',
+                          fontSize: '14px',
+                          background: 'white',
+                          color: '#374151'
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSearchTerm(dealsSearchInput.trim());
                         setSalesPipelineCurrentPage(1);
                       }}
                       style={{
-                        width: '250px',
-                        padding: '8px 12px 8px 36px',
-                        border: '1px solid #d1d5db',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: 'var(--green-600)',
+                        color: 'white',
+                        border: 'none',
                         borderRadius: 'var(--r)',
+                        cursor: 'pointer',
                         fontSize: '14px',
-                        background: 'white',
-                        color: '#374151'
+                        fontWeight: '500'
                       }}
-                    />
+                    >
+                      <Search size={15} />
+                      Search
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button

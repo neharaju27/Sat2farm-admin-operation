@@ -14,6 +14,7 @@ export const KANBAN_COLUMNS = [
   { id: 'negotiation', title: 'Negotiation', stage: 'Negotiation', useFiltered: true },
   { id: 'closed-won', title: 'Closed Won', stage: 'Closed Won', useFiltered: true },
   { id: 'closed-lost', title: 'Closed Lost', stage: 'Closed Lost', useFiltered: true },
-  { id: 'invoiced', title: 'Invoiced', stage: 'Invoiced', useFiltered: false },
+  { id: 'invoiced', title: 'Invoiced', stage: 'Invoiced', useFiltered: true },
   { id: 'paid', title: 'Paid', stage: 'Paid', useFiltered: true },
 ];
+

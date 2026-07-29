@@ -96,7 +96,7 @@ export default function SalesPipelineKanbanBoard({
               (sum, deal) => sum + (parseFloat(deal.deal_amount) || 0),
               0,
             );
-            const totalStageCount = stageTotals[column.stage] !== undefined ? stageTotals[column.stage] : deals.length;
+            const totalStageCount = deals.length;
 
             return (
               <div
