@@ -579,7 +579,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = farmsArray.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.state || farm.region || 'Unknown Region',
+          region: farm.region || farm.state || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           expiryTime: farm.expiry_time || farm.expiry || farm.expiry_date || 'N/A',
@@ -647,7 +647,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = data.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.state || farm.region || 'Unknown Region',
+          region: farm.region || farm.state || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : (farm.area ? `${farm.area} acre` : 'N/A'),
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
@@ -660,7 +660,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.state || farm.region || 'Unknown Region',
+          region: farm.region || farm.state || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
@@ -760,7 +760,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || 'Unknown Farm',
-          region: farm.state || 'Unknown Region',
+          region: farm.region || farm.state || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || 'N/A',
           expiryTime: farm.date_of_expiry || 'N/A',
