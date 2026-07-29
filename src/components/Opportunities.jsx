@@ -804,6 +804,9 @@ export default function Opportunities({ onPageChange }) {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreatingDeal, setIsCreatingDeal] = useState(false);
+  const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
+  const [isDeletingDealState, setIsDeletingDealState] = useState(false);
   const [selectedFieldToUpdate, setSelectedFieldToUpdate] = useState('');
   const [updateFieldValue, setUpdateFieldValue] = useState('');
   const [updateNewFieldValue, setUpdateNewFieldValue] = useState('');
@@ -2307,7 +2310,9 @@ export default function Opportunities({ onPageChange }) {
   };
 
   const saveDealEdit = async () => {
-    if (editingDealField && selectedDeal) {
+    if (isUpdatingDeal) return;
+    if (selectedDeal && editingDealField) {
+      setIsUpdatingDeal(true);
       try {
         toast.loading('Updating deal...');
 
@@ -2317,6 +2322,7 @@ export default function Opportunities({ onPageChange }) {
         if (!apiUrl) {
           toast.dismiss();
           toast.error('Update Deal API URL not configured');
+          setIsUpdatingDeal(false);
           return;
         }
 
@@ -2367,11 +2373,9 @@ export default function Opportunities({ onPageChange }) {
         setEditingDealField(null);
         setEditDealValue('');
 
-        // Update selectedDeal with new value
-        setSelectedDeal({
-          ...selectedDeal,
-          [editingDealField]: editDealValue
-        });
+        // Close Deal Info modal so user returns to previous view
+        setShowDealInfoModal(false);
+        setSelectedDeal(null);
 
         // Refresh deals data
         fetchDeals(selectedUser?.id);
@@ -7106,9 +7110,11 @@ export default function Opportunities({ onPageChange }) {
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
                   <button onClick={() => { setShowCreateDealModal(false); setDealName(''); setDealClosingDate(''); setDealStage(''); setDealAmount(''); setDealProbability(''); setDealDescription(''); setDealType(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
                   <button onClick={async () => {
-                    if (dealName.trim() && dealStage) {
+                    if (isCreatingDeal) return;
+                    if (dealName && dealStage && dealType) {
+                      setIsCreatingDeal(true);
                       try {
-                        toast.loading('Saving deal...');
+                        toast.loading('Creating deal...');
 
                         const currentUserName = user?.name || user?.phone_number || 'operation';
                         const apiUrl = import.meta.env.VITE_CREATE_DEAL_API_URL;
@@ -7116,6 +7122,7 @@ export default function Opportunities({ onPageChange }) {
                         if (!apiUrl) {
                           toast.dismiss();
                           toast.error('Create Deal API URL not configured');
+                          setIsCreatingDeal(false);
                           return;
                         }
 
@@ -7153,7 +7160,12 @@ export default function Opportunities({ onPageChange }) {
                         toast.dismiss();
                         toast.success('Deal created successfully');
                         setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 0) + 1 }));
+
+                        // Close BOTH Create Deal Modal AND Opportunity Details modal so user returns to previous view
                         setShowCreateDealModal(false);
+                        setShowUserModal(false);
+                        setSelectedUser(null);
+
                         setDealName('');
                         setDealClosingDate('');
                         setDealStage('');
