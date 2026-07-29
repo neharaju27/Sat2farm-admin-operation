@@ -7108,84 +7108,129 @@ export default function Opportunities({ onPageChange }) {
                   </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
-                  <button onClick={() => { setShowCreateDealModal(false); setDealName(''); setDealClosingDate(''); setDealStage(''); setDealAmount(''); setDealProbability(''); setDealDescription(''); setDealType(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
-                  <button onClick={async () => {
-                    if (isCreatingDeal) return;
-                    if (dealName && dealStage && dealType) {
-                      setIsCreatingDeal(true);
-                      try {
-                        toast.loading('Creating deal...');
+                  <button
+                    onClick={() => {
+                      if (isCreatingDeal) return;
+                      setShowCreateDealModal(false);
+                      setDealName('');
+                      setDealClosingDate('');
+                      setDealStage('');
+                      setDealAmount('');
+                      setDealProbability('');
+                      setDealDescription('');
+                      setDealType('');
+                    }}
+                    disabled={isCreatingDeal}
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: isCreatingDeal ? 'not-allowed' : 'pointer',
+                      opacity: isCreatingDeal ? 0.5 : 1
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (isCreatingDeal) return;
+                      if (dealName && dealStage && dealType) {
+                        setIsCreatingDeal(true);
+                        try {
+                          toast.loading('Creating deal...');
 
-                        const currentUserName = user?.name || user?.phone_number || 'operation';
-                        const apiUrl = import.meta.env.VITE_CREATE_DEAL_API_URL;
+                          const currentUserName = user?.name || user?.phone_number || 'operation';
+                          const apiUrl = import.meta.env.VITE_CREATE_DEAL_API_URL;
 
-                        if (!apiUrl) {
+                          if (!apiUrl) {
+                            toast.dismiss();
+                            toast.error('Create Deal API URL not configured');
+                            setIsCreatingDeal(false);
+                            return;
+                          }
+
+                          const requestBody = {
+                            account_id: selectedUser?.id?.toString() || '',
+                            deal_name: dealName,
+                            deal_amount: dealAmount || '0',
+                            deal_probability: dealProbability || '0',
+                            deal_stage: dealStage,
+                            deal_close_date: dealClosingDate || '',
+                            deal_type: dealType || 'New Business',
+                            description: dealDescription || '',
+                            user: currentUserName
+                          };
+
+                          console.log('Creating deal with:', requestBody);
+
+                          const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestBody)
+                          });
+
+                          if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error('HTTP Error:', errorText);
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                          }
+
+                          const result = await response.json();
+                          console.log('API Result:', result);
+
                           toast.dismiss();
-                          toast.error('Create Deal API URL not configured');
+                          toast.success('Deal created successfully');
+                          setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 0) + 1 }));
+
+                          // Close BOTH Create Deal Modal AND Opportunity Details modal so user returns to previous view
+                          setShowCreateDealModal(false);
+                          setShowUserModal(false);
+                          setSelectedUser(null);
+
+                          setDealName('');
+                          setDealClosingDate('');
+                          setDealStage('');
+                          setDealAmount('');
+                          setDealProbability('');
+                          setDealDescription('');
+                          setDealType('');
+                          fetchDeals(selectedUser?.id);
+                          await fetchAllKanbanDeals();
+                          setKanbanUpdateTimestamp(Date.now());
+
+                        } catch (err) {
+                          console.error('Error creating deal:', err);
+                          toast.dismiss();
+                          toast.error('Failed to create deal');
+                        } finally {
                           setIsCreatingDeal(false);
-                          return;
                         }
-
-                        const requestBody = {
-                          account_id: selectedUser?.id?.toString() || '',
-                          deal_name: dealName,
-                          deal_amount: dealAmount || '0',
-                          deal_probability: dealProbability || '0',
-                          deal_stage: dealStage,
-                          deal_close_date: dealClosingDate || '',
-                          deal_type: dealType || 'New Business',
-                          description: dealDescription || '',
-                          user: currentUserName
-                        };
-
-                        console.log('Creating deal with:', requestBody);
-
-                        const response = await fetch(apiUrl, {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json'
-                          },
-                          body: JSON.stringify(requestBody)
-                        });
-
-                        if (!response.ok) {
-                          const errorText = await response.text();
-                          console.error('HTTP Error:', errorText);
-                          throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-
-                        const result = await response.json();
-                        console.log('API Result:', result);
-
-                        toast.dismiss();
-                        toast.success('Deal created successfully');
-                        setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 0) + 1 }));
-
-                        // Close BOTH Create Deal Modal AND Opportunity Details modal so user returns to previous view
-                        setShowCreateDealModal(false);
-                        setShowUserModal(false);
-                        setSelectedUser(null);
-
-                        setDealName('');
-                        setDealClosingDate('');
-                        setDealStage('');
-                        setDealAmount('');
-                        setDealProbability('');
-                        setDealDescription('');
-                        setDealType('');
-                        fetchDeals(selectedUser?.id);
-                        await fetchAllKanbanDeals();
-                        setKanbanUpdateTimestamp(Date.now());
-
-                      } catch (err) {
-                        console.error('Error creating deal:', err);
-                        toast.dismiss();
-                        toast.error('Failed to create deal');
+                      } else {
+                        toast.error('Please fill in required fields');
                       }
-                    } else {
-                      toast.error('Please fill in required fields');
-                    }
-                  }} style={{ background: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16,185,129,0.2)' }}>Save Deal</button>
+                    }}
+                    disabled={isCreatingDeal}
+                    style={{
+                      background: isCreatingDeal ? '#9ca3af' : 'var(--green-600)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 'var(--r)',
+                      padding: '8px 20px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: isCreatingDeal ? 'not-allowed' : 'pointer',
+                      boxShadow: isCreatingDeal ? 'none' : '0 4px 6px -1px rgba(16,185,129,0.2)',
+                      opacity: isCreatingDeal ? 0.6 : 1
+                    }}
+                  >
+                    {isCreatingDeal ? 'Creating deal...' : 'Save Deal'}
+                  </button>
                 </div>
               </div>
             </div>
