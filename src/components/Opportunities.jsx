@@ -7421,8 +7421,8 @@ export default function Opportunities({ onPageChange }) {
                     Are you sure you want to delete <strong>{dealToDelete.deal_name}</strong>? This action cannot be undone.
                   </p>
                   <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button onClick={() => { setShowDeleteDealModal(false); setDealToDelete(null); }} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
-                    <button onClick={handleDeleteDeal} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                    <button onClick={() => { if (isDeletingDealState) return; setShowDeleteDealModal(false); setDealToDelete(null); }} disabled={isDeletingDealState} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.5 : 1 }}>Cancel</button>
+                    <button onClick={handleDeleteDeal} disabled={isDeletingDealState} style={{ backgroundColor: isDeletingDealState ? '#ef4444' : '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.6 : 1 }}>{isDeletingDealState ? 'Deleting...' : 'Delete'}</button>
                   </div>
                 </div>
               </div>
