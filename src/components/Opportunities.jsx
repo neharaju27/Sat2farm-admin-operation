@@ -6862,15 +6862,9 @@ export default function Opportunities({ onPageChange }) {
                                     </div>
                                     <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                                     <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
-                                      {item.activity_type === 'deal_deleted' ? (
-                                        <span>Deal deleted by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
-                                      ) : item.field === 'note' ? (
-                                        <span>Note added by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
-                                      ) : item.field === 'task' ? (
-                                        <span>Task added by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
-                                      ) : (
-                                        <span>{item.field} updated by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span></span>
-                                      )}
+                                      <span>
+  {item.activity_type ? String(item.activity_type).replace(/_/g, ' ') : (item.field === 'note' ? 'Note added' : item.field === 'task' ? 'Task added' : `${item.field || 'field'} updated`)} by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span>
+</span>
                                     </div>
                                     <div style={{ fontSize: '14px', color: 'var(--text)', fontStyle: 'Georgia' }}>
                                       {item.activity_type === 'deal_deleted' ? (
