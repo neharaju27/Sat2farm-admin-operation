@@ -360,14 +360,28 @@ export default function Opportunities({ onPageChange }) {
       if (!isDropdownClick) {
         closeAllDropdowns();
       }
-      if (!event.target.closest('.filter-property-dropdown-container')) {
-        setSelectedProperties(prevProps => {
-          if (prevProps.some(p => p && p.dropdownOpen)) {
-            return prevProps.map(p => ({ ...p, dropdownOpen: false }));
-          }
-          return prevProps;
-        });
-      }
+
+      const clickedContainer = event.target.closest('.filter-property-dropdown-container');
+      const clickedSalesIndex = clickedContainer && clickedContainer.dataset.salesIndex !== undefined
+        ? parseInt(clickedContainer.dataset.salesIndex, 10)
+        : -1;
+      const clickedAccountsIndex = clickedContainer && clickedContainer.dataset.accountsIndex !== undefined
+        ? parseInt(clickedContainer.dataset.accountsIndex, 10)
+        : -1;
+
+      setSelectedSalesProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedSalesIndex)) {
+          return prevProps.map((p, i) => i === clickedSalesIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
+
+      setSelectedProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedAccountsIndex)) {
+          return prevProps.map((p, i) => i === clickedAccountsIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -384,6 +398,7 @@ export default function Opportunities({ onPageChange }) {
   const [isLast50Mode, setIsLast50Mode] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const lastFetchedUrlRef = React.useRef('');
+  const [refreshKey, setRefreshKey] = useState(0);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
   const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
@@ -855,8 +870,9 @@ export default function Opportunities({ onPageChange }) {
             params.append('deal_filter', dealFilter);
           }
           if (newThisWeekFilter) {
-            const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            params.append('created_time_after', sevenDaysAgoStr);
+            params.append('date_type', 'in_last');
+            params.append('last_count', '7');
+            params.append('last_unit', 'days');
           }
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
@@ -981,7 +997,7 @@ export default function Opportunities({ onPageChange }) {
     };
 
     fetchFilteredOpportunities();
-  }, [dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied]);
+  }, [dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied, refreshKey]);
 
   // ── Filter Logic ─────────────────────────────────────────────────────────────
   const applyFilters = (deals) => {
@@ -1338,23 +1354,7 @@ export default function Opportunities({ onPageChange }) {
     };
   }, [filteredKanbanDeals, salesFiltersApplied, searchTerm, newThisWeekFilter, dealSummaryMetrics]);
 
-  // Update filter applied indicator
-  useEffect(() => {
-    const hasActiveFilters = selectedSalesProperties.some(prop => {
-      if (prop.property === 'deal_owner' || prop.property === 'deal_type' || prop.property === 'deal_stage' || prop.property === 'created_by' || prop.property === 'modified_by') {
-        return prop.value && prop.value.split(',').filter(v => v).length > 0;
-      }
-      if (prop.property === 'deal_name' || prop.property === 'amount') {
-        return prop.value;
-      }
-      if (prop.property === 'closing_date' || prop.property === 'created_time' || prop.property === 'modified_time') {
-        return (prop.value || prop.fromDate || prop.period);
-      }
-      return false;
-    });
 
-    setSalesFiltersApplied(hasActiveFilters);
-  }, [selectedSalesProperties]);
 
   // Reset Sales Pipeline Filters
   const resetSalesFilters = () => {
@@ -1578,7 +1578,7 @@ export default function Opportunities({ onPageChange }) {
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
-    const defaultOwners = ['Operation', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
+    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
     if (saved) {
       try {
@@ -1590,6 +1590,32 @@ export default function Opportunities({ onPageChange }) {
     }
     return defaultOwners;
   });
+
+  // ── Helper: get all available owners combining predefined & dynamic loaded data ──
+  const getAllAvailableOwners = () => {
+    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
+    const ownersFromKanban = Object.values(kanbanDeals || {})
+      .flat()
+      .map(d => d.deal_owner || d.owner || d.contactOwner)
+      .filter(v => v && typeof v === 'string' && v.trim());
+    const ownersFromOpportunities = (opportunities || [])
+      .map(o => o.contactOwner || o.owner)
+      .filter(v => v && typeof v === 'string' && v.trim());
+
+    const combined = [
+      ...defaultList,
+      ...(predefinedContactOwners || []),
+      ...ownersFromKanban,
+      ...ownersFromOpportunities
+    ];
+
+    return Array.from(new Set(combined)).filter(v => v && v.trim()).sort();
+  };
+
+  // ── Helper: unique contact owners ────────────────────────────────────────
+  const getUniqueContactOwners = () => {
+    return getAllAvailableOwners();
+  };
 
   const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedDealTypes');
@@ -1629,10 +1655,7 @@ export default function Opportunities({ onPageChange }) {
     localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
   }, [predefinedDealStages]);
 
-  // ── Helper: unique contact owners ────────────────────────────────────────
-  const getUniqueContactOwners = () => {
-    return [...new Set(opportunities.map(o => o.contactOwner).filter(v => v && v.trim()))].sort();
-  };
+
 
   // ── Helper: get icon for timeline field ─────────────────────────────────
   const getTimelineIcon = (field) => {
@@ -2456,8 +2479,9 @@ export default function Opportunities({ onPageChange }) {
         params.append('query', searchTerm.trim());
       }
       if (newThisWeekFilter) {
-        const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        params.append('created_time_after', sevenDaysAgoStr);
+        params.append('date_type', 'in_last');
+        params.append('last_count', '7');
+        params.append('last_unit', 'days');
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
@@ -2905,6 +2929,7 @@ export default function Opportunities({ onPageChange }) {
         const createdDate = parseDateRobust(opp.createdTime);
         const now = new Date();
         const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
         isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
       }
     }
@@ -3249,6 +3274,7 @@ export default function Opportunities({ onPageChange }) {
                               setNewThisWeekFilter(false);
                               setDealFilter('all');
                               setCurrentPage(1);
+                              setRefreshKey(prev => prev + 1);
                             }}
                           />
                         </td>
@@ -3831,7 +3857,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search owners..."
@@ -3871,7 +3897,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {predefinedContactOwners.filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getAllAvailableOwners().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(owner => (
                                           <div
                                             key={owner}
@@ -4385,7 +4411,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search deal types..."
@@ -4623,7 +4649,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search deal stages..."
@@ -4860,7 +4886,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search users..."
@@ -7485,7 +7511,7 @@ export default function Opportunities({ onPageChange }) {
                               </select>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                              <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                 <input
                                   type="text"
                                   placeholder="Search contact owners..."
@@ -8053,7 +8079,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search tags..."
@@ -8226,7 +8252,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search countries..."
@@ -8400,7 +8426,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search states..."

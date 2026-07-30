@@ -106,6 +106,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(100);
   const [totalLeads, setTotalLeads] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [selectedLead, setSelectedLead] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -142,14 +143,17 @@ export default function LeadPipeline({ onPageChange }) {
   // Close filter property dropdowns when clicking anywhere outside
   useEffect(() => {
     const handleClickOutsidePropertyDropdown = (event) => {
-      if (!event.target.closest('.filter-property-dropdown-container')) {
-        setSelectedProperties(prevProps => {
-          if (prevProps.some(p => p && p.dropdownOpen)) {
-            return prevProps.map(p => ({ ...p, dropdownOpen: false }));
-          }
-          return prevProps;
-        });
-      }
+      const clickedContainer = event.target.closest('.filter-property-dropdown-container');
+      const clickedIndex = clickedContainer && clickedContainer.dataset.leadsIndex !== undefined
+        ? parseInt(clickedContainer.dataset.leadsIndex, 10)
+        : -1;
+
+      setSelectedProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedIndex)) {
+          return prevProps.map((p, i) => i === clickedIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
     };
 
     document.addEventListener('mousedown', handleClickOutsidePropertyDropdown);
@@ -407,8 +411,9 @@ export default function LeadPipeline({ onPageChange }) {
               params.append(ownerKey, contactOwnerFilter);
             }
             if (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) {
-              const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-              params.append('created_time_after', sevenDaysAgoStr);
+              params.append('date_type', 'in_last');
+              params.append('last_count', '7');
+              params.append('last_unit', 'days');
             }
             if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
@@ -539,7 +544,7 @@ export default function LeadPipeline({ onPageChange }) {
     };
 
     fetchLeads();
-  }, [offset, limit, user, isFilterApplied, filterStatus, searchTerm, newThisWeekFilter, contactOwnerFilter]);
+  }, [offset, limit, user, isFilterApplied, filterStatus, searchTerm, newThisWeekFilter, contactOwnerFilter, refreshKey]);
 
   const [allLeadsData, setAllLeadsData] = useState([]);
 
@@ -1055,6 +1060,7 @@ export default function LeadPipeline({ onPageChange }) {
         const createdDate = parseDateRobust(lead.createdTime);
         const now = new Date();
         const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
         isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
       }
     }
@@ -1987,8 +1993,9 @@ export default function LeadPipeline({ onPageChange }) {
         params.append(ownerKey, contactOwnerFilter);
       }
       if (newThisWeekFilter) {
-        const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        params.append('created_time_after', sevenDaysAgoStr);
+        params.append('date_type', 'in_last');
+        params.append('last_count', '7');
+        params.append('last_unit', 'days');
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
@@ -3104,6 +3111,7 @@ export default function LeadPipeline({ onPageChange }) {
                           setCurrentProperty('');
                           setContactOwnerFilter('');
                           setOffset(0);
+                          setRefreshKey(prev => prev + 1);
                         }}
                       />
                     </td>
@@ -3854,7 +3862,7 @@ export default function LeadPipeline({ onPageChange }) {
                               </select>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                              <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                 <input
                                   type="text"
                                   placeholder="Search contact owners..."
@@ -4027,7 +4035,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search lead status..."
@@ -4212,7 +4220,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search tags..."
@@ -4396,7 +4404,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search countries..."
@@ -4571,7 +4579,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search states..."
