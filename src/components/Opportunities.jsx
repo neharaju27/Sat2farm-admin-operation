@@ -2439,66 +2439,93 @@ export default function Opportunities({ onPageChange }) {
   };
 
   // Filtered CSV download handler
-  const handleFilteredCSVDownload = async (filters) => {
-    console.log('Downloading filtered CSV with filters:', filters);
-
+  const handleFilteredCSVDownload = async () => {
     try {
+      setIsDownloadingCSV(true);
       toast.loading('Downloading CSV...');
       const currentUser = user?.name || user?.phone_number || 'operation';
-      let url = `${import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL}?user=${encodeURIComponent(currentUser)}`;
-      const urlParams = [];
 
-      // Build URL parameters for all filters
-      filters.forEach(filter => {
-        if (['contact_owner', 'lead_status', 'tag', 'mailing_state', 'mailing_country', 'created_by', 'modified_by', 'mailing_city', 'lead_source', 'description', 'account_type', 'owner', 'status', 'tags', 'city', 'state', 'country'].includes(filter.property) && filter.value) {
-          const paramName = getFilterQueryParamKey(filter.property, filter.operator);
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
-          urlParams.push(`date_type=${filter.dateOperator}`);
-          if (filter.fromDate && filter.toDate) {
-            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
-          } else if (filter.value) {
-            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-          }
-        }
+      const params = new URLSearchParams({
+        user: currentUser
       });
 
-      if (urlParams.length > 0) {
-        url += '&' + urlParams.join('&');
+      if (dealFilter && dealFilter !== 'all') {
+        params.append('deal_filter', dealFilter);
       }
-      console.log('Download CSV URL:', url);
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('query', searchTerm.trim());
+      }
+      if (newThisWeekFilter) {
+        const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        params.append('created_time_after', sevenDaysAgoStr);
+      }
+      if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+        selectedProperties.forEach(p => {
+          if (p.property === 'created_time' || p.property === 'createdTime') {
+            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+              params.append('date_type', p.dateOperator);
+              if (p.fromDate && p.toDate) {
+                params.append('from', p.fromDate);
+                params.append('to', p.toDate);
+              } else if (p.value || p.date) {
+                params.append('date', p.value || p.date);
+              }
+            } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+              params.append('date_type', 'on');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+              params.append('date_type', 'before');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+              params.append('date_type', 'after');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const count = p.count ? parseInt(p.count) : 1;
+              params.append('date_type', 'in_last');
+              params.append('last_count', count.toString());
+              params.append('last_unit', unitMap[p.period] || 'days');
+            }
+          } else if (p.property && p.value) {
+            const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+            params.append(paramKey, p.value);
+          }
+        });
+      }
 
-      const response = await fetch(url, {
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL;
+      const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
+      console.log('Download CSV URL:', downloadUrl);
+
+      const response = await fetch(downloadUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
 
-      console.log('Download response status:', response.status);
-      console.log('Download response ok:', response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Download error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
+      const downloadBlobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = 'accounts.csv';
+      a.href = downloadBlobUrl;
+      a.download = `accounts_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(downloadUrl);
+      window.URL.revokeObjectURL(downloadBlobUrl);
       document.body.removeChild(a);
       toast.dismiss();
       toast.success('CSV downloaded successfully');
     } catch (err) {
       console.error('Network error downloading filtered CSV:', err);
+      toast.dismiss();
       toast.error(`Failed to download CSV: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setIsDownloadingCSV(false);
     }
   };
 
@@ -2995,194 +3022,7 @@ export default function Opportunities({ onPageChange }) {
               </div>
 
               <button
-                onClick={async () => {
-                  try {
-                    setIsDownloadingCSV(true);
-
-                    // Check if filters are applied
-                    if (isFilterApplied) {
-                      // Collect all active filters
-                      const activeFilters = [];
-
-                      // Add contact owner filter if configured
-                      const contactOwnerProp = selectedProperties.find(prop => prop.property === 'contact_owner');
-                      if (contactOwnerProp && contactOwnerProp.value) {
-                        const selectedOwners = contactOwnerProp.value.split(',');
-                        if (selectedOwners.length > 0) {
-                          const ownersString = selectedOwners.join(',');
-                          activeFilters.push({
-                            property: 'contact_owner',
-                            value: ownersString,
-                            operator: contactOwnerProp.operator
-                          });
-                        }
-                      }
-
-                      // Add lead status filter if configured
-                      const leadStatusProp = selectedProperties.find(prop => prop.property === 'lead_status');
-                      if (leadStatusProp && leadStatusProp.value) {
-                        const selectedStatuses = leadStatusProp.value.split(',');
-                        if (selectedStatuses.length > 0) {
-                          const statusesString = selectedStatuses.join(',');
-                          activeFilters.push({
-                            property: 'lead_status',
-                            value: statusesString,
-                            operator: leadStatusProp.operator
-                          });
-                        }
-                      }
-
-                      // Add tag filter if configured
-                      const tagProp = selectedProperties.find(prop => prop.property === 'tag');
-                      if (tagProp && tagProp.value) {
-                        const selectedTags = tagProp.value.split(',');
-                        if (selectedTags.length > 0) {
-                          const tagsString = selectedTags.join(',');
-                          activeFilters.push({
-                            property: 'tag',
-                            value: tagsString,
-                            operator: tagProp.operator
-                          });
-                        }
-                      }
-
-                      // Add mailing state filter if configured
-                      const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
-                      if (mailingStateProp && mailingStateProp.value) {
-                        const selectedStates = mailingStateProp.value.split(',');
-                        if (selectedStates.length > 0) {
-                          const statesString = selectedStates.join(',');
-                          activeFilters.push({
-                            property: 'mailing_state',
-                            value: statesString,
-                            operator: mailingStateProp.operator
-                          });
-                        }
-                      }
-
-                      // Add mailing country filter if configured
-                      const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
-                      if (mailingCountryProp && mailingCountryProp.value) {
-                        const selectedCountries = mailingCountryProp.value.split(',');
-                        if (selectedCountries.length > 0) {
-                          const countriesString = selectedCountries.join(',');
-                          activeFilters.push({
-                            property: 'mailing_country',
-                            value: countriesString,
-                            operator: mailingCountryProp.operator
-                          });
-                        }
-                      }
-
-                      // Add created_by filter if configured
-                      const createdByProp = selectedProperties.find(prop => prop.property === 'created_by');
-                      if (createdByProp && createdByProp.value) {
-                        activeFilters.push({
-                          property: 'created_by',
-                          value: createdByProp.value,
-                          operator: createdByProp.operator || 'is'
-                        });
-                      }
-
-                      // Add modified_by filter if configured
-                      const modifiedByProp = selectedProperties.find(prop => prop.property === 'modified_by');
-                      if (modifiedByProp && modifiedByProp.value) {
-                        activeFilters.push({
-                          property: 'modified_by',
-                          value: modifiedByProp.value,
-                          operator: modifiedByProp.operator || 'is'
-                        });
-                      }
-
-                      // Add city filter if configured
-                      const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
-                      if (cityProp && cityProp.value) {
-                        activeFilters.push({
-                          property: 'mailing_city',
-                          value: cityProp.value,
-                          operator: cityProp.operator || 'is'
-                        });
-                      }
-
-                      // Add lead_source filter if configured
-                      const leadSourceProp = selectedProperties.find(prop => prop.property === 'lead_source');
-                      if (leadSourceProp && leadSourceProp.value) {
-                        activeFilters.push({
-                          property: 'lead_source',
-                          value: leadSourceProp.value,
-                          operator: leadSourceProp.operator || 'is'
-                        });
-                      }
-
-                      // Add description filter if configured
-                      const descriptionProp = selectedProperties.find(prop => prop.property === 'description');
-                      if (descriptionProp && descriptionProp.value) {
-                        activeFilters.push({
-                          property: 'description',
-                          value: descriptionProp.value,
-                          operator: descriptionProp.operator || 'is'
-                        });
-                      }
-
-                      // Add created_time filter if configured
-                      const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
-                      if (createdTimeProp) {
-                        if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before' || createdTimeProp.dateOperator === 'after') && createdTimeProp.value) {
-                          activeFilters.push({
-                            property: 'created_time',
-                            value: createdTimeProp.value,
-                            dateOperator: createdTimeProp.dateOperator
-                          });
-                        } else if (createdTimeProp.dateOperator === 'between' && createdTimeProp.fromDate && createdTimeProp.toDate) {
-                          activeFilters.push({
-                            property: 'created_time',
-                            fromDate: createdTimeProp.fromDate,
-                            toDate: createdTimeProp.toDate,
-                            dateOperator: createdTimeProp.dateOperator
-                          });
-                        }
-                      }
-
-                      // Download filtered CSV
-                      if (activeFilters.length > 0) {
-                        await handleFilteredCSVDownload(activeFilters);
-                      } else {
-                        // Fallback to regular download if no active filters
-                        toast.loading('Downloading CSV...');
-                        const currentUser = user?.name || user?.phone_number || 'operation';
-                        const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL}?user=${encodeURIComponent(currentUser)}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-                        if (!response.ok) throw new Error('Failed to download CSV');
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url; a.download = 'accounts.csv';
-                        document.body.appendChild(a); a.click();
-                        window.URL.revokeObjectURL(url); document.body.removeChild(a);
-                        toast.dismiss();
-                        toast.success('CSV downloaded successfully');
-                      }
-                    } else {
-                      // Regular download without filters
-                      toast.loading('Downloading CSV...');
-                      const currentUser = user?.name || user?.phone_number || 'operation';
-                      const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL}?user=${encodeURIComponent(currentUser)}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
-                      if (!response.ok) throw new Error('Failed to download CSV');
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url; a.download = 'accounts.csv';
-                      document.body.appendChild(a); a.click();
-                      window.URL.revokeObjectURL(url); document.body.removeChild(a);
-                      toast.dismiss();
-                      toast.success('CSV downloaded successfully');
-                    }
-                  } catch (error) {
-                    console.error('Error downloading CSV:', error);
-                    toast.error('Failed to download CSV');
-                  } finally {
-                    setIsDownloadingCSV(false);
-                  }
-                }}
+                onClick={handleFilteredCSVDownload}
                 disabled={isDownloadingCSV}
                 className="btn btn-sm"
                 style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '5px 10px', background: 'var(--green-600)', color: '#fff', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: isDownloadingCSV ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: isDownloadingCSV ? 0.6 : 1 }}
@@ -4207,25 +4047,6 @@ export default function Opportunities({ onPageChange }) {
                           {prop.property === 'deal_name' && (
                             <div>
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                  type="text"
-                                  value={prop.searchTerm || prop.value || ''}
-                                  onChange={(e) => {
-                                    const updated = [...selectedSalesProperties];
-                                    updated[index].searchTerm = e.target.value;
-                                    setSelectedSalesProperties(updated);
-                                  }}
-                                  placeholder="Search deal name..."
-                                  style={{
-                                    flex: 1,
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                />
                                 <select
                                   value={prop.operator || 'contains'}
                                   onChange={(e) => {
@@ -4247,6 +4068,25 @@ export default function Opportunities({ onPageChange }) {
                                   <option value="equals">equals</option>
                                   <option value="starts_with">starts with</option>
                                 </select>
+                                <input
+                                  type="text"
+                                  value={prop.searchTerm || prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  placeholder="Search deal name..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
                               </div>
                               {prop.searchTerm && (
                                 <div style={{

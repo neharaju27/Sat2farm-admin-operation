@@ -1965,85 +1965,96 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
-  const handleFilteredCSVDownload = async (filters) => {
-    console.log('Downloading filtered CSV with filters:', filters);
-
+  const handleFilteredCSVDownload = async () => {
     try {
+      toast.loading('Downloading CSV...');
       const currentUser = user?.name || user?.phone_number || 'operation';
-      let url = `${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`;
-      const urlParams = [];
 
-      // Build URL parameters for all filters
-      filters.forEach(filter => {
-        if (filter.property === 'contact_owner' && filter.value) {
-          const operator = filter.operator === 'isn\'t' ? 'is_not' : 'is';
-          const paramName = `owner_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'lead_status' && filter.value) {
-          const operator = filter.operator === 'isn\'t' || filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `status_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'tag' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `tags_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'mailing_state' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `state_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'mailing_country' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `country_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        }
+      const params = new URLSearchParams({
+        user: currentUser
       });
 
-      if (urlParams.length > 0) {
-        url += '&' + urlParams.join('&');
+      if (filterStatus && filterStatus !== 'all') {
+        params.append('status_is', filterStatus);
       }
-      console.log('Download CSV URL:', url);
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('query', searchTerm.trim());
+      }
+      if (contactOwnerFilter) {
+        const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
+        const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+        const ownerKey = isNot ? 'owner_is_not' : 'owner_is';
+        params.append(ownerKey, contactOwnerFilter);
+      }
+      if (newThisWeekFilter) {
+        const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        params.append('created_time_after', sevenDaysAgoStr);
+      }
+      if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+        selectedProperties.forEach(p => {
+          if (p.property === 'created_time' || p.property === 'createdTime') {
+            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+              params.append('date_type', p.dateOperator);
+              if (p.fromDate && p.toDate) {
+                params.append('from', p.fromDate);
+                params.append('to', p.toDate);
+              } else if (p.value || p.date) {
+                params.append('date', p.value || p.date);
+              }
+            } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+              params.append('date_type', 'on');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+              params.append('date_type', 'before');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+              params.append('date_type', 'after');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const count = p.count ? parseInt(p.count) : 1;
+              params.append('date_type', 'in_last');
+              params.append('last_count', count.toString());
+              params.append('last_unit', unitMap[p.period] || 'days');
+            }
+          } else if (p.property && p.value) {
+            const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+            params.append(paramKey, p.value);
+          }
+        });
+      }
 
-      const response = await fetch(url, {
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL;
+      const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
+      console.log('Download CSV URL:', downloadUrl);
+
+      const response = await fetch(downloadUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
 
-      console.log('Download response status:', response.status);
-      console.log('Download response ok:', response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Download error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      // Get the blob from the response
       const blob = await response.blob();
-      console.log('CSV blob created:', blob);
-
-      // Create a download link
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-
-      // Generate filename with current date and filter info
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
-      const filterInfo = filters.map(f => `${f.property}_${f.operator}_${f.value}`).join('_');
-      const filename = `filtered_leads_${dateStr}_${filterInfo.substring(0, 50)}.csv`;
-
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      alert(`Filtered CSV downloaded successfully! Filename: ${filename}`);
+      const downloadBlobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadBlobUrl;
+      a.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadBlobUrl);
+      document.body.removeChild(a);
+      toast.dismiss();
+      toast.success('CSV downloaded successfully');
     } catch (err) {
       console.error('Network error downloading filtered CSV:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      toast.dismiss();
+      toast.error(`Failed to download CSV: ${err.message || 'Unknown error occurred'}`);
     }
   };
 
@@ -2784,86 +2795,7 @@ export default function LeadPipeline({ onPageChange }) {
           </button>
 
           <button
-            onClick={() => {
-              if (isFilterApplied) {
-                // Collect active filters for download
-                const activeFilters = [];
-
-                const contactOwnerProp = selectedProperties.find(prop => prop.property === 'contact_owner');
-                if (contactOwnerProp && contactOwnerProp.value) {
-                  const selectedOwners = contactOwnerProp.value.split(',');
-                  if (selectedOwners.length > 0) {
-                    const ownersString = selectedOwners.join(',');
-                    activeFilters.push({
-                      property: 'contact_owner',
-                      value: ownersString,
-                      operator: contactOwnerProp.operator
-                    });
-                  }
-                }
-
-                const leadStatusProp = selectedProperties.find(prop => prop.property === 'lead_status');
-                if (leadStatusProp && leadStatusProp.value) {
-                  const selectedStatuses = leadStatusProp.value.split(',');
-                  if (selectedStatuses.length > 0) {
-                    const statusesString = selectedStatuses.join(',');
-                    activeFilters.push({
-                      property: 'lead_status',
-                      value: statusesString,
-                      operator: leadStatusProp.operator
-                    });
-                  }
-                }
-
-                const tagProp = selectedProperties.find(prop => prop.property === 'tag');
-                if (tagProp && tagProp.value) {
-                  const selectedTags = tagProp.value.split(',');
-                  if (selectedTags.length > 0) {
-                    const tagsString = selectedTags.join(',');
-                    activeFilters.push({
-                      property: 'tag',
-                      value: tagsString,
-                      operator: tagProp.operator
-                    });
-                  }
-                }
-
-                const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
-                if (mailingStateProp && mailingStateProp.value) {
-                  const selectedStates = mailingStateProp.value.split(',');
-                  if (selectedStates.length > 0) {
-                    const statesString = selectedStates.join(',');
-                    activeFilters.push({
-                      property: 'mailing_state',
-                      value: statesString,
-                      operator: mailingStateProp.operator
-                    });
-                  }
-                }
-
-                const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
-                if (mailingCountryProp && mailingCountryProp.value) {
-                  const selectedCountries = mailingCountryProp.value.split(',');
-                  if (selectedCountries.length > 0) {
-                    const countriesString = selectedCountries.join(',');
-                    activeFilters.push({
-                      property: 'mailing_country',
-                      value: countriesString,
-                      operator: mailingCountryProp.operator
-                    });
-                  }
-                }
-
-                // Download filtered CSV if filters are applied
-                if (activeFilters.length > 0) {
-                  handleFilteredCSVDownload(activeFilters);
-                } else {
-                  downloadCSV(); // Fallback to regular download if no filters
-                }
-              } else {
-                downloadCSV(); // Regular download if no filters applied
-              }
-            }}
+            onClick={handleFilteredCSVDownload}
             className="btn btn-sm"
             style={{
               fontFamily: 'var(--font-mono)',
