@@ -365,8 +365,8 @@ export default function LeadPipeline({ onPageChange }) {
 
         let url;
         const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
-        const fetchLimit = isSearching ? 1000 : limit;
-        const fetchOffset = isSearching ? 0 : offset;
+        const fetchLimit = limit;
+        const fetchOffset = offset;
 
         const hasActiveFilter = (typeof isFilterApplied !== 'undefined' && isFilterApplied) ||
           (typeof filterStatus !== 'undefined' && filterStatus !== 'all') ||
@@ -381,7 +381,7 @@ export default function LeadPipeline({ onPageChange }) {
         // 1. If searching, call dedicated search endpoint: /search?user=...&type=lead&query=...
         if (isSearching && searchApiUrl) {
           try {
-            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&query=${encodeURIComponent(searchTerm.trim())}`;
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
             response = await fetch(searchUrl);
           } catch (searchErr) {
             console.warn('Dedicated search API failed, falling back to filter/leads API:', searchErr);
@@ -1062,7 +1062,7 @@ export default function LeadPipeline({ onPageChange }) {
     const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
     return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
   });
-  const isClientPaginated = isSearching || newThisWeekFilter;
+  const isClientPaginated = newThisWeekFilter;
   const displayedLeads = isClientPaginated
     ? filteredLeads.slice(offset, offset + limit)
     : filteredLeads;
@@ -3167,6 +3167,10 @@ export default function LeadPipeline({ onPageChange }) {
                           setSearchTerm('');
                           setSearchInput('');
                           setIsFilterApplied(false);
+                          setCurrentFilterCriteria('');
+                          setSelectedProperties([]);
+                          setCurrentProperty('');
+                          setContactOwnerFilter('');
                           setOffset(0);
                         }}
                       />

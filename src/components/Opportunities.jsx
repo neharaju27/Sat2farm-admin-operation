@@ -221,80 +221,7 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  const getMockOpportunities = () => [
-    {
-      id: 1,
-      contactName: 'John Smith',
-      phoneNumber: '+91 9876543210',
-      alternateNumber: '+91 8765432109',
-      email: 'john.smith@example.com',
-      companyName: 'AgriTech Solutions',
-      contactOwner: 'Sales Team',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      country: 'IN',
-      leadStatus: 'Qualified',
-      tags: 'enterprise, agriculture',
-      leadSource: 'Website',
-      description: 'Interested in farm management solution for 500 acres',
-      createdTime: new Date().toISOString(),
-      industry: 'Agriculture',
-      createdBy: 'Admin',
-      modifiedBy: 'Sales Team',
-      lastActivity: new Date().toISOString(),
-      accountName: 'AgriTech Solutions Pvt Ltd',
-      accountNumber: 'ACC-001234',
-      dealPresent: true
-    },
-    {
-      id: 2,
-      contactName: 'Priya Sharma',
-      phoneNumber: '+91 9123456780',
-      alternateNumber: '+91 9012345678',
-      email: 'priya.sharma@farmcorp.com',
-      companyName: 'FarmCorp India',
-      contactOwner: 'Sales Team',
-      city: 'Bangalore',
-      state: 'Karnataka',
-      country: 'IN',
-      leadStatus: 'Contacted',
-      tags: 'startup, technology',
-      leadSource: 'Referral',
-      description: 'Looking for satellite-based crop monitoring',
-      createdTime: new Date(Date.now() - 86400000).toISOString(),
-      industry: 'Technology',
-      createdBy: 'Admin',
-      modifiedBy: 'Sales Team',
-      lastActivity: new Date(Date.now() - 43200000).toISOString(),
-      accountName: 'FarmCorp India Ltd',
-      accountNumber: 'ACC-001235',
-      dealPresent: false
-    },
-    {
-      id: 3,
-      contactName: 'Rajesh Kumar',
-      phoneNumber: '+91 9988776655',
-      alternateNumber: '+91 9877665544',
-      email: 'rajesh.kumar@greenfields.com',
-      companyName: 'Green Fields Co',
-      contactOwner: 'Operations',
-      city: 'Delhi',
-      state: 'Delhi',
-      country: 'IN',
-      leadStatus: 'Yet to Contact',
-      tags: 'large-scale, organic',
-      leadSource: 'Trade Show',
-      description: 'Large scale organic farming operation',
-      createdTime: new Date(Date.now() - 172800000).toISOString(),
-      industry: 'Agriculture',
-      createdBy: 'Admin',
-      modifiedBy: 'System',
-      lastActivity: new Date(Date.now() - 172800000).toISOString(),
-      accountName: 'Green Fields Cooperative',
-      accountNumber: 'ACC-001236',
-      dealPresent: true
-    }
-  ];
+  const getMockOpportunities = () => [];
 
   // ── Modal & editing state (mirrors LeadPipeline) ──────────────────────────
   const [showUserModal, setShowUserModal] = useState(false);
@@ -456,6 +383,7 @@ export default function Opportunities({ onPageChange }) {
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [isLast50Mode, setIsLast50Mode] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
+  const lastFetchedUrlRef = React.useRef('');
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
   const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
@@ -888,8 +816,8 @@ export default function Opportunities({ onPageChange }) {
       const currentUserName = user?.name || user?.phone_number || 'operation';
 
       const isSearching = (searchTerm && searchTerm.trim() !== '');
-      const fetchLimit = isSearching ? 1000 : currentLimit;
-      const fetchOffset = isSearching ? 0 : currentOffset;
+      const fetchLimit = currentLimit;
+      const fetchOffset = currentOffset;
 
       const hasActiveFilter = (dealFilter && dealFilter !== 'all') ||
         isSearching ||
@@ -908,7 +836,7 @@ export default function Opportunities({ onPageChange }) {
         // 1. If searching, call dedicated search endpoint: /search?user=...&type=account&query=...
         if (isSearching && searchApiUrl) {
           try {
-            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}`;
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
             response = await fetch(searchUrl);
           } catch (searchErr) {
             console.warn('Dedicated account search API failed:', searchErr);
@@ -964,7 +892,13 @@ export default function Opportunities({ onPageChange }) {
             });
           }
 
-          response = await fetch(`${filterApiUrl}?${params.toString()}`);
+          const requestUrl = `${filterApiUrl}?${params.toString()}`;
+          if (lastFetchedUrlRef.current === requestUrl && opportunities.length > 0) {
+            setLoading(false);
+            return;
+          }
+          lastFetchedUrlRef.current = requestUrl;
+          response = await fetch(requestUrl);
         }
 
         // 3. Fallback to main accounts API
@@ -975,7 +909,15 @@ export default function Opportunities({ onPageChange }) {
               offset: fetchOffset.toString(),
               limit: fetchLimit.toString()
             });
-            response = await fetch(`${accountsApiUrl}?${params.toString()}`);
+            const accountReqUrl = `${accountsApiUrl}?${params.toString()}`;
+            if (!hasActiveFilter && lastFetchedUrlRef.current === accountReqUrl && opportunities.length > 0) {
+              setLoading(false);
+              return;
+            }
+            if (!hasActiveFilter) {
+              lastFetchedUrlRef.current = accountReqUrl;
+            }
+            response = await fetch(accountReqUrl);
           }
         }
 
@@ -986,6 +928,9 @@ export default function Opportunities({ onPageChange }) {
 
           if (responseData && typeof responseData.total === 'number') {
             setTotalOpportunities(responseData.total);
+            if (isFilterApplied) {
+              toast.success(`Filter applied: ${responseData.total} records found`, { id: 'opp-filter-toast' });
+            }
             if (dealFilter !== 'all') {
               setApiDealTotals(prev => ({
                 ...prev,
@@ -994,6 +939,9 @@ export default function Opportunities({ onPageChange }) {
             }
           } else if (Array.isArray(responseData)) {
             setTotalOpportunities(responseData.length);
+            if (isFilterApplied) {
+              toast.success(`Filter applied: ${responseData.length} records found`, { id: 'opp-filter-toast' });
+            }
           }
         }
 
@@ -2121,7 +2069,7 @@ export default function Opportunities({ onPageChange }) {
     setSelectedDeal({
       deal_id: deal.deal_id,
       deal_name: deal.deal_name,
-      contact_name: deal.full_name || 'John Smith',
+      contact_name: deal.full_name || deal.account_name || deal.contact_name || '',
       amount: `₹${deal.deal_amount}`,
       closing_date: deal.deal_close_date
         ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', {
@@ -2937,7 +2885,7 @@ export default function Opportunities({ onPageChange }) {
     return matchesSearch && isNewThisWeek;
   });
 
-  const isClientPaginated = isSearching || newThisWeekFilter;
+  const isClientPaginated = newThisWeekFilter;
 
   const totalCount = (dealFilter !== 'all' && apiDealTotals[dealFilter] !== undefined)
     ? apiDealTotals[dealFilter]
@@ -3313,69 +3261,19 @@ export default function Opportunities({ onPageChange }) {
                   Filtered Results: {currentFilterCriteria}
                 </span>
                 <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
-                  ({opportunities.length} records found)
+                  ({(totalOpportunities || opportunities.length).toLocaleString()} records found)
                 </span>
               </div>
               <button
                 onClick={() => {
+                  lastFetchedUrlRef.current = '';
                   setIsFilterApplied(false);
                   setCurrentFilterCriteria('');
                   setSelectedProperties([]);
                   setCurrentProperty('');
                   setNewThisWeekFilter(false);
                   setSearchTerm('');
-                  // Refetch all opportunities to show unfiltered results
-                  const fetchOpportunities = async () => {
-                    try {
-                      setLoading(true);
-                      const currentUserName = user?.name || user?.phone_number || 'operation';
-                      const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
-                      if (!apiUrl) {
-                        setOpportunities(getMockOpportunities());
-                        setLoading(false);
-                        return;
-                      }
-                      const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}`);
-                      if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                      }
-                      const data = await response.json();
-                      const transformedOpportunities = data.map(opp => ({
-                        id: opp.id,
-                        contactName: opp.full_name || 'Unknown',
-                        phoneNumber: opp.phone || '',
-                        alternateNumber: opp.alternate_number || '',
-                        email: opp.email || '',
-                        companyName: opp.company_name || '',
-                        contactOwner: opp.owner || 'Unassigned',
-                        city: opp.city || '',
-                        state: opp.state || '',
-                        country: opp.country || 'IN',
-                        leadStatus: opp.status || 'New',
-                        tags: opp.tags || '',
-                        leadSource: opp.lead_source || '',
-                        description: opp.description || '',
-                        createdTime: opp.created_time || new Date().toISOString(),
-                        industry: opp.industry || '',
-                        createdBy: opp.created_by || 'System',
-                        modifiedBy: opp.modified_by || 'System',
-                        lastActivity: opp.last_activity || new Date().toISOString(),
-                        accountName: opp.account_name || '',
-                        accountNumber: opp.account_number || '',
-                        dealPresent: opp.deal_present || 0,
-                        website: opp.website || '',
-                        accountType: opp.account_type || '',
-                        modifiedTime: opp.modified_time || ''
-                      }));
-                      setOpportunities(transformedOpportunities);
-                    } catch (err) {
-                      console.error('Error fetching opportunities:', err);
-                      setOpportunities(getMockOpportunities());
-                    } finally {
-                      setLoading(false);
-                    }
-                  };
-                  fetchOpportunities();
+                  setCurrentPage(1);
                 }}
                 style={{
                   background: 'none',
@@ -3501,9 +3399,15 @@ export default function Opportunities({ onPageChange }) {
                             title="No accounts to display"
                             subtitle="Accounts from Satyukt CRM will appear here."
                             onRefresh={() => {
+                              lastFetchedUrlRef.current = '';
                               setSearchTerm('');
                               setSearchInput('');
                               setIsFilterApplied(false);
+                              setCurrentFilterCriteria('');
+                              setSelectedProperties([]);
+                              setCurrentProperty('');
+                              setNewThisWeekFilter(false);
+                              setDealFilter('all');
                               setCurrentPage(1);
                             }}
                           />
@@ -6045,7 +5949,7 @@ export default function Opportunities({ onPageChange }) {
                                     setSelectedDeal({
                                       deal_id: deal.deal_id,
                                       deal_name: deal.deal_name,
-                                      contact_name: deal.full_name || 'John Smith',
+                                      contact_name: deal.full_name || '',
                                       amount: `₹${deal.deal_amount}`,
                                       closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
                                       description: deal.description || '',
@@ -7002,7 +6906,7 @@ export default function Opportunities({ onPageChange }) {
                                           setSelectedDeal({
                                             deal_id: deal.deal_id,
                                             deal_name: deal.deal_name,
-                                            contact_name: selectedUser?.contactName || 'John Smith',
+                                            contact_name: selectedUser?.contactName || '',
                                             amount: `₹${deal.deal_amount}`,
                                             closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
                                             description: deal.description || '',
@@ -7678,9 +7582,9 @@ export default function Opportunities({ onPageChange }) {
                         <option value="contact_owner">Contact Owner</option>
                         <option value="created_time">Created Time</option>
                         <option value="tag">Tags</option>
-                        <option value="mailing_country">Country</option>
-                        <option value="mailing_state">State</option>
-                        <option value="mailing_city">City</option>
+                        <option value="mailing_country">Mailing Country</option>
+                        <option value="mailing_state">Mailing State</option>
+                        <option value="mailing_city">Mailing City</option>
                         <option value="created_by">Created By</option>
                         <option value="modified_by">Modified By</option>
                       </select>
