@@ -116,7 +116,7 @@ export default function Opportunities({ onPageChange }) {
 
       const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
       if (!apiUrl) {
-        console.log('Accounts API URL not configured, using mock data');
+        
         setOpportunities(getMockOpportunities());
         setError(null);
         setLoading(false);
@@ -201,7 +201,7 @@ export default function Opportunities({ onPageChange }) {
       const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=with_deals`);
       if (withDealsResponse.ok) {
         const withDealsData = await withDealsResponse.json();
-        console.log('With deals API response:', withDealsData);
+        
         if (withDealsData.total !== undefined) {
           setApiDealTotals(prev => ({ ...prev, with_deals: withDealsData.total }));
         }
@@ -211,7 +211,7 @@ export default function Opportunities({ onPageChange }) {
       const withoutDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=without_deals`);
       if (withoutDealsResponse.ok) {
         const withoutDealsData = await withoutDealsResponse.json();
-        console.log('Without deals API response:', withoutDealsData);
+        
         if (withoutDealsData.total !== undefined) {
           setApiDealTotals(prev => ({ ...prev, without_deals: withoutDealsData.total }));
         }
@@ -635,7 +635,7 @@ export default function Opportunities({ onPageChange }) {
   };
 
   const handleCombinedFilters = async (filters) => {
-    console.log('Applying combined filters:', filters);
+    
     if (isApplyingAccountsFilters) return;
     setIsApplyingAccountsFilters(true);
     setAccountsFiltersSuccess(false);
@@ -679,8 +679,8 @@ export default function Opportunities({ onPageChange }) {
       });
 
       url += urlParams.join('&');
-      console.log('Full API URL:', url);
-      console.log('URL params:', urlParams);
+      
+      
 
       const response = await fetch(url, {
         method: 'GET',
@@ -689,8 +689,8 @@ export default function Opportunities({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -699,7 +699,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
       const totalRecords = (result && typeof result.total === 'number') ? result.total : oppsData.length;
@@ -709,7 +709,7 @@ export default function Opportunities({ onPageChange }) {
       while ((result.has_more || (currentNextOffset && oppsData.length < totalRecords)) && currentNextOffset) {
         try {
           const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-          console.log('Fetching next batch from:', nextUrl);
+          
           const nextResponse = await fetch(nextUrl, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
@@ -736,7 +736,7 @@ export default function Opportunities({ onPageChange }) {
       setCurrentPage(1);
 
       if (Array.isArray(oppsData)) {
-        console.log('Combined filters successful, total loaded:', oppsData.length);
+        
 
         // Set filter applied state and criteria
         setIsFilterApplied(true);
@@ -875,6 +875,8 @@ export default function Opportunities({ onPageChange }) {
 
   // Fetch filtered opportunities based on deal filter & search criteria across all server data
   useEffect(() => {
+    if (viewMode !== 'table') return;
+
     const fetchFilteredOpportunities = async () => {
       const currentLimit = itemsPerPage || 10;
       const currentOffset = ((currentPage || 1) - 1) * currentLimit;
@@ -915,6 +917,10 @@ export default function Opportunities({ onPageChange }) {
             offset: fetchOffset.toString(),
             limit: fetchLimit.toString()
           });
+
+          if (isSearching) {
+            params.append('query', searchTerm.trim());
+          }
 
           if (dealFilter && dealFilter !== 'all') {
             params.append('deal_filter', dealFilter);
@@ -1047,7 +1053,7 @@ export default function Opportunities({ onPageChange }) {
     };
 
     fetchFilteredOpportunities();
-  }, [dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied, refreshKey]);
+  }, [viewMode, dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied, refreshKey]);
 
   // â”€â”€ Filter Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const applyFilters = (deals) => {
@@ -1423,7 +1429,7 @@ export default function Opportunities({ onPageChange }) {
     try {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL;
       if (!apiUrl) {
-        console.log('Filter Deals API URL not configured');
+        
         toast.error('Filter API URL not configured');
         return;
       }
@@ -1431,6 +1437,10 @@ export default function Opportunities({ onPageChange }) {
       const currentUser = user?.name || user?.phone_number || 'operation';
       let url = `${apiUrl}?user=${encodeURIComponent(currentUser)}`;
       const urlParams = [];
+
+      if (searchTerm && searchTerm.trim()) {
+        urlParams.push(`query=${encodeURIComponent(searchTerm.trim())}`);
+      }
 
       // Maps each date-property to its backend date_field name
       const dateFieldMap = {
@@ -1551,7 +1561,7 @@ export default function Opportunities({ onPageChange }) {
           url += '&' + urlParams.join('&');
         }
 
-        console.log('Filter API URL:', url);
+        
 
         response = await fetch(url, {
           method: 'GET',
@@ -1561,7 +1571,7 @@ export default function Opportunities({ onPageChange }) {
         });
       }
 
-      console.log('Filter response status:', response.status);
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1570,7 +1580,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Filter API result:', result);
+      
 
       if (result.data && Array.isArray(result.data)) {
         let allData = [...result.data];
@@ -1581,7 +1591,7 @@ export default function Opportunities({ onPageChange }) {
         while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
           try {
             const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-            console.log('Fetching next batch from:', nextUrl);
+            
             const nextResponse = await fetch(nextUrl, {
               method: 'GET',
               headers: { 'Content-Type': 'application/json' }
@@ -1820,7 +1830,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Note added successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Note added successfully');
@@ -1845,7 +1855,7 @@ export default function Opportunities({ onPageChange }) {
     try {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
       if (!apiUrl) {
-        console.log('Deals API URL not configured');
+        
         return { deals: [], total: 0 };
       }
 
@@ -1857,7 +1867,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log(`Deals for stage ${stage}:`, result);
+      
 
       const dealsList = Array.isArray(result) ? result : (result.data || result.results || result.deals || []);
       const totalCount = result.total !== undefined ? result.total : (result.count !== undefined ? result.count : dealsList.length);
@@ -1903,6 +1913,17 @@ export default function Opportunities({ onPageChange }) {
       console.error('Error fetching all kanban deals:', err);
     }
   };
+
+  // Apply search/filters automatically for Deal Pipeline (Kanban) when state changes
+  useEffect(() => {
+    if (viewMode !== 'kanban') return;
+
+    if (searchTerm || salesFiltersApplied || newThisWeekFilter) {
+      applySalesFilters();
+    } else {
+      fetchAllKanbanDeals();
+    }
+  }, [viewMode, searchTerm, salesFiltersApplied, newThisWeekFilter, refreshKey]);
 
   // Infinite scroll: fetch next batch of 50 deals for a specific stage when user scrolls near column bottom
   const handleLoadMoreStageDeals = async (stage) => {
@@ -1968,7 +1989,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Task added successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Task created successfully');
@@ -2031,7 +2052,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Task updated successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Task updated successfully');
@@ -2072,7 +2093,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Activities fetched:', result);
+      
       setActivities(result || []);
     } catch (err) {
       console.error('Error fetching activities:', err);
@@ -2155,7 +2176,7 @@ export default function Opportunities({ onPageChange }) {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
-        console.log('Update deal API URL not configured');
+        
         toast.dismiss();
         toast.error('Update Deal API URL not configured');
         fetchAllKanbanDeals();
@@ -2179,7 +2200,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Deal stage updated successfully:', result);
+      
 
       toast.dismiss();
       if (result.success || result.message) {
@@ -2321,7 +2342,7 @@ export default function Opportunities({ onPageChange }) {
       const apiUrl = import.meta.env.VITE_DEALS_API_URL;
 
       if (!apiUrl) {
-        console.log('Deals API URL not configured');
+        
         setDealsData([]);
         setDealCounts(prev => ({ ...prev, [accountId]: 0 }));
         return;
@@ -2335,8 +2356,8 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Deals API Result:', result);
-      console.log('First deal in fetchDeals:', result.data?.[0]);
+      
+      
 
       const deals = (result.data || []).map(deal => ({
         ...deal,
@@ -2359,7 +2380,7 @@ export default function Opportunities({ onPageChange }) {
   const fetchAllDealCounts = async (opportunities) => {
     const apiUrl = import.meta.env.VITE_DEALS_API_URL;
     if (!apiUrl) {
-      console.log('Deals API URL not configured');
+      
       return;
     }
 
@@ -2429,7 +2450,7 @@ export default function Opportunities({ onPageChange }) {
           requestBody[apiFieldName] = editDealValue;
         }
 
-        console.log('Updating deal with:', requestBody);
+        
 
         const response = await fetch(apiUrl, {
           method: 'PUT',
@@ -2446,7 +2467,7 @@ export default function Opportunities({ onPageChange }) {
         }
 
         const result = await response.json();
-        console.log('API Result:', result);
+        
 
         toast.dismiss();
         toast.success('Deal updated successfully');
@@ -2498,7 +2519,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Delete API Result:', result);
+      
 
       toast.dismiss();
       toast.success('Deal deleted successfully');
@@ -2553,7 +2574,7 @@ export default function Opportunities({ onPageChange }) {
           }
 
           const result = await response.json();
-          console.log('CSV upload result:', result);
+          
 
           toast.dismiss();
           toast.success('CSV uploaded successfully');
@@ -2628,7 +2649,7 @@ export default function Opportunities({ onPageChange }) {
 
       const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL;
       const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
-      console.log('Download CSV URL:', downloadUrl);
+      
 
       const response = await fetch(downloadUrl, {
         method: 'GET',
@@ -2945,9 +2966,9 @@ export default function Opportunities({ onPageChange }) {
         url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       }
 
-      console.log('API URL:', url);
+      
       const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
-      console.log('Response status:', response.status);
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -2956,12 +2977,12 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API Result:', result);
+      
 
       const success = result.success ||
         (result.message && (result.message.toLowerCase().includes('updated') || result.message.toLowerCase().includes('success')));
 
-      console.log('Success check:', success);
+      
 
       if (success) {
         setOpportunities(prev => prev.map(o => o.id === leadId ? { ...o, [fieldName]: newValue } : o));
@@ -3108,6 +3129,8 @@ export default function Opportunities({ onPageChange }) {
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
                   <input
+                    id="search-opportunities"
+                    name="search-opportunities"
                     type="text"
                     placeholder="Search opportunities..."
                     value={searchInput}
@@ -3201,14 +3224,19 @@ export default function Opportunities({ onPageChange }) {
                   Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
                 </span>
                 <span style={{ color: '#4ade80', fontSize: '13px' }}>
-                  • {effectiveTotalCount.toLocaleString()} {effectiveTotalCount === 1 ? 'record' : 'records'} found
+                  • {viewMode === 'kanban'
+                    ? `${dealMetrics.total.toLocaleString()} ${dealMetrics.total === 1 ? 'deal' : 'deals'} found`
+                    : `${effectiveTotalCount.toLocaleString()} ${effectiveTotalCount === 1 ? 'record' : 'records'} found`
+                  }
                 </span>
               </div>
               <button
                 onClick={() => {
                   setSearchTerm('');
                   setSearchInput('');
+                  setDealsSearchInput('');
                   setCurrentPage(1);
+                  setSalesPipelineCurrentPage(1);
                 }}
                 style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
               >
@@ -3678,7 +3706,7 @@ export default function Opportunities({ onPageChange }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
                     <span>Records per page</span>
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                      <select value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
+                      <select id="opportunities-per-page" name="opportunities-per-page" value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === 'last50') {
@@ -5891,6 +5919,8 @@ export default function Opportunities({ onPageChange }) {
                         <span style={{ fontSize: '13px', color: '#6b7280' }}>Records per page</span>
                         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                           <select
+                            id="sales-pipeline-per-page"
+                            name="sales-pipeline-per-page"
                             value={isLast50Mode && salesPipelineItemsPerPage === 50 ? 'last50' : salesPipelineItemsPerPage}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -7078,7 +7108,7 @@ export default function Opportunities({ onPageChange }) {
                             user: currentUserName
                           };
 
-                          console.log('Creating deal with:', requestBody);
+                          
 
                           const response = await fetch(apiUrl, {
                             method: 'POST',
@@ -7095,7 +7125,7 @@ export default function Opportunities({ onPageChange }) {
                           }
 
                           const result = await response.json();
-                          console.log('API Result:', result);
+                          
 
                           toast.dismiss();
                           toast.success('Deal created successfully');

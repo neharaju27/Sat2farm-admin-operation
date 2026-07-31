@@ -388,6 +388,7 @@ export default function LeadPipeline({ onPageChange }) {
         if (isSearching && searchApiUrl) {
           try {
             const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
+            console.log('Lead search URL:', searchUrl);
             response = await fetch(searchUrl);
           } catch (searchErr) {
             console.warn('Dedicated search API failed, falling back to filter/leads API:', searchErr);
@@ -402,6 +403,10 @@ export default function LeadPipeline({ onPageChange }) {
               offset: fetchOffset.toString(),
               limit: fetchLimit.toString()
             });
+
+            if (isSearching) {
+              params.append('query', searchTerm.trim());
+            }
 
             if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
               params.append('status_is', filterStatus);
@@ -469,7 +474,7 @@ export default function LeadPipeline({ onPageChange }) {
 
         const data = await response.json();
 
-        console.log('API Response structure:', data);
+        
 
         // Handle paginated API response structure
         let leadsArray = data;
@@ -477,14 +482,14 @@ export default function LeadPipeline({ onPageChange }) {
 
         if (data && typeof data === 'object' && !Array.isArray(data)) {
           // API returns paginated response object with metadata
-          console.log('API response keys:', Object.keys(data));
+          
           leadsArray = data.data || data.results || data.leads || data.items || data.records || data.rows || [];
 
           // Fallback: find the first array property in the response
           if (!Array.isArray(leadsArray) || leadsArray.length === 0) {
             for (const key in data) {
               if (Array.isArray(data[key]) && data[key].length > 0) {
-                console.log(`Found leads array in property: ${key}`);
+                
                 leadsArray = data[key];
                 break;
               }
@@ -776,7 +781,7 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Note added successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Note added successfully');
@@ -827,7 +832,7 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Task added successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Task created successfully');
@@ -890,7 +895,7 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Task updated successfully:', result);
+      
 
       if (result.success || result.message) {
         toast.success('Task updated successfully');
@@ -931,7 +936,7 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('Activities fetched:', result);
+      
       setActivities(result || []);
     } catch (err) {
       console.error('Error fetching activities:', err);
@@ -1110,12 +1115,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleStatusUpdate = async (leadId, newStatus) => {
-    console.log('Updating lead status:', { leadId, newStatus });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1124,8 +1129,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1134,10 +1139,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Status update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1162,12 +1167,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleOwnerUpdate = async (leadId, newOwner) => {
-    console.log('Updating lead owner:', { leadId, newOwner });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newOwner)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1176,8 +1181,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1186,10 +1191,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Owner update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1214,7 +1219,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleFieldUpdate = async (leadId, fieldName, newValue) => {
-    console.log('Updating lead field:', { leadId, fieldName, newValue });
+    
 
     // Show updating message
     toast.loading('Updating...', { id: 'field-update' });
@@ -1274,7 +1279,7 @@ export default function LeadPipeline({ onPageChange }) {
         successMessage = `Lead ${fieldName} updated to ${newValue} successfully!`;
       }
 
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1283,8 +1288,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1293,10 +1298,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Field update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1334,7 +1339,7 @@ export default function LeadPipeline({ onPageChange }) {
         const message = result.message || 'Unknown error';
         if (message.toLowerCase().includes('updated') || message.toLowerCase().includes('success')) {
           // If message indicates success despite success=false, treat it as success
-          console.log('API indicates success despite success flag, treating as successful update');
+          
           // Update local state
           setLeads(prevLeads =>
             prevLeads.map(lead =>
@@ -1416,12 +1421,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleTagsUpdate = async (leadId, newTags) => {
-    console.log('Updating lead tags:', { leadId, newTags });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newTags)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1430,8 +1435,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1440,10 +1445,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Tags update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1468,12 +1473,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleLeadSourceUpdate = async (leadId, newLeadSource) => {
-    console.log('Updating lead source:', { leadId, newLeadSource });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newLeadSource)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1482,8 +1487,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1492,10 +1497,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Lead source update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1520,12 +1525,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleCityUpdate = async (leadId, newCity) => {
-    console.log('Updating city:', { leadId, newCity });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newCity)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1534,8 +1539,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1544,10 +1549,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('City update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1572,12 +1577,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleStateUpdate = async (leadId, newState) => {
-    console.log('Updating state:', { leadId, newState });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newState)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1586,8 +1591,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1596,10 +1601,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('State update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1624,12 +1629,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleCountryUpdate = async (leadId, newCountry) => {
-    console.log('Updating country:', { leadId, newCountry });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newCountry)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1638,8 +1643,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1648,10 +1653,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Country update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1676,12 +1681,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleIndustryUpdate = async (leadId, newIndustry) => {
-    console.log('Updating industry:', { leadId, newIndustry });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newIndustry)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1690,8 +1695,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1700,10 +1705,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Industry update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1728,12 +1733,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleLeadInfoStatusUpdate = async (leadId, newStatus) => {
-    console.log('Updating lead status from Lead Information modal:', { leadId, newStatus });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newStatus)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1742,8 +1747,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1752,10 +1757,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Lead status update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1785,12 +1790,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleAlternateNumberUpdate = async (leadId, newAlternateNumber) => {
-    console.log('Updating alternate phone number from Lead Information modal:', { leadId, newAlternateNumber });
+    
 
     try {
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newAlternateNumber)}&user=${encodeURIComponent(currentUserName)}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -1799,8 +1804,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1809,10 +1814,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Alternate number update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -1842,7 +1847,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleDeleteLead = async (leadId) => {
-    console.log('Deleting lead:', { leadId });
+    
 
     // Confirm deletion
     const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action cannot be undone.');
@@ -1852,7 +1857,7 @@ export default function LeadPipeline({ onPageChange }) {
 
     try {
       const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'DELETE',
@@ -1861,8 +1866,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1871,10 +1876,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Lead deletion successful');
+        
         // Remove lead from local state
         setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
 
@@ -1898,7 +1903,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleContactOwnerFilter = async (owner, operator) => {
-    console.log('Filtering leads by contact owner:', { owner, operator });
+    
     setLoading(true);
 
     try {
@@ -1910,7 +1915,7 @@ export default function LeadPipeline({ onPageChange }) {
         url += `owner_is_not=${encodeURIComponent(owner)}`;
       }
 
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'GET',
@@ -1919,8 +1924,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1929,10 +1934,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.data && Array.isArray(result.data)) {
-        console.log('Contact owner filter successful');
+        
 
         // Transform the filtered leads data
         const transformedLeads = result.data.map(lead => ({
@@ -2047,7 +2052,7 @@ export default function LeadPipeline({ onPageChange }) {
 
       const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL;
       const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
-      console.log('Download CSV URL:', downloadUrl);
+      
 
       const response = await fetch(downloadUrl, {
         method: 'GET',
@@ -2080,11 +2085,11 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleContactNameUpdate = async (leadId, newContactName) => {
-    console.log('Updating contact name:', { leadId, newContactName });
+    
 
     try {
       const url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newContactName)}&user=admin`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -2093,8 +2098,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -2103,10 +2108,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success) {
-        console.log('Contact name update successful');
+        
         // Update local state
         setLeads(prevLeads =>
           prevLeads.map(lead =>
@@ -2131,12 +2136,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleCreateLead = async (leadData) => {
-    console.log('Creating new lead:', leadData);
+    
     toast.loading('Adding lead...', { id: 'create-lead' });
 
     try {
       const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}`;
-      console.log('Full API URL:', url);
+      
 
       const response = await fetch(url, {
         method: 'POST',
@@ -2146,8 +2151,8 @@ export default function LeadPipeline({ onPageChange }) {
         body: JSON.stringify(leadData)
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -2157,10 +2162,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.success || result.message || response.ok) {
-        console.log('Lead creation successful');
+        
         // Refresh the leads list
         fetchLeads();
         setShowAddModal(false);
@@ -2182,7 +2187,7 @@ export default function LeadPipeline({ onPageChange }) {
     if (isApplyingFilters) return;
     setIsApplyingFilters(true);
     setFiltersSuccess(false);
-    console.log('Applying combined filters:', filters);
+    
     setLoading(true);
 
     try {
@@ -2254,8 +2259,8 @@ export default function LeadPipeline({ onPageChange }) {
       });
 
       url += urlParams.join('&');
-      console.log('Full API URL:', url);
-      console.log('URL params:', urlParams);
+      
+      
 
       const response = await fetch(url, {
         method: 'GET',
@@ -2264,8 +2269,8 @@ export default function LeadPipeline({ onPageChange }) {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -2274,7 +2279,7 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.data && Array.isArray(result.data)) {
         let allData = [...result.data];
@@ -2285,7 +2290,7 @@ export default function LeadPipeline({ onPageChange }) {
         while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
           try {
             const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-            console.log('Fetching next batch from:', nextUrl);
+            
             const nextResponse = await fetch(nextUrl, {
               method: 'GET',
               headers: { 'Content-Type': 'application/json' }
@@ -2308,7 +2313,7 @@ export default function LeadPipeline({ onPageChange }) {
           }
         }
 
-        console.log('Combined filters successful, total loaded:', allData.length);
+        
 
         // Transform the filtered leads data
         const transformedLeads = allData.map(lead => ({
@@ -2333,18 +2338,18 @@ export default function LeadPipeline({ onPageChange }) {
           lastActivity: lead.last_activity || new Date().toISOString()
         }));
 
-        console.log('Setting filtered leads:', transformedLeads.length);
-        console.log('Filtered leads sample:', transformedLeads.slice(0, 3));
+        
+        
 
         // Debug: Show unique states in the data
         const uniqueStates = [...new Set(transformedLeads.map(lead => lead.state).filter(state => state))];
-        console.log('Unique states in data:', uniqueStates);
+        
 
         // Debug: Show Karnataka records
         const karnatakaRecords = transformedLeads.filter(lead =>
           lead.state && lead.state.toLowerCase().includes('karnatak')
         );
-        console.log('Records with Karnataka in state:', karnatakaRecords.length);
+        
         setLeads(transformedLeads);
         if (result && result.total !== undefined) {
           setTotalLeads(result.total);
@@ -2549,7 +2554,7 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleCSVImport = async (file) => {
-    console.log('Starting CSV import for file:', file.name);
+    
     toast('Note: Contact Name, Phone Number, Email, and Country are required fields in the CSV.', {
       icon: 'ℹ️',
       duration: 5000
@@ -2563,15 +2568,15 @@ export default function LeadPipeline({ onPageChange }) {
       formData.append('user', user?.name || user?.phone_number || 'operation');
       formData.append('contact_owner', user?.name || user?.phone_number || 'operation');
 
-      console.log('Uploading CSV to API...');
+      
       const currentUserName = user?.name || user?.phone_number || 'operation';
       const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}?user=${encodeURIComponent(currentUserName)}`, {
         method: 'POST',
         body: formData
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      
+      
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -2580,10 +2585,10 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-      console.log('API result:', result);
+      
 
       if (result.message === 'CSV processed' || result.success || result.total_added !== undefined) {
-        console.log('CSV import successful');
+        
         // Refresh leads data to show newly imported leads
         await fetchLeads();
         toast.dismiss();
@@ -2764,6 +2769,8 @@ export default function LeadPipeline({ onPageChange }) {
                 pointerEvents: 'none'
               }} />
               <input
+                id="search-leads"
+                name="search-leads"
                 type="text"
                 placeholder="Search leads..."
                 value={searchInput}
@@ -3391,6 +3398,8 @@ export default function LeadPipeline({ onPageChange }) {
                 <span>Records per page</span>
                 <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                   <select
+                    id="leads-per-page"
+                    name="leads-per-page"
                     value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -8322,7 +8331,7 @@ export default function LeadPipeline({ onPageChange }) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                       }
                       const result = await response.json();
-                      console.log('Lead moved to account successfully:', result);
+                      
 
                       toast.dismiss('convert-lead-toast');
 
