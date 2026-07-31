@@ -273,7 +273,7 @@ export default function Opportunities({ onPageChange }) {
       'leadStatus': Object.keys(statusConfig),
       'industry': predefinedIndustries,
       'accountType': predefinedAccountTypes,
-      'contactOwner': predefinedContactOwners,
+      'contactOwner': getContactOwnerOptions(),
       'leadSource': predefinedLeadSources,
       'tags': predefinedTags
     };
@@ -602,6 +602,12 @@ export default function Opportunities({ onPageChange }) {
 
   const getCreatedByOptions = () => {
     const uniqueFromData = getUniqueValues('created_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const getContactOwnerOptions = () => {
+    const uniqueFromData = getUniqueValues('contact_owner');
     const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
     return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
   };
@@ -5038,7 +5044,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {predefinedContactOwners.filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getContactOwnerOptions().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(owner => (
                                           <div
                                             key={owner}
@@ -5427,7 +5433,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {predefinedContactOwners.filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getContactOwnerOptions().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(owner => (
                                           <div
                                             key={owner}
@@ -6222,10 +6228,7 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select owner...</option>
-                              {[...new Set([
-                                ...predefinedContactOwners,
-                                ...opportunities.map(o => o.contactOwner)
-                              ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
+                              {getContactOwnerOptions().filter(owner => owner !== updateFieldValue).map(owner => (
                                 <option key={owner} value={owner}>{owner}</option>
                               ))}
                             </select>
@@ -6616,7 +6619,7 @@ export default function Opportunities({ onPageChange }) {
                             </div>
                             {ownerDropdownOpen && (
                               <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
-                                {predefinedContactOwners.map(owner => (
+                                {getContactOwnerOptions().map(owner => (
                                   <button key={owner} onClick={() => { handleFieldUpdate(selectedUser.id, 'contactOwner', owner); setOwnerDropdownOpen(false); }}
                                     style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
                                     onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
@@ -7257,7 +7260,7 @@ export default function Opportunities({ onPageChange }) {
                         <EditableDealField label="Deal Type" value={selectedDeal.deal_type || ''} fieldName="deal_type" type="select" options={predefinedDealTypes} />
                         <EditableDealField label="Deal Stage" value={selectedDeal.deal_stage || ''} fieldName="deal_stage" type="select" options={predefinedDealStages} />
                         {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') ? (
-                          <EditableDealField label="Deal Owner" value={selectedDeal.contact_owner || ''} fieldName="contact_owner" type="select" options={predefinedContactOwners} />
+                          <EditableDealField label="Deal Owner" value={selectedDeal.contact_owner || ''} fieldName="contact_owner" type="select" options={getContactOwnerOptions()} />
                         ) : (
                           <div>
                             <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Owner</label>

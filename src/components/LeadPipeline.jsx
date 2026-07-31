@@ -167,7 +167,7 @@ export default function LeadPipeline({ onPageChange }) {
     const optionMap = {
       'leadStatus': Object.keys(statusConfig),
       'industry': predefinedIndustries,
-      'contactOwner': predefinedContactOwners,
+      'contactOwner': getContactOwnerOptions(),
       'leadSource': predefinedLeadSources,
       'tags': predefinedTags
     };
@@ -711,7 +711,12 @@ export default function LeadPipeline({ onPageChange }) {
     return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
   };
 
-  // Get unique contact owners from leads data
+  const getContactOwnerOptions = () => {
+    const uniqueFromData = getUniqueValues('contact_owner');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
   const getUniqueContactOwners = () => {
     return getUniqueValues('contact_owner');
   };
@@ -6309,7 +6314,7 @@ export default function LeadPipeline({ onPageChange }) {
                               maxHeight: '200px',
                               overflowY: 'auto'
                             }}>
-                              {predefinedContactOwners.map(owner => (
+                              {getContactOwnerOptions().map(owner => (
                                 <button
                                   key={owner}
                                   onClick={() => {
