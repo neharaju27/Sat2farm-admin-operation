@@ -12,8 +12,6 @@ export default function ImageAdvisory({ onClose, onBack, farmId, clientId }) {
   useEffect(() => {
     if (farmId && clientId) {
       fetchAdvisoryData();
-    } else if (farmId && !clientId) {
-      setError('Report will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -48,10 +46,7 @@ export default function ImageAdvisory({ onClose, onBack, farmId, clientId }) {
         setImageData(image[0]);
       }
 
-      // If no data is available, set error message
-      if (!hasAdvisory && !hasImage) {
-        setError('Report will be available soon');
-      }
+      // Don't set error if no data - let the UI show "No image available" and "No data available"
     } catch (err) {
       setError('Report will be available soon');
       console.error('Error fetching advisory data:', err);
@@ -180,7 +175,7 @@ export default function ImageAdvisory({ onClose, onBack, farmId, clientId }) {
                   </div>
                 ) : (
                   <div style={{textAlign: 'center', color: '#64748b', padding: '20px'}}>
-                    No advisory details available
+                    No data available
                   </div>
                 )}
 
