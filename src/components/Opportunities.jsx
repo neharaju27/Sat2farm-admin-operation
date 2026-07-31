@@ -1081,33 +1081,37 @@ export default function Opportunities({ onPageChange }) {
 
       if (prop.property === 'closing_date') {
         if (prop.dateOperator === 'on' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.deal_close_date) return false;
-            const dealDate = new Date(deal.deal_close_date);
-            return dealDate.toDateString() === filterDate.toDateString();
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
           });
         } else if (prop.dateOperator === 'before' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.deal_close_date) return false;
-            const dealDate = new Date(deal.deal_close_date);
-            return dealDate < filterDate;
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
           });
         } else if (prop.dateOperator === 'after' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.deal_close_date) return false;
-            const dealDate = new Date(deal.deal_close_date);
-            return dealDate > filterDate;
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
           });
         } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = new Date(prop.fromDate);
-          const maxDate = new Date(prop.toDate);
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
           filtered = filtered.filter(deal => {
-            if (!deal.deal_close_date) return false;
-            const dealDate = new Date(deal.deal_close_date);
-            return dealDate >= minDate && dealDate <= maxDate;
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
           });
         } else if (prop.dateOperator === 'in_the_last' && prop.period) {
           const now = new Date();
@@ -1120,9 +1124,10 @@ export default function Opportunities({ onPageChange }) {
             startDate = new Date(now.setMonth(now.getMonth() - 1));
           }
           filtered = filtered.filter(deal => {
-            if (!deal.deal_close_date) return false;
-            const dealDate = new Date(deal.deal_close_date);
-            return dealDate >= startDate;
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
           });
         }
       }
@@ -1156,33 +1161,37 @@ export default function Opportunities({ onPageChange }) {
 
       if (prop.property === 'created_time') {
         if (prop.dateOperator === 'on' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.created_time) return false;
-            const dealDate = new Date(deal.created_time);
-            return dealDate.toDateString() === filterDate.toDateString();
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
           });
         } else if (prop.dateOperator === 'before' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.created_time) return false;
-            const dealDate = new Date(deal.created_time);
-            return dealDate < filterDate;
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
           });
         } else if (prop.dateOperator === 'after' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.created_time) return false;
-            const dealDate = new Date(deal.created_time);
-            return dealDate > filterDate;
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
           });
         } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = new Date(prop.fromDate);
-          const maxDate = new Date(prop.toDate);
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
           filtered = filtered.filter(deal => {
-            if (!deal.created_time) return false;
-            const dealDate = new Date(deal.created_time);
-            return dealDate >= minDate && dealDate <= maxDate;
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
           });
         } else if (prop.dateOperator === 'in_the_last' && prop.period) {
           const now = new Date();
@@ -1195,9 +1204,10 @@ export default function Opportunities({ onPageChange }) {
             startDate = new Date(now.setMonth(now.getMonth() - 1));
           }
           filtered = filtered.filter(deal => {
-            if (!deal.created_time) return false;
-            const dealDate = new Date(deal.created_time);
-            return dealDate >= startDate;
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
           });
         }
       }
@@ -1213,33 +1223,37 @@ export default function Opportunities({ onPageChange }) {
 
       if (prop.property === 'modified_time') {
         if (prop.dateOperator === 'on' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.modified_at) return false;
-            const dealDate = new Date(deal.modified_at);
-            return dealDate.toDateString() === filterDate.toDateString();
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
           });
         } else if (prop.dateOperator === 'before' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.modified_at) return false;
-            const dealDate = new Date(deal.modified_at);
-            return dealDate < filterDate;
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
           });
         } else if (prop.dateOperator === 'after' && prop.value) {
-          const filterDate = new Date(prop.value);
+          const filterDate = parseDateRobust(prop.value);
           filtered = filtered.filter(deal => {
-            if (!deal.modified_at) return false;
-            const dealDate = new Date(deal.modified_at);
-            return dealDate > filterDate;
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
           });
         } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = new Date(prop.fromDate);
-          const maxDate = new Date(prop.toDate);
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
           filtered = filtered.filter(deal => {
-            if (!deal.modified_at) return false;
-            const dealDate = new Date(deal.modified_at);
-            return dealDate >= minDate && dealDate <= maxDate;
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
           });
         } else if (prop.dateOperator === 'in_the_last' && prop.period) {
           const now = new Date();
@@ -1252,9 +1266,10 @@ export default function Opportunities({ onPageChange }) {
             startDate = new Date(now.setMonth(now.getMonth() - 1));
           }
           filtered = filtered.filter(deal => {
-            if (!deal.modified_at) return false;
-            const dealDate = new Date(deal.modified_at);
-            return dealDate >= startDate;
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
           });
         }
       }
@@ -4314,7 +4329,7 @@ export default function Opportunities({ onPageChange }) {
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <input
                                   type="number"
-                                  placeholder="Amount"
+                                  placeholder={prop.operator === 'between' ? 'From' : 'Amount'}
                                   value={prop.value || ''}
                                   onChange={(e) => {
                                     const updated = [...selectedSalesProperties];
@@ -4323,6 +4338,8 @@ export default function Opportunities({ onPageChange }) {
                                   }}
                                   style={{
                                     flex: 1,
+                                    minWidth: 0,
+                                    width: '100%',
                                     padding: '8px 12px',
                                     border: '1px solid var(--border)',
                                     borderRadius: 'var(--r)',
@@ -4343,6 +4360,8 @@ export default function Opportunities({ onPageChange }) {
                                     }}
                                     style={{
                                       flex: 1,
+                                      minWidth: 0,
+                                      width: '100%',
                                       padding: '8px 12px',
                                       border: '1px solid var(--border)',
                                       borderRadius: 'var(--r)',
@@ -4409,7 +4428,7 @@ export default function Opportunities({ onPageChange }) {
                               )}
                               {prop.dateOperator === 'between' && (
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
                                     <input
                                       type="date"
@@ -4430,7 +4449,7 @@ export default function Opportunities({ onPageChange }) {
                                       }}
                                     />
                                   </div>
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
                                     <input
                                       type="date"
@@ -5268,7 +5287,7 @@ export default function Opportunities({ onPageChange }) {
                               )}
                               {prop.dateOperator === 'between' && (
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
                                     <input
                                       type="date"
@@ -5289,7 +5308,7 @@ export default function Opportunities({ onPageChange }) {
                                       }}
                                     />
                                   </div>
-                                  <div style={{ flex: 1 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
                                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
                                     <input
                                       type="date"
@@ -8149,7 +8168,7 @@ export default function Opportunities({ onPageChange }) {
 
                             {prop.dateOperator === 'between' && (
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
                                   <input
                                     type="date"
@@ -8170,7 +8189,7 @@ export default function Opportunities({ onPageChange }) {
                                     }}
                                   />
                                 </div>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
                                   <input
                                     type="date"
@@ -8249,7 +8268,7 @@ export default function Opportunities({ onPageChange }) {
 
                             {prop.dateOperator === 'between' && (
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
                                   <input
                                     type="date"
@@ -8270,7 +8289,7 @@ export default function Opportunities({ onPageChange }) {
                                     }}
                                   />
                                 </div>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
                                   <input
                                     type="date"
