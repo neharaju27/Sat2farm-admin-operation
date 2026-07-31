@@ -8,15 +8,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [clientOpen, setClientOpen] = useState(false);
   const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
   
-  // Debug: Log user data and role detection
-  console.log('Sidebar - User data:', user);
-  console.log('Sidebar - User role (raw):', user?.role);
-  console.log('Sidebar - User role (lowercase):', user?.role?.toLowerCase());
-  console.log('Sidebar - Checking operations ===:', 'operations', user?.role === 'operations');
-  console.log('Sidebar - Checking Operations ===:', 'Operations', user?.role === 'Operations');
-  console.log('Sidebar - Checking sales ===:', 'sales', user?.role === 'sales');
-  console.log('Sidebar - Checking Sales ===:', 'Sales', user?.role === 'Sales');
-  
   // Check user role with more flexible matching
   const userRole = user?.role?.toLowerCase().trim();
   const isOperationsUser = userRole === 'operation' || userRole === 'operations';
@@ -25,18 +16,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isManagerUser = userRole === 'manager' || userRole === 'admin';
   const isPartnerUser = userRole === 'partner';
   const isMarketingUser = userRole === 'marketing';
-  
-  // Debug: Log what should be visible
-  console.log('Sidebar - User data:', user);
-  console.log('Sidebar - User role (raw):', user?.role);
-  console.log('Sidebar - User role (lowercase):', userRole);
-  console.log('Sidebar - Checking client ===:', 'client', userRole === 'client');
-  console.log('Sidebar - Checking test ===:', 'test', userRole === 'test');
-  console.log('Sidebar - Checking user ===:', 'user', userRole === 'user');
-  console.log('Sidebar - Processed role:', userRole);
-  console.log('Sidebar - Should show operations section:', isOperationsUser);
-  console.log('Sidebar - Should show sales section:', isSalesUser);
-  console.log('Sidebar - Should show client section:', isClientUser);
   
   // Page activity states
   const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
