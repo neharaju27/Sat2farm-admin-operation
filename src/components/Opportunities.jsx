@@ -223,7 +223,7 @@ export default function Opportunities({ onPageChange }) {
 
   const getMockOpportunities = () => [];
 
-  // ── Modal & editing state (mirrors LeadPipeline) ──────────────────────────
+  // â”€â”€ Modal & editing state (mirrors LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -258,7 +258,7 @@ export default function Opportunities({ onPageChange }) {
   const [isDownloadingCSV, setIsDownloadingCSV] = useState(false);
   const [kanbanUpdateTimestamp, setKanbanUpdateTimestamp] = useState(Date.now());
 
-  // ── Edit dialog state ─────────────────────────────────────────────────────────
+  // â”€â”€ Edit dialog state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editDialogField, setEditDialogField] = useState('');
   const [editDialogValue, setEditDialogValue] = useState('');
@@ -267,7 +267,7 @@ export default function Opportunities({ onPageChange }) {
   const [showEditDialogCustomInput, setShowEditDialogCustomInput] = useState(false);
   const [editDialogCustomValue, setEditDialogCustomValue] = useState('');
 
-  // ── Get predefined options for field ───────────────────────────────────────────
+  // â”€â”€ Get predefined options for field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const getFieldOptions = (fieldName) => {
     const optionMap = {
       'leadStatus': Object.keys(statusConfig),
@@ -284,7 +284,7 @@ export default function Opportunities({ onPageChange }) {
     return getFieldOptions(fieldName) !== null;
   };
 
-  // ── Edit dialog handlers ─────────────────────────────────────────────────────
+  // â”€â”€ Edit dialog handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openEditDialog = (rowId, fieldName, currentValue) => {
     setEditDialogRowId(rowId);
     setEditDialogField(fieldName);
@@ -343,7 +343,7 @@ export default function Opportunities({ onPageChange }) {
     setEditDialogDropdownOpen(false);
   };
 
-  // ── Close all dropdowns when one is opened ─────────────────────────────────
+  // â”€â”€ Close all dropdowns when one is opened â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const closeAllDropdowns = () => {
     setStatusDropdownOpen(false);
     setOwnerDropdownOpen(false);
@@ -387,9 +387,9 @@ export default function Opportunities({ onPageChange }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ── Table / filter state ──────────────────────────────────────────────────
+  // â”€â”€ Table / filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
+  const [searchInput, setSearchInput] = useState(''); // what user types • does NOT trigger API
   const [dealsSearchInput, setDealsSearchInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedRows, setSelectedRows] = useState([]);
@@ -399,6 +399,10 @@ export default function Opportunities({ onPageChange }) {
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
   const lastFetchedUrlRef = React.useRef('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isApplyingSalesFilters, setIsApplyingSalesFilters] = useState(false);
+  const [salesFiltersSuccess, setSalesFiltersSuccess] = useState(false);
+  const [isApplyingAccountsFilters, setIsApplyingAccountsFilters] = useState(false);
+  const [accountsFiltersSuccess, setAccountsFiltersSuccess] = useState(false);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
   const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
@@ -440,8 +444,8 @@ export default function Opportunities({ onPageChange }) {
   const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
   const [filterFetchProgress, setFilterFetchProgress] = useState(0);
 
-  // Optimized: parallel batch fetching — all remaining batches fire simultaneously
-  // after first response reveals total count. Reduces N×RTT to ~2×RTT.
+  // Optimized: parallel batch fetching "” all remaining batches fire simultaneously
+  // after first response reveals total count. Reduces N<X size={12} />RTT to ~2<X size={12} />RTT.
   useEffect(() => {
     let active = true;
 
@@ -536,7 +540,7 @@ export default function Opportunities({ onPageChange }) {
     };
   }, [user?.name, user?.phone_number]);
 
-  // Memoized unique values map — recomputes only when allAccountsData changes, not on every render
+  // Memoized unique values map "” recomputes only when allAccountsData changes, not on every render
   const uniqueValuesMap = useMemo(() => {
     const propertyMap = {
       'contact_owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
@@ -587,8 +591,20 @@ export default function Opportunities({ onPageChange }) {
     return result;
   }, [allAccountsData, opportunities]);
 
-  // Get unique values for a property — reads from memoized cache
+  // Get unique values for a property "” reads from memoized cache
   const getUniqueValues = (property) => uniqueValuesMap[property] || [];
+
+  const getModifiedByOptions = () => {
+    const uniqueFromData = getUniqueValues('modified_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const getCreatedByOptions = () => {
+    const uniqueFromData = getUniqueValues('created_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
 
   // Helper to construct query parameter keys with _is or _is_not suffixes
   const getFilterQueryParamKey = (property, operator = 'is') => {
@@ -620,6 +636,9 @@ export default function Opportunities({ onPageChange }) {
 
   const handleCombinedFilters = async (filters) => {
     console.log('Applying combined filters:', filters);
+    if (isApplyingAccountsFilters) return;
+    setIsApplyingAccountsFilters(true);
+    setAccountsFiltersSuccess(false);
     setLoading(true);
 
     try {
@@ -682,19 +701,50 @@ export default function Opportunities({ onPageChange }) {
       const result = await response.json();
       console.log('API result:', result);
 
-      const oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
-      if (result && result.total !== undefined) {
-        setTotalOpportunities(result.total);
-      } else {
-        setTotalOpportunities(oppsData.length);
+      let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
+      const totalRecords = (result && typeof result.total === 'number') ? result.total : oppsData.length;
+
+      // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
+      let currentNextOffset = result.next_offset || (result.has_more ? oppsData.length : null);
+      while ((result.has_more || (currentNextOffset && oppsData.length < totalRecords)) && currentNextOffset) {
+        try {
+          const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
+          console.log('Fetching next batch from:', nextUrl);
+          const nextResponse = await fetch(nextUrl, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (!nextResponse.ok) break;
+          const nextResult = await nextResponse.json();
+          const nextItems = Array.isArray(nextResult) ? nextResult : (nextResult.data || nextResult.results || nextResult.accounts || []);
+          if (nextItems.length === 0) break;
+          oppsData = [...oppsData, ...nextItems];
+          if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
+            currentNextOffset = nextResult.next_offset;
+          } else if (nextItems.length > 0 && oppsData.length < totalRecords) {
+            currentNextOffset += nextItems.length;
+          } else {
+            break;
+          }
+        } catch (loopErr) {
+          console.warn('Error fetching additional filter pages:', loopErr);
+          break;
+        }
       }
+
+      setTotalOpportunities(totalRecords || oppsData.length);
       setCurrentPage(1);
 
       if (Array.isArray(oppsData)) {
-        console.log('Combined filters successful');
+        console.log('Combined filters successful, total loaded:', oppsData.length);
 
         // Set filter applied state and criteria
         setIsFilterApplied(true);
+        setAccountsFiltersSuccess(true);
+        setTimeout(() => {
+          setAccountsFiltersSuccess(false);
+          setFilterSidebarOpen(false);
+        }, 500);
         const criteriaText = filters.map(f => {
           const propLabel = f.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
           const operatorText = f.operator === 'is' || f.operator === 'is not' ? f.operator === 'is' ? 'is' : 'isn\'t' : '';
@@ -754,7 +804,7 @@ export default function Opportunities({ onPageChange }) {
   const [updateFieldValue, setUpdateFieldValue] = useState('');
   const [updateNewFieldValue, setUpdateNewFieldValue] = useState('');
 
-  // ── Tab state for modal right panel ──────────────────────────────────────
+  // â”€â”€ Tab state for modal right panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [activeModalTab, setActiveModalTab] = useState('timeline');
   const [showCreateDealModal, setShowCreateDealModal] = useState(false);
   const [showDealInfoModal, setShowDealInfoModal] = useState(false);
@@ -801,17 +851,17 @@ export default function Opportunities({ onPageChange }) {
   const [loadingMoreStages, setLoadingMoreStages] = useState({}); // Track infinite scroll loading per stage
   const [pipelineViewMode, setPipelineViewMode] = useState('kanban'); // Track sales pipeline view mode (kanban vs list)
 
-  // ── Sales Pipeline Filter State ─────────────────────────────────────────────
+  // â”€â”€ Sales Pipeline Filter State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [salesFilterSidebarOpen, setSalesFilterSidebarOpen] = useState(false);
   const [selectedSalesProperties, setSelectedSalesProperties] = useState([]);
   const [currentSalesProperty, setCurrentSalesProperty] = useState('');
   const [salesFiltersApplied, setSalesFiltersApplied] = useState(false);
 
-  // ── Summary Deal Filter State ───────────────────────────────────────────────
+  // â”€â”€ Summary Deal Filter State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [dealFilter, setDealFilter] = useState('all'); // 'all', 'with_deals', 'without_deals'
   const [apiDealTotals, setApiDealTotals] = useState({ with_deals: 0, without_deals: 0 });
 
-  // ── Sales Pipeline List View Pagination State ───────────────────────────────
+  // â”€â”€ Sales Pipeline List View Pagination State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(100);
   const [salesPipelineCurrentPage, setSalesPipelineCurrentPage] = useState(1);
 
@@ -999,7 +1049,7 @@ export default function Opportunities({ onPageChange }) {
     fetchFilteredOpportunities();
   }, [dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied, refreshKey]);
 
-  // ── Filter Logic ─────────────────────────────────────────────────────────────
+  // â”€â”€ Filter Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const applyFilters = (deals) => {
     let filtered = [...deals];
 
@@ -1367,6 +1417,9 @@ export default function Opportunities({ onPageChange }) {
   // Apply Sales Pipeline Filters via API
   // Apply Sales Pipeline Filters via API
   const applySalesFilters = async () => {
+    if (isApplyingSalesFilters) return;
+    setIsApplyingSalesFilters(true);
+    setSalesFiltersSuccess(false);
     try {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL;
       if (!apiUrl) {
@@ -1387,7 +1440,7 @@ export default function Opportunities({ onPageChange }) {
       };
 
       selectedSalesProperties.forEach(filter => {
-        // ── Deal Owner: deal_owner_is / deal_owner_is_not ──────────────────
+        // â”€â”€ Deal Owner: deal_owner_is / deal_owner_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (filter.property === 'deal_owner' && filter.value) {
           const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'deal_owner_is_not' : 'deal_owner_is';
           filter.value.split(',').filter(v => v.trim()).forEach(value => {
@@ -1395,14 +1448,14 @@ export default function Opportunities({ onPageChange }) {
           });
         }
 
-        // ── Deal Name: deal_name_operator=contains/equals/starts_with ──────
+        // â”€â”€ Deal Name: deal_name_operator=contains/equals/starts_with â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'deal_name' && (filter.value || filter.searchTerm)) {
           const operator = filter.operator || 'contains';
           urlParams.push(`deal_name_operator=${operator}`);
           urlParams.push(`deal_name=${encodeURIComponent(filter.value || filter.searchTerm)}`);
         }
 
-        // ── Amount: equals / greater_than / less_than / between ────────────
+        // â”€â”€ Amount: equals / greater_than / less_than / between â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'amount' && (filter.value || filter.operator === 'between')) {
           if (filter.operator === 'between') {
             urlParams.push(`amount_operator=between`);
@@ -1415,7 +1468,7 @@ export default function Opportunities({ onPageChange }) {
           }
         }
 
-        // ── Deal Type: deal_type_is / deal_type_is_not ─────────────────────
+        // â”€â”€ Deal Type: deal_type_is / deal_type_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'deal_type' && filter.value) {
           const param = filter.operator === 'is not' ? 'deal_type_is_not' : 'deal_type_is';
           filter.value.split(',').filter(v => v.trim()).forEach(value => {
@@ -1423,7 +1476,7 @@ export default function Opportunities({ onPageChange }) {
           });
         }
 
-        // ── Deal Stage: deal_stage_is / deal_stage_is_not ──────────────────
+        // â”€â”€ Deal Stage: deal_stage_is / deal_stage_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'deal_stage' && filter.value) {
           const param = filter.operator === 'is not' ? 'deal_stage_is_not' : 'deal_stage_is';
           filter.value.split(',').filter(v => v.trim()).forEach(value => {
@@ -1431,7 +1484,7 @@ export default function Opportunities({ onPageChange }) {
           });
         }
 
-        // ── Created By: created_by_is / created_by_is_not ─────────────────
+        // â”€â”€ Created By: created_by_is / created_by_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'created_by' && filter.value) {
           const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'created_by_is_not' : 'created_by_is';
           filter.value.split(',').filter(v => v.trim()).forEach(value => {
@@ -1439,7 +1492,7 @@ export default function Opportunities({ onPageChange }) {
           });
         }
 
-        // ── Modified By: modified_by_is / modified_by_is_not ──────────────
+        // â”€â”€ Modified By: modified_by_is / modified_by_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         else if (filter.property === 'modified_by' && filter.value) {
           const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'modified_by_is_not' : 'modified_by_is';
           filter.value.split(',').filter(v => v.trim()).forEach(value => {
@@ -1447,7 +1500,7 @@ export default function Opportunities({ onPageChange }) {
           });
         }
 
-        // ── Date filters: closing_date / created_time / modified_time ─────
+        // â”€â”€ Date filters: closing_date / created_time / modified_time â”€â”€â”€â”€â”€
         else if (['closing_date', 'created_time', 'modified_time'].includes(filter.property)) {
           const dateField = dateFieldMap[filter.property];
 
@@ -1520,18 +1573,72 @@ export default function Opportunities({ onPageChange }) {
       console.log('Filter API result:', result);
 
       if (result.data && Array.isArray(result.data)) {
-        // Group filtered deals by stage
-        const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
-        const dealsByStage = {};
+        let allData = [...result.data];
+        const totalRecords = result.total || allData.length;
 
-        stages.forEach(stage => {
-          dealsByStage[stage] = result.data.filter(deal => deal.deal_stage === stage);
+        // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
+        let currentNextOffset = result.next_offset || (result.has_more ? allData.length : null);
+        while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
+          try {
+            const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
+            console.log('Fetching next batch from:', nextUrl);
+            const nextResponse = await fetch(nextUrl, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (!nextResponse.ok) break;
+            const nextResult = await nextResponse.json();
+            const nextItems = Array.isArray(nextResult.data) ? nextResult.data : [];
+            if (nextItems.length === 0) break;
+            allData = [...allData, ...nextItems];
+            if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
+              currentNextOffset = nextResult.next_offset;
+            } else if (nextItems.length > 0 && allData.length < totalRecords) {
+              currentNextOffset += nextItems.length;
+            } else {
+              break;
+            }
+          } catch (loopErr) {
+            console.warn('Error fetching additional filter pages:', loopErr);
+            break;
+          }
+        }
+
+        // Group filtered deals by stage (safely preserving ALL records)
+        const dealsByStage = {
+          'Opportunity': [],
+          'Proposal': [],
+          'Negotiation': [],
+          'Closed Won': [],
+          'Closed Lost': [],
+          'Invoiced': [],
+          'Paid': []
+        };
+
+        const knownStagesMap = {
+          'opportunity': 'Opportunity',
+          'proposal': 'Proposal',
+          'negotiation': 'Negotiation',
+          'closed won': 'Closed Won',
+          'closed lost': 'Closed Lost',
+          'invoiced': 'Invoiced',
+          'paid': 'Paid'
+        };
+
+        allData.forEach(deal => {
+          const normalizedStage = deal.deal_stage ? String(deal.deal_stage).trim().toLowerCase() : '';
+          const mappedStage = knownStagesMap[normalizedStage] || 'Opportunity';
+          dealsByStage[mappedStage].push(deal);
         });
 
         setKanbanDeals(dealsByStage);
         setSalesFiltersApplied(true);
-        setSalesFilterSidebarOpen(false);
-        toast.success(`Filter applied successfully! Found ${result.data.length} records.`);
+        setSalesFiltersSuccess(true);
+        toast.success(`Filter applied successfully! Found ${allData.length} records.`);
+        setTimeout(() => {
+          setSalesFiltersSuccess(false);
+          setSalesFilterSidebarOpen(false);
+        }, 500);
       } else {
         console.error('API returned unexpected format:', result);
         toast.error('Failed to apply filter: Unexpected response format');
@@ -1539,10 +1646,12 @@ export default function Opportunities({ onPageChange }) {
     } catch (err) {
       console.error('Error applying sales filters:', err);
       toast.error(`Error applying filter: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setIsApplyingSalesFilters(false);
     }
   };
 
-  // ── Static option lists (same as LeadPipeline) ───────────────────────────
+  // â”€â”€ Static option lists (same as LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const statusConfig = {
     'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
     'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
@@ -1591,7 +1700,7 @@ export default function Opportunities({ onPageChange }) {
     return defaultOwners;
   });
 
-  // ── Helper: get all available owners combining predefined & dynamic loaded data ──
+  // â”€â”€ Helper: get all available owners combining predefined & dynamic loaded data â”€â”€
   const getAllAvailableOwners = () => {
     const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
     const ownersFromKanban = Object.values(kanbanDeals || {})
@@ -1612,7 +1721,7 @@ export default function Opportunities({ onPageChange }) {
     return Array.from(new Set(combined)).filter(v => v && v.trim()).sort();
   };
 
-  // ── Helper: unique contact owners ────────────────────────────────────────
+  // â”€â”€ Helper: unique contact owners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const getUniqueContactOwners = () => {
     return getAllAvailableOwners();
   };
@@ -1657,7 +1766,7 @@ export default function Opportunities({ onPageChange }) {
 
 
 
-  // ── Helper: get icon for timeline field ─────────────────────────────────
+  // â”€â”€ Helper: get icon for timeline field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const getTimelineIcon = (field) => {
     const iconMap = {
       'contactName': User,
@@ -1970,7 +2079,7 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // ── Editing helpers ───────────────────────────────────────────────────────
+  // â”€â”€ Editing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const startEditing = (fieldName, currentValue) => {
     setEditingField(fieldName);
     setEditValue(currentValue || '');
@@ -1989,7 +2098,7 @@ export default function Opportunities({ onPageChange }) {
     setEditValue('');
   };
 
-  // ── Drag and drop handler for Kanban board (Pragmatic DnD) ───────────────
+  // â”€â”€ Drag and drop handler for Kanban board (Pragmatic DnD) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleKanbanDealMove = async ({
     dealId,
     sourceColumnId,
@@ -2114,7 +2223,7 @@ export default function Opportunities({ onPageChange }) {
     setShowDealInfoModal(true);
   };
 
-  // ── Fetch timeline data for a lead ─────────────────────────────────────────
+  // â”€â”€ Fetch timeline data for a lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchTimeline = async (leadId) => {
     setTimelineLoading(true);
     try {
@@ -2133,7 +2242,7 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // ── Editable field component (identical to LeadPipeline) ─────────────────
+  // â”€â”€ Editable field component (identical to LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const EditableField = ({ label, value, fieldName, type = 'text' }) => {
     const isEditing = editingField === fieldName;
     const containerRef = React.useRef(null);
@@ -2173,7 +2282,7 @@ export default function Opportunities({ onPageChange }) {
                 }}
                 autoFocus
               />
-              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✓</button>
+              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} /></button>
               <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
             </>
           ) : (
@@ -2205,7 +2314,7 @@ export default function Opportunities({ onPageChange }) {
     );
   };
 
-  // ── API handlers (same as LeadPipeline) ──────────────────────────────────
+  // â”€â”€ API handlers (same as LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchDeals = async (accountId) => {
     try {
       setDealsLoading(true);
@@ -2410,7 +2519,7 @@ export default function Opportunities({ onPageChange }) {
   // CSV Import handler
   const handleCSVImport = () => {
     toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
-      icon: 'ℹ️',
+      icon: 'ℹ️',
       duration: 5000
     });
     const fileInput = document.createElement('input');
@@ -2743,7 +2852,7 @@ export default function Opportunities({ onPageChange }) {
                   cursor: 'pointer'
                 }}
               >
-                ✓
+                <Check size={14} style={{ color: "var(--blue-600)" }} />
               </button>
               <button
                 onClick={cancelDealEdit}
@@ -2900,7 +3009,7 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
+  // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filteredOpportunities = opportunities.filter(opp => {
     let matchesSearch = true;
     if (isSearching) {
@@ -2955,7 +3064,7 @@ export default function Opportunities({ onPageChange }) {
     ? filteredOpportunities.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     : filteredOpportunities;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="main-full">
       <div style={{ padding: '8px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -3092,7 +3201,7 @@ export default function Opportunities({ onPageChange }) {
                   Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
                 </span>
                 <span style={{ color: '#4ade80', fontSize: '13px' }}>
-                  — {effectiveTotalCount.toLocaleString()} {effectiveTotalCount === 1 ? 'record' : 'records'} found
+                  • {effectiveTotalCount.toLocaleString()} {effectiveTotalCount === 1 ? 'record' : 'records'} found
                 </span>
               </div>
               <button
@@ -3707,6 +3816,7 @@ export default function Opportunities({ onPageChange }) {
               {/* Sales Pipeline Filter Sidebar */}
               {salesFilterSidebarOpen && (
                 <>
+                  <style>{`@keyframes satyuktSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                   <div style={{
                     position: 'absolute',
                     top: '73px',
@@ -3831,7 +3941,6 @@ export default function Opportunities({ onPageChange }) {
                             </button>
                           </div>
 
-                          {/* Deal Owner - User dropdown with is/isn't */}
                           {prop.property === 'deal_owner' && (
                             <div style={{ display: 'flex', gap: '12px' }}>
                               <div style={{ minWidth: '80px' }}>
@@ -3860,11 +3969,12 @@ export default function Opportunities({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search owners..."
+                                    placeholder="Search users..."
                                     value={prop.searchTerm || ''}
                                     onChange={(e) => {
                                       const updated = [...selectedSalesProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      updated[index].dropdownOpen = true;
                                       setSelectedSalesProperties(updated);
                                     }}
                                     onFocus={() => {
@@ -3935,7 +4045,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{owner}</span>
                                               {prop.value && prop.value.includes(owner) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4059,7 +4169,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${owner}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -4158,7 +4268,7 @@ export default function Opportunities({ onPageChange }) {
                                       }}
                                       title={`Remove ${prop.searchTerm}`}
                                     >
-                                      ×
+                                      <X size={12} />
                                     </button>
                                   </span>
                                 </div>
@@ -4489,7 +4599,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{type}</span>
                                               {prop.value && prop.value.includes(type) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4613,7 +4723,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${type}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -4727,7 +4837,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{stage}</span>
                                               {prop.value && prop.value.includes(stage) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4850,7 +4960,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${stage}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -4964,7 +5074,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{owner}</span>
                                               {prop.value && prop.value.includes(owner) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -5087,7 +5197,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${owner}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -5269,7 +5379,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ position: 'relative' }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
                                     placeholder="Search users..."
@@ -5277,9 +5387,15 @@ export default function Opportunities({ onPageChange }) {
                                     onChange={(e) => {
                                       const updated = [...selectedSalesProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      updated[index].dropdownOpen = true;
                                       setSelectedSalesProperties(updated);
                                     }}
                                     onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onClick={() => {
                                       const updated = [...selectedSalesProperties];
                                       updated[index].dropdownOpen = true;
                                       setSelectedSalesProperties(updated);
@@ -5313,7 +5429,9 @@ export default function Opportunities({ onPageChange }) {
                                         .map(owner => (
                                           <div
                                             key={owner}
-                                            onClick={() => {
+                                            onMouseDown={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
                                               const updated = [...selectedSalesProperties];
                                               const currentValues = updated[index].value ? updated[index].value.split(',') : [];
 
@@ -5325,7 +5443,7 @@ export default function Opportunities({ onPageChange }) {
                                               }
 
                                               updated[index].value = currentValues.join(',');
-                                              updated[index].dropdownOpen = false;
+                                              updated[index].dropdownOpen = true;
                                               updated[index].searchTerm = '';
                                               setSelectedSalesProperties(updated);
                                             }}
@@ -5347,7 +5465,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{owner}</span>
                                               {prop.value && prop.value.includes(owner) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -5470,7 +5588,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${owner}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -5648,21 +5766,46 @@ export default function Opportunities({ onPageChange }) {
                           Clear Filters
                         </button>
                         <button
+                          disabled={isApplyingSalesFilters || salesFiltersSuccess}
                           onClick={() => {
                             applySalesFilters();
                           }}
                           style={{
                             flex: 1,
                             padding: '8px 16px',
-                            border: '1px solid var(--blue-600)',
+                            border: salesFiltersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
                             borderRadius: 'var(--r)',
-                            background: 'var(--blue-600)',
+                            background: salesFiltersSuccess ? '#10b981' : isApplyingSalesFilters ? '#2563eb' : 'var(--blue-600)',
                             color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '13px'
+                            cursor: (isApplyingSalesFilters || salesFiltersSuccess) ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            opacity: isApplyingSalesFilters ? 0.85 : 1,
+                            transition: 'all 0.2s ease'
                           }}
                         >
-                          Apply Filters
+                          {salesFiltersSuccess ? (
+                            <>
+                              <Check size={14} /> Applied!
+                            </>
+                          ) : isApplyingSalesFilters ? (
+                            <>
+                              <div style={{
+                                width: '13px',
+                                height: '13px',
+                                border: '2px solid rgba(255,255,255,0.4)',
+                                borderTopColor: '#ffffff',
+                                borderRadius: '50%',
+                                animation: 'satyuktSpin 0.7s linear infinite'
+                              }} />
+                              Applying...
+                            </>
+                          ) : (
+                            'Apply Filters'
+                          )}
                         </button>
                       </div>
                     </div>
@@ -5788,8 +5931,8 @@ export default function Opportunities({ onPageChange }) {
                       </div>
                     </div>
 
-                    <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse' }}>
                         <thead style={{ background: '#f8f9fa', borderBottom: '2px solid #e0e0e0' }}>
                           <tr>
                             <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Deal Name</th>
@@ -6289,7 +6432,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Opportunity Information Modal (same layout as LeadPipeline) ── */}
+          {/* â”€â”€ Opportunity Information Modal (same layout as LeadPipeline) â”€â”€ */}
           {showUserModal && selectedUser && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
               <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '0', width: '85%', height: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
@@ -6305,7 +6448,7 @@ export default function Opportunities({ onPageChange }) {
                 {/* Modal body: two-column layout */}
                 <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-                  {/* ── Left panel: all editable sections ── */}
+                  {/* â”€â”€ Left panel: all editable sections â”€â”€ */}
                   <div style={{ flex: 1, overflowY: 'auto', padding: '24px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                     {/* Contact Information */}
@@ -6587,7 +6730,7 @@ export default function Opportunities({ onPageChange }) {
 
                   </div>{/* end left panel */}
 
-                  {/* ── Right panel: tabs (Timeline / Notes / Activities / Pipelines) ── */}
+                  {/* â”€â”€ Right panel: tabs (Timeline / Notes / Activities / Pipelines) â”€â”€ */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     {/* Tabs */}
                     <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 20px', flexShrink: 0 }}>
@@ -6816,7 +6959,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Create Deal Modal ── */}
+          {/* â”€â”€ Create Deal Modal â”€â”€ */}
           {showCreateDealModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
               <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '650px', maxWidth: '92%', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
@@ -7006,7 +7149,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Deal Information Modal ── */}
+          {/* â”€â”€ Deal Information Modal â”€â”€ */}
           {showDealInfoModal && selectedDeal && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
               <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r)', maxWidth: '900px', width: '92%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
@@ -7176,7 +7319,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Delete Deal Confirmation Modal ── */}
+          {/* â”€â”€ Delete Deal Confirmation Modal â”€â”€ */}
           {showDeleteDealModal && dealToDelete && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
               <div style={{ backgroundColor: '#fff', borderRadius: '16px', maxWidth: '400px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
@@ -7199,7 +7342,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Create Task Modal ── */}
+          {/* â”€â”€ Create Task Modal â”€â”€ */}
           {showCreateTaskModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
               <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '450px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
@@ -7255,7 +7398,7 @@ export default function Opportunities({ onPageChange }) {
             </div>
           )}
 
-          {/* ── Edit Task Modal ── */}
+          {/* â”€â”€ Edit Task Modal â”€â”€ */}
           {showEditTaskModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
               <div style={{ backgroundColor: '#fff', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
@@ -7590,7 +7733,7 @@ export default function Opportunities({ onPageChange }) {
                                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <span>{owner}</span>
                                             {prop.value && prop.value.includes(owner) && (
-                                              <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                             )}
                                           </div>
                                         </div>
@@ -7647,7 +7790,7 @@ export default function Opportunities({ onPageChange }) {
                                         }}
                                         title={`Remove ${owner}`}
                                       >
-                                        ×
+                                        <X size={12} />
                                       </button>
                                     </span>
                                   ))}
@@ -7758,13 +7901,9 @@ export default function Opportunities({ onPageChange }) {
                                   }}
                                 >
                                   <option value="">All Created By</option>
-                                  {isFetchingFilterOptions ? (
-                                    <option value="" disabled>Loading options, please wait...</option>
-                                  ) : (
-                                    getUniqueValues(prop.property).map(value => (
-                                      <option key={value} value={value}>{value}</option>
-                                    ))
-                                  )}
+                                  {getCreatedByOptions().map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
                                 </select>
                               </div>
                             </div>
@@ -7772,14 +7911,49 @@ export default function Opportunities({ onPageChange }) {
                         )}
 
                         {prop.property === 'modified_by' && (
-                          <div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ minWidth: '100px' }}>
-                                <select
-                                  value={prop.operator || 'is'}
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search users..."
+                                  value={prop.searchTerm || ''}
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
-                                    updated[index].operator = e.target.value;
+                                    updated[index].searchTerm = e.target.value;
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onClick={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -7791,39 +7965,126 @@ export default function Opportunities({ onPageChange }) {
                                     background: 'var(--surface)',
                                     color: 'var(--text)'
                                   }}
-                                >
-                                  <option value="is">Is</option>
-                                  <option value="is not">Is Not</option>
-                                </select>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <select
-                                  value={prop.value}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
                                     border: '1px solid var(--border)',
                                     borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Modified By</option>
-                                  {isFetchingFilterOptions ? (
-                                    <option value="" disabled>Loading options, please wait...</option>
-                                  ) : (
-                                    getUniqueValues(prop.property).map(value => (
-                                      <option key={value} value={value}>{value}</option>
-                                    ))
-                                  )}
-                                </select>
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getModifiedByOptions()
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = true;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
                               </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -8157,7 +8418,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{tag}</span>
                                               {prop.value && prop.value.includes(tag) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -8214,7 +8475,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${tag}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -8331,7 +8592,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{country}</span>
                                               {prop.value && prop.value.includes(country) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -8388,7 +8649,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${country}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -8505,7 +8766,7 @@ export default function Opportunities({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{state}</span>
                                               {prop.value && prop.value.includes(state) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -8562,7 +8823,7 @@ export default function Opportunities({ onPageChange }) {
                                           }}
                                           title={`Remove ${state}`}
                                         >
-                                          ×
+                                          <X size={12} />
                                         </button>
                                       </span>
                                     ))}
@@ -8617,7 +8878,9 @@ export default function Opportunities({ onPageChange }) {
                         Clear Filters
                       </button>
                       <button
+                        disabled={isApplyingAccountsFilters || accountsFiltersSuccess}
                         onClick={() => {
+                          if (isApplyingAccountsFilters || accountsFiltersSuccess) return;
                           // Collect all active filters
                           const activeFilters = [];
 
@@ -8764,22 +9027,46 @@ export default function Opportunities({ onPageChange }) {
                           // Apply all filters together in single API call
                           if (activeFilters.length > 0) {
                             handleCombinedFilters(activeFilters);
+                          } else {
+                            setFilterSidebarOpen(false);
                           }
-
-                          setFilterSidebarOpen(false);
                         }}
                         style={{
                           flex: 1,
                           padding: '8px 16px',
-                          border: '1px solid var(--blue-600)',
+                          border: accountsFiltersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
                           borderRadius: 'var(--r)',
-                          background: 'var(--blue-600)',
+                          background: accountsFiltersSuccess ? '#10b981' : isApplyingAccountsFilters ? '#2563eb' : 'var(--blue-600)',
                           color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '13px'
+                          cursor: (isApplyingAccountsFilters || accountsFiltersSuccess) ? 'not-allowed' : 'pointer',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          opacity: isApplyingAccountsFilters ? 0.85 : 1,
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        Apply Filters
+                        {accountsFiltersSuccess ? (
+                          <>
+                            <Check size={14} /> Applied!
+                          </>
+                        ) : isApplyingAccountsFilters ? (
+                          <>
+                            <div style={{
+                              width: '13px',
+                              height: '13px',
+                              border: '2px solid rgba(255,255,255,0.4)',
+                              borderTopColor: '#ffffff',
+                              borderRadius: '50%',
+                              animation: 'satyuktSpin 0.7s linear infinite'
+                            }} />
+                            Applying...
+                          </>
+                        ) : (
+                          'Apply Filters'
+                        )}
                       </button>
                     </div>
                   </>)}

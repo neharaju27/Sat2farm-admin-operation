@@ -109,7 +109,20 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       {/* Header */}
       <div className="sb-logo">
         <div className="sb-logo-text">SATYUKT</div>
-        <img src={sat2farmLogo} alt="Satyukt" style={{width: '100px', height: 'auto', margin: '8px 0'}} />
+        <div style={{
+          width: '72px',
+          height: '72px',
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.95)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '10px 0 6px',
+          padding: '6px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.18), 0 0 0 2px rgba(255,255,255,0.15)'
+        }}>
+          <img src={sat2farmLogo} alt="Satyukt" style={{width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%'}} />
+        </div>
         <div className="sb-logo-sub">ADMIN PORTAL · v2.4</div>
       </div>
       <div className="sb-role">Viewing as: <span>{

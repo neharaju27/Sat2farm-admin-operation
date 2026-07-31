@@ -296,6 +296,8 @@ export default function LeadPipeline({ onPageChange }) {
   const [isLast50Mode, setIsLast50Mode] = useState(false);
   const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
   const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const [filtersSuccess, setFiltersSuccess] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState(() => {
     try {
       const saved = sessionStorage.getItem('lead_selectedProperties');
@@ -691,6 +693,18 @@ export default function LeadPipeline({ onPageChange }) {
 
   // Get unique values for a property — reads from memoized cache
   const getUniqueValues = (property) => uniqueValuesMap[property] || [];
+
+  const getModifiedByOptions = () => {
+    const uniqueFromData = getUniqueValues('modified_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const getCreatedByOptions = () => {
+    const uniqueFromData = getUniqueValues('created_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
 
   // Get unique contact owners from leads data
   const getUniqueContactOwners = () => {
@@ -2165,6 +2179,9 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleCombinedFilters = async (filters) => {
+    if (isApplyingFilters) return;
+    setIsApplyingFilters(true);
+    setFiltersSuccess(false);
     console.log('Applying combined filters:', filters);
     setLoading(true);
 
@@ -2260,10 +2277,41 @@ export default function LeadPipeline({ onPageChange }) {
       console.log('API result:', result);
 
       if (result.data && Array.isArray(result.data)) {
-        console.log('Combined filters successful');
+        let allData = [...result.data];
+        const totalRecords = result.total || allData.length;
+
+        // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
+        let currentNextOffset = result.next_offset || (result.has_more ? allData.length : null);
+        while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
+          try {
+            const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
+            console.log('Fetching next batch from:', nextUrl);
+            const nextResponse = await fetch(nextUrl, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (!nextResponse.ok) break;
+            const nextResult = await nextResponse.json();
+            const nextItems = Array.isArray(nextResult.data) ? nextResult.data : [];
+            if (nextItems.length === 0) break;
+            allData = [...allData, ...nextItems];
+            if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
+              currentNextOffset = nextResult.next_offset;
+            } else if (nextItems.length > 0 && allData.length < totalRecords) {
+              currentNextOffset += nextItems.length;
+            } else {
+              break;
+            }
+          } catch (loopErr) {
+            console.warn('Error fetching additional filter pages:', loopErr);
+            break;
+          }
+        }
+
+        console.log('Combined filters successful, total loaded:', allData.length);
 
         // Transform the filtered leads data
-        const transformedLeads = result.data.map(lead => ({
+        const transformedLeads = allData.map(lead => ({
           id: lead.id,
           contactName: lead.full_name || 'Unknown',
           phoneNumber: lead.phone || '',
@@ -2322,6 +2370,11 @@ export default function LeadPipeline({ onPageChange }) {
         } else {
           toast.success(`${filters.length} filters applied (${filterCount} records found)`);
         }
+        setFiltersSuccess(true);
+        setTimeout(() => {
+          setFiltersSuccess(false);
+          setFilterSidebarOpen(false);
+        }, 500);
       } else {
         console.error('API returned unexpected format:', result);
         alert(`Failed to filter leads: Unexpected response format`);
@@ -2331,6 +2384,7 @@ export default function LeadPipeline({ onPageChange }) {
       alert(`Network error: ${err.message || 'Unknown error occurred'}`);
     } finally {
       setLoading(false);
+      setIsApplyingFilters(false);
     }
   };
 
@@ -2426,9 +2480,7 @@ export default function LeadPipeline({ onPageChange }) {
                   fontSize: '10px',
                   cursor: 'pointer'
                 }}
-              >
-                ✓
-              </button>
+              ><Check size={14} style={{ color: "var(--blue-600)" }} /></button>
               <button
                 onClick={cancelEdit}
                 style={{
@@ -3569,6 +3621,7 @@ export default function LeadPipeline({ onPageChange }) {
         {/* Filter Sidebar */}
         {filterSidebarOpen && (
           <>
+            <style>{`@keyframes satyuktSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             <div
               style={{
                 position: 'fixed',
@@ -3827,9 +3880,7 @@ export default function LeadPipeline({ onPageChange }) {
                                       justifyContent: 'center'
                                     }}
                                     title={`Remove ${prop.value}`}
-                                  >
-                                    ×
-                                  </button>
+                                  ><X size={12} /></button>
                                 </span>
                               </div>
                             )}
@@ -3941,7 +3992,7 @@ export default function LeadPipeline({ onPageChange }) {
                                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <span>{owner}</span>
                                             {prop.value && prop.value.includes(owner) && (
-                                              <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                             )}
                                           </div>
                                         </div>
@@ -3997,9 +4048,7 @@ export default function LeadPipeline({ onPageChange }) {
                                           justifyContent: 'center'
                                         }}
                                         title={`Remove ${owner}`}
-                                      >
-                                        ×
-                                      </button>
+                                      ><X size={12} /></button>
                                     </span>
                                   ))}
                                 </div>
@@ -4125,7 +4174,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{status}</span>
                                               {prop.value && prop.value.includes(status) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4181,9 +4230,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             justifyContent: 'center'
                                           }}
                                           title={`Remove ${status}`}
-                                        >
-                                          ×
-                                        </button>
+                                        ><X size={12} /></button>
                                       </span>
                                     ))}
                                   </div>
@@ -4308,7 +4355,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{tag}</span>
                                               {prop.value && prop.value.includes(tag) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4364,9 +4411,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             justifyContent: 'center'
                                           }}
                                           title={`Remove ${tag}`}
-                                        >
-                                          ×
-                                        </button>
+                                        ><X size={12} /></button>
                                       </span>
                                     ))}
                                   </div>
@@ -4483,7 +4528,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{country}</span>
                                               {prop.value && prop.value.includes(country) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4539,9 +4584,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             justifyContent: 'center'
                                           }}
                                           title={`Remove ${country}`}
-                                        >
-                                          ×
-                                        </button>
+                                        ><X size={12} /></button>
                                       </span>
                                     ))}
                                   </div>
@@ -4658,7 +4701,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{state}</span>
                                               {prop.value && prop.value.includes(state) && (
-                                                <span style={{ color: 'var(--blue-600)', fontSize: '12px' }}>✓</span>
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
                                               )}
                                             </div>
                                           </div>
@@ -4714,9 +4757,7 @@ export default function LeadPipeline({ onPageChange }) {
                                             justifyContent: 'center'
                                           }}
                                           title={`Remove ${state}`}
-                                        >
-                                          ×
-                                        </button>
+                                        ><X size={12} /></button>
                                       </span>
                                     ))}
                                   </div>
@@ -4824,13 +4865,9 @@ export default function LeadPipeline({ onPageChange }) {
                                   }}
                                 >
                                   <option value="">All Created By</option>
-                                  {isFetchingFilterOptions ? (
-                                    <option value="" disabled>Loading options, please wait...</option>
-                                  ) : (
-                                    getUniqueValues(prop.property).map(value => (
-                                      <option key={value} value={value}>{value}</option>
-                                    ))
-                                  )}
+                                  {getCreatedByOptions().map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
                                 </select>
                               </div>
                             </div>
@@ -4838,14 +4875,49 @@ export default function LeadPipeline({ onPageChange }) {
                         )}
 
                         {prop.property === 'modified_by' && (
-                          <div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <select
-                                  value={prop.operator || 'is'}
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search users..."
+                                  value={prop.searchTerm || ''}
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
-                                    updated[index].operator = e.target.value;
+                                    updated[index].searchTerm = e.target.value;
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onClick={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -4857,39 +4929,124 @@ export default function LeadPipeline({ onPageChange }) {
                                     background: 'var(--surface)',
                                     color: 'var(--text)'
                                   }}
-                                >
-                                  <option value="is">Is</option>
-                                  <option value="is not">Is Not</option>
-                                </select>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <select
-                                  value={prop.value}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
                                     border: '1px solid var(--border)',
                                     borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Modified By</option>
-                                  {isFetchingFilterOptions ? (
-                                    <option value="" disabled>Loading options, please wait...</option>
-                                  ) : (
-                                    getUniqueValues(prop.property).map(value => (
-                                      <option key={value} value={value}>{value}</option>
-                                    ))
-                                  )}
-                                </select>
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getModifiedByOptions()
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = true;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
                               </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      ><X size={12} /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -5493,22 +5650,47 @@ export default function LeadPipeline({ onPageChange }) {
                           // Apply all filters together in single API call
                           if (activeFilters.length > 0) {
                             handleCombinedFilters(activeFilters);
+                          } else {
+                            setFilterSidebarOpen(false);
                           }
-
-                          setFilterSidebarOpen(false);
                         }}
+                        disabled={isApplyingFilters || filtersSuccess}
                         style={{
                           flex: 1,
                           padding: '8px 16px',
-                          border: '1px solid var(--blue-600)',
+                          border: filtersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
                           borderRadius: 'var(--r)',
-                          background: 'var(--blue-600)',
+                          background: filtersSuccess ? '#10b981' : isApplyingFilters ? '#2563eb' : 'var(--blue-600)',
                           color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '13px'
+                          cursor: (isApplyingFilters || filtersSuccess) ? 'not-allowed' : 'pointer',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          opacity: isApplyingFilters ? 0.85 : 1,
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        Apply Filters
+                        {filtersSuccess ? (
+                          <>
+                            <Check size={14} /> Applied!
+                          </>
+                        ) : isApplyingFilters ? (
+                          <>
+                            <div style={{
+                              width: '13px',
+                              height: '13px',
+                              border: '2px solid rgba(255,255,255,0.4)',
+                              borderTopColor: '#ffffff',
+                              borderRadius: '50%',
+                              animation: 'satyuktSpin 0.7s linear infinite'
+                            }} />
+                            Applying...
+                          </>
+                        ) : (
+                          'Apply Filters'
+                        )}
                       </button>
                     </div>
                   </>)}
