@@ -183,8 +183,6 @@ export default function Opportunities({ onPageChange }) {
     }
   };
   useEffect(() => {
-
-    fetchOpportunities();
     fetchDealTotals();
     fetchAllKanbanDeals();
   }, []);
@@ -707,8 +705,17 @@ export default function Opportunities({ onPageChange }) {
       const result = await response.json();
       
 
-      let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
-      const totalRecords = (result && typeof result.total === 'number') ? result.total : oppsData.length;
+      let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || result.records || result.items || []);
+      // Fallback: find the first array property in the response
+      if ((!Array.isArray(oppsData) || oppsData.length === 0) && result && typeof result === 'object' && !Array.isArray(result)) {
+        for (const key in result) {
+          if (Array.isArray(result[key]) && result[key].length > 0) {
+            oppsData = result[key];
+            break;
+          }
+        }
+      }
+      const totalRecords = (result && typeof result.total === 'number') ? result.total : (Array.isArray(oppsData) ? oppsData.length : 0);
 
 
 
@@ -883,6 +890,7 @@ export default function Opportunities({ onPageChange }) {
         // 1. If searching, call dedicated search endpoint: /search?user=...&type=account&query=...
         if (isSearching && searchApiUrl) {
           try {
+            lastFetchedUrlRef.current = ''; // Clear URL cache to prevent stale data after search is cleared
             const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
             response = await fetch(searchUrl);
           } catch (searchErr) {
@@ -976,7 +984,19 @@ export default function Opportunities({ onPageChange }) {
         let data = [];
         if (response && response.ok) {
           const responseData = await response.json();
-          data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || []);
+          data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || responseData.records || responseData.items || []);
+
+          // If data is still not an array, try to find the first array property in the response
+          if (!Array.isArray(data) || data.length === 0) {
+            if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
+              for (const key in responseData) {
+                if (Array.isArray(responseData[key]) && responseData[key].length > 0) {
+                  data = responseData[key];
+                  break;
+                }
+              }
+            }
+          }
 
           if (responseData && typeof responseData.total === 'number') {
             setTotalOpportunities(responseData.total);
@@ -994,6 +1014,9 @@ export default function Opportunities({ onPageChange }) {
             if (isFilterApplied) {
               toast.success(`Filter applied: ${responseData.length} records found`, { id: 'opp-filter-toast' });
             }
+          } else {
+            // Fallback: set total from extracted data array length (covers search API responses without total field)
+            setTotalOpportunities(Array.isArray(data) ? data.length : 0);
           }
         }
 
@@ -1576,9 +1599,25 @@ export default function Opportunities({ onPageChange }) {
 
       const result = await response.json();
       
+      // Extract deals array from various possible response formats
+      let extractedData = null;
+      if (Array.isArray(result)) {
+        extractedData = result;
+      } else if (result && typeof result === 'object') {
+        extractedData = result.data || result.results || result.records || result.items || result.deals || null;
+        // Fallback: find first array property in response
+        if (!Array.isArray(extractedData) || extractedData.length === 0) {
+          for (const key in result) {
+            if (Array.isArray(result[key]) && result[key].length > 0) {
+              extractedData = result[key];
+              break;
+            }
+          }
+        }
+      }
 
-      if (result.data && Array.isArray(result.data)) {
-        let allData = [...result.data];
+      if (Array.isArray(extractedData)) {
+        let allData = [...extractedData];
         const totalRecords = result.total || allData.length;
 
         // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
