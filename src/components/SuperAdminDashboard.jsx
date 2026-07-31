@@ -107,12 +107,8 @@ export default function SuperAdminDashboard({
       console.log('Admin Info API Response:', adminData);
       
       // Handle array response
-      if (Array.isArray(adminData)) {
-        setAdminInfo(adminData);
-      } else {
-        // If single object, wrap in array
-        setAdminInfo([adminData]);
-      }
+      const formattedAdminData = Array.isArray(adminData) ? adminData : [adminData];
+      setAdminInfo(formattedAdminData);
 
       // Step 3: Fetch superadmin area data
       console.log('Fetching superadmin area data with phone:', phoneNumber);
@@ -128,20 +124,45 @@ export default function SuperAdminDashboard({
         if (errorText.toLowerCase().includes('not found') || 
             errorText.toLowerCase().includes('area details not found') ||
             errorText.toLowerCase().includes('no area')) {
-          // Clear admin info when area details are not found
-          setAdminInfo([]);
+          // Don't clear admin info, just keep it without area data
+          console.log('Area data not found, keeping admin info without area details');
           return;
         }
         throw new Error(`Failed to fetch area data: ${areaResponse.status} - ${errorText}`);
       }
 
       const areaResult = await areaResponse.json();
+      console.log('Area Result:', areaResult);
 
       if (
         areaResult.status === "success" &&
         areaResult.data
       ) {
         setAreaData(areaResult.data);
+        
+        // Merge area data with admin info
+        const areaDataMap = {};
+        if (Array.isArray(areaResult.data)) {
+          areaResult.data.forEach(area => {
+            areaDataMap[area.mobile_no || area.phoneNumber] = area;
+          });
+        } else if (areaResult.data && typeof areaResult.data === 'object') {
+          areaDataMap[areaResult.data.mobile_no || areaResult.data.phoneNumber] = areaResult.data;
+        }
+        
+        // Update adminInfo with area data
+        const mergedAdminInfo = formattedAdminData.map(admin => {
+          const areaInfo = areaDataMap[admin.mobile_no || admin.phoneNumber];
+          return {
+            ...admin,
+            allocate_area: areaInfo?.allocate_area || areaInfo?.allocated_area || admin.allocate_area || admin.allocated_area || 'N/A',
+            available_area: areaInfo?.available_area || admin.available_area || 'N/A',
+            used_area: areaInfo?.used_area || admin.used_area || 'N/A',
+            total_area: areaInfo?.total_area || admin.total_area || 'N/A'
+          };
+        });
+        
+        setAdminInfo(mergedAdminInfo);
       }
     } catch (err) {
       setError(err.message);
@@ -271,19 +292,21 @@ export default function SuperAdminDashboard({
               <table className="sa-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "25%" }}>Manager</th>
-                    <th style={{ width: "10%" }}>Manager ID</th>
-                    <th style={{ width: "15%" }}>Phone Number</th>
-                    <th style={{ width: "15%" }}>Registered Date</th>
-                    <th style={{ width: "10%" }}>Status</th>
-                    <th style={{ width: "25%", textAlign: "center" }}>Action</th>
+                    <th style={{ width: "20%" }}>Manager</th>
+                    <th style={{ width: "8%" }}>Manager ID</th>
+                    <th style={{ width: "12%" }}>Phone Number</th>
+                    <th style={{ width: "12%" }}>Registered Date</th>
+                    <th style={{ width: "12%" }}>Allocated Area</th>
+                    <th style={{ width: "12%" }}>Available Area</th>
+                    <th style={{ width: "8%" }}>Status</th>
+                    <th style={{ width: "18%", textAlign: "center" }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredManagers.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="8"
                         style={{
                           textAlign: "center",
                           padding: "60px",
@@ -330,6 +353,20 @@ export default function SuperAdminDashboard({
 
                         {/* Registered */}
                         <td>{formatDate(manager.reg_date)}</td>
+
+                        {/* Allocated Area */}
+                        <td>
+                          <span className="sa-table-id">
+                            {manager.unit_limit || manager.unit_limit || 'N/A'}
+                          </span>
+                        </td>
+
+                        {/* Available Area */}
+                        <td>
+                          <span className="sa-table-id">
+                            {manager.available_acreage || 'N/A'}
+                          </span>
+                        </td>
 
                         {/* Status */}
                         <td>

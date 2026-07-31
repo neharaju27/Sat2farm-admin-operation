@@ -1,7 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, MoreVertical } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
+import FeatureDashboard from './FeatureDashboard';
+import FarmMap from './features/FarmMap';
+import Weather from './features/Weather';
+import CropCalendar from './features/CropCalendar';
+import PestAndDisease from './features/PestAndDisease';
+import SoilMoisture from './features/SoilMoisture';
+import CropHealth from './features/CropHealth';
+import LSWI from './features/LSWI';
+import Irrigation from './features/Irrigation';
+import SoilReport from './features/SoilReport';
+import ImageAdvisory from './features/ImageAdvisory';
 
 export default function UnlockFarm({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -34,31 +45,37 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [farmDetails, setFarmDetails] = useState(null);
   const [farmDetailsLoading, setFarmDetailsLoading] = useState(false);
   const [farmDetailsError, setFarmDetailsError] = useState('');
-
+  
   // State for recently added farms (for manager and client roles)
   const [recentFarms, setRecentFarms] = useState([]);
   const [recentFarmsLoading, setRecentFarmsLoading] = useState(false);
   const [recentFarmsError, setRecentFarmsError] = useState('');
   const [activePage, setActivePage] = useState(0);
   const [selectedView, setSelectedView] = useState('added'); // 'added' or 'expiring'
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchProgress, setSearchProgress] = useState(0);
+  const [showLockConfirmModal, setShowLockConfirmModal] = useState(false);
+  const [farmToLock, setFarmToLock] = useState(null);
+  
   // State for ops role recent farms
   const [opsRecentFarms, setOpsRecentFarms] = useState([]);
   const [opsRecentFarmsLoading, setOpsRecentFarmsLoading] = useState(false);
   const [opsRecentFarmsError, setOpsRecentFarmsError] = useState('');
   const [opsActivePage, setOpsActivePage] = useState(0);
-
+  
   // State for expiring farms
   const [expiringFarms, setExpiringFarms] = useState([]);
   const [expiringFarmsLoading, setExpiringFarmsLoading] = useState(false);
   const [expiringFarmsError, setExpiringFarmsError] = useState('');
-
+  
   // State for acreages
   const [totalAcreage, setTotalAcreage] = useState(0);
   const [availableAcreage, setAvailableAcreage] = useState(0);
   const [usedAcreage, setUsedAcreage] = useState(0);
   const [acreageLoading, setAcreageLoading] = useState(false);
-
+  
   // State for plan selection modal
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedFarmId, setSelectedFarmId] = useState('');
@@ -79,7 +96,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [extractedCoordinates, setExtractedCoordinates] = useState('');
   const [csvUploadedFile, setCsvUploadedFile] = useState(null);
   const [isCsvDragging, setIsCsvDragging] = useState(false);
-
+  
   // State for farm details form
   const [farmName, setFarmName] = useState('');
   const [cropType, setCropType] = useState('');
@@ -95,6 +112,15 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [selectedFarmerApiKey, setSelectedFarmerApiKey] = useState('');
   const [isFetchingFarmerApiKey, setIsFetchingFarmerApiKey] = useState(false);
   const [isAddFarmSubmitting, setIsAddFarmSubmitting] = useState(false);
+
+  // State for dropdown menu
+  const [dropdownOpen, setDropdownOpen] = useState(null); // null or farmId
+
+  // State for specific feature modal
+  const [featureModalOpen, setFeatureModalOpen] = useState(null); // null or feature name
+  const [featureFarmId, setFeatureFarmId] = useState(null); // store selected farm_id for features
+  const [featureClientId, setFeatureClientId] = useState(null); // store selected client_id for features
+  const [featureFarmStatus, setFeatureFarmStatus] = useState(null); // store farm status for features
 
   const getSelectedFarmerId = (farmer = selectedFarmer) =>
     farmer?.user_id || farmer?.userId || farmer?.id;
@@ -443,7 +469,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       const content = String(e.target.result || '');
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(content, 'text/xml');
-
+      
       // Try to find coordinates in different possible locations
       const coordinatesElements = xmlDoc.getElementsByTagName('coordinates');
       if (coordinatesElements.length > 0) {
@@ -506,7 +532,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       const storedAuth = localStorage.getItem('sat2farm_auth');
       let userMobileNumber = null;
       let authToken = null;
-
+      
       if (storedAuth) {
         try {
           const authData = JSON.parse(storedAuth);
@@ -516,7 +542,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           console.error('Error parsing auth data:', e);
         }
       }
-
+      
       if (!userMobileNumber) {
         setRecentFarmsError('User mobile number not found. Please login again.');
         return;
@@ -534,21 +560,21 @@ export default function UnlockFarm({ user, onPageChange }) {
         apiUrl = import.meta.env.VITE_FETCH_50_FARMS_API_URL + `?mobile_no=${userMobileNumber}`;
       }
       console.log('Fetching top 50 farms:', apiUrl);
-
+      
       // Prepare headers - only add Authorization if token exists to avoid CORS issues
       const headers = {
         'Content-Type': 'application/json'
       };
-
+      
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: headers
       });
-
+      
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('API endpoint not found. Please check the API URL configuration.');
@@ -562,10 +588,10 @@ export default function UnlockFarm({ user, onPageChange }) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       }
-
+      
       const data = await response.json();
       console.log('Top 50 farms API response:', data);
-
+      
       // Handle different response structures
       let farmsArray = null;
       if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
@@ -579,14 +605,15 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = farmsArray.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.region || farm.state || 'Unknown Region',
+          region: farm.state || farm.region || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           expiryTime: farm.expiry_time || farm.expiry || farm.expiry_date || 'N/A',
           status: farm.farm_status || 'N/A',
-          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined
+          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
+          clientId: farm.client_id || farm.clientId || undefined
         }));
-
+        
         setRecentFarms(formattedFarms);
         console.log(`Successfully loaded ${formattedFarms.length} farms`);
       } else if (data && data.count === 0) {
@@ -617,14 +644,14 @@ export default function UnlockFarm({ user, onPageChange }) {
     try {
       const apiUrl = import.meta.env.VITE_OPS_RECENT_FARMS_API_URL;
       console.log('Fetching ops recent farms:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-
+      
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('API endpoint not found. Please check the API URL configuration.');
@@ -638,21 +665,21 @@ export default function UnlockFarm({ user, onPageChange }) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       }
-
+      
       const data = await response.json();
       console.log('Ops recent farms API response:', data);
-
+      
       if (data && Array.isArray(data)) {
         // Format the API response data to match the expected structure
         const formattedFarms = data.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.region || farm.state || 'Unknown Region',
+          region: farm.state || farm.region || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : (farm.area ? `${farm.area} acre` : 'N/A'),
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
         }));
-
+        
         setOpsRecentFarms(formattedFarms);
         console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
       } else if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
@@ -660,12 +687,12 @@ export default function UnlockFarm({ user, onPageChange }) {
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || farm.farmName || 'Unknown Farm',
-          region: farm.region || farm.state || 'Unknown Region',
+          region: farm.state || farm.region || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || 'N/A'
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
         }));
-
+        
         setOpsRecentFarms(formattedFarms);
         console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
       } else {
@@ -723,21 +750,21 @@ export default function UnlockFarm({ user, onPageChange }) {
         apiUrl = import.meta.env.VITE_EXPIRING_FARMS_API_URL + `?mobile_no=${userMobileNumber}`;
       }
       console.log('Fetching expiring farms:', apiUrl);
-
+      
       // Prepare headers - only add Authorization if token exists to avoid CORS issues
       const headers = {
         'Content-Type': 'application/json'
       };
-
+      
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: headers
       });
-
+      
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('API endpoint not found. Please check the API URL configuration.');
@@ -751,23 +778,23 @@ export default function UnlockFarm({ user, onPageChange }) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
       }
-
+      
       const data = await response.json();
       console.log('Expiring farms API response:', data);
-
+      
       if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
         // Format the API response data to match the expected structure
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || `FARM${String(index + 1).padStart(5, '0')}`,
           farmName: farm.farm_name || 'Unknown Farm',
-          region: farm.region || farm.state || 'Unknown Region',
+          region: farm.state || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || 'N/A',
           expiryTime: farm.date_of_expiry || 'N/A',
           status: farm.farm_status || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined
         }));
-
+        
         setExpiringFarms(formattedFarms);
         console.log(`Successfully loaded ${formattedFarms.length} expiring farms`);
       } else {
@@ -785,13 +812,13 @@ export default function UnlockFarm({ user, onPageChange }) {
   // Function to fetch acreages data
   const fetchAcreages = async () => {
     setAcreageLoading(true);
-
+    
     try {
       // Get user mobile number from login storage
       const storedAuth = localStorage.getItem('sat2farm_auth');
       let userMobileNumber = null;
       let authToken = null;
-
+      
       if (storedAuth) {
         try {
           const authData = JSON.parse(storedAuth);
@@ -801,7 +828,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           console.error('Error parsing auth data:', e);
         }
       }
-
+      
       if (!userMobileNumber) {
         console.error('User mobile number not found');
         return;
@@ -810,22 +837,22 @@ export default function UnlockFarm({ user, onPageChange }) {
       // Call API to fetch available area
       const apiUrl = import.meta.env.VITE_AVAILABLE_AREA_API_URL + `?mobile_no=${userMobileNumber}`;
       console.log('Fetching acreages:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-
+      
       if (!response.ok) {
         console.error('Failed to fetch acreages:', response.status);
         return;
       }
-
+      
       const data = await response.json();
       console.log('Acreages API response:', data);
-
+      
       if (data && data.status === "Success" && data.data) {
         setAvailableAcreage(data.data.available_area || 0);
         setUsedAcreage(data.data.used_area || 0);
@@ -840,12 +867,12 @@ export default function UnlockFarm({ user, onPageChange }) {
   // Function to fetch superadmin area data for partner role
   const fetchSuperadminArea = async () => {
     setAcreageLoading(true);
-
+    
     try {
       // Get user mobile number from login storage
       const storedAuth = localStorage.getItem('sat2farm_auth');
       let userMobileNumber = null;
-
+      
       if (storedAuth) {
         try {
           const authData = JSON.parse(storedAuth);
@@ -854,7 +881,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           console.error('Error parsing auth data:', e);
         }
       }
-
+      
       if (!userMobileNumber) {
         console.error('User mobile number not found');
         return;
@@ -863,22 +890,22 @@ export default function UnlockFarm({ user, onPageChange }) {
       // Call API to fetch superadmin area data
       const apiUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL + `?mobile_no=${userMobileNumber}`;
       console.log('Fetching superadmin area:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-
+      
       if (!response.ok) {
         console.error('Failed to fetch superadmin area:', response.status);
         return;
       }
-
+      
       const data = await response.json();
       console.log('Superadmin area API response:', data);
-
+      
       if (data && data.data) {
         setTotalAcreage(data.data.total_area || 0);
         setAvailableAcreage(data.data.available_area || 0);
@@ -898,6 +925,53 @@ export default function UnlockFarm({ user, onPageChange }) {
     setShowPlanModal(true);
   };
 
+  // Function to lock farm
+  const lockRecentFarm = async (farmId) => {
+    setFormLoading(true);
+    setFormError('');
+
+    try {
+      const apiUrl = import.meta.env.VITE_UNLOCK_FARM_API_URL + `?farm_id=${farmId}&lockstatus=0&mode=cash&expiry=0`;
+      console.log('Locking farm:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET'
+      });
+
+      const data = await response.json();
+      console.log('Lock farm API response:', data);
+
+      if (data.success || data.status === 'success') {
+        toast.success(`Farm ID ${farmId} locked successfully!`);
+        setMessage(`Farm ID ${farmId} locked successfully!`);
+        setShowLockConfirmModal(false);
+        setFarmToLock(null);
+        
+        // Refresh the farms list
+        if (selectedView === 'added') {
+          fetchRecentFarms();
+        }
+      } else {
+        const errorMessage = data?.message || 'Failed to lock farm';
+        setFormError(errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (err) {
+      console.error('Error locking farm:', err);
+      const errorMessage = `Failed to lock farm: ${err.message}`;
+      setFormError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Function to close lock confirmation modal
+  const closeLockConfirmModal = () => {
+    setShowLockConfirmModal(false);
+    setFarmToLock(null);
+  };
+
   // Function to unlock farm with selected plan
   const unlockFarmWithPlan = async () => {
     if (!selectedPlan) {
@@ -913,31 +987,31 @@ export default function UnlockFarm({ user, onPageChange }) {
       // Call unlock API with selected plan using the new endpoint
       const apiUrl = import.meta.env.VITE_UNLOCK_FARM_API_URL + `?farm_id=${selectedFarmId}&lockstatus=1&mode=cash&expiry=${selectedPlan}`;
       console.log('Unlocking farm with plan:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
-        method: 'GET'
+        method:'GET'
       });
-
+      
       if (!response.ok) {
         if (response.status === 500 || response.status === 503 || response.status === 502) {
           throw new Error('Service unavailable');
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
       const data = await response.json();
       console.log('Unlock API response:', data);
-
+      
       if (data && data.status !== 'Failure') {
         toast.success(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
         setMessage(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
-
+        
         // Store unlock details
         try {
           const storedAuth = localStorage.getItem('sat2farm_auth');
           let userName = null;
           let userMobileNumber = null;
-
+          
           if (storedAuth) {
             try {
               const authData = JSON.parse(storedAuth);
@@ -947,17 +1021,17 @@ export default function UnlockFarm({ user, onPageChange }) {
               console.error('Error parsing auth data:', e);
             }
           }
-
+          
           if (userMobileNumber && selectedFarmId) {
             const storeUnlockUrl = import.meta.env.VITE_STORE_UNLOCK_DETAILS_API_URL;
             console.log('Storing unlock details:', storeUnlockUrl);
-
+            
             const storePayload = {
               name: userName,
               mobile_no: userMobileNumber,
               farm_id: selectedFarmId
             };
-
+            
             const storeResponse = await fetch(storeUnlockUrl, {
               method: 'POST',
               headers: {
@@ -965,21 +1039,21 @@ export default function UnlockFarm({ user, onPageChange }) {
               },
               body: JSON.stringify(storePayload)
             });
-
+            
             console.log('Store unlock details response:', await storeResponse.json());
           }
         } catch (storeErr) {
           console.error('Error storing unlock details:', storeErr);
           // Don't fail the main operation if storing details fails
         }
-
+        
         // Remove the unlocked farm from the appropriate list based on current view
         if (selectedView === 'added') {
           setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
         } else {
           setExpiringFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
         }
-
+        
         // Close the modal
         setShowPlanModal(false);
         setSelectedFarmId('');
@@ -990,13 +1064,13 @@ export default function UnlockFarm({ user, onPageChange }) {
         if (errorMessage.toLowerCase().includes('already unlock') || errorMessage.toLowerCase().includes('already unlocked')) {
           toast.success(`Farm ID ${selectedFarmId} is already unlocked!`);
           setMessage(`Farm ID ${selectedFarmId} is already unlocked!`);
-
+          
           // Store unlock details even for already unlocked farms
           try {
             const storedAuth = localStorage.getItem('sat2farm_auth');
             let userName = null;
             let userMobileNumber = null;
-
+            
             if (storedAuth) {
               try {
                 const authData = JSON.parse(storedAuth);
@@ -1006,17 +1080,17 @@ export default function UnlockFarm({ user, onPageChange }) {
                 console.error('Error parsing auth data:', e);
               }
             }
-
+            
             if (userMobileNumber && selectedFarmId) {
               const storeUnlockUrl = import.meta.env.VITE_STORE_UNLOCK_DETAILS_API_URL;
               console.log('Storing unlock details for already unlocked farm:', storeUnlockUrl);
-
+              
               const storePayload = {
                 name: userName,
                 mobile_no: userMobileNumber,
                 farm_id: selectedFarmId
               };
-
+              
               const storeResponse = await fetch(storeUnlockUrl, {
                 method: 'POST',
                 headers: {
@@ -1024,20 +1098,20 @@ export default function UnlockFarm({ user, onPageChange }) {
                 },
                 body: JSON.stringify(storePayload)
               });
-
+              
               console.log('Store unlock details response:', await storeResponse.json());
             }
           } catch (storeErr) {
             console.error('Error storing unlock details:', storeErr);
           }
-
+          
           // Remove the farm from the list since it's already unlocked
           if (selectedView === 'added') {
             setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
           } else {
             setExpiringFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
           }
-
+          
           // Close the modal
           setShowPlanModal(false);
           setSelectedFarmId('');
@@ -1161,6 +1235,208 @@ export default function UnlockFarm({ user, onPageChange }) {
   };
 
   // Function to fetch farm details with referral code validation
+  const handleSearchFarm = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResult(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchResult(null);
+    setFarmDetailsError('');
+    setSearchProgress(0);
+
+    // Helper function to update progress
+    const updateProgress = (progress) => {
+      setSearchProgress(progress);
+    };
+
+    try {
+      // Check if search query is a farm ID or farm name
+      const isFarmId = /^\d+$/.test(searchQuery.trim());
+      
+      if (isFarmId) {
+        const farmIdValue = searchQuery.trim();
+        
+        // Start validation
+        updateProgress(15);
+        
+        // Step 1: Validate farm access for partner role (check first)
+        if (user?.role === 'partner' || user?.user_role === 'partner') {
+          // Get user data from AuthContext storage
+          const storedAuth = localStorage.getItem('sat2farm_auth');
+          let userMobileNumber = null;
+          
+          if (storedAuth) {
+            try {
+              const authData = JSON.parse(storedAuth);
+              userMobileNumber = authData.phone_number;
+            } catch (e) {
+              console.error('Error parsing auth data:', e);
+            }
+          }
+          
+          if (!userMobileNumber) {
+            setFarmDetailsError('User mobile number not found. Please login again.');
+            return;
+          }
+
+          // Check if farm ID is under super admin access
+          updateProgress(30);
+          const superFarmCheckUrl = import.meta.env.VITE_FETCH_SUPER_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue}`;
+          console.log('Checking super admin farm access:', superFarmCheckUrl);
+          
+          const superFarmResponse = await fetch(superFarmCheckUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const superFarmData = await superFarmResponse.json();
+          console.log('Super admin farm access response:', superFarmData);
+          
+          // Check if access is granted
+          const isAccessGranted = superFarmData.message?.toLowerCase() === "access granted" || 
+                                superFarmData.status?.toLowerCase() === "success" || 
+                                superFarmData.success === true ||
+                                (superFarmData.data && superFarmData.data.access === true) ||
+                                (superFarmData.data && Array.isArray(superFarmData.data) && superFarmData.data.length > 0) ||
+                                (superFarmData.farm_id || superFarmData.farmId || superFarmData.farm_name || superFarmData.farmName);
+          
+          if (!isAccessGranted) {
+            setFarmDetailsError('Access denied: This farm ID is not under your super admin access.');
+            return;
+          }
+          
+          console.log('Super admin farm access validation successful');
+          updateProgress(50);
+        }
+        // Step 2: Validate referral code for manager and client roles (non-partner)
+        else if (currentRole === 'manager' || currentRole === 'client') {
+          // Get user data from AuthContext storage
+          const storedAuth = localStorage.getItem('sat2farm_auth');
+          let userMobileNumber = null;
+          let authToken = null;
+          
+          if (storedAuth) {
+            try {
+              const authData = JSON.parse(storedAuth);
+              userMobileNumber = authData.phone_number;
+              authToken = authData.token || authData.jwt;
+            } catch (e) {
+              console.error('Error parsing auth data:', e);
+            }
+          }
+          
+          if (!userMobileNumber) {
+            setFarmDetailsError('User mobile number not found. Please login again.');
+            return;
+          }
+
+          // Check if farm ID is under this referral code
+          updateProgress(30);
+          const referralCheckUrl = import.meta.env.VITE_FETCH_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue}`;
+          console.log('Checking referral code access:', referralCheckUrl);
+          
+          // Prepare headers - only add Authorization if token exists to avoid CORS issues
+          const referralHeaders = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            referralHeaders['Authorization'] = `Bearer ${authToken}`;
+          }
+          
+          const referralResponse = await fetch(referralCheckUrl, {
+            method: 'GET',
+            headers: referralHeaders
+          });
+          
+          const referralData = await referralResponse.json();
+          console.log('Referral code validation response:', referralData);
+          
+          // Check if farm belongs to this user - look for 'Access granted' message
+          const isAccessGranted = referralData.message?.toLowerCase() === "access granted" || 
+                                referralData.status?.toLowerCase() === "success" || 
+                                referralData.success === true ||
+                                (referralData.data && referralData.data.access === true) ||
+                                (referralData.data && Array.isArray(referralData.data) && referralData.data.length > 0) ||
+                                (referralData.farm_id || referralData.farmId || referralData.farm_name || referralData.farmName);
+          
+          if (!isAccessGranted) {
+            setFarmDetailsError('Access denied: This farm ID is not under your referral code.');
+            return;
+          }
+          
+          console.log('Referral code validation successful');
+          updateProgress(50);
+        }
+        
+        // Step 3: Fetch farm details after successful validation
+        updateProgress(70);
+        const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farmIdValue}`;
+        console.log('Fetching farm details:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        updateProgress(90);
+        const data = await response.json();
+        console.log('Farm search API response:', data);
+        
+        if ((data.status === 'Success' || data.success) && data.data) {
+          const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+          const farmInfo = farmArray[0] || {};
+          const farmData = {
+            farmId: farmInfo.farm_id || farmIdValue,
+            farmName: farmInfo.farm_name || 'N/A',
+            area: farmInfo.area ? `${farmInfo.area} acre` : 'N/A',
+            region: farmInfo.district || 'N/A',
+            cropType: farmInfo.croptype || 'N/A',
+            status: farmInfo.farm_status || 'N/A',
+            clientId: farmInfo.client_id || undefined,
+            createdTime: farmInfo.created_time || 'N/A',
+            state: farmInfo.state || 'N/A',
+            country: farmInfo.country || 'N/A'
+          };
+          setSearchResult(farmData);
+          updateProgress(100);
+        } else {
+          setFarmDetailsError('Farm ID doesn\'t exist, please enter proper farm ID');
+        }
+      } else {
+        // Search by farm name - search through recent farms
+        updateProgress(50);
+        const foundFarm = recentFarms.find(farm => 
+          farm.farmName && farm.farmName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        
+        if (foundFarm) {
+          setSearchResult(foundFarm);
+          updateProgress(100);
+        } else {
+          setFarmDetailsError('Farm not found');
+        }
+      }
+    } catch (err) {
+      console.error('Error searching farm:', err);
+      setFarmDetailsError('Failed to search farm');
+    } finally {
+      setSearchLoading(false);
+      // Reset progress after a short delay
+      setTimeout(() => setSearchProgress(0), 500);
+    }
+  };
+
   const fetchFarmDetails = async (farmIdValue) => {
     if (!farmIdValue.trim()) {
       setFarmDetails(null);
@@ -1177,7 +1453,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         // Get user data from AuthContext storage
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
-
+        
         if (storedAuth) {
           try {
             const authData = JSON.parse(storedAuth);
@@ -1186,7 +1462,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             console.error('Error parsing auth data:', e);
           }
         }
-
+        
         if (!userMobileNumber) {
           setFarmDetailsError('User mobile number not found. Please login again.');
           return;
@@ -1195,31 +1471,31 @@ export default function UnlockFarm({ user, onPageChange }) {
         // Check if farm ID is under super admin access
         const superFarmCheckUrl = import.meta.env.VITE_FETCH_SUPER_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue.trim()}`;
         console.log('Checking super admin farm access:', superFarmCheckUrl);
-
+        
         const superFarmResponse = await fetch(superFarmCheckUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
           }
         });
-
+        
         const superFarmData = await superFarmResponse.json();
         console.log('Super admin farm access response:', superFarmData);
-
+        
         // Check if access is granted - look for success indicators (case-insensitive)
         // Also check if the API returns the farm data (which means access is granted)
-        const isAccessGranted = superFarmData.message?.toLowerCase() === "access granted" ||
-          superFarmData.status?.toLowerCase() === "success" ||
-          superFarmData.success === true ||
-          (superFarmData.data && superFarmData.data.access === true) ||
-          (superFarmData.data && Array.isArray(superFarmData.data) && superFarmData.data.length > 0) ||
-          (superFarmData.farm_id || superFarmData.farmId || superFarmData.farm_name || superFarmData.farmName);
-
+        const isAccessGranted = superFarmData.message?.toLowerCase() === "access granted" || 
+                              superFarmData.status?.toLowerCase() === "success" || 
+                              superFarmData.success === true ||
+                              (superFarmData.data && superFarmData.data.access === true) ||
+                              (superFarmData.data && Array.isArray(superFarmData.data) && superFarmData.data.length > 0) ||
+                              (superFarmData.farm_id || superFarmData.farmId || superFarmData.farm_name || superFarmData.farmName);
+        
         if (!isAccessGranted) {
           setFarmDetailsError('Access denied: This farm ID is not under your super admin access.');
           return;
         }
-
+        
         console.log('Super admin farm access validation successful');
       }
       // Step 2: Validate referral code for manager and client roles (non-partner)
@@ -1228,7 +1504,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
         let authToken = null;
-
+        
         if (storedAuth) {
           try {
             const authData = JSON.parse(storedAuth);
@@ -1238,7 +1514,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             console.error('Error parsing auth data:', e);
           }
         }
-
+        
         if (!userMobileNumber) {
           setFarmDetailsError('User mobile number not found. Please login again.');
           return;
@@ -1247,70 +1523,75 @@ export default function UnlockFarm({ user, onPageChange }) {
         // Check if farm ID is under this referral code
         const referralCheckUrl = import.meta.env.VITE_FETCH_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmIdValue.trim()}`;
         console.log('Checking referral code access:', referralCheckUrl);
-
+        
         // Prepare headers - only add Authorization if token exists to avoid CORS issues
         const referralHeaders = {
           'Content-Type': 'application/json'
         };
-
+        
         if (authToken) {
           referralHeaders['Authorization'] = `Bearer ${authToken}`;
         }
-
+        
         const referralResponse = await fetch(referralCheckUrl, {
           method: 'GET',
           headers: referralHeaders
         });
-
+        
         const referralData = await referralResponse.json();
         console.log('Referral validation response:', referralData);
-
+        
         // Check if referral validation passed - look for success indicators
-        const isAccessGranted = referralData.message === "Access granted" ||
-          referralData.status === "Success" ||
-          referralData.success === true ||
-          (referralData.data && referralData.data.access === true);
-
+        const isAccessGranted = referralData.message === "Access granted" || 
+                              referralData.status === "Success" || 
+                              referralData.success === true ||
+                              (referralData.data && referralData.data.access === true);
+        
         if (!isAccessGranted) {
           setFarmDetailsError('Access denied: This farm ID is not under your referral code.');
           return;
         }
-
+        
         console.log('Referral code validation successful');
       }
 
       // Step 2: Fetch farm details after successful validation
       const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farmIdValue.trim()}`;
       console.log('Fetching farm details:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+      
       const data = await response.json();
       console.log('Farm details API response:', data);
-      const farmRecord = Array.isArray(data?.data) ? data.data[0] : data?.data;
-      if (data?.status == 'Success' && farmRecord) {
+      
+      if ((data.status === 'Success' || data.success) && data.data) {
         // Clear any previous error messages
         setFarmDetailsError('');
-
+        
+        // Handle array response
+        const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+        const farmInfo = farmArray[0] || {};
+        
         // Handle null values and format the data
         const farmData = {
-          farmId: farmRecord.farm_id ?? farmIdValue.trim(),
-          cropType: farmRecord.croptype || 'N/A',
-          area: farmRecord.area ? `${farmRecord.area} acre` : 'N/A',
-          district: farmRecord.district || 'N/A',
-          state: farmRecord.state || 'N/A',
-          country: farmRecord.country || 'N/A',
-          timeOfRegistration: farmRecord.created_time || farmRecord.time || 'N/A'
+          farmId: farmInfo.farm_id || farmIdValue.trim(),
+          cropType: farmInfo.croptype || 'N/A',
+          area: farmInfo.area ? `${farmInfo.area} acre` : 'N/A',
+          district: farmInfo.district || 'N/A',
+          state: farmInfo.state || 'N/A',
+          country: farmInfo.country || 'N/A',
+          timeOfRegistration: farmInfo.time || farmInfo.created_time || 'N/A'
         };
+        
         setFarmDetails(farmData);
       } else {
         setFarmDetailsError('Farm ID doesn\'t exist, please enter proper farm ID');
@@ -1343,7 +1624,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
         let authToken = null;
-
+        
         if (storedAuth) {
           try {
             const authData = JSON.parse(storedAuth);
@@ -1353,7 +1634,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             console.error('Error parsing auth data:', e);
           }
         }
-
+        
         if (!userMobileNumber) {
           const errorMessage = 'User mobile number not found. Please login again.';
           setFormError(errorMessage);
@@ -1364,31 +1645,31 @@ export default function UnlockFarm({ user, onPageChange }) {
         // Verify farm belongs to this user
         const verifyUrl = import.meta.env.VITE_FETCH_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmId.trim()}`;
         console.log('Verifying farm ownership:', verifyUrl);
-
+        
         const verifyResponse = await fetch(verifyUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+            'Authorization': `Bearer ${authToken}` 
           }
         });
-
+        
         const verifyData = await verifyResponse.json();
         console.log('Farm verification response:', verifyData);
-
+        
         if (verifyData.message !== "Access granted") {
           const errorMessage = 'Access denied: This farm does not belong to your account.';
           setFormError(errorMessage);
           toast.error(errorMessage);
           return;
         }
-
+        
         console.log('Farm ownership verified successfully');
       } else if (currentRole === 'partner') {
         // For partner role, verify using super admin farm API
         const storedAuth = localStorage.getItem('sat2farm_auth');
         let userMobileNumber = null;
-
+        
         if (storedAuth) {
           try {
             const authData = JSON.parse(storedAuth);
@@ -1397,7 +1678,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             console.error('Error parsing auth data:', e);
           }
         }
-
+        
         if (!userMobileNumber) {
           const errorMessage = 'User mobile number not found. Please login again.';
           setFormError(errorMessage);
@@ -1408,57 +1689,57 @@ export default function UnlockFarm({ user, onPageChange }) {
         // Verify farm access using super admin API
         const verifyUrl = import.meta.env.VITE_FETCH_SUPER_FARM_API_URL + `?mobile_no=${userMobileNumber}&farm_id=${farmId.trim()}`;
         console.log('Verifying partner farm access:', verifyUrl);
-
+        
         const verifyResponse = await fetch(verifyUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
           }
         });
-
+        
         const verifyData = await verifyResponse.json();
         console.log('Partner farm verification response:', verifyData);
-
+        
         // Check if access is granted - look for success indicators or farm data
-        const isAccessGranted = verifyData.message?.toLowerCase() === "access granted" ||
-          verifyData.status?.toLowerCase() === "success" ||
-          verifyData.success === true ||
-          (verifyData.data && verifyData.data.access === true) ||
-          (verifyData.data && Array.isArray(verifyData.data) && verifyData.data.length > 0) ||
-          (verifyData.farm_id || verifyData.farmId || verifyData.farm_name || verifyData.farmName);
-
+        const isAccessGranted = verifyData.message?.toLowerCase() === "access granted" || 
+                              verifyData.status?.toLowerCase() === "success" || 
+                              verifyData.success === true ||
+                              (verifyData.data && verifyData.data.access === true) ||
+                              (verifyData.data && Array.isArray(verifyData.data) && verifyData.data.length > 0) ||
+                              (verifyData.farm_id || verifyData.farmId || verifyData.farm_name || verifyData.farmName);
+        
         if (!isAccessGranted) {
           const errorMessage = 'Access denied: This farm ID is not under your super admin access.';
           setFormError(errorMessage);
           toast.error(errorMessage);
           return;
         }
-
+        
         console.log('Partner farm access verified successfully');
       }
 
       // Step 2: Proceed with unlock/lock operation
       // Map status to lockstatus: unlock -> 1, lock -> 0 (reversed based on API behavior)
       const lockStatus = status === 'lock' ? 0 : 1;
-
+      
       console.log('Form status:', status);
       console.log('Mapped lockstatus:', lockStatus);
       console.log('Farm ID:', farmId.trim());
-
+      
       // Map expiry to numeric value
       let expiryValue = expiry;
       if (expiry === 'other') {
         expiryValue = customExpiry.trim();
       }
-
+      
       // Construct API URL
       const apiUrl = import.meta.env.VITE_UNLOCK_FARM_API_URL + `?farm_id=${farmId.trim()}&lockstatus=${lockStatus}&mode=${paymentMode}&expiry=${expiryValue}`;
       console.log('Calling API:', apiUrl);
-
+      
       const response = await fetch(apiUrl, {
         method: 'GET'
       });
-
+      
       if (!response.ok) {
         // Try to get the error message from the response body
         let errorDetails = '';
@@ -1472,7 +1753,7 @@ export default function UnlockFarm({ user, onPageChange }) {
             errorDetails = 'No error details available';
           }
         }
-
+        
         if (response.status === 500 || response.status === 503 || response.status === 502) {
           throw new Error(`Service unavailable: ${errorDetails}`);
         }
@@ -1481,7 +1762,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         }
         throw new Error(`HTTP error! status: ${response.status} - ${errorDetails}`);
       }
-
+      
       const data = await response.json().catch(err => {
         console.log('Response is not JSON, trying to get text:', err);
         return response.text().then(text => {
@@ -1492,20 +1773,20 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('API Response:', data);
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
-
+      
       const apiMessage = data?.message || `Farm ID ${farmId.trim()} has been ${status === 'lock' ? 'locked' : 'unlocked'} successfully!`;
       const wasSuccessful = data?.status?.toLowerCase() === 'success';
-
+      
       if (wasSuccessful) {
         toast.success(apiMessage);
         setMessage(apiMessage);
-
+        
         // Store unlock details
         try {
           const storedAuth = localStorage.getItem('sat2farm_auth');
           let userName = null;
           let userMobileNumber = null;
-
+          
           if (storedAuth) {
             try {
               const authData = JSON.parse(storedAuth);
@@ -1515,17 +1796,17 @@ export default function UnlockFarm({ user, onPageChange }) {
               console.error('Error parsing auth data:', e);
             }
           }
-
+          
           if (userMobileNumber && farmId.trim()) {
             const storeUnlockUrl = import.meta.env.VITE_STORE_UNLOCK_DETAILS_API_URL;
             console.log('Storing unlock details:', storeUnlockUrl);
-
+            
             const storePayload = {
               name: userName,
               mobile_no: userMobileNumber,
               farm_id: farmId.trim()
             };
-
+            
             const storeResponse = await fetch(storeUnlockUrl, {
               method: 'POST',
               headers: {
@@ -1533,14 +1814,14 @@ export default function UnlockFarm({ user, onPageChange }) {
               },
               body: JSON.stringify(storePayload)
             });
-
+            
             console.log('Store unlock details response:', await storeResponse.json());
           }
         } catch (storeErr) {
           console.error('Error storing unlock details:', storeErr);
           // Don't fail the main operation if storing details fails
         }
-
+        
         // Reset form only when the operation is truly completed or idempotent success
         setFarmId('');
         setStatus('unlock');
@@ -1553,7 +1834,7 @@ export default function UnlockFarm({ user, onPageChange }) {
         toast.error(apiMessage);
         return;
       }
-
+      
     } catch (err) {
       console.error('API Error:', err);
       const errorMessage = `Failed to update farm status: ${err.message}`;
@@ -1591,19 +1872,19 @@ export default function UnlockFarm({ user, onPageChange }) {
     }
   }, [currentRole]);
 
-
+  
   return (
-    <div className="content-area" style={{ backgroundColor: '#ffffff', padding: '0', overflow: 'auto', height: '100vh', width: '100%' }}>
+    <div className="content-area" style={{backgroundColor: '#ffffff', padding: '0', overflow: 'auto', height: '100vh', width: '100%'}}>
       {/* Top Navigation Bar - Full Width */}
-      <div className="topbar" style={{ marginBottom: '16px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px' }}>
+      <div className="topbar" style={{marginBottom: '16px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
         <div className="tb-left">
           <div>
             <div className="tb-page">Farms</div>
             <div className="tb-sub">
-              {currentRole === 'ops' ? 'Operations · Access Control' :
-                currentRole === 'sales' ? 'Sales · Access Control' :
-                  currentRole === 'manager' ? 'Manager · Access Control' :
-                    'Client · Access Control'}
+              {currentRole === 'ops' ? 'Operations · Access Control' : 
+               currentRole === 'sales' ? 'Sales · Access Control' : 
+               currentRole === 'manager' ? 'Manager · Access Control' :
+               'Client · Access Control'}
             </div>
           </div>
         </div>
@@ -1613,8 +1894,8 @@ export default function UnlockFarm({ user, onPageChange }) {
       </div>
 
       {/* Section Header */}
-      <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="section-head" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px'}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
           <div className="section-title">Farm requests</div>
         </div>
         {(currentRole === 'manager' || currentRole === 'client') && (
@@ -1624,29 +1905,29 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       {/* Acreages Cards - Only for Manager */}
       {currentRole === 'manager' && (
-        <div style={{ display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px' }}>
-          <div className="card" style={{ flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: '500' }}>Available Acreages</div>
-                <div style={{ fontSize: '28px', color: 'var(--text-1)', fontWeight: '600' }}>
+        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Acreages</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : (
                     <>
-                      {Number(availableAcreage).toFixed(2)} <span style={{ fontSize: '14px', marginLeft: '4px' }}>acres</span>
+                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{ flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: '500' }}>Used Acreages</div>
-                <div style={{ fontSize: '28px', color: 'var(--text-1)', fontWeight: '600' }}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Acreages</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : (
                     <>
-                      {Number(usedAcreage).toFixed(2)} <span style={{ fontSize: '14px', marginLeft: '4px' }}>acres</span>
+                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
                     </>
                   )}
                 </div>
@@ -1658,43 +1939,43 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       {/* Acreages Cards - Only for Partner */}
       {currentRole === 'partner' && (
-        <div style={{ display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px' }}>
-          <div className="card" style={{ flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: '500' }}>Total Area</div>
-                <div style={{ fontSize: '28px', color: 'var(--text-1)', fontWeight: '600' }}>
+        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Total Area</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : (
                     <>
-                      {Number(totalAcreage).toFixed(2)} <span style={{ fontSize: '14px', marginLeft: '4px' }}>acres</span>
+                      {Number(totalAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{ flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: '500' }}>Available Area</div>
-                <div style={{ fontSize: '28px', color: 'var(--text-1)', fontWeight: '600' }}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Area</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : (
                     <>
-                      {Number(availableAcreage).toFixed(2)} <span style={{ fontSize: '14px', marginLeft: '4px' }}>acres</span>
+                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="card" style={{ flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: '500' }}>Used Area</div>
-                <div style={{ fontSize: '28px', color: 'var(--text-1)', fontWeight: '600' }}>
+          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div className="card-body" style={{padding: '16px'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Area</div>
+                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
                   {acreageLoading ? '...' : (
                     <>
-                      {Number(usedAcreage).toFixed(2)} <span style={{ fontSize: '14px', marginLeft: '4px' }}>acres</span>
+                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
                     </>
                   )}
                 </div>
@@ -1707,7 +1988,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       {/* Quick Actions Modal */}
       {modalOpen === 'quick-actions' && (
         <div className="modal-overlay">
-          <div className="modal" style={{ width: '420px', maxWidth: '90vw' }}>
+          <div className="modal" style={{width: '420px', maxWidth: '90vw'}}>
             <div className="modal-head">
               <h3>Quick actions</h3>
               <button className="btn btn-ghost btn-sm" onClick={closeModal}>
@@ -1715,29 +1996,29 @@ export default function UnlockFarm({ user, onPageChange }) {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                 {currentRole === 'client' || currentRole === 'manager' ? (
                   // Client and Manager user options
                   <>
-                    <button className="btn" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => { closeModal(); onPageChange('register'); }}>
-                      <span style={{ marginRight: '8px' }}>+</span> New registration
+                    <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('register'); }}>
+                      <span style={{marginRight: '8px'}}>+</span> New registration
                     </button>
-                    <button className="btn" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
-                      <span style={{ marginRight: '8px' }}>+</span> Unlock farm
+                    <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
+                      <span style={{marginRight: '8px'}}>+</span> Unlock farm
                     </button>
                   </>
                 ) : (
                   // Sales/Operations user options
                   <>
-                    <button className="btn" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => { closeModal(); onPageChange('assign-acreages'); }}>
-                      <span style={{ marginRight: '8px' }}>+</span> Assign acreage to client
+                    <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('assign-acreages'); }}>
+                      <span style={{marginRight: '8px'}}>+</span> Assign acreage to client
                     </button>
-
-                    <button className="btn" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
-                      <span style={{ marginRight: '8px' }}>+</span> Unlock farm
+                    
+                    <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
+                      <span style={{marginRight: '8px'}}>+</span> Unlock farm
                     </button>
-                    <button className="btn" style={{ justifyContent: 'flex-start', textAlign: 'left' }} onClick={() => { closeModal(); onPageChange('monthly-acreages'); openModal('add-registration-modal'); }}>
-                      <span style={{ marginRight: '8px' }}>+</span> Add new registration
+                    <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('monthly-acreages'); openModal('add-registration-modal'); }}>
+                      <span style={{marginRight: '8px'}}>+</span> Add new registration
                     </button>
                   </>
                 )}
@@ -1750,7 +2031,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       {/* Plan Selection Modal */}
       {showPlanModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ width: '420px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div className="modal" style={{width: '420px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto'}}>
             <div className="modal-head">
               <h3>Select Unlock Plan</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowPlanModal(false)}>
@@ -1758,69 +2039,69 @@ export default function UnlockFarm({ user, onPageChange }) {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)' }}>
-                    Farm ID: <span style={{ fontWeight: '600', color: 'var(--primary)' }}>{selectedFarmId}</span>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
+                    Farm ID: <span style={{fontWeight: '600', color: 'var(--primary)'}}>{selectedFarmId}</span>
                   </label>
                 </div>
-
+                
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)' }}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
                     Select Plan Duration
                   </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <button 
                       className={`btn ${selectedPlan === '1' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px' }}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('1'); }}
                     >
                       <div>
                         <strong>1 Month</strong>
-                        <div style={{ fontSize: '12px', color: selectedPlan === '1' ? '#ffffff' : 'var(--text-2)', marginTop: '4px' }}>
+                        <div style={{fontSize: '12px', color: selectedPlan === '1' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
                           Short term access
                         </div>
                       </div>
                     </button>
-
-                    <button
+                    
+                    <button 
                       className={`btn ${selectedPlan === '6' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px' }}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('6'); }}
                     >
                       <div>
                         <strong>6 Months</strong>
-                        <div style={{ fontSize: '12px', color: selectedPlan === '6' ? '#ffffff' : 'var(--text-2)', marginTop: '4px' }}>
+                        <div style={{fontSize: '12px', color: selectedPlan === '6' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
                           Standard plan
                         </div>
                       </div>
                     </button>
-
-                    <button
+                    
+                    <button 
                       className={`btn ${selectedPlan === '12' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px' }}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('12'); }}
                     >
                       <div>
                         <strong>12 Months</strong>
-                        <div style={{ fontSize: '12px', color: selectedPlan === '12' ? '#ffffff' : 'var(--text-2)', marginTop: '4px' }}>
+                        <div style={{fontSize: '12px', color: selectedPlan === '12' ? '#ffffff' : 'var(--text-2)', marginTop: '4px'}}>
                           Best value
                         </div>
                       </div>
                     </button>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn btn-ghost"
+                
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                  <button 
+                    className="btn btn-ghost" 
                     onClick={() => setShowPlanModal(false)}
                     disabled={planLoading}
                   >
                     Cancel
                   </button>
-                  <button
-                    className="btn btn-primary"
+                  <button 
+                    className="btn btn-primary" 
                     onClick={unlockFarmWithPlan}
                     disabled={planLoading || !selectedPlan}
                   >
@@ -1836,7 +2117,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && farmToDelete && (
         <div className="modal-overlay">
-          <div className="modal" style={{ width: '400px', maxWidth: '90vw' }}>
+          <div className="modal" style={{width: '400px', maxWidth: '90vw'}}>
             <div className="modal-head">
               <h3>Confirm Delete</h3>
               <button className="btn btn-ghost btn-sm" onClick={closeDeleteModal}>
@@ -1844,25 +2125,25 @@ export default function UnlockFarm({ user, onPageChange }) {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ padding: '16px 0' }}>
-                <p style={{ fontSize: '14px', color: 'var(--text-1)', marginBottom: '8px' }}>
+              <div style={{padding: '16px 0'}}>
+                <p style={{fontSize: '14px', color: 'var(--text-1)', marginBottom: '8px'}}>
                   Are you sure you want to delete Farm ID <strong>{farmToDelete.farmId}</strong>?
                 </p>
-                <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+                <p style={{fontSize: '12px', color: 'var(--text-3)'}}>
                   This action cannot be undone.
                 </p>
               </div>
             </div>
             <div className="modal-foot">
-              <button
-                className="btn btn-ghost"
+              <button 
+                className="btn btn-ghost" 
                 onClick={closeDeleteModal}
                 disabled={formLoading}
               >
                 No
               </button>
-              <button
-                className="btn btn-danger"
+              <button 
+                className="btn btn-danger" 
                 onClick={handleDeleteFarm}
                 disabled={formLoading}
               >
@@ -1873,10 +2154,50 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       )}
 
+      {/* Lock Confirmation Modal */}
+      {showLockConfirmModal && farmToLock && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '400px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Confirm Lock</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeLockConfirmModal}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{padding: '16px 0'}}>
+                <p style={{fontSize: '14px', color: 'var(--text-1)', marginBottom: '8px'}}>
+                  Are you sure you want to lock Farm ID <strong>{farmToLock}</strong>?
+                </p>
+                <p style={{fontSize: '12px', color: 'var(--text-3)'}}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button 
+                className="btn btn-ghost" 
+                onClick={closeLockConfirmModal}
+                disabled={formLoading}
+              >
+                No
+              </button>
+              <button 
+                className="btn btn-danger" 
+                onClick={() => lockRecentFarm(farmToLock)}
+                disabled={formLoading}
+              >
+                {formLoading ? 'Locking...' : 'Yes, Lock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Combined Add Farm Modal */}
       {showAddFarmModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ width: addFarmModalStep === 3 ? '600px' : '550px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="modal" style={{width: addFarmModalStep === 3 ? '600px' : '550px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column'}}>
             <div className="modal-head">
               <h3>
                 {addFarmModalStep === 0 && 'Select Farmer'}
@@ -1889,10 +2210,10 @@ export default function UnlockFarm({ user, onPageChange }) {
                 <X className="ic-xs" />
               </button>
             </div>
-            <div className="modal-body" style={{ flex: 1, overflow: 'auto' }}>
+            <div className="modal-body" style={{flex: 1, overflow: 'auto'}}>
               {/* Step 0: Select Farmer */}
               {addFarmModalStep === 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <input
                     type="text"
                     placeholder="Search farmer by name or ID..."
@@ -1908,12 +2229,12 @@ export default function UnlockFarm({ user, onPageChange }) {
                       fontSize: '14px'
                     }}
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflow: 'auto' }}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflow: 'auto'}}>
                     {farmersListLoading && (
-                      <div style={{ padding: '12px', color: 'var(--text-2)', fontSize: '13px' }}>Loading farmers...</div>
+                      <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>Loading farmers...</div>
                     )}
                     {!farmersListLoading && farmersList.length === 0 && (
-                      <div style={{ padding: '12px', color: 'var(--text-2)', fontSize: '13px' }}>No farmers found.</div>
+                      <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>No farmers found.</div>
                     )}
                     {farmersList
                       .filter(farmer =>
@@ -1941,17 +2262,17 @@ export default function UnlockFarm({ user, onPageChange }) {
                           onMouseOver={(e) => e.target.style.borderColor = 'var(--primary)'}
                           onMouseOut={(e) => e.target.style.borderColor = 'var(--border)'}
                         >
-                          <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)' }}>
+                          <div style={{fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
                             {farmer.name}
                           </div>
-                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px' }}>
+                          <div style={{borderTop: '1px solid var(--border)', paddingTop: '8px'}}>
+                            <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
                               <strong>ID:</strong> {farmer.id}
                             </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px' }}>
+                            <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
                               <strong>Phone:</strong> {farmer.phone}
                             </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                            <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
                               <strong>Registered Date:</strong> {farmer.registeredDate}
                             </div>
                           </div>
@@ -1963,51 +2284,51 @@ export default function UnlockFarm({ user, onPageChange }) {
 
               {/* Step 1: Choose Polygon Category */}
               {addFarmModalStep === 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <button
-                    className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                  <button 
+                    className="btn" 
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedPolygonCategory('Farm'); setAddFarmModalStep(2); }}
                   >
                     <div>
                       <strong>Farm</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Add a new farm polygon
                       </div>
                     </div>
                   </button>
-                  <button
-                    className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                  <button 
+                    className="btn" 
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedPolygonCategory('Aquaculture'); setAddFarmModalStep(2); }}
                   >
                     <div>
                       <strong>Aquaculture</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Add an aquaculture polygon
                       </div>
                     </div>
                   </button>
-                  <button
-                    className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                  <button 
+                    className="btn" 
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedPolygonCategory('Polyhouse'); setAddFarmModalStep(2); }}
                   >
                     <div>
                       <strong>Polyhouse</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Add a polyhouse polygon
                       </div>
                     </div>
                   </button>
-                  <button
-                    className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                  <button 
+                    className="btn" 
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedPolygonCategory('Terrace Garden'); setAddFarmModalStep(2); }}
                   >
                     <div>
                       <strong>Terrace Garden</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Add a terrace garden polygon
                       </div>
                     </div>
@@ -2017,27 +2338,27 @@ export default function UnlockFarm({ user, onPageChange }) {
 
               {/* Step 2: Choose Upload Method */}
               {addFarmModalStep === 2 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                   <button
                     className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedUploadMethod('KML'); setAddFarmModalStep(3); }}
                   >
                     <div>
                       <strong>Upload via KML</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Upload polygon data using KML file format
                       </div>
                     </div>
                   </button>
                   <button
                     className="btn"
-                    style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '16px' }}
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px'}}
                     onClick={() => { setSelectedUploadMethod('CSV'); setAddFarmModalStep(3); }}
                   >
                     <div>
                       <strong>Upload via CSV</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '4px' }}>
+                      <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>
                         Upload polygon data using CSV file format
                       </div>
                     </div>
@@ -2047,16 +2368,16 @@ export default function UnlockFarm({ user, onPageChange }) {
 
               {/* Step 3: Upload File (KML or CSV) */}
               {addFarmModalStep === 3 && selectedUploadMethod === 'KML' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div>
                     <a
                       href="/sample.kml"
                       download="sample.kml"
-                      style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                      style={{color: 'var(--primary)', textDecoration: 'underline'}}
                     >
                       Download sample KML file format here
                     </a>
-                    <p style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic' }}>
+                    <p style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic'}}>
                       Note: Please download the sample KML file provided here. Replace the sample coordinates in the downloaded file with your own coordinates, and then proceed with the upload
                     </p>
                   </div>
@@ -2091,7 +2412,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       id="kml-file-input"
                       type="file"
                       accept=".kml"
-                      style={{ display: 'none' }}
+                      style={{display: 'none'}}
                       onChange={(e) => {
                         const file = e.target.files[0];
                         if (file) {
@@ -2103,26 +2424,26 @@ export default function UnlockFarm({ user, onPageChange }) {
                     />
                     {uploadedFile ? (
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                        <div style={{fontSize: '14px', fontWeight: '500', marginBottom: '8px'}}>
                           {uploadedFile.name}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
                           {(uploadedFile.size / 1024).toFixed(2)} KB
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <div style={{ fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+                        <div style={{fontSize: '16px', fontWeight: '500', marginBottom: '8px'}}>
                           Drag and drop your KML file here
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
                           or click to browse
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
                     <button
                       className="btn btn-ghost"
                       onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(0); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setUploadedFile(null); setSelectedFarmer(null); setFarmerSearchQuery(''); }}
@@ -2144,16 +2465,16 @@ export default function UnlockFarm({ user, onPageChange }) {
 
               {/* Step 3: Upload CSV File */}
               {addFarmModalStep === 3 && selectedUploadMethod === 'CSV' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div>
                     <a
                       href="/sample_coordinates.csv"
                       download="sample_coordinates.csv"
-                      style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                      style={{color: 'var(--primary)', textDecoration: 'underline'}}
                     >
                       Download sample CSV file format here
                     </a>
-                    <p style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic' }}>
+                    <p style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic'}}>
                       Note: Please download the sample CSV file provided here. Replace the sample coordinates in the downloaded file with your own coordinates, and then proceed with the upload
                     </p>
                   </div>
@@ -2188,7 +2509,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       id="csv-file-input"
                       type="file"
                       accept=".csv"
-                      style={{ display: 'none' }}
+                      style={{display: 'none'}}
                       onChange={(e) => {
                         const file = e.target.files[0];
                         if (file) {
@@ -2200,26 +2521,26 @@ export default function UnlockFarm({ user, onPageChange }) {
                     />
                     {csvUploadedFile ? (
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                        <div style={{fontSize: '14px', fontWeight: '500', marginBottom: '8px'}}>
                           {csvUploadedFile.name}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
                           {(csvUploadedFile.size / 1024).toFixed(2)} KB
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <div style={{ fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+                        <div style={{fontSize: '16px', fontWeight: '500', marginBottom: '8px'}}>
                           Drag and drop your CSV file here
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
                           or click to browse
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
                     <button
                       className="btn btn-ghost"
                       onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(0); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setCsvUploadedFile(null); setSelectedFarmer(null); setFarmerSearchQuery(''); }}
@@ -2241,11 +2562,11 @@ export default function UnlockFarm({ user, onPageChange }) {
 
               {/* Step 4: Farm Details Form */}
               {addFarmModalStep === 4 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div className="form-group">
                     <label>Farm Name</label>
                     {selectedFarmer && (
-                      <div style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px' }}>
+                      <div style={{fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px'}}>
                         Farmer: {selectedFarmer.name} ({selectedFarmer.user_id || selectedFarmer.userId || selectedFarmer.id})
                       </div>
                     )}
@@ -2263,7 +2584,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       type="text"
                       value={selectedPolygonCategory}
                       disabled
-                      style={{ backgroundColor: 'var(--bg-2)', cursor: 'not-allowed' }}
+                      style={{backgroundColor: 'var(--bg-2)', cursor: 'not-allowed'}}
                     />
                   </div>
 
@@ -2308,8 +2629,8 @@ export default function UnlockFarm({ user, onPageChange }) {
 
                   <div className="form-group">
                     <label>Irrigation</label>
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <div style={{display: 'flex', gap: '16px', marginTop: '8px'}}>
+                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
                         <input
                           type="radio"
                           name="irrigation"
@@ -2319,7 +2640,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                         />
                         <span>Rainfed</span>
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
                         <input
                           type="radio"
                           name="irrigation"
@@ -2332,15 +2653,15 @@ export default function UnlockFarm({ user, onPageChange }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button
-                      className="btn btn-ghost"
+                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                    <button 
+                      className="btn btn-ghost" 
                       onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(1); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setUploadedFile(null); setFarmName(''); setCropType(''); setVariety(''); setSowingDate(''); setIrrigation(''); }}
                     >
                       Cancel
                     </button>
-                    <button
-                      className="btn btn-primary"
+                    <button 
+                      className="btn btn-primary" 
                       disabled={!farmName || !cropType || !sowingDate || !irrigation || isFetchingFarmerApiKey || isAddFarmSubmitting}
                       onClick={handleAddFarmSubmit}
                     >
@@ -2378,13 +2699,14 @@ export default function UnlockFarm({ user, onPageChange }) {
         </div>
       )}
 
-      {/* Unlock by Form ID Card */}
-      <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
+      {/* Unlock by Form ID Card - Not for manager and partner roles */}
+      {currentRole !== 'manager' && currentRole !== 'partner' && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
         <div className="card-head">
           <span className="card-title">Unlock/Lock Farm by Farm ID</span>
         </div>
         <div className="card-body">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             <div className="two-col">
               <div className="form-group">
                 <label>Farm ID</label>
@@ -2438,7 +2760,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       value={customExpiry}
                       onChange={(e) => setCustomExpiry(e.target.value)}
                       placeholder="Enter custom expiry (e.g. 2)"
-                      style={{ marginTop: '8px' }}
+                      style={{marginTop: '8px'}}
                     />
                   )}
                 </div>
@@ -2446,12 +2768,12 @@ export default function UnlockFarm({ user, onPageChange }) {
             )}
 
             {status === 'lock' && (
-              <p style={{ fontSize: '13px', color: 'var(--text-2)', fontStyle: 'italic' }}>
+              <p style={{fontSize: '13px', color: 'var(--text-2)', fontStyle: 'italic'}}>
                 No payment/expiry required for lock.
               </p>
             )}
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
               <button
                 onClick={handleFormSubmit}
                 disabled={formLoading}
@@ -2462,48 +2784,49 @@ export default function UnlockFarm({ user, onPageChange }) {
             </div>
 
             {message && (
-              <p style={{ fontSize: '13px', color: 'var(--green-600)', marginTop: '8px' }}>
+              <p style={{fontSize: '13px', color: 'var(--green-600)', marginTop: '8px'}}>
                 {message}
               </p>
             )}
             {formError && (
-              <p style={{ fontSize: '13px', color: 'var(--red-600)', marginTop: '8px' }}>
+              <p style={{fontSize: '13px', color: 'var(--red-600)', marginTop: '8px'}}>
                 {formError}
               </p>
             )}
           </div>
         </div>
       </div>
+      )}
 
       {/* Farm Details Table */}
       {farmDetails && farmId.trim() && (
-        <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
             <span className="card-title">Farm Details</span>
           </div>
           <div className="card-body">
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <div style={{overflowX: 'auto'}}>
+              <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
                 <thead>
-                  <tr style={{ backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Farm ID</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Crop Type</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Area</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>District</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>State</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Country</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Time of Registration</th>
+                  <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>District</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>State</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Country</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Time of Registration</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.farmId}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.cropType}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.area}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.district}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.state}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.country}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farmDetails.timeOfRegistration}</td>
+                  <tr style={{borderBottom: '1px solid var(--border)'}}>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.farmId}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.cropType}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.area}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.district}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.state}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.country}</td>
+                    <td style={{padding: '12px', color: 'var(--text-1)'}}>{farmDetails.timeOfRegistration}</td>
                   </tr>
                 </tbody>
               </table>
@@ -2514,37 +2837,37 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       {/* Farm Details Loading */}
       {farmDetailsLoading && farmId.trim() && (
-        <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
-          <div className="card-body" style={{ textAlign: 'center', padding: '24px' }}>
-            <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Loading farm details...</p>
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-body" style={{textAlign: 'center', padding: '24px'}}>
+            <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading farm details...</p>
           </div>
         </div>
       )}
 
       {/* Farm Details Error */}
       {farmDetailsError && farmId.trim() && (
-        <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
-          <div className="card-body" style={{ textAlign: 'center', padding: '24px' }}>
-            <p style={{ color: 'var(--red-600)', fontSize: '14px' }}>{farmDetailsError}</p>
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-body" style={{textAlign: 'center', padding: '24px'}}>
+            <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{farmDetailsError}</p>
           </div>
         </div>
       )}
 
       {/* 50 Recently Added Farms Section - Only for Ops */}
       {currentRole === 'ops' && (
-        <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
             <span className="card-title">50 Recently Added Farm</span>
           </div>
           <div className="card-body">
             {opsRecentFarmsLoading && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Loading recently added farms...</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recently added farms...</p>
               </div>
             )}
             {opsRecentFarmsError && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--red-600)', fontSize: '14px' }}>{opsRecentFarmsError}</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{opsRecentFarmsError}</p>
               </div>
             )}
             {!opsRecentFarmsLoading && !opsRecentFarmsError && opsRecentFarms.length > 0 && (
@@ -2557,39 +2880,39 @@ export default function UnlockFarm({ user, onPageChange }) {
 
                   return (
                     <div>
-                      <div style={{ backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                        <span style={{ fontWeight: '600', color: 'var(--text-1)', fontSize: '13px' }}>
+                      <div style={{backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        <span style={{fontWeight: '600', color: 'var(--text-1)', fontSize: '13px'}}>
                           {startIdx + 1} to {endIdx} farm ids in {groupNumber}
                         </span>
                       </div>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <div style={{overflowX: 'auto'}}>
+                        <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
                           <thead>
-                            <tr style={{ backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)' }}>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Farm ID</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Farm Name</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Region</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Area</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Added Time</th>
-                              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>Client ID</th>
+                            <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm Name</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Region</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Added Time</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Client ID</th>
                             </tr>
                           </thead>
                           <tbody>
                             {groupFarms.map((farm, index) => (
-                              <tr key={startIdx + index} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.farmId}</td>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.farmName}</td>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.region}</td>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.area}</td>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.createdTime}</td>
-                                <td style={{ padding: '12px', color: 'var(--text-1)' }}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
+                              <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmId}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmName}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.region}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.area}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.createdTime}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                       {/* Pagination Buttons */}
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      <div style={{display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)'}}>
                         {Array.from({ length: Math.ceil(opsRecentFarms.length / 10) }, (_, index) => (
                           <button
                             key={index}
@@ -2619,8 +2942,172 @@ export default function UnlockFarm({ user, onPageChange }) {
               </div>
             )}
             {!opsRecentFarmsLoading && !opsRecentFarmsError && opsRecentFarms.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>No recently added farms found</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No recently added farms found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Search Farm Card - Only for Client, Manager, and Partner */}
+      {(currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') && (
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-head">
+            <span className="card-title">Search Farm</span>
+          </div>
+          <div className="card-body" style={{padding: '16px'}}>
+            <div style={{display: 'flex', gap: '8px'}}>
+              <input
+                type="text"
+                placeholder="Enter Farm ID"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (!e.target.value.trim()) {
+                    setSearchResult(null);
+                    setFarmDetailsError('');
+                  }
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchFarm()}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+              <button
+                onClick={handleSearchFarm}
+                disabled={searchLoading}
+                className="btn btn-primary"
+                style={{padding: '8px 16px'}}
+              >
+                {searchLoading ? `${searchProgress}%` : 'Search'}
+              </button>
+            </div>
+
+            {/* Search Progress Indicator */}
+            {searchLoading && (
+              <div style={{marginTop: '16px'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                  <span style={{fontSize: '13px', color: 'var(--text-2)'}}>Searching farm...</span>
+                  <span style={{fontSize: '13px', fontWeight: '600', color: 'var(--text-1)'}}>{searchProgress}%</span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '8px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${searchProgress}%`,
+                    height: '100%',
+                    backgroundColor: '#2d7a3d',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease-in-out'
+                  }} />
+                </div>
+              </div>
+            )}
+            
+            {/* Search Result */}
+            {searchResult && (
+              <div style={{marginTop: '16px'}}>
+                <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '16px'}}>
+                  <thead>
+                    <tr style={{borderBottom: '1px solid var(--border)'}}>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Crop Type</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{borderBottom: '1px solid var(--border)'}}>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.farmId || searchResult.farm_id || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.farmName || searchResult.farm_name || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.region || searchResult.district || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.area || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.cropType || searchResult.croptype || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.status || 'N/A'}</td>
+                      <td style={{padding: '10px 16px'}}>
+                        <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                          {String(searchResult.status).toLowerCase() === 'locked' ? (
+                            <button
+                              onClick={() => {
+                                console.log('Unlock button clicked for search result - Farm ID:', searchResult.farmId || searchResult.farm_id);
+                                unlockRecentFarm(searchResult.farmId || searchResult.farm_id);
+                              }}
+                              disabled={formLoading}
+                              className="btn btn-primary btn-sm"
+                              style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                            >
+                              {formLoading ? '...' : 'Unlock'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setFarmToLock(searchResult.farmId || searchResult.farm_id);
+                                setShowLockConfirmModal(true);
+                              }}
+                              disabled={formLoading}
+                              className="btn btn-danger btn-sm"
+                              style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', fontWeight: 'bold'}}
+                            >
+                              {formLoading ? '...' : 'Lock'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              openDeleteModal(searchResult.farmId || searchResult.farm_id, 0);
+                            }}
+                            disabled={formLoading || (searchResult.status && String(searchResult.status).toLowerCase() === 'unlocked')}
+                            className="btn btn-danger btn-sm"
+                            style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (formLoading || (searchResult.status && String(searchResult.status).toLowerCase() === 'unlocked')) ? 'not-allowed' : 'pointer'}}
+                          >
+                            Delete
+                          </button>
+                          {(currentRole === 'partner' || currentRole === 'manager') && (
+                            <button
+                              onClick={() => {
+                                setFeatureFarmId(searchResult.farmId || searchResult.farm_id);
+                                setFeatureClientId(searchResult.clientId);
+                                setFeatureFarmStatus(searchResult.status);
+                                openModal('feature-dashboard');
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--border)',
+                                borderRadius: '6px',
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                height: '32px',
+                                width: '32px'
+                              }}
+                            >
+                              <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {farmDetailsError && searchQuery && (
+              <div style={{marginTop: '16px', padding: '12px', backgroundColor: '#fee2e2', borderRadius: '8px', border: '1px solid #fecaca'}}>
+                <p style={{color: '#dc2626', fontSize: '14px'}}>{farmDetailsError}</p>
               </div>
             )}
           </div>
@@ -2629,17 +3116,17 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       {/* Recently Added Farms Table - Only for Client, Manager, and Partner */}
       {(currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') && (
-        <div className="card" style={{ marginBottom: '16px', marginLeft: '24px', marginRight: '24px' }}>
-          <div className="card-head" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
+          <div className="card-head" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             <span className="card-title">Top 50 Farms</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{display: 'flex', gap: '8px'}}>
               <button
                 className={`btn btn-sm ${selectedView === 'added' ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => {
                   setSelectedView('added');
                   fetchRecentFarms();
                 }}
-                style={{ flex: 1, padding: '4px 12px', fontSize: '12px' }}
+                style={{flex: 1, padding: '4px 12px', fontSize: '12px'}}
               >
                 Added Farms
               </button>
@@ -2649,159 +3136,255 @@ export default function UnlockFarm({ user, onPageChange }) {
                   setSelectedView('expiring');
                   fetchExpiringFarms();
                 }}
-                style={{ flex: 1, padding: '4px 12px', fontSize: '12px' }}
+                style={{flex: 1, padding: '4px 12px', fontSize: '12px'}}
               >
                 Expiring Farms
               </button>
             </div>
           </div>
-          <div className="card-body" style={{ padding: '16px' }}>
+          <div className="card-body" style={{padding: '16px'}}>
             {selectedView === 'added' && recentFarmsLoading && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Loading recent farms...</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recent farms...</p>
               </div>
             )}
-
+            
             {selectedView === 'expiring' && expiringFarmsLoading && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Loading expiring farms...</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading expiring farms...</p>
               </div>
             )}
-
+            
             {selectedView === 'added' && recentFarmsError && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--red-600)', fontSize: '14px' }}>{recentFarmsError}</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{recentFarmsError}</p>
               </div>
             )}
-
+            
             {selectedView === 'expiring' && expiringFarmsError && (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--red-600)', fontSize: '14px' }}>{expiringFarmsError}</p>
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--red-600)', fontSize: '14px'}}>{expiringFarmsError}</p>
               </div>
             )}
-
-            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError &&
-              ((selectedView === 'added' && recentFarms.length > 0) || (selectedView === 'expiring' && expiringFarms.length > 0)) && (
-                <div>
-                  {/* Show only the selected farm group */}
-                  {(() => {
-                    const currentFarms = selectedView === 'added' ? recentFarms : expiringFarms;
-                    const startIdx = activePage * 10;
-                    const endIdx = Math.min(startIdx + 10, currentFarms.length);
-                    const groupFarms = currentFarms.slice(startIdx, endIdx);
-                    const groupNumber = activePage + 1;
-
-                    return (
-                      <div>
-                        <div style={{ backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                          <span style={{ fontWeight: '600', color: 'var(--text-1)', fontSize: '13px' }}>
-                            {startIdx + 1} to {endIdx} farm ids in {groupNumber}
-                          </span>
-                        </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '16px' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Farm ID</th>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Farm Name</th>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Region</th>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Area</th>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
+            
+            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
+             ((selectedView === 'added' && recentFarms.length > 0) || (selectedView === 'expiring' && expiringFarms.length > 0)) && (
+              <div>
+                {/* Show only the selected farm group */}
+                {(() => {
+                  const currentFarms = selectedView === 'added' ? recentFarms : expiringFarms;
+                  const startIdx = activePage * 10;
+                  const endIdx = Math.min(startIdx + 10, currentFarms.length);
+                  const groupFarms = currentFarms.slice(startIdx, endIdx);
+                  const groupNumber = activePage + 1;
+                  
+                  return (
+                    <div>
+                      <div style={{backgroundColor: 'var(--bg-1)', padding: '8px 12px', margin: '8px 0 4px 0', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        <span style={{fontWeight: '600', color: 'var(--text-1)', fontSize: '13px'}}>
+                          {startIdx + 1} to {endIdx} farm ids in {groupNumber}
+                        </span>
+                      </div>
+                      <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '16px'}}>
+                        <thead>
+                          <tr style={{borderBottom: '1px solid var(--border)'}}>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
+                            {selectedView === 'added' && (
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
+                            )}
+                            {currentRole === 'partner' && (
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Admin Name</th>
+                            )}
+                            {selectedView === 'added' && (
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupFarms.map((farm, index) => (
+                            <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmId}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmName}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.region}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.area}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
                               {selectedView === 'added' && (
-                                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Status</th>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.status}</td>
                               )}
                               {currentRole === 'partner' && (
-                                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px' }}>Admin Name</th>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.adminName || 'N/A'}</td>
                               )}
-                              <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px' }}>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {groupFarms.map((farm, index) => (
-                              <tr key={startIdx + index} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.farmId}</td>
-                                <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.farmName}</td>
-                                <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.region}</td>
-                                <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.area}</td>
-                                <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
-                                {selectedView === 'added' && (
-                                  <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.status}</td>
-                                )}
-                                {currentRole === 'partner' && (
-                                  <td style={{ padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px' }}>{farm.adminName || 'N/A'}</td>
-                                )}
-                                <td style={{ padding: '10px 16px' }}>
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                      onClick={() => {
-                                        console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-                                        unlockRecentFarm(farm.farmId);
-                                      }}
-                                      disabled={formLoading || ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked')}
-                                      className="btn btn-primary btn-sm"
-                                      style={{ fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: ((currentRole === 'manager' || currentRole === 'partner') && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1 }}
-                                    >
-                                      {formLoading ? '...' : 'Unlock'}
-                                    </button>
-                                    {selectedView === 'added' && (
+                              {selectedView === 'added' && (
+                                <td style={{padding: '10px 16px'}}>
+                                  <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                    {String(farm.status).toLowerCase() === 'locked' ? (
                                       <button
                                         onClick={() => {
-                                          console.log('Delete button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-                                          openDeleteModal(farm.farmId, startIdx + index);
+                                          console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                          unlockRecentFarm(farm.farmId);
                                         }}
-                                        disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
-                                        className="btn btn-danger btn-sm"
-                                        style={{ fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1 }}
+                                        disabled={formLoading}
+                                        className="btn btn-primary btn-sm"
+                                        style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
                                       >
-                                        Delete
+                                        {formLoading ? '...' : 'Unlock'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setFarmToLock(farm.farmId);
+                                          setShowLockConfirmModal(true);
+                                        }}
+                                        disabled={formLoading}
+                                        className="btn btn-danger btn-sm"
+                                        style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', fontWeight: 'bold'}}
+                                      >
+                                        {formLoading ? '...' : 'Lock'}
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        console.log('Delete button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                        openDeleteModal(farm.farmId, startIdx + index);
+                                      }}
+                                      disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
+                                      className="btn btn-danger btn-sm"
+                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
+                                    >
+                                      Delete
+                                    </button>
+                                    {(currentRole === 'partner' || currentRole === 'manager') && (
+                                      <button
+                                        onClick={async () => {
+                                          setFeatureFarmId(farm.farmId);
+                                          setFeatureFarmStatus(farm.status);
+                                          
+                                          // If clientId is missing, fetch it from farm details API
+                                          if (!farm.clientId) {
+                                            try {
+                                              const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
+                                              const response = await fetch(apiUrl, {
+                                                method: 'GET',
+                                                headers: {
+                                                  'Content-Type': 'application/json'
+                                                }
+                                              });
+                                              
+                                              if (response.ok) {
+                                                const data = await response.json();
+                                                if ((data.status === 'Success' || data.success) && data.data) {
+                                                  const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+                                                  const farmInfo = farmArray[0] || {};
+                                                  setFeatureClientId(farmInfo.client_id || undefined);
+                                                }
+                                              }
+                                            } catch (error) {
+                                              console.error('Error fetching client ID:', error);
+                                              setFeatureClientId(undefined);
+                                            }
+                                          } else {
+                                            setFeatureClientId(farm.clientId);
+                                          }
+                                          
+                                          openModal('feature-dashboard');
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: '1px solid var(--border)',
+                                          borderRadius: '6px',
+                                          padding: '6px 8px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          height: '32px',
+                                          width: '32px'
+                                        }}
+                                      >
+                                        <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
                                       </button>
                                     )}
                                   </div>
                                 </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      
+                      {/* Pagination Buttons */}
+                      <div style={{display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)'}}>
+                        {Array.from({ length: Math.ceil(currentFarms.length / 10) }, (_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setActivePage(index)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '14px',
+                              borderRadius: '20px',
+                              backgroundColor: activePage === index ? '#2d7a3d' : '#ffffff',
+                              color: activePage === index ? '#ffffff' : '#333333',
+                              border: activePage === index ? 'none' : '1px solid #cccccc',
+                              cursor: 'pointer',
+                              fontWeight: activePage === index ? '600' : '400',
+                              minWidth: '36px',
+                              height: '36px',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {index + 1}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })()}
-
-                  {/* Pagination Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                    {Array.from({ length: Math.ceil((selectedView === 'added' ? recentFarms.length : expiringFarms.length) / 10) }, (_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setActivePage(index)}
-                        className="btn btn-sm"
-                        style={{
-                          padding: '6px 12px',
-                          fontSize: '14px',
-                          borderRadius: '20px',
-                          backgroundColor: activePage === index ? '#2d7a3d' : '#ffffff',
-                          color: activePage === index ? '#ffffff' : '#333333',
-                          border: activePage === index ? 'none' : '1px solid #cccccc',
-                          cursor: 'pointer',
-                          fontWeight: activePage === index ? '600' : '400',
-                          minWidth: '36px',
-                          height: '36px',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {index + 1}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError &&
-              ((selectedView === 'added' && recentFarms.length === 0) || (selectedView === 'expiring' && expiringFarms.length === 0)) && (
-                <div style={{ textAlign: 'center', padding: '24px' }}>
-                  <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>No farms found</p>
-                </div>
-              )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            
+            {!recentFarmsLoading && !expiringFarmsLoading && !recentFarmsError && !expiringFarmsError && 
+             ((selectedView === 'added' && recentFarms.length === 0) || (selectedView === 'expiring' && expiringFarms.length === 0)) && (
+              <div style={{textAlign: 'center', padding: '24px'}}>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No farms found</p>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Feature Dashboard Modal */}
+      {modalOpen === 'feature-dashboard' && (
+        <FeatureDashboard 
+          onClose={() => {
+            setModalOpen(null);
+            setFeatureFarmId(null);
+            setFeatureClientId(null);
+            setFeatureFarmStatus(null);
+          }} 
+          onFeatureSelect={(feature) => {
+            setModalOpen(null);
+            setFeatureModalOpen(feature.name);
+          }}
+          farmStatus={featureFarmStatus}
+        />
+      )}
+
+      {/* Specific Feature Modals */}
+      {featureModalOpen === 'Farm Map' && <FarmMap onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Weather' && <Weather onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Crop Calendar' && <CropCalendar onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Pest and Disease' && <PestAndDisease onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Soil Moisture' && <SoilMoisture onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Crop Health' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'LSWI' && <LSWI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Image Advisory' && <ImageAdvisory onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
     </div>
   );
 }
