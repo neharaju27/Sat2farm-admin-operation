@@ -2285,33 +2285,7 @@ export default function LeadPipeline({ onPageChange }) {
         let allData = [...result.data];
         const totalRecords = result.total || allData.length;
 
-        // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
-        let currentNextOffset = result.next_offset || (result.has_more ? allData.length : null);
-        while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
-          try {
-            const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-            
-            const nextResponse = await fetch(nextUrl, {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' }
-            });
-            if (!nextResponse.ok) break;
-            const nextResult = await nextResponse.json();
-            const nextItems = Array.isArray(nextResult.data) ? nextResult.data : [];
-            if (nextItems.length === 0) break;
-            allData = [...allData, ...nextItems];
-            if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
-              currentNextOffset = nextResult.next_offset;
-            } else if (nextItems.length > 0 && allData.length < totalRecords) {
-              currentNextOffset += nextItems.length;
-            } else {
-              break;
-            }
-          } catch (loopErr) {
-            console.warn('Error fetching additional filter pages:', loopErr);
-            break;
-          }
-        }
+
 
         
 

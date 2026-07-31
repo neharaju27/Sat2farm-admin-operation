@@ -704,33 +704,7 @@ export default function Opportunities({ onPageChange }) {
       let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || []);
       const totalRecords = (result && typeof result.total === 'number') ? result.total : oppsData.length;
 
-      // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
-      let currentNextOffset = result.next_offset || (result.has_more ? oppsData.length : null);
-      while ((result.has_more || (currentNextOffset && oppsData.length < totalRecords)) && currentNextOffset) {
-        try {
-          const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-          
-          const nextResponse = await fetch(nextUrl, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (!nextResponse.ok) break;
-          const nextResult = await nextResponse.json();
-          const nextItems = Array.isArray(nextResult) ? nextResult : (nextResult.data || nextResult.results || nextResult.accounts || []);
-          if (nextItems.length === 0) break;
-          oppsData = [...oppsData, ...nextItems];
-          if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
-            currentNextOffset = nextResult.next_offset;
-          } else if (nextItems.length > 0 && oppsData.length < totalRecords) {
-            currentNextOffset += nextItems.length;
-          } else {
-            break;
-          }
-        } catch (loopErr) {
-          console.warn('Error fetching additional filter pages:', loopErr);
-          break;
-        }
-      }
+
 
       setTotalOpportunities(totalRecords || oppsData.length);
       setCurrentPage(1);
@@ -1923,7 +1897,7 @@ export default function Opportunities({ onPageChange }) {
     } else {
       fetchAllKanbanDeals();
     }
-  }, [viewMode, searchTerm, salesFiltersApplied, newThisWeekFilter, refreshKey]);
+  }, [viewMode, searchTerm, newThisWeekFilter, refreshKey]);
 
   // Infinite scroll: fetch next batch of 50 deals for a specific stage when user scrolls near column bottom
   const handleLoadMoreStageDeals = async (stage) => {
