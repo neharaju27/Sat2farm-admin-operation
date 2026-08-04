@@ -1,0 +1,9342 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown } from 'lucide-react';
+import toast from 'react-hot-toast';
+import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
+import satyuktLogo from '../assets/satyukt.webp';
+
+// Satyukt Full Page Loading Component (Matching User Mockup)
+const SatyuktLoader = ({ message, subtitle }) => (
+  <div className="satyukt-full-loader-wrapper">
+    <div className="satyukt-logo-spinner-outer">
+      <div className="satyukt-logo-spinner-ring" />
+      <div className="satyukt-logo-spinner-core">
+        <img src={satyuktLogo} alt="Satyukt" className="satyukt-logo-img" />
+      </div>
+    </div>
+    <h2 className="satyukt-loader-headline">
+      {message || 'Loading accounts from Satyukt CRM...'}
+    </h2>
+    <p className="satyukt-loader-subtext">
+      {subtitle || 'Fetching your latest accounts. This may take a few seconds.'}
+    </p>
+    <div className="satyukt-loader-progress-track">
+      <div className="satyukt-loader-progress-fill" />
+    </div>
+    <div className="satyukt-loader-caution">
+      <span className="satyukt-dot-green">•</span> Please don't close or refresh this page
+    </div>
+  </div>
+);
+
+// Satyukt Empty State Component (Matching User Mockup)
+const SatyuktEmptyState = ({ title, subtitle, onRefresh }) => (
+  <div className="satyukt-empty-state-wrapper">
+    <div className="satyukt-empty-icon-box">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="20" width="48" height="34" rx="6" fill="#22c55e" fillOpacity="0.15" />
+        <path d="M12 24C12 21.7909 13.7909 20 16 20H26L30 24H52C54.2091 24 56 25.7909 56 28V48C56 50.2091 54.2091 52 52 52H12V24Z" fill="#16a34a" />
+        <path d="M18 16H30L34 20H46C48.2091 20 50 21.7909 50 24V26H14V20C14 17.7909 15.7909 16 18 16Z" fill="#86efac" />
+        <circle cx="40" cy="40" r="9" fill="white" stroke="#0f172a" strokeWidth="3" />
+        <line x1="46" y1="46" x2="54" y2="54" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    </div>
+    <h3 className="satyukt-empty-title">{title || 'No accounts to display'}</h3>
+    <p className="satyukt-empty-subtext">{subtitle || 'Accounts from Satyukt CRM will appear here.'}</p>
+    {onRefresh && (
+      <button onClick={onRefresh} className="satyukt-empty-refresh-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+        Refresh
+      </button>
+    )}
+  </div>
+);
+
+// Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
+const parseDateRobust = (dateStr) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+  const str = String(dateStr).trim();
+  if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
+
+  // 1. Try DD-MM-YYYY or DD/MM/YYYY with time or without
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dmyMatch) {
+    const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 2. Try YYYY-MM-DD HH:mm:ss or YYYY-MM-DD HH:mm
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (ymdMatch) {
+    const [, year, month, day, hours = '0', minutes = '0', seconds = '0'] = ymdMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 3. Try standard JS Date parsing
+  let d = new Date(str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str);
+  if (!isNaN(d.getTime())) return d;
+
+  d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
+};
+
+const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', year: 'numeric' }, formatType = 'date') => {
+  if (!dateStr) return '-';
+  const d = parseDateRobust(dateStr);
+  if (!d) return (dateStr === 'Invalid Date' ? '-' : dateStr) || '-';
+  try {
+    return formatType === 'datetime' ? d.toLocaleString('en-IN', options) : d.toLocaleDateString('en-IN', options);
+  } catch (err) {
+    return dateStr || '-';
+  }
+};
+
+export default function Opportunities({ onPageChange }) {
+  const { user } = useAuth();
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [totalOpportunities, setTotalOpportunities] = useState(0);
+
+  // Fetch opportunities from API
+
+  const fetchOpportunities = async () => {
+    try {
+      setLoading(true);
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+
+      const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+      if (!apiUrl) {
+        
+        setOpportunities(getMockOpportunities());
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      const currentLimit = itemsPerPage || 10;
+      const currentOffset = ((currentPage || 1) - 1) * currentLimit;
+      const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${currentOffset}&limit=${currentLimit}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      let oppsList = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        oppsList = data.data || data.results || data.accounts || data.opportunities || data.items || [];
+        if (data.total !== undefined) {
+          setTotalOpportunities(data.total);
+        }
+      } else if (Array.isArray(data)) {
+        oppsList = data;
+        setTotalOpportunities(data.length);
+      }
+
+      const transformedOpportunities = oppsList.map(opp => ({
+        id: opp.id,
+        contactName: opp.full_name || 'Unknown',
+        phoneNumber: opp.phone || '',
+        alternateNumber: opp.alternate_number || '',
+        email: opp.email || '',
+        companyName: opp.company_name || '',
+        contactOwner: opp.owner || 'Unassigned',
+        city: opp.city || '',
+        state: opp.state || '',
+        country: opp.country || 'IN',
+        leadStatus: opp.status || 'New',
+        tags: opp.tags || '',
+        leadSource: opp.lead_source || '',
+        description: opp.description || '',
+        createdTime: opp.created_time || new Date().toISOString(),
+        industry: opp.industry || '',
+        createdBy: opp.created_by || 'System',
+        modifiedBy: opp.modified_by || 'System',
+        lastActivity: opp.last_activity || new Date().toISOString(),
+        accountName: opp.account_name || '',
+        accountNumber: opp.account_number || '',
+        dealPresent: opp.deal_present || 0,
+        website: opp.website || '',
+        accountType: opp.account_type || '',
+        modifiedTime: opp.modified_time || ''
+      }));
+
+      setOpportunities(transformedOpportunities);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching opportunities:', err);
+      const mockOpps = getMockOpportunities();
+      setOpportunities(mockOpps);
+      setError(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchDealTotals();
+    fetchAllKanbanDeals();
+  }, []);
+
+  // Fetch deal totals from API
+  const fetchDealTotals = async () => {
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const apiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
+
+    if (!apiUrl) return;
+
+    try {
+      // Fetch with_deals total
+      const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=with_deals`);
+      if (withDealsResponse.ok) {
+        const withDealsData = await withDealsResponse.json();
+        
+        if (withDealsData.total !== undefined) {
+          setApiDealTotals(prev => ({ ...prev, with_deals: withDealsData.total }));
+        }
+      }
+
+      // Fetch without_deals total
+      const withoutDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=without_deals`);
+      if (withoutDealsResponse.ok) {
+        const withoutDealsData = await withoutDealsResponse.json();
+        
+        if (withoutDealsData.total !== undefined) {
+          setApiDealTotals(prev => ({ ...prev, without_deals: withoutDealsData.total }));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching deal totals:', err);
+    }
+  };
+
+  const getMockOpportunities = () => [];
+
+  // â”€â”€ Modal & editing state (mirrors LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [customStatus, setCustomStatus] = useState('');
+  const [showCustomStatusInput, setShowCustomStatusInput] = useState(false);
+
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const [customOwner, setCustomOwner] = useState('');
+  const [showCustomOwnerInput, setShowCustomOwnerInput] = useState(false);
+
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
+
+  const [tagsDropdownOpen, setTagsDropdownOpen] = useState(false);
+  const [customTags, setCustomTags] = useState('');
+  const [showCustomTagsInput, setShowCustomTagsInput] = useState(false);
+
+  const [leadSourceDropdownOpen, setLeadSourceDropdownOpen] = useState(false);
+  const [customLeadSource, setCustomLeadSource] = useState('');
+  const [showCustomLeadSourceInput, setShowCustomLeadSourceInput] = useState(false);
+
+  const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
+  const [customIndustry, setCustomIndustry] = useState('');
+  const [showCustomIndustryInput, setShowCustomIndustryInput] = useState(false);
+
+  const [accountTypeDropdownOpen, setAccountTypeDropdownOpen] = useState(false);
+  const [customAccountType, setCustomAccountType] = useState('');
+  const [showCustomAccountTypeInput, setShowCustomAccountTypeInput] = useState(false);
+
+  const [isDownloadingCSV, setIsDownloadingCSV] = useState(false);
+  const [kanbanUpdateTimestamp, setKanbanUpdateTimestamp] = useState(Date.now());
+
+  // â”€â”€ Edit dialog state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editDialogField, setEditDialogField] = useState('');
+  const [editDialogValue, setEditDialogValue] = useState('');
+  const [editDialogRowId, setEditDialogRowId] = useState(null);
+  const [editDialogDropdownOpen, setEditDialogDropdownOpen] = useState(false);
+  const [showEditDialogCustomInput, setShowEditDialogCustomInput] = useState(false);
+  const [editDialogCustomValue, setEditDialogCustomValue] = useState('');
+
+  // â”€â”€ Get predefined options for field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const getFieldOptions = (fieldName) => {
+    const optionMap = {
+      'leadStatus': Object.keys(statusConfig),
+      'industry': predefinedIndustries,
+      'accountType': predefinedAccountTypes,
+      'contactOwner': getContactOwnerOptions(),
+      'leadSource': predefinedLeadSources,
+      'tags': predefinedTags
+    };
+    return optionMap[fieldName] || null;
+  };
+
+  const isFieldWithDropdown = (fieldName) => {
+    return getFieldOptions(fieldName) !== null;
+  };
+
+  // â”€â”€ Edit dialog handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const openEditDialog = (rowId, fieldName, currentValue) => {
+    setEditDialogRowId(rowId);
+    setEditDialogField(fieldName);
+    setEditDialogValue(currentValue);
+    setEditDialogDropdownOpen(false);
+    setShowEditDialogCustomInput(false);
+    setEditDialogCustomValue('');
+    setShowEditDialog(true);
+  };
+
+  const closeEditDialog = () => {
+    setShowEditDialog(false);
+    setEditDialogField('');
+    setEditDialogValue('');
+    setEditDialogRowId(null);
+    setEditDialogDropdownOpen(false);
+    setShowEditDialogCustomInput(false);
+    setEditDialogCustomValue('');
+  };
+
+  const handleEditDialogSave = async () => {
+    const valueToSave = showEditDialogCustomInput ? editDialogCustomValue : editDialogValue;
+    if (!valueToSave.trim() || !editDialogRowId || !editDialogField) {
+      toast.error('Please enter a value');
+      return;
+    }
+
+    await handleFieldUpdate(editDialogRowId, editDialogField, valueToSave.trim());
+
+    // Update predefined options if custom value was added
+    if (showEditDialogCustomInput && valueToSave.trim()) {
+      if (editDialogField === 'industry') {
+        setPredefinedIndustries([...predefinedIndustries, valueToSave.trim()]);
+      } else if (editDialogField === 'accountType') {
+        setPredefinedAccountTypes([...predefinedAccountTypes, valueToSave.trim()]);
+      } else if (editDialogField === 'contactOwner') {
+        setPredefinedContactOwners([...predefinedContactOwners, valueToSave.trim()]);
+      } else if (editDialogField === 'leadSource') {
+        setPredefinedLeadSources([...predefinedLeadSources, valueToSave.trim()]);
+      } else if (editDialogField === 'tags') {
+        setPredefinedTags([...predefinedTags, valueToSave.trim()]);
+      }
+    }
+
+    closeEditDialog();
+  };
+
+  const handleEditDialogOptionSelect = (value) => {
+    setEditDialogValue(value);
+    setEditDialogDropdownOpen(false);
+  };
+
+  const handleEditDialogCustomInput = () => {
+    setEditDialogCustomValue(editDialogValue);
+    setShowEditDialogCustomInput(true);
+    setEditDialogDropdownOpen(false);
+  };
+
+  // â”€â”€ Close all dropdowns when one is opened â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const closeAllDropdowns = () => {
+    setStatusDropdownOpen(false);
+    setOwnerDropdownOpen(false);
+    setTagsDropdownOpen(false);
+    setLeadSourceDropdownOpen(false);
+    setIndustryDropdownOpen(false);
+    setAccountTypeDropdownOpen(false);
+  };
+
+  // Handle click outside to close dropdowns
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isDropdownClick = event.target.closest('[data-dropdown="true"]');
+      if (!isDropdownClick) {
+        closeAllDropdowns();
+      }
+
+      const clickedContainer = event.target.closest('.filter-property-dropdown-container');
+      const clickedSalesIndex = clickedContainer && clickedContainer.dataset.salesIndex !== undefined
+        ? parseInt(clickedContainer.dataset.salesIndex, 10)
+        : -1;
+      const clickedAccountsIndex = clickedContainer && clickedContainer.dataset.accountsIndex !== undefined
+        ? parseInt(clickedContainer.dataset.accountsIndex, 10)
+        : -1;
+
+      setSelectedSalesProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedSalesIndex)) {
+          return prevProps.map((p, i) => i === clickedSalesIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
+
+      setSelectedProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedAccountsIndex)) {
+          return prevProps.map((p, i) => i === clickedAccountsIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // â”€â”€ Table / filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // what user types • does NOT trigger API
+  const [dealsSearchInput, setDealsSearchInput] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [isLast50Mode, setIsLast50Mode] = useState(false);
+  const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
+  const lastFetchedUrlRef = React.useRef('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isApplyingSalesFilters, setIsApplyingSalesFilters] = useState(false);
+  const [salesFiltersSuccess, setSalesFiltersSuccess] = useState(false);
+  const [isApplyingAccountsFilters, setIsApplyingAccountsFilters] = useState(false);
+  const [accountsFiltersSuccess, setAccountsFiltersSuccess] = useState(false);
+  const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
+  const [showMoreDropdown, setShowMoreDropdown] = useState(false);
+  const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('opp_selectedProperties');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  });
+  const [currentProperty, setCurrentProperty] = useState('');
+  const [isFilterApplied, setIsFilterApplied] = useState(() => {
+    try {
+      return sessionStorage.getItem('opp_isFilterApplied') === 'true';
+    } catch (e) { return false; }
+  });
+  const [currentFilterCriteria, setCurrentFilterCriteria] = useState(() => {
+    try {
+      return sessionStorage.getItem('opp_currentFilterCriteria') || '';
+    } catch (e) { return ''; }
+  });
+
+  // Save filter state to sessionStorage
+  useEffect(() => {
+    try {
+      if (isFilterApplied) {
+        sessionStorage.setItem('opp_selectedProperties', JSON.stringify(selectedProperties));
+        sessionStorage.setItem('opp_isFilterApplied', 'true');
+        sessionStorage.setItem('opp_currentFilterCriteria', currentFilterCriteria);
+      } else {
+        sessionStorage.removeItem('opp_selectedProperties');
+        sessionStorage.removeItem('opp_isFilterApplied');
+        sessionStorage.removeItem('opp_currentFilterCriteria');
+      }
+    } catch (e) { }
+  }, [selectedProperties, isFilterApplied, currentFilterCriteria]);
+
+  const [allAccountsData, setAllAccountsData] = useState([]);
+
+  const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
+  const [filterFetchProgress, setFilterFetchProgress] = useState(0);
+
+  // Optimized: parallel batch fetching "” all remaining batches fire simultaneously
+  // after first response reveals total count. Reduces N<X size={12} />RTT to ~2<X size={12} />RTT.
+  useEffect(() => {
+    let active = true;
+
+    const fetchAllAccountsForFilters = async () => {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+      if (!apiUrl) {
+        if (active) setIsFetchingFilterOptions(false);
+        return;
+      }
+
+      const batchLimit = 1000;
+      const buildUrl = (offset) =>
+        `${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${batchLimit}`;
+      const parseItems = (data) =>
+        Array.isArray(data) ? data : (data.data || data.results || data.accounts || data.records || data.items || []);
+
+      try {
+        if (active) {
+          setIsFetchingFilterOptions(true);
+          setFilterFetchProgress(10);
+        }
+
+        // Fetch first batch of 1000 accounts for filter options (single request)
+        const firstRes = await fetch(buildUrl(0));
+        if (!firstRes.ok || !active) return;
+        const firstData = await firstRes.json();
+        if (!active) return;
+
+        const firstItems = parseItems(firstData);
+        if (!firstItems.length) {
+          if (active) {
+            setFilterFetchProgress(100);
+            setIsFetchingFilterOptions(false);
+          }
+          return;
+        }
+
+        let allFetched = [...firstItems];
+
+        if (!active) return;
+
+        setFilterFetchProgress(99);
+
+        // --- Step 3: Transform ---
+        const transformed = allFetched.map(opp => ({
+          id: opp.id,
+          contactName: opp.full_name || opp.contact_name || opp.name || '',
+          phoneNumber: opp.phone || opp.phone_number || '',
+          alternateNumber: opp.alternate_number || '',
+          email: opp.email || '',
+          companyName: opp.company_name || opp.company || '',
+          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || '',
+          city: opp.city || opp.mailing_city || '',
+          state: opp.state || opp.mailing_state || '',
+          country: opp.country || opp.mailing_country || 'IN',
+          leadStatus: opp.status || opp.lead_status || '',
+          tags: opp.tags || opp.tag || '',
+          leadSource: opp.lead_source || opp.source || '',
+          description: opp.description || '',
+          createdTime: opp.created_time || opp.created_at || '',
+          industry: opp.industry || '',
+          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || '',
+          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || '',
+          lastActivity: opp.last_activity || opp.updated_at || '',
+          accountName: opp.account_name || '',
+          accountNumber: opp.account_number || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: opp.modified_time || '',
+          _raw: opp
+        }));
+
+        if (active) {
+          setAllAccountsData(transformed);
+          setFilterFetchProgress(100);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch full accounts dataset for filter options:', err);
+      } finally {
+        if (active) {
+          setIsFetchingFilterOptions(false);
+        }
+      }
+    };
+
+    fetchAllAccountsForFilters();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.name, user?.phone_number]);
+
+  // Memoized unique values map "” recomputes only when allAccountsData changes, not on every render
+  const uniqueValuesMap = useMemo(() => {
+    const propertyMap = {
+      'contact_owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'lead_status': ['leadStatus', 'status', 'lead_status'],
+      'status': ['leadStatus', 'status', 'lead_status'],
+      'tag': ['tags', 'tag'],
+      'tags': ['tags', 'tag'],
+      'mailing_country': ['country', 'mailing_country'],
+      'mailing_state': ['state', 'mailing_state'],
+      'mailing_city': ['city', 'mailing_city'],
+      'mailing_street': ['companyName', 'company_name', 'street'],
+      'created_by': ['createdBy', 'created_by', 'created_user', 'creator', 'created_by_name'],
+      'modified_by': ['modifiedBy', 'modified_by', 'modified_user', 'modifier', 'modified_by_name'],
+      'lead_source': ['leadSource', 'lead_source', 'source'],
+      'pipeline_stage': ['leadStatus', 'status'],
+      'contact_name': ['contactName', 'contact_name', 'full_name', 'name'],
+      'industry': ['industry'],
+      'account_type': ['accountType', 'account_type']
+    };
+
+    const sourceData = (allAccountsData && allAccountsData.length > 0) ? allAccountsData : opportunities;
+    const result = {};
+
+    for (const [property, possibleFields] of Object.entries(propertyMap)) {
+      if (property === 'tag' || property === 'tags') {
+        const allTags = sourceData.flatMap(item => {
+          const tagStr = item.tags || (item._raw && (item._raw.tags || item._raw.tag)) || '';
+          return (tagStr && typeof tagStr === 'string' && tagStr.trim())
+            ? tagStr.split(',').map(t => t.trim()).filter(Boolean)
+            : [];
+        });
+        result[property] = [...new Set(allTags)].sort((a, b) => String(a).localeCompare(String(b)));
+        continue;
+      }
+
+      const extracted = sourceData.flatMap(item => {
+        const vals = [];
+        for (const field of possibleFields) {
+          if (item[field]) vals.push(item[field]);
+          if (item._raw && item._raw[field]) vals.push(item._raw[field]);
+        }
+        return vals;
+      }).filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined');
+
+      result[property] = [...new Set(extracted)].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+    return result;
+  }, [allAccountsData, opportunities]);
+
+  // Get unique values for a property "” reads from memoized cache
+  const getUniqueValues = (property) => uniqueValuesMap[property] || [];
+
+  const getModifiedByOptions = () => {
+    const uniqueFromData = getUniqueValues('modified_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const getCreatedByOptions = () => {
+    const uniqueFromData = getUniqueValues('created_by');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const getContactOwnerOptions = () => {
+    const uniqueFromData = getUniqueValues('contact_owner');
+    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
+    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  // Helper to construct query parameter keys with _is or _is_not suffixes
+  const getFilterQueryParamKey = (property, operator = 'is') => {
+    const fieldMap = {
+      'contact_owner': 'owner',
+      'owner': 'owner',
+      'lead_status': 'status',
+      'status': 'status',
+      'tag': 'tags',
+      'tags': 'tags',
+      'lead_source': 'lead_source',
+      'mailing_city': 'city',
+      'city': 'city',
+      'mailing_state': 'state',
+      'state': 'state',
+      'mailing_country': 'country',
+      'country': 'country',
+      'description': 'description',
+      'created_by': 'created_by',
+      'modified_by': 'modified_by',
+      'account_type': 'account_type'
+    };
+    const baseKey = fieldMap[property] || property;
+    const opLower = String(operator || '').toLowerCase().trim();
+    const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+    const suffix = isNot ? '_is_not' : '_is';
+    return `${baseKey}${suffix}`;
+  };
+
+  const handleCombinedFilters = async (filters) => {
+    
+    if (isApplyingAccountsFilters) return;
+    setIsApplyingAccountsFilters(true);
+    setAccountsFiltersSuccess(false);
+    setLoading(true);
+
+    try {
+      setCurrentPage(1);
+      let url = `${import.meta.env.VITE_FILTER_ACCOUNTS_API_URL}?`;
+      const urlParams = [];
+
+      // Add base parameters
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
+      const currentLimit = itemsPerPage || 10;
+      urlParams.push(`limit=${currentLimit}`);
+      urlParams.push(`offset=0`);
+
+      // Build URL parameters for all filters
+      filters.forEach(filter => {
+        if (['contact_owner', 'lead_status', 'tag', 'mailing_state', 'mailing_country', 'created_by', 'modified_by', 'mailing_city', 'lead_source', 'description', 'account_type', 'owner', 'status', 'tags', 'city', 'state', 'country'].includes(filter.property) && filter.value) {
+          const paramName = getFilterQueryParamKey(filter.property, filter.operator);
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
+          urlParams.push(`date_type=on`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && filter.value) {
+          urlParams.push(`date_type=after`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
+          urlParams.push(`date_type=before`);
+          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
+          urlParams.push(`date_type=${filter.dateOperator}`);
+          if (filter.fromDate && filter.toDate) {
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.value) {
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          }
+        }
+      });
+
+      url += urlParams.join('&');
+      
+      
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      
+      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+
+      let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || result.records || result.items || []);
+      // Fallback: find the first array property in the response
+      if ((!Array.isArray(oppsData) || oppsData.length === 0) && result && typeof result === 'object' && !Array.isArray(result)) {
+        for (const key in result) {
+          if (Array.isArray(result[key]) && result[key].length > 0) {
+            oppsData = result[key];
+            break;
+          }
+        }
+      }
+      const totalRecords = (result && typeof result.total === 'number') ? result.total : (Array.isArray(oppsData) ? oppsData.length : 0);
+
+
+
+      setTotalOpportunities(totalRecords || oppsData.length);
+      setCurrentPage(1);
+
+      if (Array.isArray(oppsData)) {
+        
+
+        // Set filter applied state and criteria
+        setIsFilterApplied(true);
+        setAccountsFiltersSuccess(true);
+        setTimeout(() => {
+          setAccountsFiltersSuccess(false);
+          setFilterSidebarOpen(false);
+        }, 500);
+        const criteriaText = filters.map(f => {
+          const propLabel = f.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const operatorText = f.operator === 'is' || f.operator === 'is not' ? f.operator === 'is' ? 'is' : 'isn\'t' : '';
+          return `${propLabel} ${operatorText} ${f.value}`;
+        }).join(', ');
+        setCurrentFilterCriteria(criteriaText);
+
+        // Transform the filtered opportunities data
+        const transformedOpportunities = oppsData.map(opp => ({
+          id: opp.id,
+          contactName: opp.full_name || 'Unknown',
+          phoneNumber: opp.phone || '',
+          alternateNumber: opp.alternate_number || '',
+          email: opp.email || '',
+          companyName: opp.company_name || '',
+          contactOwner: opp.owner || 'Unassigned',
+          city: opp.city || '',
+          state: opp.state || '',
+          country: opp.country || 'IN',
+          leadStatus: opp.status || 'New',
+          tags: opp.tags || '',
+          leadSource: opp.lead_source || '',
+          description: opp.description || '',
+          createdTime: opp.created_time || new Date().toISOString(),
+          industry: opp.industry || '',
+          createdBy: opp.created_by || 'System',
+          modifiedBy: opp.modified_by || 'System',
+          lastActivity: opp.last_activity || new Date().toISOString(),
+          accountName: opp.account_name || '',
+          accountNumber: opp.account_number || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: opp.modified_time || ''
+        }));
+
+        setOpportunities(transformedOpportunities);
+      } else {
+        console.error('Unexpected API response format:', result);
+        throw new Error('Unexpected API response format');
+      }
+    } catch (err) {
+      console.error('Error applying combined filters:', err);
+      alert(`Error applying filters: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreatingDeal, setIsCreatingDeal] = useState(false);
+  const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
+  const [isDeletingDealState, setIsDeletingDealState] = useState(false);
+  const [selectedFieldToUpdate, setSelectedFieldToUpdate] = useState('');
+  const [updateFieldValue, setUpdateFieldValue] = useState('');
+  const [updateNewFieldValue, setUpdateNewFieldValue] = useState('');
+
+  // â”€â”€ Tab state for modal right panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [activeModalTab, setActiveModalTab] = useState('timeline');
+  const [showCreateDealModal, setShowCreateDealModal] = useState(false);
+  const [showDealInfoModal, setShowDealInfoModal] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState(null);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'kanban'
+  const [collapsedStages, setCollapsedStages] = useState({}); // Track collapsed stages
+  const [columnWidths, setColumnWidths] = useState({}); // Track column widths for resize
+  const [timelineData, setTimelineData] = useState([]); // Timeline data
+  const [timelineLoading, setTimelineLoading] = useState(false); // Timeline loading state
+  const [taskName, setTaskName] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskOwner, setTaskOwner] = useState('');
+  const [dealName, setDealName] = useState('');
+  const [dealClosingDate, setDealClosingDate] = useState('');
+  const [dealStage, setDealStage] = useState('');
+  const [dealAmount, setDealAmount] = useState('');
+  const [dealProbability, setDealProbability] = useState('');
+  const [dealDescription, setDealDescription] = useState('');
+  const [dealType, setDealType] = useState('');
+  const [dealsData, setDealsData] = useState([]);
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealCounts, setDealCounts] = useState({});
+  const [editingDealField, setEditingDealField] = useState(null);
+  const [editDealValue, setEditDealValue] = useState('');
+  const [showDeleteDealModal, setShowDeleteDealModal] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState(null);
+  const [showCustomDealTypeInput, setShowCustomDealTypeInput] = useState(false);
+  const [showCustomDealStageInput, setShowCustomDealStageInput] = useState(false);
+  const [showCustomDealOwnerInput, setShowCustomDealOwnerInput] = useState(false);
+  const [customDealType, setCustomDealType] = useState('');
+  const [customDealStage, setCustomDealStage] = useState('');
+  const [customDealOwner, setCustomDealOwner] = useState('');
+  const [taskStatus, setTaskStatus] = useState('Pending');
+  const [noteInput, setNoteInput] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [addingNote, setAddingNote] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
+  const [kanbanDeals, setKanbanDeals] = useState({}); // Store deals by stage for Kanban
+  const [stageTotals, setStageTotals] = useState({}); // Store total deals count per stage from API
+  const [stageValues, setStageValues] = useState({}); // Store total deals value per stage from API
+  const [loadingMoreStages, setLoadingMoreStages] = useState({}); // Track infinite scroll loading per stage
+  const [pipelineViewMode, setPipelineViewMode] = useState('kanban'); // Track sales pipeline view mode (kanban vs list)
+
+  // â”€â”€ Sales Pipeline Filter State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [salesFilterSidebarOpen, setSalesFilterSidebarOpen] = useState(false);
+  const [selectedSalesProperties, setSelectedSalesProperties] = useState([]);
+  const [currentSalesProperty, setCurrentSalesProperty] = useState('');
+  const [salesFiltersApplied, setSalesFiltersApplied] = useState(false);
+
+  // â”€â”€ Summary Deal Filter State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [dealFilter, setDealFilter] = useState('all'); // 'all', 'with_deals', 'without_deals'
+  const [apiDealTotals, setApiDealTotals] = useState({ with_deals: 0, without_deals: 0 });
+
+  // â”€â”€ Sales Pipeline List View Pagination State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(100);
+  const [salesPipelineCurrentPage, setSalesPipelineCurrentPage] = useState(1);
+
+  const isSearching = Boolean(searchTerm && searchTerm.trim() !== '');
+
+  // Handle deal filter click
+  const handleDealFilterClick = async (filter) => {
+    setDealFilter(prev => (prev === filter ? 'all' : filter));
+    setCurrentPage(1);
+  };
+
+  // Fetch filtered opportunities based on deal filter & search criteria across all server data
+  useEffect(() => {
+    if (viewMode !== 'table') return;
+
+    const fetchFilteredOpportunities = async () => {
+      const currentLimit = itemsPerPage || 10;
+      const currentOffset = ((currentPage || 1) - 1) * currentLimit;
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+
+      const isSearching = (searchTerm && searchTerm.trim() !== '');
+      const fetchLimit = currentLimit;
+      const fetchOffset = currentOffset;
+
+      const hasActiveFilter = (dealFilter && dealFilter !== 'all') ||
+        isSearching ||
+        newThisWeekFilter ||
+        (isFilterApplied && selectedProperties && selectedProperties.length > 0) ||
+        isFilterApplied;
+
+      const filterApiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
+      const accountsApiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
+      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+
+      try {
+        setLoading(true);
+        let response;
+
+        // 1. If searching, call dedicated search endpoint: /search?user=...&type=account&query=...
+        if (isSearching && searchApiUrl) {
+          try {
+            lastFetchedUrlRef.current = ''; // Clear URL cache to prevent stale data after search is cleared
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
+            response = await fetch(searchUrl);
+          } catch (searchErr) {
+            console.warn('Dedicated account search API failed:', searchErr);
+          }
+        }
+
+        // 2. If not searching or search failed, call filter API if filters active
+        if ((!response || !response.ok) && hasActiveFilter && filterApiUrl) {
+          const params = new URLSearchParams({
+            user: currentUserName,
+            offset: fetchOffset.toString(),
+            limit: fetchLimit.toString()
+          });
+
+          if (isSearching) {
+            params.append('query', searchTerm.trim());
+          }
+
+          if (dealFilter && dealFilter !== 'all') {
+            params.append('deal_filter', dealFilter);
+          }
+          if (newThisWeekFilter) {
+            params.append('date_type', 'in_last');
+            params.append('last_count', '7');
+            params.append('last_unit', 'days');
+          }
+          if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+            selectedProperties.forEach(p => {
+              if (p.property === 'created_time' || p.property === 'createdTime') {
+                if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+                  params.append('date_type', p.dateOperator);
+                  if (p.fromDate && p.toDate) {
+                    params.append('from', p.fromDate);
+                    params.append('to', p.toDate);
+                  } else if (p.value || p.date) {
+                    params.append('date', p.value || p.date);
+                  }
+                } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+                  params.append('date_type', 'on');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+                  params.append('date_type', 'before');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+                  params.append('date_type', 'after');
+                  params.append('date', p.value || p.date);
+                } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+                  const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+                  const count = p.count ? parseInt(p.count) : 1;
+                  params.append('date_type', 'in_last');
+                  params.append('last_count', count.toString());
+                  params.append('last_unit', unitMap[p.period] || 'days');
+                }
+              } else if (p.property && p.value) {
+                const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+                params.append(paramKey, p.value);
+              }
+            });
+          }
+
+          const requestUrl = `${filterApiUrl}?${params.toString()}`;
+          if (lastFetchedUrlRef.current === requestUrl && opportunities.length > 0) {
+            setLoading(false);
+            return;
+          }
+          lastFetchedUrlRef.current = requestUrl;
+          response = await fetch(requestUrl);
+        }
+
+        // 3. Fallback to main accounts API
+        if (!response || !response.ok) {
+          if (accountsApiUrl) {
+            const params = new URLSearchParams({
+              user: currentUserName,
+              offset: fetchOffset.toString(),
+              limit: fetchLimit.toString()
+            });
+            const accountReqUrl = `${accountsApiUrl}?${params.toString()}`;
+            if (!hasActiveFilter && lastFetchedUrlRef.current === accountReqUrl && opportunities.length > 0) {
+              setLoading(false);
+              return;
+            }
+            if (!hasActiveFilter) {
+              lastFetchedUrlRef.current = accountReqUrl;
+            }
+            response = await fetch(accountReqUrl);
+          }
+        }
+
+        let data = [];
+        if (response && response.ok) {
+          const responseData = await response.json();
+          data = Array.isArray(responseData) ? responseData : (responseData.data || responseData.results || responseData.accounts || responseData.records || responseData.items || []);
+
+          // If data is still not an array, try to find the first array property in the response
+          if (!Array.isArray(data) || data.length === 0) {
+            if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
+              for (const key in responseData) {
+                if (Array.isArray(responseData[key]) && responseData[key].length > 0) {
+                  data = responseData[key];
+                  break;
+                }
+              }
+            }
+          }
+
+          if (responseData && typeof responseData.total === 'number') {
+            setTotalOpportunities(responseData.total);
+            if (isFilterApplied) {
+              toast.success(`Filter applied: ${responseData.total} records found`, { id: 'opp-filter-toast' });
+            }
+            if (dealFilter !== 'all') {
+              setApiDealTotals(prev => ({
+                ...prev,
+                [dealFilter]: responseData.total
+              }));
+            }
+          } else if (Array.isArray(responseData)) {
+            setTotalOpportunities(responseData.length);
+            if (isFilterApplied) {
+              toast.success(`Filter applied: ${responseData.length} records found`, { id: 'opp-filter-toast' });
+            }
+          } else {
+            // Fallback: set total from extracted data array length (covers search API responses without total field)
+            setTotalOpportunities(Array.isArray(data) ? data.length : 0);
+          }
+        }
+
+        const transformedOpportunities = data.map(opp => ({
+          id: opp.id,
+          contactName: opp.full_name || opp.contact_name || opp.name || 'Unknown',
+          phoneNumber: opp.phone || opp.phone_number || '',
+          alternateNumber: opp.alternate_number || opp.alternateNumber || opp.mobile || '',
+          email: opp.email || '',
+          companyName: opp.company_name || opp.companyName || opp.company || '',
+          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || 'Unassigned',
+          city: opp.city || opp.mailing_city || '',
+          state: opp.state || opp.mailing_state || '',
+          country: opp.country || opp.mailing_country || 'IN',
+          leadStatus: opp.status || opp.lead_status || opp.leadStatus || 'New',
+          tags: opp.tags || opp.tag || '',
+          leadSource: opp.lead_source || opp.leadSource || opp.source || '',
+          description: opp.description || '',
+          createdTime: opp.created_time || opp.created_at || new Date().toISOString(),
+          industry: opp.industry || '',
+          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || 'System',
+          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || 'System',
+          lastActivity: opp.last_activity || opp.updated_at || new Date().toISOString(),
+          accountName: opp.account_name || opp.accountName || '',
+          accountNumber: opp.account_number || opp.accountNumber || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: opp.modified_time || ''
+        }));
+        setOpportunities(transformedOpportunities);
+      } catch (err) {
+        console.error('Error fetching opportunities:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFilteredOpportunities();
+  }, [viewMode, dealFilter, currentPage, itemsPerPage, searchTerm, newThisWeekFilter, isFilterApplied, refreshKey]);
+
+  // â”€â”€ Filter Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const applyFilters = (deals) => {
+    let filtered = [...deals];
+
+    selectedSalesProperties.forEach(prop => {
+      if (prop.property === 'deal_owner' && prop.value) {
+        const values = prop.value.split(',').filter(v => v);
+        if (prop.operator === 'is') {
+          filtered = filtered.filter(deal => values.includes(deal.deal_owner));
+        } else if (prop.operator === 'is_not' || prop.operator === "isn't") {
+          filtered = filtered.filter(deal => !values.includes(deal.deal_owner));
+        }
+      }
+
+      if (prop.property === 'deal_name' && prop.value) {
+        const searchValue = prop.value.toLowerCase();
+        if (prop.operator === 'contains') {
+          filtered = filtered.filter(deal => deal.deal_name?.toLowerCase().includes(searchValue));
+        } else if (prop.operator === 'equals') {
+          filtered = filtered.filter(deal => deal.deal_name?.toLowerCase() === searchValue);
+        } else if (prop.operator === 'starts_with') {
+          filtered = filtered.filter(deal => deal.deal_name?.toLowerCase().startsWith(searchValue));
+        }
+      }
+
+      if (prop.property === 'amount' && prop.value) {
+        const dealAmount = parseFloat(prop.value) || 0;
+        if (prop.operator === 'equals') {
+          filtered = filtered.filter(deal => parseFloat(deal.deal_amount) === dealAmount);
+        } else if (prop.operator === 'greater_than') {
+          filtered = filtered.filter(deal => parseFloat(deal.deal_amount) > dealAmount);
+        } else if (prop.operator === 'less_than') {
+          filtered = filtered.filter(deal => parseFloat(deal.deal_amount) < dealAmount);
+        } else if (prop.operator === 'between' && prop.value2) {
+          const dealAmount2 = parseFloat(prop.value2) || 0;
+          const min = Math.min(dealAmount, dealAmount2);
+          const max = Math.max(dealAmount, dealAmount2);
+          filtered = filtered.filter(deal => {
+            const amount = parseFloat(deal.deal_amount) || 0;
+            return amount >= min && amount <= max;
+          });
+        }
+      }
+
+      if (prop.property === 'closing_date') {
+        if (prop.dateOperator === 'on' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
+          });
+        } else if (prop.dateOperator === 'before' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
+          });
+        } else if (prop.dateOperator === 'after' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
+          });
+        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
+          });
+        } else if (prop.dateOperator === 'in_the_last' && prop.period) {
+          const now = new Date();
+          let startDate;
+          if (prop.period === 'day') {
+            startDate = new Date(now.setDate(now.getDate() - 1));
+          } else if (prop.period === 'week') {
+            startDate = new Date(now.setDate(now.getDate() - 7));
+          } else if (prop.period === 'month') {
+            startDate = new Date(now.setMonth(now.getMonth() - 1));
+          }
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
+          });
+        }
+      }
+
+      if (prop.property === 'deal_type' && prop.value) {
+        const values = prop.value.split(',').filter(v => v);
+        if (prop.operator === 'is') {
+          filtered = filtered.filter(deal => values.includes(deal.deal_type));
+        } else if (prop.operator === 'is_not') {
+          filtered = filtered.filter(deal => !values.includes(deal.deal_type));
+        }
+      }
+
+      if (prop.property === 'deal_stage' && prop.value) {
+        const values = prop.value.split(',').filter(v => v);
+        if (prop.operator === 'is') {
+          filtered = filtered.filter(deal => values.includes(deal.deal_stage));
+        } else if (prop.operator === 'is_not') {
+          filtered = filtered.filter(deal => !values.includes(deal.deal_stage));
+        }
+      }
+
+      if (prop.property === 'created_by' && prop.value) {
+        const values = prop.value.split(',').filter(v => v);
+        if (prop.operator === 'is') {
+          filtered = filtered.filter(deal => values.includes(deal.created_by));
+        } else if (prop.operator === 'is_not' || prop.operator === "isn't") {
+          filtered = filtered.filter(deal => !values.includes(deal.created_by));
+        }
+      }
+
+      if (prop.property === 'created_time') {
+        if (prop.dateOperator === 'on' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
+          });
+        } else if (prop.dateOperator === 'before' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
+          });
+        } else if (prop.dateOperator === 'after' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
+          });
+        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
+          });
+        } else if (prop.dateOperator === 'in_the_last' && prop.period) {
+          const now = new Date();
+          let startDate;
+          if (prop.period === 'day') {
+            startDate = new Date(now.setDate(now.getDate() - 1));
+          } else if (prop.period === 'week') {
+            startDate = new Date(now.setDate(now.getDate() - 7));
+          } else if (prop.period === 'month') {
+            startDate = new Date(now.setMonth(now.getMonth() - 1));
+          }
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
+          });
+        }
+      }
+
+      if (prop.property === 'modified_by' && prop.value) {
+        const values = prop.value.split(',').filter(v => v);
+        if (prop.operator === 'is') {
+          filtered = filtered.filter(deal => values.includes(deal.modified_by));
+        } else if (prop.operator === 'is_not' || prop.operator === "isn't") {
+          filtered = filtered.filter(deal => !values.includes(deal.modified_by));
+        }
+      }
+
+      if (prop.property === 'modified_time') {
+        if (prop.dateOperator === 'on' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate.toDateString() === filterDate.toDateString();
+          });
+        } else if (prop.dateOperator === 'before' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate < filterDate;
+          });
+        } else if (prop.dateOperator === 'after' && prop.value) {
+          const filterDate = parseDateRobust(prop.value);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && filterDate && dealDate > filterDate;
+          });
+        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
+          const minDate = parseDateRobust(prop.fromDate);
+          const maxDate = parseDateRobust(prop.toDate);
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && minDate && maxDate && dealDate >= minDate && dealDate <= maxDate;
+          });
+        } else if (prop.dateOperator === 'in_the_last' && prop.period) {
+          const now = new Date();
+          let startDate;
+          if (prop.period === 'day') {
+            startDate = new Date(now.setDate(now.getDate() - 1));
+          } else if (prop.period === 'week') {
+            startDate = new Date(now.setDate(now.getDate() - 7));
+          } else if (prop.period === 'month') {
+            startDate = new Date(now.setMonth(now.getMonth() - 1));
+          }
+          filtered = filtered.filter(deal => {
+            const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
+            if (!dateVal) return false;
+            const dealDate = parseDateRobust(dateVal);
+            return dealDate && startDate && dealDate >= startDate;
+          });
+        }
+      }
+    });
+
+    return filtered;
+  };
+
+  // Compute filtered kanban deals
+  const filteredKanbanDeals = useMemo(() => {
+    const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
+    const filteredByStage = {};
+
+    stages.forEach(stage => {
+      let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+
+      // 1. Search term filter across all deal fields
+      if (isSearching) {
+        const q = searchTerm.trim().toLowerCase();
+        stageDeals = stageDeals.filter(deal => {
+          const dealNameMatch = (deal.deal_name || deal.dealName || '').toLowerCase().includes(q);
+          const contactMatch = (deal.contact_name || deal.contactName || deal.full_name || '').toLowerCase().includes(q);
+          const accountMatch = (deal.account_name || deal.accountName || '').toLowerCase().includes(q);
+          const ownerMatch = (deal.owner || deal.contactOwner || deal.deal_owner || '').toLowerCase().includes(q);
+          const stageMatch = (deal.deal_stage || deal.stage || '').toLowerCase().includes(q);
+          const amountMatch = String(deal.deal_amount || deal.amount || '').includes(q);
+          const typeMatch = (deal.deal_type || deal.type || '').toLowerCase().includes(q);
+          const descMatch = (deal.description || '').toLowerCase().includes(q);
+
+          return dealNameMatch || contactMatch || accountMatch || ownerMatch || stageMatch || amountMatch || typeMatch || descMatch;
+        });
+      }
+
+      // 2. Sales Property filters if active
+      if (salesFiltersApplied && selectedSalesProperties.length > 0) {
+        stageDeals = applyFilters(stageDeals);
+      }
+
+      filteredByStage[stage] = stageDeals;
+    });
+
+    return filteredByStage;
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
+
+  // Dynamic summary metrics fetched directly from backend APIs:
+  // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
+  // - Total count fetched from VITE_DEALS_API_URL (deals)
+  const [dealSummaryMetrics, setDealSummaryMetrics] = useState({
+    total: 0,
+    open: 0,
+    won: 0,
+    closed: 0
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchDealsSummaryAndTotal = async () => {
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      const dealsSummaryApiUrl = import.meta.env.VITE_DEALS_SUMMARY_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals/summary';
+      const dealsApiUrl = import.meta.env.VITE_DEALS_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals';
+
+      try {
+        const [summaryRes, dealsRes] = await Promise.all([
+          fetch(`${dealsSummaryApiUrl}?user=${encodeURIComponent(currentUser)}`).catch(() => null),
+          fetch(`${dealsApiUrl}?user=${encodeURIComponent(currentUser)}&offset=0&limit=1`).catch(() => null)
+        ]);
+
+        let summaryData = null;
+        let dealsData = null;
+
+        if (summaryRes && summaryRes.ok) {
+          summaryData = await summaryRes.json();
+        }
+        if (dealsRes && dealsRes.ok) {
+          dealsData = await dealsRes.json();
+        }
+
+        if (!active) return;
+
+        const openCount = summaryData?.open ?? 0;
+        const wonCount = summaryData?.won ?? 0;
+        const closedCount = summaryData?.closed ?? 0;
+        const totalCount = dealsData?.total ?? dealsData?.count ?? dealsData?.total_count ?? (openCount + wonCount + closedCount);
+
+        setDealSummaryMetrics({
+          total: totalCount,
+          open: openCount,
+          won: wonCount,
+          closed: closedCount
+        });
+      } catch (err) {
+        console.error('Error fetching deals summary metrics:', err);
+      }
+    };
+
+    fetchDealsSummaryAndTotal();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.name, user?.phone_number, kanbanUpdateTimestamp]);
+
+  // Calculate deal metrics for summary
+  const dealMetrics = useMemo(() => {
+    // If filters are applied, compute metrics from the filtered local list
+    if (salesFiltersApplied || searchTerm || newThisWeekFilter) {
+      const allDeals = Object.values(filteredKanbanDeals).flat();
+      const openDeals = allDeals.filter(deal =>
+        ['Opportunity', 'Proposal', 'Negotiation'].includes(deal.deal_stage)
+      );
+      const positiveDeals = allDeals.filter(deal =>
+        ['Closed Won', 'Invoiced', 'Paid'].includes(deal.deal_stage)
+      );
+      const negativeDeals = allDeals.filter(deal =>
+        deal.deal_stage === 'Closed Lost'
+      );
+
+      return {
+        total: allDeals.length,
+        open: openDeals.length,
+        positive: positiveDeals.length,
+        negative: negativeDeals.length
+      };
+    }
+
+    // Otherwise use exact counts fetched directly from backend APIs (deals/summary & deals total)
+    return {
+      total: dealSummaryMetrics.total,
+      open: dealSummaryMetrics.open,
+      positive: dealSummaryMetrics.won,
+      negative: dealSummaryMetrics.closed
+    };
+  }, [filteredKanbanDeals, salesFiltersApplied, searchTerm, newThisWeekFilter, dealSummaryMetrics]);
+
+
+
+  // Reset Sales Pipeline Filters
+  const resetSalesFilters = () => {
+    setSelectedSalesProperties([]);
+    setCurrentSalesProperty('');
+    setSalesFiltersApplied(false);
+    fetchAllKanbanDeals(); // Reload all deals when filters are reset
+  };
+
+  // Apply Sales Pipeline Filters via API
+  // Apply Sales Pipeline Filters via API
+  const applySalesFilters = async () => {
+    if (isApplyingSalesFilters) return;
+    setIsApplyingSalesFilters(true);
+    setSalesFiltersSuccess(false);
+    try {
+      const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL;
+      if (!apiUrl) {
+        
+        toast.error('Filter API URL not configured');
+        return;
+      }
+
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      let url = `${apiUrl}?user=${encodeURIComponent(currentUser)}`;
+      const urlParams = [];
+
+      if (searchTerm && searchTerm.trim()) {
+        urlParams.push(`query=${encodeURIComponent(searchTerm.trim())}`);
+      }
+
+      // Maps each date-property to its backend date_field name
+      const dateFieldMap = {
+        closing_date: 'deal_close_date',
+        created_time: 'created_time',
+        modified_time: 'modified_time'
+      };
+
+      selectedSalesProperties.forEach(filter => {
+        // â”€â”€ Deal Owner: deal_owner_is / deal_owner_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        if (filter.property === 'deal_owner' && filter.value) {
+          const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'deal_owner_is_not' : 'deal_owner_is';
+          filter.value.split(',').filter(v => v.trim()).forEach(value => {
+            urlParams.push(`${param}=${encodeURIComponent(value.trim())}`);
+          });
+        }
+
+        // â”€â”€ Deal Name: deal_name_operator=contains/equals/starts_with â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'deal_name' && (filter.value || filter.searchTerm)) {
+          const operator = filter.operator || 'contains';
+          urlParams.push(`deal_name_operator=${operator}`);
+          urlParams.push(`deal_name=${encodeURIComponent(filter.value || filter.searchTerm)}`);
+        }
+
+        // â”€â”€ Amount: equals / greater_than / less_than / between â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'amount' && (filter.value || filter.operator === 'between')) {
+          if (filter.operator === 'between') {
+            urlParams.push(`amount_operator=between`);
+            urlParams.push(`from_amount=${encodeURIComponent(filter.value || '0')}`);
+            urlParams.push(`to_amount=${encodeURIComponent(filter.value2 || '')}`);
+          } else {
+            const operator = filter.operator || 'equals';
+            urlParams.push(`amount_operator=${operator}`);
+            urlParams.push(`amount=${encodeURIComponent(filter.value)}`);
+          }
+        }
+
+        // â”€â”€ Deal Type: deal_type_is / deal_type_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'deal_type' && filter.value) {
+          const param = filter.operator === 'is not' ? 'deal_type_is_not' : 'deal_type_is';
+          filter.value.split(',').filter(v => v.trim()).forEach(value => {
+            urlParams.push(`${param}=${encodeURIComponent(value.trim())}`);
+          });
+        }
+
+        // â”€â”€ Deal Stage: deal_stage_is / deal_stage_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'deal_stage' && filter.value) {
+          const param = filter.operator === 'is not' ? 'deal_stage_is_not' : 'deal_stage_is';
+          filter.value.split(',').filter(v => v.trim()).forEach(value => {
+            urlParams.push(`${param}=${encodeURIComponent(value.trim())}`);
+          });
+        }
+
+        // â”€â”€ Created By: created_by_is / created_by_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'created_by' && filter.value) {
+          const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'created_by_is_not' : 'created_by_is';
+          filter.value.split(',').filter(v => v.trim()).forEach(value => {
+            urlParams.push(`${param}=${encodeURIComponent(value.trim())}`);
+          });
+        }
+
+        // â”€â”€ Modified By: modified_by_is / modified_by_is_not â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        else if (filter.property === 'modified_by' && filter.value) {
+          const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'modified_by_is_not' : 'modified_by_is';
+          filter.value.split(',').filter(v => v.trim()).forEach(value => {
+            urlParams.push(`${param}=${encodeURIComponent(value.trim())}`);
+          });
+        }
+
+        // â”€â”€ Date filters: closing_date / created_time / modified_time â”€â”€â”€â”€â”€
+        else if (['closing_date', 'created_time', 'modified_time'].includes(filter.property)) {
+          const dateField = dateFieldMap[filter.property];
+
+          if (filter.dateOperator === 'on' && filter.value) {
+            urlParams.push(`date_field=${dateField}`);
+            urlParams.push(`date_type=on`);
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          } else if (filter.dateOperator === 'before' && filter.value) {
+            urlParams.push(`date_field=${dateField}`);
+            urlParams.push(`date_type=before`);
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          } else if (filter.dateOperator === 'after' && filter.value) {
+            urlParams.push(`date_field=${dateField}`);
+            urlParams.push(`date_type=after`);
+            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          } else if (filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
+            urlParams.push(`date_field=${dateField}`);
+            urlParams.push(`date_type=between`);
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.dateOperator === 'in_the_last' && filter.period) {
+            const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+            const countMap = { day: 1, week: 7, month: 30 };
+            // Use custom count if provided, otherwise use default countMap
+            const count = filter.count ? parseInt(filter.count) : countMap[filter.period] || 1;
+            urlParams.push(`date_field=${dateField}`);
+            urlParams.push(`date_type=in_last`);
+            urlParams.push(`last_count=${count}`);
+            urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
+          }
+        }
+      });
+
+      let response;
+      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+
+      if (searchTerm && searchTerm.trim() && searchApiUrl) {
+        try {
+          const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUser)}&type=deal&query=${encodeURIComponent(searchTerm.trim())}`;
+          response = await fetch(searchUrl);
+        } catch (searchErr) {
+          console.warn('Dedicated deal search API failed:', searchErr);
+        }
+      }
+
+      if (!response || !response.ok) {
+        if (urlParams.length > 0) {
+          url += '&' + urlParams.join('&');
+        }
+
+        
+
+        response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+      }
+
+      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Filter error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      // Extract deals array from various possible response formats
+      let extractedData = null;
+      if (Array.isArray(result)) {
+        extractedData = result;
+      } else if (result && typeof result === 'object') {
+        extractedData = result.data || result.results || result.records || result.items || result.deals || null;
+        // Fallback: find first array property in response
+        if (!Array.isArray(extractedData) || extractedData.length === 0) {
+          for (const key in result) {
+            if (Array.isArray(result[key]) && result[key].length > 0) {
+              extractedData = result[key];
+              break;
+            }
+          }
+        }
+      }
+
+      if (Array.isArray(extractedData)) {
+        let allData = [...extractedData];
+        const totalRecords = result.total || allData.length;
+
+        // If backend returned paginated results with has_more/next_offset, fetch remaining batches!
+        let currentNextOffset = result.next_offset || (result.has_more ? allData.length : null);
+        while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
+          try {
+            const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
+            
+            const nextResponse = await fetch(nextUrl, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            if (!nextResponse.ok) break;
+            const nextResult = await nextResponse.json();
+            const nextItems = Array.isArray(nextResult.data) ? nextResult.data : [];
+            if (nextItems.length === 0) break;
+            allData = [...allData, ...nextItems];
+            if (nextResult.has_more && nextResult.next_offset && nextResult.next_offset !== currentNextOffset) {
+              currentNextOffset = nextResult.next_offset;
+            } else if (nextItems.length > 0 && allData.length < totalRecords) {
+              currentNextOffset += nextItems.length;
+            } else {
+              break;
+            }
+          } catch (loopErr) {
+            console.warn('Error fetching additional filter pages:', loopErr);
+            break;
+          }
+        }
+
+        // Group filtered deals by stage (safely preserving ALL records)
+        const dealsByStage = {
+          'Opportunity': [],
+          'Proposal': [],
+          'Negotiation': [],
+          'Closed Won': [],
+          'Closed Lost': [],
+          'Invoiced': [],
+          'Paid': []
+        };
+
+        const knownStagesMap = {
+          'opportunity': 'Opportunity',
+          'proposal': 'Proposal',
+          'negotiation': 'Negotiation',
+          'closed won': 'Closed Won',
+          'closed lost': 'Closed Lost',
+          'invoiced': 'Invoiced',
+          'paid': 'Paid'
+        };
+
+        allData.forEach(deal => {
+          const normalizedStage = deal.deal_stage ? String(deal.deal_stage).trim().toLowerCase() : '';
+          const mappedStage = knownStagesMap[normalizedStage] || 'Opportunity';
+          dealsByStage[mappedStage].push(deal);
+        });
+
+        setKanbanDeals(dealsByStage);
+        setSalesFiltersApplied(true);
+        setSalesFiltersSuccess(true);
+        toast.success(`Filter applied successfully! Found ${allData.length} records.`);
+        setTimeout(() => {
+          setSalesFiltersSuccess(false);
+          setSalesFilterSidebarOpen(false);
+        }, 500);
+      } else {
+        console.error('API returned unexpected format:', result);
+        toast.error('Failed to apply filter: Unexpected response format');
+      }
+    } catch (err) {
+      console.error('Error applying sales filters:', err);
+      toast.error(`Error applying filter: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setIsApplyingSalesFilters(false);
+    }
+  };
+
+  // â”€â”€ Static option lists (same as LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const statusConfig = {
+    'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
+    'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
+    'Contacted': { color: '#8b5cf6', label: 'Contacted' },
+    'Starter': { color: '#14b8a6', label: 'Starter' },
+    'Growth': { color: '#0ea5e9', label: 'Growth' },
+    'Enterprise': { color: '#6366f1', label: 'Enterprise' },
+    'Follow-up 1': { color: '#10b981', label: 'Follow-up 1' },
+    'Follow-up 2': { color: '#06b6d4', label: 'Follow-up 2' },
+    'In Discussion': { color: '#8b5cf6', label: 'In Discussion' },
+    'Interested': { color: '#10b981', label: 'Interested' },
+    'Junk': { color: '#ef4444', label: 'Junk' }
+  };
+
+  const [predefinedTags, setPredefinedTags] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedTags');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+  });
+
+  const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedLeadSources');
+    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
+  });
+
+  const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedIndustries');
+    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
+  });
+
+  const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedAccountTypes');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+  });
+
+  const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
+    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
+    const saved = localStorage.getItem('opportunities_predefinedContactOwners');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return Array.from(new Set([...defaultOwners, ...parsed]));
+        }
+      } catch (e) { }
+    }
+    return defaultOwners;
+  });
+
+  // â”€â”€ Helper: get all available owners combining predefined & dynamic loaded data â”€â”€
+  const getAllAvailableOwners = () => {
+    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini'];
+    const ownersFromKanban = Object.values(kanbanDeals || {})
+      .flat()
+      .map(d => d.deal_owner || d.owner || d.contactOwner)
+      .filter(v => v && typeof v === 'string' && v.trim());
+    const ownersFromOpportunities = (opportunities || [])
+      .map(o => o.contactOwner || o.owner)
+      .filter(v => v && typeof v === 'string' && v.trim());
+
+    const combined = [
+      ...defaultList,
+      ...(predefinedContactOwners || []),
+      ...ownersFromKanban,
+      ...ownersFromOpportunities
+    ];
+
+    return Array.from(new Set(combined)).filter(v => v && v.trim()).sort();
+  };
+
+  // â”€â”€ Helper: unique contact owners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const getUniqueContactOwners = () => {
+    return getAllAvailableOwners();
+  };
+
+  const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedDealTypes');
+    return saved ? JSON.parse(saved) : ['Trial', 'Starter', 'Growth', 'Entrepreneur'];
+  });
+  const [predefinedDealStages, setPredefinedDealStages] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedDealStages');
+    return saved ? JSON.parse(saved) : ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
+  });
+
+  // Save to localStorage when predefined values change
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedTags', JSON.stringify(predefinedTags));
+  }, [predefinedTags]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedLeadSources', JSON.stringify(predefinedLeadSources));
+  }, [predefinedLeadSources]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedIndustries', JSON.stringify(predefinedIndustries));
+  }, [predefinedIndustries]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedAccountTypes', JSON.stringify(predefinedAccountTypes));
+  }, [predefinedAccountTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedContactOwners', JSON.stringify(predefinedContactOwners));
+  }, [predefinedContactOwners]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedDealTypes', JSON.stringify(predefinedDealTypes));
+  }, [predefinedDealTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
+  }, [predefinedDealStages]);
+
+
+
+  // â”€â”€ Helper: get icon for timeline field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const getTimelineIcon = (field) => {
+    const iconMap = {
+      'contactName': User,
+      'phoneNumber': Phone,
+      'email': Mail,
+      'companyName': Building,
+      'alternateNumber': Phone,
+      'city': MapPin,
+      'state': Map,
+      'country': Globe,
+      'leadStatus': Activity,
+      'industry': Briefcase,
+      'contactOwner': UserCheck,
+      'leadSource': TrendingUp,
+      'tags': Tag,
+      'notes': MessageSquare,
+      'description': FileText
+    };
+    const IconComponent = iconMap[field] || FileEdit;
+    return IconComponent;
+  };
+
+  // Add note using API
+  const handleAddNote = async () => {
+    if (!noteInput.trim()) {
+      toast.error('Please enter a note');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No opportunity selected');
+      return;
+    }
+
+    setAddingNote(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=note&message=${encodeURIComponent(noteInput)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding note:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      if (result.success || result.message) {
+        toast.success('Note added successfully');
+        setNoteInput('');
+        // Refresh timeline to show the new note
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new note
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to add note');
+      }
+    } catch (err) {
+      console.error('Error adding note:', err);
+      toast.error('Failed to add note');
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  // Fetch deals by stage for Kanban dashboard
+  const fetchDealsByStage = async (stage, stageOffset = 0, stageLimit = 50) => {
+    try {
+      const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
+      if (!apiUrl) {
+        
+        return { deals: [], total: 0 };
+      }
+
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUser)}&deal_stage=${encodeURIComponent(stage)}&offset=${stageOffset}&limit=${stageLimit}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      const dealsList = Array.isArray(result) ? result : (result.data || result.results || result.deals || []);
+      const totalCount = result.total !== undefined ? result.total : (result.count !== undefined ? result.count : dealsList.length);
+      const totalVal = result.total_value || result.total_amount || result.sum_amount || result.total_val || null;
+
+      const deals = dealsList.map(deal => ({
+        ...deal,
+        account_name: deal.account_name || '',
+        account_number: deal.account_number || '',
+        created_time: deal.created_time || '',
+        created_by: deal.created_by || ''
+      }));
+
+      return { deals, total: totalCount, totalValue: totalVal };
+    } catch (err) {
+      console.error(`Error fetching deals for stage ${stage}:`, err);
+      return { deals: [], total: 0, totalValue: null };
+    }
+  };
+
+  // Fetch all deals for all stages concurrently using Promise.all (initial batch offset=0, limit=50)
+  const fetchAllKanbanDeals = async () => {
+    const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
+
+    try {
+      const results = await Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50)));
+      const dealsByStage = {};
+      const totalsByStage = {};
+      const valuesByStage = {};
+
+      stages.forEach((stage, index) => {
+        dealsByStage[stage] = results[index].deals;
+        totalsByStage[stage] = results[index].total;
+        if (results[index].totalValue !== null && results[index].totalValue !== undefined) {
+          valuesByStage[stage] = results[index].totalValue;
+        }
+      });
+
+      setKanbanDeals(dealsByStage);
+      setStageTotals(totalsByStage);
+      setStageValues(valuesByStage);
+    } catch (err) {
+      console.error('Error fetching all kanban deals:', err);
+    }
+  };
+
+  // Apply search/filters automatically for Deal Pipeline (Kanban) when state changes
+  useEffect(() => {
+    if (viewMode !== 'kanban') return;
+
+    if (searchTerm || salesFiltersApplied || newThisWeekFilter) {
+      applySalesFilters();
+    } else {
+      fetchAllKanbanDeals();
+    }
+  }, [viewMode, searchTerm, newThisWeekFilter, refreshKey]);
+
+  // Infinite scroll: fetch next batch of 50 deals for a specific stage when user scrolls near column bottom
+  const handleLoadMoreStageDeals = async (stage) => {
+    if (loadingMoreStages[stage]) return;
+
+    const currentDeals = kanbanDeals[stage] || [];
+    const totalForStage = stageTotals[stage] || 0;
+
+    if (currentDeals.length >= totalForStage) return;
+
+    try {
+      setLoadingMoreStages(prev => ({ ...prev, [stage]: true }));
+
+      const nextOffset = currentDeals.length;
+      const { deals: newDeals } = await fetchDealsByStage(stage, nextOffset, 50);
+
+      if (newDeals.length > 0) {
+        setKanbanDeals(prev => {
+          const existing = prev[stage] || [];
+          const existingIds = new Set(existing.map(d => String(d.deal_id || d.id)));
+          const uniqueNewDeals = newDeals.filter(d => !existingIds.has(String(d.deal_id || d.id)));
+          return {
+            ...prev,
+            [stage]: [...existing, ...uniqueNewDeals]
+          };
+        });
+      }
+    } catch (err) {
+      console.error(`Error loading more deals for stage ${stage}:`, err);
+    } finally {
+      setLoadingMoreStages(prev => ({ ...prev, [stage]: false }));
+    }
+  };
+
+  // Add task using API
+  const handleAddTask = async () => {
+    if (!taskName.trim()) {
+      toast.error('Please enter task name');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No opportunity selected');
+      return;
+    }
+
+    setAddingTask(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      if (result.success || result.message) {
+        toast.success('Task created successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskStatus('Pending');
+        setShowCreateTaskModal(false);
+        // Refresh timeline to show the new task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to create task');
+      }
+    } catch (err) {
+      console.error('Error adding task:', err);
+      toast.error('Failed to create task');
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  // Edit task - populate form with task data
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setTaskName(task.task_name);
+    setTaskDueDate(task.due_date);
+    setTaskStatus(task.status);
+    setShowEditTaskModal(true);
+  };
+
+  // Update task using API
+  const handleUpdateTask = async () => {
+    if (!taskName.trim()) {
+      toast.error('Please enter task name');
+      return;
+    }
+
+    if (!editingTask) {
+      toast.error('No task selected');
+      return;
+    }
+
+    setAddingTask(true);
+    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${editingTask.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      if (result.success || result.message) {
+        toast.success('Task updated successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskStatus('Pending');
+        setEditingTask(null);
+        setShowEditTaskModal(false);
+        // Refresh timeline to show the updated task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the updated task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to update task');
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
+      toast.error('Failed to update task');
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  // Fetch activities from API
+  const fetchActivities = async (leadId) => {
+    try {
+      const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${leadId}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Error fetching activities:', response.status);
+        return;
+      }
+
+      const result = await response.json();
+      
+      setActivities(result || []);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  };
+
+  // â”€â”€ Editing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const startEditing = (fieldName, currentValue) => {
+    setEditingField(fieldName);
+    setEditValue(currentValue || '');
+  };
+
+  const saveEdit = () => {
+    if (editingField && editValue.trim() !== '') {
+      handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
+      setEditingField(null);
+      setEditValue('');
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  // â”€â”€ Drag and drop handler for Kanban board (Pragmatic DnD) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleKanbanDealMove = async ({
+    dealId,
+    sourceColumnId,
+    destinationColumnId,
+    sourceIndex,
+    destinationIndex,
+  }) => {
+    if (
+      sourceColumnId === destinationColumnId &&
+      sourceIndex === destinationIndex
+    ) {
+      return;
+    }
+
+    const columnToStageMap = {
+      opportunity: 'Opportunity',
+      proposal: 'Proposal',
+      negotiation: 'Negotiation',
+      'closed-won': 'Closed Won',
+      'closed-lost': 'Closed Lost',
+      invoiced: 'Invoiced',
+      paid: 'Paid',
+    };
+
+    const newStage = columnToStageMap[destinationColumnId];
+    const oldStage = columnToStageMap[sourceColumnId];
+
+    if (!newStage) {
+      toast.error('Invalid destination column');
+      return;
+    }
+
+    const updatedKanbanDeals = { ...kanbanDeals };
+    const sourceDeals = [...updatedKanbanDeals[oldStage]];
+    const [movedDeal] = sourceDeals.splice(sourceIndex, 1);
+
+    if (movedDeal) {
+      movedDeal.deal_stage = newStage;
+      const destDeals = [...updatedKanbanDeals[newStage]];
+      destDeals.splice(destinationIndex, 0, movedDeal);
+      updatedKanbanDeals[oldStage] = sourceDeals;
+      updatedKanbanDeals[newStage] = destDeals;
+      setKanbanDeals(updatedKanbanDeals);
+      setKanbanUpdateTimestamp(Date.now());
+    }
+
+    if (sourceColumnId === destinationColumnId) {
+      return;
+    }
+
+    toast.loading('Updating deal stage...');
+
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+      if (!apiUrl) {
+        
+        toast.dismiss();
+        toast.error('Update Deal API URL not configured');
+        fetchAllKanbanDeals();
+        return;
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deal_id: dealId,
+          deal_stage: newStage,
+          user: currentUserName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      toast.dismiss();
+      if (result.success || result.message) {
+        toast.success('Deal stage updated successfully');
+        fetchAllKanbanDeals();
+      } else {
+        toast.error('Failed to update deal stage');
+        fetchAllKanbanDeals();
+      }
+    } catch (err) {
+      console.error('Error updating deal stage:', err);
+      toast.dismiss();
+      toast.error('Failed to update deal stage');
+      fetchAllKanbanDeals();
+    }
+  };
+
+  const handleKanbanDealClick = (deal) => {
+    setSelectedDeal({
+      deal_id: deal.deal_id,
+      deal_name: deal.deal_name,
+      contact_name: deal.full_name || deal.account_name || deal.contact_name || '',
+      amount: `₹${deal.deal_amount}`,
+      closing_date: deal.deal_close_date
+        ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+        : '-',
+      description: deal.description || '',
+      deal_type: deal.deal_type || '',
+      deal_stage: deal.deal_stage || '',
+      contact_owner: deal.deal_owner || '',
+      probability: `${deal.deal_probability}%`,
+      account_name: deal.account_name || '',
+      account_number: deal.account_number || '',
+      created_time: deal.created_time || '',
+      created_by: deal.created_by || ''
+    });
+    setShowDealInfoModal(true);
+  };
+
+  // â”€â”€ Fetch timeline data for a lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const fetchTimeline = async (leadId) => {
+    setTimelineLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_LEAD_TIMELINE_API_URL}?lead_id=${leadId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch timeline');
+      }
+      const data = await response.json();
+      setTimelineData(data);
+    } catch (error) {
+      console.error('Error fetching timeline:', error);
+      toast.error('Failed to fetch timeline');
+      setTimelineData([]);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  // â”€â”€ Editable field component (identical to LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const EditableField = ({ label, value, fieldName, type = 'text' }) => {
+    const isEditing = editingField === fieldName;
+    const containerRef = React.useRef(null);
+
+    React.useEffect(() => {
+      if (isEditing) {
+        const handleClickOutside = (event) => {
+          if (containerRef.current && !containerRef.current.contains(event.target)) {
+            cancelEdit();
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
+
+    return (
+      <div ref={containerRef}>
+        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+          {label}
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isEditing ? (
+            <>
+              <input
+                type={type}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveEdit();
+                  if (e.key === 'Escape') cancelEdit();
+                }}
+                style={{
+                  flex: 1, padding: '6px 8px',
+                  border: '1px solid var(--green-600)', borderRadius: 'var(--r)',
+                  fontSize: '12px', background: 'var(--surface)', color: 'var(--text)'
+                }}
+                autoFocus
+              />
+              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} /></button>
+              <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+            </>
+          ) : (
+            <div
+              style={{
+                flex: 1, color: value ? 'var(--text)' : 'var(--text-3)',
+                fontStyle: value ? 'normal' : 'italic', minHeight: '20px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '4px', borderRadius: 'var(--r)', cursor: 'pointer',
+                transition: 'background-color 0.2s ease'
+              }}
+              onClick={() => startEditing(fieldName, value)}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <span>{value || 'Not specified'}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                style={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                onMouseEnter={(e) => { e.target.style.opacity = '1'; }}
+                onMouseLeave={(e) => { e.target.style.opacity = '0'; }}
+              >
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // â”€â”€ API handlers (same as LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const fetchDeals = async (accountId) => {
+    try {
+      setDealsLoading(true);
+      const apiUrl = import.meta.env.VITE_DEALS_API_URL;
+
+      if (!apiUrl) {
+        
+        setDealsData([]);
+        setDealCounts(prev => ({ ...prev, [accountId]: 0 }));
+        return;
+      }
+
+      const currentUser = user?.name || user?.phone_number || 'operation';
+      const response = await fetch(`${apiUrl}?account_id=${accountId}&user=${encodeURIComponent(currentUser)}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      
+
+      const deals = (result.data || []).map(deal => ({
+        ...deal,
+        account_name: deal.account_name || '',
+        account_number: deal.account_number || '',
+        created_time: deal.created_time || '',
+        created_by: deal.created_by || ''
+      }));
+      setDealsData(deals);
+      setDealCounts(prev => ({ ...prev, [accountId]: deals.length }));
+    } catch (err) {
+      console.error('Error fetching deals:', err);
+      setDealsData([]);
+      setDealCounts(prev => ({ ...prev, [accountId]: 0 }));
+    } finally {
+      setDealsLoading(false);
+    }
+  };
+
+  const fetchAllDealCounts = async (opportunities) => {
+    const apiUrl = import.meta.env.VITE_DEALS_API_URL;
+    if (!apiUrl) {
+      
+      return;
+    }
+
+    const currentUser = user?.name || user?.phone_number || 'operation';
+    const counts = {};
+    const promises = opportunities.map(async (opp) => {
+      try {
+        const response = await fetch(`${apiUrl}?account_id=${opp.id}&user=${encodeURIComponent(currentUser)}`);
+        if (response.ok) {
+          const result = await response.json();
+          counts[opp.id] = (result.data || []).length;
+        } else {
+          counts[opp.id] = 0;
+        }
+      } catch (err) {
+        console.error(`Error fetching deal count for account ${opp.id}:`, err);
+        counts[opp.id] = 0;
+      }
+    });
+
+    await Promise.all(promises);
+    setDealCounts(counts);
+  };
+
+  const startDealEditing = (fieldName, currentValue) => {
+    setEditingDealField(fieldName);
+    setEditDealValue(currentValue || '');
+  };
+
+  const saveDealEdit = async () => {
+    if (isUpdatingDeal) return;
+    if (selectedDeal && editingDealField) {
+      setIsUpdatingDeal(true);
+      try {
+        toast.loading('Updating deal...');
+
+        const currentUserName = user?.name || user?.phone_number || 'operation';
+        const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+
+        if (!apiUrl) {
+          toast.dismiss();
+          toast.error('Update Deal API URL not configured');
+          setIsUpdatingDeal(false);
+          return;
+        }
+
+        const requestBody = {
+          deal_id: selectedDeal.deal_id,
+          user: currentUserName
+        };
+
+        // Map field names to API field names
+        const fieldMapping = {
+          'deal_name': 'deal_name',
+          'deal_amount': 'deal_amount',
+          'deal_close_date': 'deal_close_date',
+          'deal_type': 'deal_type',
+          'deal_stage': 'deal_stage',
+          'deal_owner': 'deal_owner',
+          'contact_owner': 'contact_owner',
+          'deal_probability': 'deal_probability',
+          'description': 'description'
+        };
+
+        const apiFieldName = fieldMapping[editingDealField];
+        if (apiFieldName) {
+          requestBody[apiFieldName] = editDealValue;
+        }
+
+        
+
+        const response = await fetch(apiUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('HTTP Error:', errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+
+        toast.dismiss();
+        toast.success('Deal updated successfully');
+        setEditingDealField(null);
+        setEditDealValue('');
+
+        // Close Deal Info modal so user returns to previous view
+        setShowDealInfoModal(false);
+        setSelectedDeal(null);
+
+        // Refresh deals data
+        fetchDeals(selectedUser?.id);
+      } catch (err) {
+        console.error('Error updating deal:', err);
+        toast.dismiss();
+        toast.error('Failed to update deal');
+      }
+    }
+  };
+
+  const cancelDealEdit = () => {
+    setEditingDealField(null);
+    setEditDealValue('');
+  };
+
+  const handleDeleteDeal = async () => {
+    if (!dealToDelete) return;
+
+    try {
+      toast.loading('Deleting deal...');
+
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const apiUrl = import.meta.env.VITE_DELETE_DEAL_API_URL;
+
+      if (!apiUrl) {
+        toast.dismiss();
+        toast.error('Delete Deal API URL not configured');
+        return;
+      }
+
+      const response = await fetch(`${apiUrl}?deal_id=${dealToDelete.deal_id}&user=${currentUserName}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      toast.dismiss();
+      toast.success('Deal deleted successfully');
+      setShowDeleteDealModal(false);
+      setDealToDelete(null);
+      setShowDealInfoModal(false);
+      setSelectedDeal(null);
+      setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 1) - 1 }));
+      fetchDeals(selectedUser?.id);
+      fetchAllKanbanDeals();
+    } catch (err) {
+      console.error('Error deleting deal:', err);
+      toast.dismiss();
+      toast.error('Failed to delete deal');
+    }
+  };
+
+  // CSV Import handler
+  const handleCSVImport = () => {
+    toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
+      icon: 'ℹ️',
+      duration: 5000
+    });
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv,.xlsx,.xls';
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        try {
+          toast.loading('Uploading CSV...');
+
+          const currentUserName = user?.name || user?.phone_number || 'operation';
+          const apiUrl = import.meta.env.VITE_UPLOAD_ACCOUNT_CSV_API_URL;
+
+          if (!apiUrl) {
+            toast.dismiss();
+            toast.error('Upload CSV API URL not configured');
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}`, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await response.json();
+          
+
+          toast.dismiss();
+          toast.success('CSV uploaded successfully');
+
+          // Refresh the data
+          fetchOpportunities();
+        } catch (err) {
+          console.error('Error uploading CSV:', err);
+          toast.dismiss();
+          toast.error('Failed to upload CSV');
+        }
+      }
+    };
+    fileInput.click();
+  };
+
+  // Filtered CSV download handler
+  const handleFilteredCSVDownload = async () => {
+    try {
+      setIsDownloadingCSV(true);
+      toast.loading('Downloading CSV...');
+      const currentUser = user?.name || user?.phone_number || 'operation';
+
+      const params = new URLSearchParams({
+        user: currentUser
+      });
+
+      if (dealFilter && dealFilter !== 'all') {
+        params.append('deal_filter', dealFilter);
+      }
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('query', searchTerm.trim());
+      }
+      if (newThisWeekFilter) {
+        params.append('date_type', 'in_last');
+        params.append('last_count', '7');
+        params.append('last_unit', 'days');
+      }
+      if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+        selectedProperties.forEach(p => {
+          if (p.property === 'created_time' || p.property === 'createdTime') {
+            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+              params.append('date_type', p.dateOperator);
+              if (p.fromDate && p.toDate) {
+                params.append('from', p.fromDate);
+                params.append('to', p.toDate);
+              } else if (p.value || p.date) {
+                params.append('date', p.value || p.date);
+              }
+            } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+              params.append('date_type', 'on');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+              params.append('date_type', 'before');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+              params.append('date_type', 'after');
+              params.append('date', p.value || p.date);
+            } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const count = p.count ? parseInt(p.count) : 1;
+              params.append('date_type', 'in_last');
+              params.append('last_count', count.toString());
+              params.append('last_unit', unitMap[p.period] || 'days');
+            }
+          } else if (p.property && p.value) {
+            const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+            params.append(paramKey, p.value);
+          }
+        });
+      }
+
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL;
+      const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
+      
+
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const downloadBlobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadBlobUrl;
+      a.download = `accounts_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadBlobUrl);
+      document.body.removeChild(a);
+      toast.dismiss();
+      toast.success('CSV downloaded successfully');
+    } catch (err) {
+      console.error('Network error downloading filtered CSV:', err);
+      toast.dismiss();
+      toast.error(`Failed to download CSV: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setIsDownloadingCSV(false);
+    }
+  };
+
+  // Editable deal field component
+  const EditableDealField = ({ label, value, fieldName, type = 'text', options = [] }) => {
+    const isEditing = editingDealField === fieldName;
+    const textareaRef = React.useRef(null);
+    const containerRef = React.useRef(null);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [localTextareaValue, setLocalTextareaValue] = useState('');
+
+    // Initialize local value when editing starts
+    React.useEffect(() => {
+      if (isEditing && type === 'textarea') {
+        setLocalTextareaValue(editDealValue);
+      }
+    }, [isEditing, type, editDealValue]);
+
+    // Sync local value to parent when editing ends
+    React.useEffect(() => {
+      if (!isEditing && type === 'textarea') {
+        setLocalTextareaValue('');
+      }
+    }, [isEditing, type]);
+
+    // Handle click outside to close editing
+    React.useEffect(() => {
+      if (isEditing) {
+        const handleClickOutside = (event) => {
+          if (containerRef.current && !containerRef.current.contains(event.target)) {
+            cancelDealEdit();
+            setDropdownOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
+
+    const handleTextareaChange = (e) => {
+      setLocalTextareaValue(e.target.value);
+      setEditDealValue(e.target.value);
+    };
+
+    // Handle custom input for deal_type, deal_stage, and contact_owner
+    const showCustomInput = fieldName === 'deal_type' ? showCustomDealTypeInput :
+      fieldName === 'deal_stage' ? showCustomDealStageInput :
+        fieldName === 'contact_owner' ? showCustomDealOwnerInput : false;
+    const customValue = fieldName === 'deal_type' ? customDealType :
+      fieldName === 'deal_stage' ? customDealStage :
+        fieldName === 'contact_owner' ? customDealOwner : '';
+    const setCustomValue = fieldName === 'deal_type' ? setCustomDealType :
+      fieldName === 'deal_stage' ? setCustomDealStage :
+        fieldName === 'contact_owner' ? setCustomDealOwner : null;
+    const setShowCustomInput = fieldName === 'deal_type' ? setShowCustomDealTypeInput :
+      fieldName === 'deal_stage' ? setShowCustomDealStageInput :
+        fieldName === 'contact_owner' ? setShowCustomDealOwnerInput : null;
+
+    return (
+      <div ref={containerRef}>
+        {label && <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>{label}</label>}
+        <div style={{ display: 'flex', alignItems: type === 'textarea' ? 'flex-start' : 'center', gap: '8px' }}>
+          {isEditing ? (
+            <>
+              {type === 'select' ? (
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <div data-dropdown="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                    onClick={() => setDropdownOpen(!dropdownOpen)}>
+                    <span>{editDealValue || 'Select...'}</span><ChevronDown size={14} />
+                  </div>
+                  {dropdownOpen && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                      {options.map(opt => (
+                        <button key={opt} onClick={() => { setEditDealValue(opt); setDropdownOpen(false); }}
+                          style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                        >{opt}</button>
+                      ))}
+                      {(fieldName === 'deal_type' || fieldName === 'deal_stage' || fieldName === 'contact_owner') && (user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                        <button onClick={() => { setShowCustomInput(true); setDropdownOpen(false); }}
+                          style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                        >+ Custom</button>
+                      )}
+                    </div>
+                  )}
+                  {showCustomInput && (
+                    <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input type="text" value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder={`Enter custom ${fieldName.replace('_', ' ')}...`}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                        <button onClick={() => { if (customValue.trim()) { setEditDealValue(customValue.trim()); if (fieldName === 'deal_type') setPredefinedDealTypes([...predefinedDealTypes, customValue.trim()]); if (fieldName === 'deal_stage') setPredefinedDealStages([...predefinedDealStages, customValue.trim()]); if (fieldName === 'contact_owner') setPredefinedContactOwners([...predefinedContactOwners, customValue.trim()]); setCustomValue(''); setShowCustomInput(false); } }}
+                          style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                        <button onClick={() => { setCustomValue(''); setShowCustomInput(false); }}
+                          style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : type === 'date' ? (
+                <input
+                  type="date"
+                  value={editDealValue}
+                  onChange={(e) => setEditDealValue(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    border: '1px solid var(--green-600)',
+                    borderRadius: 'var(--r)',
+                    fontSize: '12px',
+                    outline: 'none',
+                    background: 'var(--surface)',
+                    color: 'var(--text)'
+                  }}
+                  autoFocus
+                />
+              ) : type === 'number' ? (
+                <input
+                  type="number"
+                  value={editDealValue}
+                  onChange={(e) => setEditDealValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveDealEdit();
+                    if (e.key === 'Escape') cancelDealEdit();
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    border: '1px solid var(--green-600)',
+                    borderRadius: 'var(--r)',
+                    fontSize: '12px',
+                    outline: 'none',
+                    background: 'var(--surface)',
+                    color: 'var(--text)'
+                  }}
+                  autoFocus
+                />
+              ) : type === 'textarea' ? (
+                <textarea
+                  ref={textareaRef}
+                  value={localTextareaValue}
+                  onChange={handleTextareaChange}
+                  rows={4}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    border: '1px solid var(--green-600)',
+                    borderRadius: 'var(--r)',
+                    fontSize: '12px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    fontFamily: 'inherit'
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type={type}
+                  value={editDealValue}
+                  onChange={(e) => setEditDealValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveDealEdit();
+                    if (e.key === 'Escape') cancelDealEdit();
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    border: '1px solid var(--green-600)',
+                    borderRadius: 'var(--r)',
+                    fontSize: '12px',
+                    outline: 'none',
+                    background: 'var(--surface)',
+                    color: 'var(--text)'
+                  }}
+                  autoFocus
+                />
+              )}
+              <button
+                onClick={saveDealEdit}
+                style={{
+                  padding: '4px 8px',
+                  background: 'var(--green-600)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--r)',
+                  fontSize: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Check size={14} style={{ color: "var(--blue-600)" }} />
+              </button>
+              <button
+                onClick={cancelDealEdit}
+                style={{
+                  padding: '4px 8px',
+                  background: 'var(--gray-200)',
+                  color: 'var(--text)',
+                  border: 'none',
+                  borderRadius: 'var(--r)',
+                  fontSize: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <div
+              onClick={() => startDealEditing(fieldName, value)}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r)',
+                color: value ? 'var(--text)' : 'var(--text-3)',
+                fontSize: '12px',
+                fontStyle: value ? 'normal' : 'italic',
+                minHeight: '20px',
+                display: 'flex',
+                alignItems: type === 'textarea' ? 'flex-start' : 'center'
+              }}
+            >
+              {value || '-'}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const handleFieldUpdate = async (leadId, fieldName, newValue) => {
+    // Show updating message
+    toast.loading('Updating...', { id: 'field-update' });
+
+    try {
+      const currentUserName = user?.name || user?.phone_number || 'operation';
+      let url;
+
+      // Account-related fields use the update-account API
+      if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
+        const accountName = fieldName === 'accountName' ? newValue : selectedUser?.accountName || '';
+        const accountType = fieldName === 'accountType' ? newValue : selectedUser?.accountType || '';
+        const website = fieldName === 'website' ? newValue : selectedUser?.website || '';
+        const dealPresent = selectedUser?.dealPresent ? 1 : 0;
+        const owner = selectedUser?.contactOwner || currentUserName;
+
+        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&account_name=${encodeURIComponent(accountName)}&account_type=${encodeURIComponent(accountType)}&website=${encodeURIComponent(website)}&deal_present=${dealPresent}&status=active&owner=${encodeURIComponent(owner)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'contactName') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'phoneNumber') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&phone=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'email') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&email=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'companyName') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&company_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'alternateNumber') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'city') {
+        url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'state') {
+        url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'country') {
+        url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'leadStatus') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'industry') {
+        url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'contactOwner') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'leadSource') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'tags') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'notes') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&notes=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else if (fieldName === 'description') {
+        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      } else {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      }
+
+      
+      const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
+      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+
+      const success = result.success ||
+        (result.message && (result.message.toLowerCase().includes('updated') || result.message.toLowerCase().includes('success')));
+
+      
+
+      if (success) {
+        setOpportunities(prev => prev.map(o => o.id === leadId ? { ...o, [fieldName]: newValue } : o));
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
+          // Auto-refresh timeline for this lead
+          fetchTimeline(leadId);
+        }
+        const fieldMessages = {
+          contactName: 'Contact name updated', phoneNumber: 'Phone number updated',
+          email: 'Email updated', companyName: 'Company name updated',
+          alternateNumber: 'Alternate phone number updated', city: 'City updated',
+          state: 'State updated', country: 'Country updated', leadStatus: 'Lead status updated',
+          industry: 'Industry updated', contactOwner: 'Contact owner updated',
+          leadSource: 'Lead source updated', tags: 'Tags updated',
+          notes: 'Notes updated', description: 'Description updated',
+          accountName: 'Account name updated', accountType: 'Account type updated', website: 'Website updated'
+        };
+        toast.success(fieldMessages[fieldName] || `${fieldName} updated`, { id: 'field-update' });
+      } else {
+        console.error('API returned unsuccessful:', result);
+        toast.error('Failed to update field', { id: 'field-update' });
+      }
+    } catch (err) {
+      console.error('Error updating field:', err);
+      toast.error('Failed to update field', { id: 'field-update' });
+    }
+  };
+
+  const handleDeleteOpportunity = async (leadId) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this opportunity? This action cannot be undone.');
+    if (!confirmDelete) return;
+    try {
+      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}`;
+      const response = await fetch(url, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      if (result.success) {
+        setOpportunities(prev => prev.filter(o => o.id !== leadId));
+        if (selectedUser && selectedUser.id === leadId) { setSelectedUser(null); setShowUserModal(false); }
+        toast.success('Opportunity deleted successfully');
+      }
+    } catch (err) {
+      console.error('Error deleting opportunity:', err);
+    }
+  };
+
+  // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const filteredOpportunities = opportunities.filter(opp => {
+    let matchesSearch = true;
+    if (isSearching) {
+      const q = searchTerm.trim().toLowerCase();
+      const nameMatch = (opp.contactName || '').toLowerCase().includes(q);
+      const phoneMatch = (opp.phoneNumber || '').includes(q) || (opp.alternateNumber || '').includes(q);
+      const emailMatch = (opp.email || '').toLowerCase().includes(q);
+      const companyMatch = (opp.companyName || '').toLowerCase().includes(q);
+      const accountNameMatch = (opp.accountName || '').toLowerCase().includes(q);
+      const accountNumberMatch = (opp.accountNumber || '').toLowerCase().includes(q);
+      const ownerMatch = (opp.contactOwner || '').toLowerCase().includes(q);
+      const cityMatch = (opp.city || '').toLowerCase().includes(q);
+      const stateMatch = (opp.state || '').toLowerCase().includes(q);
+      const countryMatch = (opp.country || '').toLowerCase().includes(q);
+      const tagsMatch = (opp.tags || '').toLowerCase().includes(q);
+      const descMatch = (opp.description || '').toLowerCase().includes(q);
+
+      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || tagsMatch || descMatch;
+    }
+
+    let isNewThisWeek = true;
+    if (newThisWeekFilter) {
+      if (!opp.createdTime) {
+        isNewThisWeek = false;
+      } else {
+        const createdDate = parseDateRobust(opp.createdTime);
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
+      }
+    }
+
+    return matchesSearch && isNewThisWeek;
+  });
+
+  const isClientPaginated = newThisWeekFilter;
+
+  const totalCount = (dealFilter !== 'all' && apiDealTotals[dealFilter] !== undefined)
+    ? apiDealTotals[dealFilter]
+    : (totalOpportunities || filteredOpportunities.length);
+
+  const effectiveTotalCount = isSearching
+    ? (totalOpportunities === 0 ? 0 : (totalOpportunities || filteredOpportunities.length))
+    : (isClientPaginated ? filteredOpportunities.length : totalCount);
+
+  const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
+  const startRecord = filteredOpportunities.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endRecord = Math.min(currentPage * itemsPerPage, effectiveTotalCount);
+
+  const currentOpportunities = isClientPaginated
+    ? filteredOpportunities.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : filteredOpportunities;
+
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  return (
+    <div className="main-full">
+      <div style={{ padding: '8px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 8px 0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              Opportunities
+            </h1>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>Manage and track sales opportunities through the pipeline</p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+            >
+              {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
+              {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
+            </button>
+            <button
+              onClick={handleCSVImport}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+            >
+              <Upload size={16} /> Import CSV
+            </button>
+          </div>
+        </div>
+
+        <>
+          {/* Search and Filter - Only show in table view */}
+          {viewMode === 'table' && (
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
+                <button
+                  onClick={() => setFilterSidebarOpen(!filterSidebarOpen)}
+                  style={{ padding: '10px', border: '1px solid var(--border)', borderRadius: 'var(--r)', background: filterSidebarOpen ? 'var(--blue-600)' : 'var(--surface)', color: filterSidebarOpen ? 'white' : 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Filter size={16} />
+                </button>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+                  <input
+                    id="search-opportunities"
+                    name="search-opportunities"
+                    type="text"
+                    placeholder="Search opportunities..."
+                    value={searchInput}
+                    onChange={(e) => {
+                      setSearchInput(e.target.value);
+                      // If user clears the input, also clear the actual search
+                      if (!e.target.value.trim()) {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchTerm(searchInput.trim());
+                        setCurrentPage(1);
+                      }
+                    }}
+                    style={{ width: '220px', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', height: '36px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    setSearchTerm(searchInput.trim());
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: '0 14px',
+                    height: '36px',
+                    background: '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                  title="Search"
+                >
+                  <Search size={14} /> Search
+                </button>
+              </div>
+
+              <button
+                onClick={handleFilteredCSVDownload}
+                disabled={isDownloadingCSV}
+                className="btn btn-sm"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '5px 10px', background: 'var(--green-600)', color: '#fff', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: isDownloadingCSV ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: isDownloadingCSV ? 0.6 : 1 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-700)'; e.currentTarget.style.borderColor = 'var(--green-700)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--green-600)'; e.currentTarget.style.borderColor = 'var(--green-600)'; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                Download CSV
+              </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={newThisWeekFilter}
+                  onChange={(e) => {
+                    setNewThisWeekFilter(e.target.checked);
+                    setCurrentPage(1);
+                    setSalesPipelineCurrentPage(1);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span style={{ color: 'var(--text)', fontSize: '14px' }}>New This Week</span>
+              </label>
+            </div>
+          )}
+
+          {/* Search Results Banner */}
+          {isSearching && !loading && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 'var(--r)',
+              padding: '10px 16px',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Search size={15} style={{ color: '#16a34a' }} />
+                <span style={{ color: '#15803d', fontSize: '14px', fontWeight: '500' }}>
+                  Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+                </span>
+                <span style={{ color: '#4ade80', fontSize: '13px' }}>
+                  • {viewMode === 'kanban'
+                    ? `${dealMetrics.total.toLocaleString()} ${dealMetrics.total === 1 ? 'deal' : 'deals'} found`
+                    : `${effectiveTotalCount.toLocaleString()} ${effectiveTotalCount === 1 ? 'record' : 'records'} found`
+                  }
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSearchInput('');
+                  setDealsSearchInput('');
+                  setCurrentPage(1);
+                  setSalesPipelineCurrentPage(1);
+                }}
+                style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          )}
+
+          {/* Filtered Results Display */}
+          {isFilterApplied && !isSearching && (
+            <div style={{
+              background: 'var(--blue-50)',
+              border: '1px solid var(--blue-200)',
+              borderRadius: 'var(--r)',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Filter size={16} style={{ color: 'var(--blue-600)' }} />
+                <span style={{ color: 'var(--blue-600)', fontSize: '14px', fontWeight: '500' }}>
+                  Filtered Results: {currentFilterCriteria}
+                </span>
+                <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
+                  ({(totalOpportunities || opportunities.length).toLocaleString()} records found)
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  lastFetchedUrlRef.current = '';
+                  setIsFilterApplied(false);
+                  setCurrentFilterCriteria('');
+                  setSelectedProperties([]);
+                  setCurrentProperty('');
+                  setNewThisWeekFilter(false);
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--blue-600)',
+                  borderRadius: 'var(--r)',
+                  padding: '4px 8px',
+                  color: 'var(--blue-600)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <X size={12} />
+                Clear Filter
+              </button>
+            </div>
+          )}
+
+          {/* More Dropdown Button - Shows when items are selected */}
+          {selectedRows.length > 0 && (
+            <div style={{ marginBottom: '16px', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>{selectedRows.length} item(s) selected</span>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowMoreDropdown(!showMoreDropdown)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                  >
+                    More <ChevronDown size={16} />
+                  </button>
+                  {showMoreDropdown && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, minWidth: '160px' }}>
+                      <button
+                        onClick={() => {
+                          setShowMoreDropdown(false);
+                          setShowUpdateFieldsModal(true);
+                          setSelectedFieldToUpdate('');
+                          setUpdateFieldValue('');
+                        }}
+                        style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-100)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        Update Fields
+                      </button>
+                      {user?.role === 'operation' && (
+                        <button
+                          onClick={() => {
+                            setShowMoreDropdown(false);
+                            setShowDeleteConfirmModal(true);
+                          }}
+                          style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--red-50)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Opportunity Table - Only show in table view */}
+          {viewMode === 'table' && (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)', overflowX: 'auto', maxWidth: '100%', flex: 1 }}>
+              <div style={{ overflowX: 'auto', maxWidth: '100%', flex: 1, position: 'relative' }}>
+                {loading && <div className="satyukt-top-loader-bar" />}
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px', height: '100%' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--gray-100)', zIndex: 11, minWidth: '150px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input type="checkbox" checked={selectedRows.length === currentOpportunities.length && currentOpportunities.length > 0 && currentOpportunities.every(opp => selectedRows.includes(opp.id))} onChange={(e) => { if (e.target.checked) setSelectedRows(currentOpportunities.map(o => o.id)); else setSelectedRows(selectedRows.filter(id => !currentOpportunities.find(opp => opp.id === id))); }} style={{ cursor: 'pointer' }} />
+                          <span>Contact Name</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Alternate Number</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '180px' }}>Email</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Company Name</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Account Name</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Account Number</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>No. of Deals</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Account Type</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Contact Owner</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>City</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>State</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>Country</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>Tags</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '200px' }}>Description</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Created Time</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Industry</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Created By</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Modified By</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Last Activity</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Modified Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="22" style={{ padding: '0', background: '#fafafa' }}>
+                          <SatyuktLoader
+                            message={
+                              searchTerm
+                                ? `Searching accounts for "${searchTerm}"...`
+                                : isFilterApplied
+                                  ? `Filtering accounts by applied criteria...`
+                                  : `Loading accounts from Satyukt CRM...`
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ) : filteredOpportunities.length === 0 ? (
+                      <tr>
+                        <td colSpan="22" style={{ padding: '0', background: '#ffffff' }}>
+                          <SatyuktEmptyState
+                            title="No accounts to display"
+                            subtitle="Accounts from Satyukt CRM will appear here."
+                            onRefresh={() => {
+                              lastFetchedUrlRef.current = '';
+                              setSearchTerm('');
+                              setSearchInput('');
+                              setIsFilterApplied(false);
+                              setCurrentFilterCriteria('');
+                              setSelectedProperties([]);
+                              setCurrentProperty('');
+                              setNewThisWeekFilter(false);
+                              setDealFilter('all');
+                              setCurrentPage(1);
+                              setRefreshKey(prev => prev + 1);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ) : (
+                      currentOpportunities.map(opp => (
+                        <tr key={opp.id} style={{ borderBottom: '1px solid var(--border-soft)', transition: 'all 0.2s ease' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                              <input type="checkbox" checked={selectedRows.includes(opp.id)} onChange={(e) => { if (e.target.checked) setSelectedRows([...selectedRows, opp.id]); else setSelectedRows(selectedRows.filter(id => id !== opp.id)); }} style={{ cursor: 'pointer' }} />
+                              <button onClick={() => { setSelectedUser(opp); setShowUserModal(true); fetchTimeline(opp.id); fetchActivities(opp.id); fetchDeals(opp.id); }} style={{ background: 'none', border: 'none', color: 'var(--blue-600)', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.contactName}>
+                                {opp.contactName}
+                              </button>
+                              <button onClick={() => openEditDialog(opp.id, 'contactName', opp.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }} title="Edit contact name">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.phoneNumber}>{opp.phoneNumber}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'phoneNumber', opp.phoneNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit phone number">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.alternateNumber}>{opp.alternateNumber}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'alternateNumber', opp.alternateNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit alternate number">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.email}>{opp.email}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'email', opp.email)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit email">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.companyName}>{opp.companyName}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'companyName', opp.companyName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit company name">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountName}>{opp.accountName}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'accountName', opp.accountName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit account name">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountNumber}>{opp.accountNumber}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>
+                            <span style={{ color: opp.dealPresent ? '#10b981' : '#ef4444', fontSize: '13px', fontWeight: '500' }}>
+                              {opp.dealPresent ? opp.dealPresent : 0}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.accountType || '-'}>{opp.accountType || '-'}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'accountType', opp.accountType)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit account type">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.contactOwner}>{opp.contactOwner}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'contactOwner', opp.contactOwner)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit contact owner">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.city}>{opp.city}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'city', opp.city)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit city">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.state}>{opp.state}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'state', opp.state)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit state">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.country}>{opp.country}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'country', opp.country)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit country">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.tags}>{opp.tags}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'tags', opp.tags)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit tags">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', width: '200px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.description}>{opp.description}</div>
+                              <button onClick={() => openEditDialog(opp.id, 'description', opp.description)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit description">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.createdTime)}</span>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.industry}>{opp.industry}</span>
+                              <button onClick={() => openEditDialog(opp.id, 'industry', opp.industry)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit industry">
+                                <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.createdBy}>{opp.createdBy}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.modifiedBy}>{opp.modifiedBy}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.lastActivity)}</span>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{formatDateSafe(opp.modifiedTime)}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary Section */}
+              <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', gap: '24px', fontSize: '13px', color: '#4b5563', flexShrink: 0 }}>
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  Total{' '}
+                  <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                  <strong style={{ color: '#111827', fontWeight: 600 }}>{totalCount}</strong>
+                </span>
+
+                {/* Total with deals - clickable */}
+                {dealFilter === 'with_deals' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDealFilterClick('with_deals')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: 'none',
+                        background: '#dcfce7',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Total with deals{' '}
+                      <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.with_deals}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDealFilterClick('all')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#2563eb',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDealFilterClick('with_deals')}
+                    title="Filter by accounts with deals"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: '#4b5563',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#111827'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#4b5563'; }}
+                  >
+                    Total with deals{' '}
+                    <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.with_deals}</strong>
+                  </button>
+                )}
+
+                {/* Total without deals - clickable */}
+                {dealFilter === 'without_deals' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDealFilterClick('without_deals')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        border: 'none',
+                        background: '#dcfce7',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Total without deals{' '}
+                      <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.without_deals}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDealFilterClick('all')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#2563eb',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDealFilterClick('without_deals')}
+                    title="Filter by accounts without deals"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: '#4b5563',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#111827'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#4b5563'; }}
+                  >
+                    Total without deals{' '}
+                    <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.without_deals}</strong>
+                  </button>
+                )}
+              </div>
+
+              {/* Pagination */}
+              {!loading && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1px 10px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
+                    <span>Records per page</span>
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      <select id="opportunities-per-page" name="opportunities-per-page" value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'last50') {
+                            setIsLast50Mode(true);
+                            setItemsPerPage(50);
+                            const total = effectiveTotalCount || totalCount || 0;
+                            const lastPage = Math.max(Math.ceil(total / 50), 1);
+                            setCurrentPage(lastPage);
+                          } else {
+                            setIsLast50Mode(false);
+                            setItemsPerPage(Number(val));
+                            setCurrentPage(1);
+                          }
+                        }}
+                        style={{ appearance: 'none', WebkitAppearance: 'none', padding: '6px 32px 6px 14px', borderRadius: '20px', border: '1px solid #d1d5db', background: '#fff', fontSize: '13px', color: '#374151', cursor: 'pointer', minWidth: '56px', fontFamily: 'inherit' }}>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value="last50">Last 50</option>
+                      </select>
+                      <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button type="button" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1 || filteredOpportunities.length === 0}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', padding: 0, background: 'none', border: 'none', color: currentPage === 1 || filteredOpportunities.length === 0 ? '#d1d5db' : '#6b7280', cursor: currentPage === 1 || filteredOpportunities.length === 0 ? 'not-allowed' : 'pointer' }}>
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span style={{ fontSize: '13px', color: '#374151', minWidth: '56px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {filteredOpportunities.length === 0 ? '0 to 0' : `${startRecord} to ${endRecord} of ${effectiveTotalCount.toLocaleString()}`}
+                    </span>
+                    <button type="button" onClick={() => setCurrentPage(p => Math.min(p + 1, Math.max(totalPages, 1)))} disabled={currentPage >= totalPages || filteredOpportunities.length === 0}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', padding: 0, background: 'none', border: 'none', color: currentPage >= totalPages || filteredOpportunities.length === 0 ? '#d1d5db' : '#6b7280', cursor: currentPage >= totalPages || filteredOpportunities.length === 0 ? 'not-allowed' : 'pointer' }}>
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Kanban Dashboard View */}
+          {viewMode === 'kanban' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Kanban Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid var(--border)', background: 'white', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Sales Pipeline</h2>
+                  {salesFiltersApplied && (
+                    <span style={{ padding: '4px 12px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
+                      Filters Applied
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={16} style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#64748b'
+                      }} />
+                      <input
+                        type="text"
+                        placeholder="Search deals..."
+                        value={dealsSearchInput}
+                        onChange={(e) => {
+                          setDealsSearchInput(e.target.value);
+                          if (!e.target.value.trim()) {
+                            setSearchTerm('');
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setSearchTerm(dealsSearchInput.trim());
+                            setSalesPipelineCurrentPage(1);
+                          }
+                        }}
+                        style={{
+                          width: '240px',
+                          padding: '8px 12px 8px 36px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: 'var(--r)',
+                          fontSize: '14px',
+                          background: 'white',
+                          color: '#374151'
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSearchTerm(dealsSearchInput.trim());
+                        setSalesPipelineCurrentPage(1);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: 'var(--green-600)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--r)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      <Search size={15} />
+                      Search
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setSalesFilterSidebarOpen(!salesFilterSidebarOpen)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: salesFilterSidebarOpen ? '#3b82f6' : 'white', color: salesFilterSidebarOpen ? 'white' : '#374151', border: '1px solid #d1d5db', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                    >
+                      <Filter size={16} />
+                      Filters
+                    </button>
+                    <button
+                      onClick={() => setPipelineViewMode(pipelineViewMode === 'kanban' ? 'list' : 'kanban')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: pipelineViewMode === 'kanban' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                    >
+                      {pipelineViewMode === 'kanban' ? <List size={16} /> : <Activity size={16} />}
+                      {pipelineViewMode === 'kanban' ? 'List View' : 'Kanban View'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sales Pipeline Filter Sidebar */}
+              {salesFilterSidebarOpen && (
+                <>
+                  <style>{`@keyframes satyuktSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                  <div style={{
+                    position: 'absolute',
+                    top: '73px',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    zIndex: 999
+                  }} onClick={() => setSalesFilterSidebarOpen(false)} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '73px',
+                    left: 0,
+                    bottom: 0,
+                    width: '320px',
+                    background: 'white',
+                    borderRight: '1px solid var(--border)',
+                    zIndex: 1000,
+                    overflowY: 'auto',
+                    boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <div style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid var(--border)',
+                      background: 'var(--surface)'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '16px', fontWeight: '600' }}>Filters</h3>
+                        <button
+                          onClick={() => setSalesFilterSidebarOpen(false)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-3)',
+                            cursor: 'pointer',
+                            padding: '4px'
+                          }}
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '8px 12px' }}>
+                      {/* Property Selector */}
+                      <div style={{ marginBottom: '16px' }}>
+                        <select
+                          value={currentSalesProperty}
+                          onChange={(e) => {
+                            const property = e.target.value;
+                            setCurrentSalesProperty(property);
+                            if (property && !selectedSalesProperties.find(p => p.property === property)) {
+                              setSelectedSalesProperties([...selectedSalesProperties, {
+                                property,
+                                operator: property === 'deal_name' ? 'contains' : 'is',
+                                value: '',
+                                value2: '',
+                                fromDate: '',
+                                toDate: '',
+                                period: '',
+                                dateOperator: 'on',
+                                searchTerm: '',
+                                dropdownOpen: false
+                              }]);
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            background: 'var(--surface)',
+                            color: 'var(--text)'
+                          }}
+                        >
+                          <option value="">Add Filter Property</option>
+                          <option value="deal_owner">Deal Owner</option>
+                          <option value="deal_name">Deal Name</option>
+                          <option value="amount">Amount</option>
+                          <option value="closing_date">Closing Date</option>
+                          <option value="deal_type">Deal Type</option>
+                          <option value="deal_stage">Deal Stage</option>
+                          <option value="created_by">Created By</option>
+                          <option value="created_time">Created Time</option>
+                          <option value="modified_by">Modified By</option>
+                          <option value="modified_time">Modified Time</option>
+                        </select>
+                      </div>
+
+                      {/* Selected Properties */}
+                      {selectedSalesProperties.map((prop, index) => (
+                        <div key={index} style={{ marginBottom: '24px', position: 'relative' }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px'
+                          }}>
+                            <label style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>
+                              {prop.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </label>
+                            <button
+                              onClick={() => {
+                                setSelectedSalesProperties(selectedSalesProperties.filter((_, i) => i !== index));
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-3)',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                borderRadius: 'var(--r)'
+                              }}
+                              title="Remove filter"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          {prop.property === 'deal_owner' && (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">is</option>
+                                  <option value="isn't">isn't</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getAllAvailableOwners().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(owner => (
+                                          <div
+                                            key={owner}
+                                            onClick={() => {
+                                              const updated = [...selectedSalesProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(owner)) {
+                                                const indexToRemove = currentValues.indexOf(owner);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(owner);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedSalesProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{owner}</span>
+                                              {prop.value && prop.value.includes(owner) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            updated[index].showCustomInput = true;
+                                            updated[index].dropdownOpen = false;
+                                            setSelectedSalesProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            color: 'var(--green-600)',
+                                            borderBottom: 'none'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--green-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                          }}
+                                        >
+                                          + Custom Owner
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.showCustomInput && (
+                                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)', position: 'relative', zIndex: 20 }}>
+                                    <input
+                                      type="text"
+                                      value={prop.customValue || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].customValue = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      placeholder="Enter custom owner..."
+                                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)', marginBottom: '8px', boxSizing: 'border-box' }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => {
+                                          if (prop.customValue && prop.customValue.trim()) {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            currentValues.push(prop.customValue.trim());
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].customValue = '';
+                                            updated[index].showCustomInput = false;
+                                            setSelectedSalesProperties(updated);
+                                          }
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                                      >Apply</button>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].customValue = '';
+                                          updated[index].showCustomInput = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer' }}
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((owner, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {owner}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(owner);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedSalesProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${owner}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Deal Name - Search box with operators */}
+                          {prop.property === 'deal_name' && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <select
+                                  value={prop.operator || 'contains'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)',
+                                    minWidth: '80px'
+                                  }}
+                                >
+                                  <option value="contains">contains</option>
+                                  <option value="equals">equals</option>
+                                  <option value="starts_with">starts with</option>
+                                </select>
+                                <input
+                                  type="text"
+                                  value={prop.searchTerm || prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  placeholder="Search deal name..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              </div>
+                              {prop.searchTerm && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  <span style={{
+                                    background: 'var(--blue-600)15',
+                                    color: 'var(--blue-600)',
+                                    padding: '2px 6px',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.searchTerm}
+                                    <button
+                                      onClick={() => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].value = '';
+                                        updated[index].searchTerm = '';
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--blue-600)',
+                                        cursor: 'pointer',
+                                        padding: '0',
+                                        fontSize: '12px',
+                                        lineHeight: '1',
+                                        borderRadius: '50%',
+                                        width: '14px',
+                                        height: '14px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                      title={`Remove ${prop.searchTerm}`}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Amount - Number filter with operators */}
+                          {prop.property === 'amount' && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <select
+                                  value={prop.operator || 'equals'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option>Choose a value</option>
+                                  <option value="greater_than">greater than</option>
+                                  <option value="less_than">less than</option>
+                                  <option value="between">between</option>
+                                </select>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                  type="number"
+                                  placeholder={prop.operator === 'between' ? 'From' : 'Amount'}
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                                {prop.operator === 'between' && (
+                                  <input
+                                    type="number"
+                                    placeholder="To"
+                                    value={prop.value2 || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].value2 = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Closing Date - Date filter with operators */}
+                          {prop.property === 'closing_date' && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <select
+                                  value={prop.dateOperator || 'on'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].dateOperator = e.target.value;
+                                    updated[index].value = '';
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="on">on</option>
+                                  <option value="before">before</option>
+                                  <option value="after">after</option>
+                                  <option value="between">between</option>
+                                  <option value="in_the_last">in the last</option>
+                                </select>
+                              </div>
+                              {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                                <input
+                                  type="date"
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              )}
+                              {prop.dateOperator === 'between' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
+                                    <input
+                                      type="date"
+                                      value={prop.fromDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].fromDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
+                                    <input
+                                      type="date"
+                                      value={prop.toDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].toDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {prop.dateOperator === 'in_the_last' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <select
+                                    value={prop.period || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].period = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  >
+                                    <option value="">Select period</option>
+                                    <option value="day">Day</option>
+                                    <option value="week">Week</option>
+                                    <option value="month">Month</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={prop.count || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].count = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    placeholder="Count"
+                                    min="1"
+                                    style={{
+                                      width: '80px',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                            </div>
+                          )}
+
+                          {/* Deal Type - Dropdown with is/isn't */}
+                          {prop.property === 'deal_type' && (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">is</option>
+                                  <option value="is not">is not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search deal types..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {['Trail', 'Starter', 'Growth', 'Entrepreneur'].filter(type => !prop.searchTerm || type.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(type => (
+                                          <div
+                                            key={type}
+                                            onClick={() => {
+                                              const updated = [...selectedSalesProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(type)) {
+                                                const indexToRemove = currentValues.indexOf(type);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(type);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedSalesProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(type) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(type) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{type}</span>
+                                              {prop.value && prop.value.includes(type) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            updated[index].showCustomInput = true;
+                                            updated[index].dropdownOpen = false;
+                                            setSelectedSalesProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            color: 'var(--green-600)',
+                                            borderBottom: 'none'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--green-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                          }}
+                                        >
+                                          + Custom Type
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.showCustomInput && (
+                                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)', position: 'relative', zIndex: 20 }}>
+                                    <input
+                                      type="text"
+                                      value={prop.customValue || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].customValue = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      placeholder="Enter custom deal type..."
+                                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)', marginBottom: '8px', boxSizing: 'border-box' }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => {
+                                          if (prop.customValue && prop.customValue.trim()) {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            currentValues.push(prop.customValue.trim());
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].customValue = '';
+                                            updated[index].showCustomInput = false;
+                                            setSelectedSalesProperties(updated);
+                                          }
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                                      >Apply</button>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].customValue = '';
+                                          updated[index].showCustomInput = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer' }}
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((type, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {type}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(type);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedSalesProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${type}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Deal Stage - Dropdown with is/isn't */}
+                          {prop.property === 'deal_stage' && (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">is</option>
+                                  <option value="is not">is not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search deal stages..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {['Proposal', 'Negotiation', 'Closed Won', 'Invoiced', 'Paid', 'Closed Lost'].filter(stage => !prop.searchTerm || stage.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(stage => (
+                                          <div
+                                            key={stage}
+                                            onClick={() => {
+                                              const updated = [...selectedSalesProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(stage)) {
+                                                const indexToRemove = currentValues.indexOf(stage);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(stage);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedSalesProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(stage) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(stage) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{stage}</span>
+                                              {prop.value && prop.value.includes(stage) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      <div
+                                        onClick={() => {
+                                          if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].showCustomInput = true;
+                                          updated[index].dropdownOpen = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{
+                                          padding: '8px 12px',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          fontWeight: '500',
+                                          color: 'var(--green-600)',
+                                          borderBottom: 'none'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = 'var(--green-100)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        + Custom Stage
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.showCustomInput && (
+                                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)', position: 'relative', zIndex: 20 }}>
+                                    <input
+                                      type="text"
+                                      value={prop.customValue || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].customValue = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      placeholder="Enter custom deal stage..."
+                                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)', marginBottom: '8px', boxSizing: 'border-box' }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => {
+                                          if (prop.customValue && prop.customValue.trim()) {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            currentValues.push(prop.customValue.trim());
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].customValue = '';
+                                            updated[index].showCustomInput = false;
+                                            setSelectedSalesProperties(updated);
+                                          }
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                                      >Apply</button>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].customValue = '';
+                                          updated[index].showCustomInput = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer' }}
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((stage, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {stage}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(stage);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedSalesProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${stage}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Created By - User dropdown with is/isn't */}
+                          {prop.property === 'created_by' && (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">is</option>
+                                  <option value="isn't">isn't</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getContactOwnerOptions().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(owner => (
+                                          <div
+                                            key={owner}
+                                            onClick={() => {
+                                              const updated = [...selectedSalesProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(owner)) {
+                                                const indexToRemove = currentValues.indexOf(owner);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(owner);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedSalesProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{owner}</span>
+                                              {prop.value && prop.value.includes(owner) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      <div
+                                        onClick={() => {
+                                          if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].showCustomInput = true;
+                                          updated[index].dropdownOpen = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{
+                                          padding: '8px 12px',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          fontWeight: '500',
+                                          color: 'var(--green-600)',
+                                          borderBottom: 'none'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = 'var(--green-100)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        + Custom User
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.showCustomInput && (
+                                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)', position: 'relative', zIndex: 20 }}>
+                                    <input
+                                      type="text"
+                                      value={prop.customValue || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].customValue = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      placeholder="Enter custom user..."
+                                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)', marginBottom: '8px', boxSizing: 'border-box' }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => {
+                                          if (prop.customValue && prop.customValue.trim()) {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            currentValues.push(prop.customValue.trim());
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].customValue = '';
+                                            updated[index].showCustomInput = false;
+                                            setSelectedSalesProperties(updated);
+                                          }
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                                      >Apply</button>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].customValue = '';
+                                          updated[index].showCustomInput = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer' }}
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((owner, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {owner}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(owner);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedSalesProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${owner}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Created Time - Date filter with operators */}
+                          {prop.property === 'created_time' && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <select
+                                  value={prop.dateOperator || 'on'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].dateOperator = e.target.value;
+                                    updated[index].value = '';
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="on">on</option>
+                                  <option value="before">before</option>
+                                  <option value="after">after</option>
+                                  <option value="between">between</option>
+                                  <option value="in_the_last">in the last</option>
+                                </select>
+                              </div>
+                              {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                                <input
+                                  type="date"
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              )}
+                              {prop.dateOperator === 'between' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
+                                    <input
+                                      type="date"
+                                      value={prop.fromDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].fromDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
+                                    <input
+                                      type="date"
+                                      value={prop.toDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].toDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {prop.dateOperator === 'in_the_last' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <select
+                                    value={prop.period || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].period = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  >
+                                    <option value="">Select period</option>
+                                    <option value="day">Day</option>
+                                    <option value="week">Week</option>
+                                    <option value="month">Month</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={prop.count || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].count = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    placeholder="Count"
+                                    min="1"
+                                    style={{
+                                      width: '80px',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Modified By - User dropdown with is/isn't */}
+                          {prop.property === 'modified_by' && (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">is</option>
+                                  <option value="isn't">isn't</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-sales-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    onClick={() => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getContactOwnerOptions().filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(owner => (
+                                          <div
+                                            key={owner}
+                                            onMouseDown={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              const updated = [...selectedSalesProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(owner)) {
+                                                const indexToRemove = currentValues.indexOf(owner);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(owner);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = true;
+                                              updated[index].searchTerm = '';
+                                              setSelectedSalesProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{owner}</span>
+                                              {prop.value && prop.value.includes(owner) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      <div
+                                        onClick={() => {
+                                          if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].showCustomInput = true;
+                                          updated[index].dropdownOpen = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{
+                                          padding: '8px 12px',
+                                          cursor: 'pointer',
+                                          fontSize: '13px',
+                                          fontWeight: '500',
+                                          color: 'var(--green-600)',
+                                          borderBottom: 'none'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = 'var(--green-100)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = 'transparent';
+                                        }}
+                                      >
+                                        + Custom User
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.showCustomInput && (
+                                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)', position: 'relative', zIndex: 20 }}>
+                                    <input
+                                      type="text"
+                                      value={prop.customValue || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].customValue = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      placeholder="Enter custom user..."
+                                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '13px', background: 'var(--surface)', color: 'var(--text)', marginBottom: '8px', boxSizing: 'border-box' }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={() => {
+                                          if (prop.customValue && prop.customValue.trim()) {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            currentValues.push(prop.customValue.trim());
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].customValue = '';
+                                            updated[index].showCustomInput = false;
+                                            setSelectedSalesProperties(updated);
+                                          }
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}
+                                      >Apply</button>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedSalesProperties];
+                                          updated[index].customValue = '';
+                                          updated[index].showCustomInput = false;
+                                          setSelectedSalesProperties(updated);
+                                        }}
+                                        style={{ flex: 1, padding: '8px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '13px', cursor: 'pointer' }}
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((owner, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {owner}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(owner);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedSalesProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${owner}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Modified Time - Date filter with operators */}
+                          {prop.property === 'modified_time' && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <select
+                                  value={prop.dateOperator || 'on'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].dateOperator = e.target.value;
+                                    updated[index].value = '';
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="on">on</option>
+                                  <option value="before">before</option>
+                                  <option value="after">after</option>
+                                  <option value="between">between</option>
+                                  <option value="in_the_last">in the last</option>
+                                </select>
+                              </div>
+                              {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                                <input
+                                  type="date"
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              )}
+                              {prop.dateOperator === 'between' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
+                                    <input
+                                      type="date"
+                                      value={prop.fromDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].fromDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
+                                    <input
+                                      type="date"
+                                      value={prop.toDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].toDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {prop.dateOperator === 'in_the_last' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <select
+                                    value={prop.period || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].period = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  >
+                                    <option value="">Select period</option>
+                                    <option value="day">Day</option>
+                                    <option value="week">Week</option>
+                                    <option value="month">Month</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={prop.count || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedSalesProperties];
+                                      updated[index].count = e.target.value;
+                                      setSelectedSalesProperties(updated);
+                                    }}
+                                    placeholder="Count"
+                                    min="1"
+                                    style={{
+                                      width: '80px',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            resetSalesFilters();
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '8px 16px',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            background: 'var(--surface)',
+                            color: 'var(--text)',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                        <button
+                          disabled={isApplyingSalesFilters || salesFiltersSuccess}
+                          onClick={() => {
+                            applySalesFilters();
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '8px 16px',
+                            border: salesFiltersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
+                            borderRadius: 'var(--r)',
+                            background: salesFiltersSuccess ? '#10b981' : isApplyingSalesFilters ? '#2563eb' : 'var(--blue-600)',
+                            color: 'white',
+                            cursor: (isApplyingSalesFilters || salesFiltersSuccess) ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            opacity: isApplyingSalesFilters ? 0.85 : 1,
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {salesFiltersSuccess ? (
+                            <>
+                              <Check size={14} /> Applied!
+                            </>
+                          ) : isApplyingSalesFilters ? (
+                            <>
+                              <div style={{
+                                width: '13px',
+                                height: '13px',
+                                border: '2px solid rgba(255,255,255,0.4)',
+                                borderTopColor: '#ffffff',
+                                borderRadius: '50%',
+                                animation: 'satyuktSpin 0.7s linear infinite'
+                              }} />
+                              Applying...
+                            </>
+                          ) : (
+                            'Apply Filters'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Filter Applied Indicator */}
+              {salesFiltersApplied && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                  padding: '12px 16px',
+                  background: 'var(--blue-600)15',
+                  border: '1px solid var(--blue-600)30',
+                  borderRadius: 'var(--r)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Filter size={14} style={{ color: 'var(--blue-600)' }} />
+                    <span style={{ color: 'var(--text)', fontSize: '13px', fontWeight: '500' }}>
+                      Filter Applied
+                    </span>
+                    <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
+                      ({Object.values(filteredKanbanDeals).flat().length} records found)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetSalesFilters();
+                    }}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--blue-600)',
+                      borderRadius: 'var(--r)',
+                      padding: '4px 8px',
+                      color: 'var(--blue-600)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <X size={12} />
+                    Clear Filter
+                  </button>
+                </div>
+              )}
+
+              {/* Content Area */}
+              <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {/* List View */}
+                {pipelineViewMode === 'list' && (
+                  <div style={{ flex: 1, overflow: 'auto', padding: '20px', background: '#f5f5f5' }}>
+                    {/* Summary Section */}
+                    <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', marginBottom: '16px', padding: '12px 16px', display: 'flex', gap: '24px', alignItems: 'center', fontSize: '13px', color: '#4b5563' }}>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        Total{' '}
+                        <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                        <strong style={{ color: '#111827', fontWeight: 600 }}>{dealMetrics.total}</strong>
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Activity size={14} style={{ color: '#3b82f6' }} />
+                        Open{' '}
+                        <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                        <strong style={{ color: '#111827', fontWeight: 600 }}>{dealMetrics.open}</strong>
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <ThumbsUp size={14} style={{ color: '#10b981' }} />
+                        Won{' '}
+                        <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                        <strong style={{ color: '#111827', fontWeight: 600 }}>{dealMetrics.positive}</strong>
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <ThumbsDown size={14} style={{ color: '#ef4444' }} />
+                        Lost{' '}
+                        <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                        <strong style={{ color: '#111827', fontWeight: 600 }}>{dealMetrics.negative}</strong>
+                      </span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>Records per page</span>
+                        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                          <select
+                            id="sales-pipeline-per-page"
+                            name="sales-pipeline-per-page"
+                            value={isLast50Mode && salesPipelineItemsPerPage === 50 ? 'last50' : salesPipelineItemsPerPage}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'last50') {
+                                setIsLast50Mode(true);
+                                setSalesPipelineItemsPerPage(50);
+                                const total = (filteredKanbanDeals && Object.values(filteredKanbanDeals).flat().length) || (dealMetrics && dealMetrics.total) || 50;
+                                const lastPage = Math.max(Math.ceil(total / 50), 1);
+                                setSalesPipelineCurrentPage(lastPage);
+                              } else {
+                                setIsLast50Mode(false);
+                                setSalesPipelineItemsPerPage(Number(val));
+                                setSalesPipelineCurrentPage(1);
+                              }
+                            }}
+                            style={{
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              padding: '6px 32px 6px 14px',
+                              borderRadius: '20px',
+                              border: '1px solid #d1d5db',
+                              background: '#fff',
+                              fontSize: '13px',
+                              color: '#374151',
+                              cursor: 'pointer',
+                              minWidth: '56px',
+                              fontFamily: 'inherit'
+                            }}
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value="last50">Last 50</option>
+                          </select>
+                          <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse' }}>
+                        <thead style={{ background: '#f8f9fa', borderBottom: '2px solid #e0e0e0' }}>
+                          <tr>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Deal Name</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Contact Name</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Amount</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Stage</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Probability</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Closing Date</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Deal Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.values(filteredKanbanDeals).flat()
+                            .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
+                            .map((deal) => (
+                              <tr key={deal.deal_id} style={{ borderBottom: '1px solid #e0e0e0', '&:hover': { background: '#f8f9fa' } }}>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={deal.deal_name}
+                                  onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                                  onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDeal({
+                                      deal_id: deal.deal_id,
+                                      deal_name: deal.deal_name,
+                                      contact_name: deal.full_name || '',
+                                      amount: `₹${deal.deal_amount}`,
+                                      closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+                                      description: deal.description || '',
+                                      deal_type: deal.deal_type || '',
+                                      deal_stage: deal.deal_stage || '',
+                                      contact_owner: deal.deal_owner || '',
+                                      probability: `${deal.deal_probability}%`,
+                                      account_name: deal.account_name || '',
+                                      account_number: deal.account_number || '',
+                                      created_time: deal.created_time || '',
+                                      created_by: deal.created_by || ''
+                                    });
+                                    setShowDealInfoModal(true);
+                                  }}>
+                                  {deal.deal_name}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.full_name || '-'}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666', fontWeight: '600' }}>₹{deal.deal_amount}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_stage}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_probability}%</td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>
+                                  {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_type || '-'}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {dealMetrics.total > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '12px 16px', background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                          {Math.min((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage + 1, dealMetrics.total)} to {Math.min(salesPipelineCurrentPage * salesPipelineItemsPerPage, dealMetrics.total)} of {dealMetrics.total}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            onClick={() => setSalesPipelineCurrentPage(p => Math.max(p - 1, 1))}
+                            disabled={salesPipelineCurrentPage === 1}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              padding: 0,
+                              background: 'none',
+                              border: 'none',
+                              color: salesPipelineCurrentPage === 1 ? '#d1d5db' : '#6b7280',
+                              cursor: salesPipelineCurrentPage === 1 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <ChevronLeft size={18} />
+                          </button>
+                          <span style={{ fontSize: '13px', color: '#374151', minWidth: '56px', textAlign: 'center' }}>
+                            {salesPipelineCurrentPage}
+                          </span>
+                          <button
+                            onClick={() => setSalesPipelineCurrentPage(p => Math.min(p + 1, Math.ceil(dealMetrics.total / salesPipelineItemsPerPage)))}
+                            disabled={salesPipelineCurrentPage >= Math.ceil(dealMetrics.total / salesPipelineItemsPerPage)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              padding: 0,
+                              background: 'none',
+                              border: 'none',
+                              color: salesPipelineCurrentPage >= Math.ceil(dealMetrics.total / salesPipelineItemsPerPage) ? '#d1d5db' : '#6b7280',
+                              cursor: salesPipelineCurrentPage >= Math.ceil(dealMetrics.total / salesPipelineItemsPerPage) ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Kanban Board */}
+                {pipelineViewMode === 'kanban' && (
+                  <SalesPipelineKanbanBoard
+                    filteredKanbanDeals={filteredKanbanDeals}
+                    kanbanDeals={kanbanDeals}
+                    collapsedStages={collapsedStages}
+                    setCollapsedStages={setCollapsedStages}
+                    columnWidths={columnWidths}
+                    setColumnWidths={setColumnWidths}
+                    onDealMove={handleKanbanDealMove}
+                    onDealClick={handleKanbanDealClick}
+                    stageTotals={stageTotals}
+                    stageValues={stageValues}
+                    isSearching={isSearching}
+                    salesFiltersApplied={salesFiltersApplied}
+                    onLoadMoreStage={handleLoadMoreStageDeals}
+                    loadingMoreStages={loadingMoreStages}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+
+
+          {/* Update Fields Modal */}
+          {showUpdateFieldsModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+              <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+                {/* Modal header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Update Fields</h2>
+                  <button onClick={() => setShowUpdateFieldsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Modal body */}
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Field selector */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Select Field to Update</label>
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={selectedFieldToUpdate}
+                        onChange={(e) => { setSelectedFieldToUpdate(e.target.value); setUpdateFieldValue(''); }}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                      >
+                        <option value="">Choose a field...</option>
+                        <option value="tags">Tags</option>
+                        <option value="industry">Industry</option>
+                        <option value="state">State</option>
+                        <option value="country">Country</option>
+                        <option value="leadStatus">Lead Status</option>
+                        <option value="contactOwner">Contact Owner</option>
+                      </select>
+                      <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                    </div>
+                  </div>
+
+                  {/* Current value and new value */}
+                  {selectedFieldToUpdate && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Current value */}
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change From</label>
+                        <div style={{ position: 'relative' }}>
+                          {selectedFieldToUpdate === 'leadStatus' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.leadStatus))].filter(Boolean).sort().map(status => (
+                                <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'industry' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.industry))].filter(Boolean).sort().map(industry => (
+                                <option key={industry} value={industry}>{industry}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'contactOwner' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.contactOwner))].filter(Boolean).sort().map(owner => (
+                                <option key={owner} value={owner}>{owner}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'state' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.state))].filter(Boolean).sort().map(state => (
+                                <option key={state} value={state}>{state}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'country' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.country))].filter(Boolean).sort().map(country => (
+                                <option key={country} value={country}>{country}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'tags' ? (
+                            <select
+                              value={updateFieldValue}
+                              onChange={(e) => setUpdateFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">All selected</option>
+                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.tags))].filter(Boolean).sort().map(tag => (
+                                <option key={tag} value={tag}>{tag}</option>
+                              ))}
+                            </select>
+                          ) : null}
+                          <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                        </div>
+                      </div>
+
+                      {/* New value */}
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change To</label>
+                        <div style={{ position: 'relative' }}>
+                          {selectedFieldToUpdate === 'leadStatus' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">Select new status...</option>
+                              {Object.keys(statusConfig)
+                                .filter(status => status !== updateFieldValue)
+                                .map(status => (
+                                  <option key={status} value={status}>{statusConfig[status].label}</option>
+                                ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'industry' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select industry...'}</option>
+                              {[...new Set([
+                                ...getUniqueValues('industry'),
+                                ...predefinedIndustries,
+                                ...opportunities.map(o => o.industry)
+                              ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
+                                <option key={industry} value={industry}>{industry}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'contactOwner' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">Select owner...</option>
+                              {getContactOwnerOptions().filter(owner => owner !== updateFieldValue).map(owner => (
+                                <option key={owner} value={owner}>{owner}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'state' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select state...'}</option>
+                              {[...new Set([
+                                ...getUniqueValues('mailing_state'),
+                                ...opportunities.map(o => o.state)
+                              ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
+                                <option key={state} value={state}>{state}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'country' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select country...'}</option>
+                              {[...new Set([
+                                ...getUniqueValues('mailing_country'),
+                                ...opportunities.map(o => o.country)
+                              ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
+                                <option key={country} value={country}>{country}</option>
+                              ))}
+                            </select>
+                          ) : selectedFieldToUpdate === 'tags' ? (
+                            <select
+                              value={updateNewFieldValue}
+                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                            >
+                              <option value="">Select tags...</option>
+                              {[...new Set([
+                                ...getUniqueValues('tag'),
+                                ...opportunities.map(o => o.tags)
+                              ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
+                                <option key={tag} value={tag}>{tag}</option>
+                              ))}
+                            </select>
+                          ) : null}
+                          <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal footer */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setShowUpdateFieldsModal(false)}
+                    style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!selectedFieldToUpdate || !updateNewFieldValue) {
+                        toast.error('Please select a field and enter a new value');
+                        return;
+                      }
+                      const fieldMap = {
+                        tags: 'tags',
+                        industry: 'industry',
+                        state: 'state',
+                        country: 'country',
+                        leadStatus: 'status',
+                        contactOwner: 'owner'
+                      };
+                      const field = fieldMap[selectedFieldToUpdate];
+                      const currentUserName = user?.name || user?.phone_number || 'operation';
+                      const ids = selectedRows.join(',');
+
+                      setIsUpdating(true);
+                      try {
+                        const valueParam = updateFieldValue ? updateFieldValue : 'all';
+                        const url = `${import.meta.env.VITE_BULK_UPDATE_LEADS_API_URL}?ids=${ids}&field=${field}&value=${encodeURIComponent(valueParam)}&update_value=${encodeURIComponent(updateNewFieldValue)}&user=${encodeURIComponent(currentUserName)}`;
+
+                        const response = await fetch(url, {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          }
+                        });
+
+                        if (!response.ok) {
+                          throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+
+                        setOpportunities(prev => prev.map(opp => {
+                          if (!selectedRows.includes(opp.id)) return opp;
+                          // If "Change From" is empty, update all selected items
+                          if (!updateFieldValue) {
+                            return { ...opp, [field]: updateNewFieldValue };
+                          }
+                          // Only update items that match the "Change From" value
+                          if (opp[field] === updateFieldValue) {
+                            return { ...opp, [field]: updateNewFieldValue };
+                          }
+                          return opp;
+                        }));
+
+                        const updatedCount = opportunities.filter(opp =>
+                          selectedRows.includes(opp.id) && (!updateFieldValue || opp[field] === updateFieldValue)
+                        ).length;
+
+                        toast.success(`Updated ${selectedFieldToUpdate} for ${updatedCount} item(s)`);
+                        setShowUpdateFieldsModal(false);
+                        setSelectedRows([]);
+                        setUpdateFieldValue('');
+                        setUpdateNewFieldValue('');
+                      } catch (error) {
+                        console.error('Error updating fields:', error);
+                        toast.error('Failed to update fields. Please try again.');
+                      } finally {
+                        setIsUpdating(false);
+                      }
+                    }}
+                    disabled={!selectedFieldToUpdate || !updateNewFieldValue || isUpdating}
+                    style={{ padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: (!selectedFieldToUpdate || !updateNewFieldValue || isUpdating) ? 0.5 : 1 }}
+                  >
+                    {isUpdating ? 'Updating...' : 'Update'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Confirmation Modal */}
+          {showDeleteConfirmModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+              <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '400px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+                {/* Modal header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Confirm Delete</h2>
+                  <button onClick={() => setShowDeleteConfirmModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Modal body */}
+                <div style={{ padding: '24px' }}>
+                  <p style={{ margin: 0, color: 'var(--text)', fontSize: '14px' }}>
+                    Are you sure you want to delete {selectedRows.length} item(s)? This action cannot be undone.
+                  </p>
+                </div>
+
+                {/* Modal footer */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setShowDeleteConfirmModal(false)}
+                    style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                  >
+                    No
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const currentUserName = user?.name || user?.phone_number || 'operation';
+
+                      setIsDeleting(true);
+                      try {
+                        // Delete each item individually using the delete-account API
+                        const deletePromises = selectedRows.map(id => {
+                          const url = `${import.meta.env.VITE_DELETE_ACCOUNT_API_URL}?id=${id}&user=${encodeURIComponent(currentUserName)}`;
+                          return fetch(url, {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            }
+                          });
+                        });
+
+                        const responses = await Promise.all(deletePromises);
+
+                        // Check if any response failed
+                        const failedResponse = responses.find(response => !response.ok);
+                        if (failedResponse) {
+                          throw new Error(`HTTP error! status: ${failedResponse.status}`);
+                        }
+
+                        // Delete selected items from local state
+                        setOpportunities(prev => prev.filter(opp => !selectedRows.includes(opp.id)));
+                        setSelectedRows([]);
+                        setShowDeleteConfirmModal(false);
+                        toast.success(`Deleted ${selectedRows.length} item(s)`);
+                      } catch (error) {
+                        console.error('Error deleting items:', error);
+                        toast.error('Failed to delete items. Please try again.');
+                      } finally {
+                        setIsDeleting(false);
+                      }
+                    }}
+                    disabled={isDeleting}
+                    style={{ padding: '10px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: isDeleting ? 0.5 : 1 }}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Yes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Opportunity Information Modal (same layout as LeadPipeline) â”€â”€ */}
+          {showUserModal && selectedUser && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+              <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '0', width: '85%', height: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+
+                {/* Modal header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Opportunity Information</h2>
+                  <button onClick={() => { setShowUserModal(false); setSelectedUser(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Modal body: two-column layout */}
+                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+                  {/* â”€â”€ Left panel: all editable sections â”€â”€ */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '24px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                    {/* Contact Information */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>Contact Information</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <EditableField label="Contact Name" value={selectedUser.contactName} fieldName="contactName" />
+                        <EditableField label="Email" value={selectedUser.email} fieldName="email" type="email" />
+                        <EditableField label="Phone Number" value={selectedUser.phoneNumber} fieldName="phoneNumber" type="tel" />
+                        <EditableField label="Alternate Number" value={selectedUser.alternateNumber} fieldName="alternateNumber" type="tel" />
+                      </div>
+                    </div>
+
+                    {/* Company Information */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>Company Information</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <EditableField label="Company Name" value={selectedUser.companyName} fieldName="companyName" />
+                        <EditableField label="Account Name" value={selectedUser.accountName} fieldName="accountName" />
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Number</label>
+                          <div style={{ padding: '8px 12px', background: 'var(--gray-100)', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '12px', color: 'var(--text)' }}>{selectedUser.accountNumber || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>No. of Deals</label>
+                          <div style={{ padding: '8px 12px', background: 'var(--gray-100)', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '12px', color: 'var(--text)' }}>
+                            {selectedUser?.dealPresent || 0}
+                          </div>
+                        </div>
+                        <EditableField label="Website" value={selectedUser.website} fieldName="website" />
+                        {/* Account Type dropdown */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Type</label>
+                          <div style={{ position: 'relative' }}>
+                            <div
+                              data-dropdown="true"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                              onClick={() => {
+                                closeAllDropdowns();
+                                setAccountTypeDropdownOpen(!accountTypeDropdownOpen);
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}
+                            >
+                              <span>{selectedUser.accountType || 'Select account type'}</span>
+                              <ChevronDown size={14} />
+                            </div>
+                            {accountTypeDropdownOpen && (
+                              <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {predefinedAccountTypes.map(accountType => (
+                                  <button key={accountType} onClick={() => { handleFieldUpdate(selectedUser.id, 'accountType', accountType); setAccountTypeDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >{accountType}</button>
+                                ))}
+                                {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                  <button onClick={() => { setShowCustomAccountTypeInput(true); setAccountTypeDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >+ Custom</button>
+                                )}
+                              </div>
+                            )}
+                            {showCustomAccountTypeInput && (
+                              <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input type="text" value={customAccountType} onChange={(e) => setCustomAccountType(e.target.value)} placeholder="Enter custom account type..."
+                                    style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                                  <button onClick={() => { if (customAccountType.trim()) { handleFieldUpdate(selectedUser.id, 'accountType', customAccountType.trim()); setPredefinedAccountTypes([...predefinedAccountTypes, customAccountType.trim()]); setCustomAccountType(''); setShowCustomAccountTypeInput(false); } }}
+                                    style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                                  <button onClick={() => { setCustomAccountType(''); setShowCustomAccountTypeInput(false); }}
+                                    style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Industry dropdown */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry</label>
+                          <div style={{ position: 'relative' }}>
+                            <div
+                              data-dropdown="true"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                              onClick={() => {
+                                closeAllDropdowns();
+                                setIndustryDropdownOpen(!industryDropdownOpen);
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}
+                            >
+                              <span>{selectedUser.industry || 'Select industry'}</span>
+                              <ChevronDown size={14} />
+                            </div>
+                            {industryDropdownOpen && (
+                              <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {predefinedIndustries.map(industry => (
+                                  <button key={industry} onClick={() => { handleFieldUpdate(selectedUser.id, 'industry', industry); setIndustryDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >{industry}</button>
+                                ))}
+                                {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                  <button onClick={() => { setShowCustomIndustryInput(true); setIndustryDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >+ Custom</button>
+                                )}
+                              </div>
+                            )}
+                            {showCustomIndustryInput && (
+                              <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input type="text" value={customIndustry} onChange={(e) => setCustomIndustry(e.target.value)} placeholder="Enter custom industry..."
+                                    style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                                  <button onClick={() => { if (customIndustry.trim()) { handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim()); setPredefinedIndustries([...predefinedIndustries, customIndustry.trim()]); setCustomIndustry(''); setShowCustomIndustryInput(false); } }}
+                                    style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                                  <button onClick={() => { setCustomIndustry(''); setShowCustomIndustryInput(false); }}
+                                    style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location Information */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>Location Information</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                        <EditableField label="City" value={selectedUser.city} fieldName="city" />
+                        <EditableField label="State" value={selectedUser.state} fieldName="state" />
+                        <EditableField label="Country" value={selectedUser.country} fieldName="country" />
+                      </div>
+                    </div>
+
+                    {/* Lead Management */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>Lead Management</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+                        {/* Contact Owner */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Owner</label>
+                          <div style={{ position: 'relative' }}>
+                            <div
+                              data-dropdown="true"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                              onClick={() => {
+                                closeAllDropdowns();
+                                setOwnerDropdownOpen(!ownerDropdownOpen);
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}>
+                              <span>{selectedUser.contactOwner}</span><ChevronDown size={14} />
+                            </div>
+                            {ownerDropdownOpen && (
+                              <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {getContactOwnerOptions().map(owner => (
+                                  <button key={owner} onClick={() => { handleFieldUpdate(selectedUser.id, 'contactOwner', owner); setOwnerDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >{owner}</button>
+                                ))}
+                                {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                  <button onClick={() => { setShowCustomOwnerInput(true); setOwnerDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >+ Custom Owner</button>
+                                )}
+                              </div>
+                            )}
+                            {showCustomOwnerInput && (
+                              <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input type="text" value={customOwner} onChange={(e) => setCustomOwner(e.target.value)} placeholder="Enter custom owner..."
+                                    style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                                  <button onClick={() => { if (customOwner.trim()) { handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim()); setPredefinedContactOwners([...predefinedContactOwners, customOwner.trim()]); setCustomOwner(''); setShowCustomOwnerInput(false); } }}
+                                    style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                                  <button onClick={() => { setCustomOwner(''); setShowCustomOwnerInput(false); }}
+                                    style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
+                          <div style={{ position: 'relative' }}>
+                            <div
+                              data-dropdown="true"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                              onClick={() => {
+                                closeAllDropdowns();
+                                setTagsDropdownOpen(!tagsDropdownOpen);
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface)'; }}>
+                              <span>{selectedUser.tags || 'Select tag'}</span><ChevronDown size={14} />
+                            </div>
+                            {tagsDropdownOpen && (
+                              <div data-dropdown="true" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {predefinedTags.map(tag => (
+                                  <button key={tag} onClick={() => { handleFieldUpdate(selectedUser.id, 'tags', tag); setTagsDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >{tag}</button>
+                                ))}
+                                {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                  <button onClick={() => { setShowCustomTagsInput(true); setTagsDropdownOpen(false); }}
+                                    style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                                  >+ Custom Tag</button>
+                                )}
+                              </div>
+                            )}
+                            {showCustomTagsInput && (
+                              <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input type="text" value={customTags} onChange={(e) => setCustomTags(e.target.value)} placeholder="Enter custom tag..."
+                                    style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                                  <button onClick={() => { if (customTags.trim()) { handleFieldUpdate(selectedUser.id, 'tags', customTags.trim()); setPredefinedTags([...predefinedTags, customTags.trim()]); setCustomTags(''); setShowCustomTagsInput(false); } }}
+                                    style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                                  <button onClick={() => { setCustomTags(''); setShowCustomTagsInput(false); }}
+                                    style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Additional Information */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>Additional Information</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                        <EditableField label="Description" value={selectedUser.description} fieldName="description" />
+                      </div>
+                    </div>
+
+                    {/* System Information */}
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+                      <h3 style={{ margin: '0 0 16px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600', borderBottom: '1px solid var(--border-soft)', paddingBottom: '8px' }}>System Information</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.createdTime, undefined, 'datetime')}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.lastActivity, undefined, 'datetime')}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
+                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser?.createdBy}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified By</label>
+                          <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser?.modifiedBy}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                          <div style={{ color: 'var(--text)' }}>{formatDateSafe(selectedUser?.modifiedTime, undefined, 'datetime')}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>{/* end left panel */}
+
+                  {/* â”€â”€ Right panel: tabs (Timeline / Notes / Activities / Pipelines) â”€â”€ */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    {/* Tabs */}
+                    <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 20px', flexShrink: 0 }}>
+                      {[
+                        { id: 'timeline', label: 'Timeline' },
+                        { id: 'notes', label: 'Notes' },
+                        { id: 'activities', label: 'Activities' },
+                        { id: 'pipelines', label: 'Pipelines', count: 1 }
+                      ].map(tab => (
+                        <button key={tab.id} onClick={() => setActiveModalTab(tab.id)}
+                          style={{ padding: '14px 16px', border: 'none', borderBottom: activeModalTab === tab.id ? '2px solid var(--green-600)' : '2px solid transparent', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', color: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--text-3)', fontWeight: activeModalTab === tab.id ? '600' : '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {tab.label}
+                          {tab.count && (
+                            <span style={{ backgroundColor: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--gray-200)', color: activeModalTab === tab.id ? '#fff' : 'var(--text-3)', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '600' }}>{tab.count}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+
+                      {activeModalTab === 'timeline' && (
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '600', fontSize: '16px' }}>
+                              {selectedUser?.contactName?.charAt(0) || 'O'}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text)' }}>{selectedUser?.contactName || 'Opportunity'}</div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>Created on {new Date(selectedUser?.createdTime || Date.now()).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                            </div>
+                          </div>
+                          {timelineLoading ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Loading timeline...</div>
+                          ) : timelineData.length > 0 ? (
+                            <div style={{ paddingLeft: '32px', borderLeft: '2px solid var(--border)', marginLeft: '20px' }}>
+                              {timelineData.map((item, index) => {
+                                const IconComponent = getTimelineIcon(item.field);
+                                return (
+                                  <div key={item.id} style={{ paddingBottom: index < timelineData.length - 1 ? '20px' : '0' }}>
+                                    <div style={{ marginLeft: '-36px', marginBottom: '12px' }}>
+                                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--green-100)', border: '2px solid var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <IconComponent size={16} style={{ color: 'var(--green-600)' }} />
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                    <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
+                                      <span>
+  {item.activity_type ? String(item.activity_type).replace(/_/g, ' ') : (item.field === 'note' ? 'Note added' : item.field === 'task' ? 'Task added' : `${item.field || 'field'} updated`)} by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span>
+</span>
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: 'var(--text)', fontStyle: 'Georgia' }}>
+                                      {item.activity_type === 'deal_deleted' ? (
+                                        <span>' {item.old_value} '</span>
+                                      ) : item.field === 'note' ? (
+                                        <span>' {item.new_value} '</span>
+                                      ) : item.field === 'task' ? (
+                                        <span>' {item.new_value} '</span>
+                                      ) : item.old_value === null || item.old_value === '' ? (
+                                        <span>' {item.new_value} '</span>
+                                      ) : (
+                                        <span>{`' ${item.old_value} ' to '${item.new_value}'`}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>No timeline data available</div>
+                          )}
+                        </div>
+                      )}
+
+                      {activeModalTab === 'notes' && (
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                          <div style={{ marginBottom: '16px' }}>
+                            <textarea placeholder="Add a note..." rows={3}
+                              value={noteInput}
+                              onChange={(e) => setNoteInput(e.target.value)}
+                              style={{ width: '100%', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', resize: 'vertical', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }} />
+                            <button onClick={handleAddNote} disabled={addingNote} style={{ marginTop: '8px', backgroundColor: addingNote ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: addingNote ? 'not-allowed' : 'pointer' }}>{addingNote ? 'Adding...' : 'Add Note'}</button>
+                          </div>
+                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                            {activities.filter(activity => activity.message).length > 0 ? (
+                              activities.filter(activity => activity.message).map((activity) => (
+                                <div key={activity.id} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px', fontWeight: 'bold' }}>
+                                    {activity.created_by}</div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text)', margBottom: '4px' }}>
+
+                                    {new Date(activity.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                  <div style={{ fontSize: '15px', color: 'var(--text-3)', fontWeight: 'bold' }}>{activity.message}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>No notes yet</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeModalTab === 'activities' && (
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                            <h3 style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Activities</h3>
+                            <button onClick={() => setShowCreateTaskModal(true)}
+                              style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Plus size={14} /> Task
+                            </button>
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                                {['Task Name', 'Due Date', 'Status', 'Task Owner', 'Actions'].map(h => (
+                                  <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px' }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).map((activity) => (
+                                <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_name}</td>
+                                  <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                                  <td style={{ padding: '10px 8px' }}>
+                                    <span style={{
+                                      backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
+                                      color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
+                                      padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                    }}>{activity.status}</span>
+                                  </td>
+                                  <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_owner || '-'}</td>
+                                  <td style={{ padding: '10px 8px' }}>
+                                    <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
+                                  </td>
+                                </tr>
+                              ))}
+                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).length === 0 && (
+                                <tr>
+                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No tasks yet</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {activeModalTab === 'pipelines' && (
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                            <button onClick={() => setShowCreateDealModal(true)}
+                              style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Plus size={14} /> Deal
+                            </button>
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                                {['Deal Name', 'Amount', 'Stage', 'Probability', 'Closing Date'].map(h => (
+                                  <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px' }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dealsLoading ? (
+                                <tr>
+                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>Loading deals...</td>
+                                </tr>
+                              ) : dealsData.length === 0 ? (
+                                <tr>
+                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No deals yet</td>
+                                </tr>
+                              ) : (
+                                dealsData.map(deal => (
+                                  <tr key={deal.deal_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>
+                                      <span
+                                        style={{ color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
+                                        onClick={() => {
+                                          setSelectedDeal({
+                                            deal_id: deal.deal_id,
+                                            deal_name: deal.deal_name,
+                                            contact_name: selectedUser?.contactName || '',
+                                            amount: `₹${deal.deal_amount}`,
+                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+                                            description: deal.description || '',
+                                            deal_type: deal.deal_type || '',
+                                            deal_stage: deal.deal_stage || '',
+                                            contact_owner: deal.deal_owner || '',
+                                            probability: `${deal.deal_probability}%`,
+                                            account_name: deal.account_name || '',
+                                            account_number: deal.account_number || '',
+                                            created_time: deal.created_time || '',
+                                            created_by: deal.created_by || ''
+                                          });
+                                          setShowDealInfoModal(true);
+                                        }}
+                                      >
+                                        {deal.deal_name}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>₹{deal.deal_amount}</td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                      <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500' }}>
+                                        {deal.deal_stage}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{deal.deal_probability}%</td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px' }}>
+                                      {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>{/* end right panel */}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Create Deal Modal â”€â”€ */}
+          {showCreateDealModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+              <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '650px', maxWidth: '92%', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Create Deal</h3>
+                  <button onClick={() => setShowCreateDealModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+                <div style={{ padding: '24px', maxHeight: 'calc(90vh - 140px)', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
+                        Deal Name<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+                      </label>
+                      <input type="text" value={dealName} onChange={(e) => setDealName(e.target.value)} placeholder="Enter deal name"
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Closing Date</label>
+                      <input type="date" value={dealClosingDate} onChange={(e) => setDealClosingDate(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Stage <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
+                      <select value={dealStage} onChange={(e) => setDealStage(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+                        <option value="">Choose a stage</option>
+                        {['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Deal Type<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
+                      <select value={dealType} onChange={(e) => setDealType(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+                        <option value="">Choose a deal type</option>
+                        {['Trial', 'Starter', 'Growth', 'Entrepreneur'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Amount</label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', fontSize: '13px', fontWeight: '500' }}>₹</span>
+                        <input type="text" value={dealAmount} onChange={(e) => setDealAmount(e.target.value)} placeholder="0.00" style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Probability</label>
+                      <div style={{ position: 'relative' }}>
+                        <input type="number" value={dealProbability} onChange={(e) => setDealProbability(e.target.value)} placeholder="0" min="0" max="100" style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                        <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', fontSize: '13px', fontWeight: '500' }}>%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Description</label>
+                      <textarea value={dealDescription} onChange={(e) => setDealDescription(e.target.value)} placeholder="A few words about this deal" rows={4}
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', resize: 'vertical', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit' }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
+                  <button
+                    onClick={() => {
+                      if (isCreatingDeal) return;
+                      setShowCreateDealModal(false);
+                      setDealName('');
+                      setDealClosingDate('');
+                      setDealStage('');
+                      setDealAmount('');
+                      setDealProbability('');
+                      setDealDescription('');
+                      setDealType('');
+                    }}
+                    disabled={isCreatingDeal}
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: isCreatingDeal ? 'not-allowed' : 'pointer',
+                      opacity: isCreatingDeal ? 0.5 : 1
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (isCreatingDeal) return;
+                      if (dealName && dealStage && dealType) {
+                        setIsCreatingDeal(true);
+                        try {
+                          toast.loading('Creating deal...');
+
+                          const currentUserName = user?.name || user?.phone_number || 'operation';
+                          const apiUrl = import.meta.env.VITE_CREATE_DEAL_API_URL;
+
+                          if (!apiUrl) {
+                            toast.dismiss();
+                            toast.error('Create Deal API URL not configured');
+                            setIsCreatingDeal(false);
+                            return;
+                          }
+
+                          const requestBody = {
+                            account_id: selectedUser?.id?.toString() || '',
+                            deal_name: dealName,
+                            deal_amount: dealAmount || '0',
+                            deal_probability: dealProbability || '0',
+                            deal_stage: dealStage,
+                            deal_close_date: dealClosingDate || '',
+                            deal_type: dealType || 'New Business',
+                            description: dealDescription || '',
+                            user: currentUserName
+                          };
+
+                          
+
+                          const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestBody)
+                          });
+
+                          if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error('HTTP Error:', errorText);
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                          }
+
+                          const result = await response.json();
+                          
+
+                          toast.dismiss();
+                          toast.success('Deal created successfully');
+                          setDealCounts(prev => ({ ...prev, [selectedUser?.id]: (prev[selectedUser?.id] || 0) + 1 }));
+
+                          // Close BOTH Create Deal Modal AND Opportunity Details modal so user returns to previous view
+                          setShowCreateDealModal(false);
+                          setShowUserModal(false);
+                          setSelectedUser(null);
+
+                          setDealName('');
+                          setDealClosingDate('');
+                          setDealStage('');
+                          setDealAmount('');
+                          setDealProbability('');
+                          setDealDescription('');
+                          setDealType('');
+                          fetchDeals(selectedUser?.id);
+                          await fetchAllKanbanDeals();
+                          setKanbanUpdateTimestamp(Date.now());
+
+                        } catch (err) {
+                          console.error('Error creating deal:', err);
+                          toast.dismiss();
+                          toast.error('Failed to create deal');
+                        } finally {
+                          setIsCreatingDeal(false);
+                        }
+                      } else {
+                        toast.error('Please fill in required fields');
+                      }
+                    }}
+                    disabled={isCreatingDeal}
+                    style={{
+                      background: isCreatingDeal ? '#9ca3af' : 'var(--green-600)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 'var(--r)',
+                      padding: '8px 20px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: isCreatingDeal ? 'not-allowed' : 'pointer',
+                      boxShadow: isCreatingDeal ? 'none' : '0 4px 6px -1px rgba(16,185,129,0.2)',
+                      opacity: isCreatingDeal ? 0.6 : 1
+                    }}
+                  >
+                    {isCreatingDeal ? 'Creating deal...' : 'Save Deal'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Deal Information Modal â”€â”€ */}
+          {showDealInfoModal && selectedDeal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+              <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r)', maxWidth: '900px', width: '92%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                {/* Modal header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '24px 24px 16px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-display)'
+                  }}>
+                    Deal Information
+                  </h2>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => { setDealToDelete(selectedDeal); setShowDeleteDealModal(true); }}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: 'none',
+                        borderRadius: 'var(--r)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Delete Deal
+                    </button>
+                    <button
+                      onClick={() => { setShowDealInfoModal(false); setSelectedDeal(null); setEditingDealField(null); setEditDealValue(''); }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-3)',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal body: single column layout for deal info */}
+                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                    {/* Deal Details Section */}
+                    <div style={{
+                      marginBottom: '24px',
+                      padding: '8px 12px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)'
+                    }}>
+                      <h3 style={{
+                        margin: '0 0 16px 0',
+                        color: 'var(--text)',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        borderBottom: '1px solid var(--border-soft)',
+                        paddingBottom: '8px'
+                      }}>
+                        Deal Details
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <EditableDealField label="Deal Name" value={selectedDeal.deal_name} fieldName="deal_name" />
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '12px',
+                            color: 'var(--text)'
+                          }}>{selectedDeal.contact_name}</div>
+                        </div>
+                        <EditableDealField label="Account Name" value={selectedDeal.account_name || ''} fieldName="account_name" />
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '12px',
+                            color: 'var(--text)'
+                          }}>{selectedDeal.account_number || '-'}</div>
+                        </div>
+                        <EditableDealField label="Amount" value={selectedDeal.amount?.replace('₹', '') || ''} fieldName="deal_amount" type="number" />
+                        <EditableDealField label="Closing Date" value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
+                        <EditableDealField label="Deal Type" value={selectedDeal.deal_type || ''} fieldName="deal_type" type="select" options={predefinedDealTypes} />
+                        <EditableDealField label="Deal Stage" value={selectedDeal.deal_stage || ''} fieldName="deal_stage" type="select" options={predefinedDealStages} />
+                        {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') ? (
+                          <EditableDealField label="Deal Owner" value={selectedDeal.contact_owner || ''} fieldName="contact_owner" type="select" options={getContactOwnerOptions()} />
+                        ) : (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Owner</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.contact_owner || '-'}</div>
+                          </div>
+                        )}
+                        <EditableDealField label="Probability" value={selectedDeal.probability?.replace('%', '') || ''} fieldName="deal_probability" type="number" />
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '12px',
+                            color: 'var(--text)'
+                          }}>{selectedDeal.created_time || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '12px',
+                            color: 'var(--text)'
+                          }}>{selectedDeal.created_by || '-'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description Section */}
+                    <div style={{
+                      marginBottom: '24px',
+                      padding: '8px 12px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)'
+                    }}>
+                      <h3 style={{
+                        margin: '0 0 16px 0',
+                        color: 'var(--text)',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        borderBottom: '1px solid var(--border-soft)',
+                        paddingBottom: '8px'
+                      }}>
+                        Description
+                      </h3>
+                      <EditableDealField label="Description" value={selectedDeal?.description || ''} fieldName="description" type="textarea" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Delete Deal Confirmation Modal â”€â”€ */}
+          {showDeleteDealModal && dealToDelete && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+              <div style={{ backgroundColor: '#fff', borderRadius: '16px', maxWidth: '400px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                <div style={{ padding: '24px', textAlign: 'center' }}>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+                    </svg>
+                  </div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700', color: '#0f172a' }}>Delete Deal?</h3>
+                  <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#64748b', lineHeight: '1.5' }}>
+                    Are you sure you want to delete <strong>{dealToDelete.deal_name}</strong>? This action cannot be undone.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <button onClick={() => { if (isDeletingDealState) return; setShowDeleteDealModal(false); setDealToDelete(null); }} disabled={isDeletingDealState} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.5 : 1 }}>Cancel</button>
+                    <button onClick={handleDeleteDeal} disabled={isDeletingDealState} style={{ backgroundColor: isDeletingDealState ? '#ef4444' : '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.6 : 1 }}>{isDeletingDealState ? 'Deleting...' : 'Delete'}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Create Task Modal â”€â”€ */}
+          {showCreateTaskModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+              <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '450px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Create Task</h3>
+                  <button onClick={() => setShowCreateTaskModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Task Type</label>
+                    <select
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Select task type</option>
+                      <option value="mail">Mail</option>
+                      <option value="call">Call</option>
+                      <option value="meet">Meet</option>
+                      <option value="follow-up">Follow Up</option>
+                      <option value="payment follow-up">Payment Follow Up</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Due Date</label>
+                    <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Status</label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => setTaskStatus(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Choose a Task status</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Due For">Due For</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Task Owner</label>
+                    <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
+                  </div>
+                </div>
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
+                  <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={handleAddTask} disabled={addingTask} style={{ background: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '13px', fontWeight: '500', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Saving...' : 'Save'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€ Edit Task Modal â”€â”€ */}
+          {showEditTaskModal && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+              <div style={{ backgroundColor: '#fff', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>Edit Task</h3>
+                  <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
+                    <select
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
+                    >
+                      <option value="">Select task type</option>
+                      <option value="mail">Mail</option>
+                      <option value="call">Call</option>
+                      <option value="meet">Meet</option>
+                      <option value="follow-up">Follow Up</option>
+                      <option value="payment follow-up">Payment Follow Up</option>
+
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
+                    <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => setTaskStatus(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
+                    >
+
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Due For">Due For</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
+                    <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} />
+                  </div>
+                </div>
+                <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#fafbfc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
+                  <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={handleUpdateTask} disabled={addingTask} style={{ background: addingTask ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Updating...' : 'Update'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+
+        {/* Filter Sidebar */}
+        {filterSidebarOpen && (
+          <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                zIndex: 999
+              }}
+              onClick={() => setFilterSidebarOpen(false)}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '320px',
+              background: 'var(--surface)',
+              borderRight: '1px solid var(--border)',
+              zIndex: 1000,
+              overflowY: 'auto'
+            }}>
+              <div style={{
+                padding: '20px',
+                borderBottom: '1px solid var(--border)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '16px', fontWeight: '600' }}>Filters</h3>
+                  <button
+                    onClick={() => setFilterSidebarOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '20px' }}>
+                {isFetchingFilterOptions && (
+                  <div style={{
+                    padding: '20px 16px',
+                    borderRadius: '10px',
+                    background: 'var(--gray-50, #f9fafb)',
+                    border: '1px solid var(--border)',
+                    marginTop: '4px'
+                  }}>
+                    <style>{`@keyframes filterSpin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{
+                        width: '16px', height: '16px', flexShrink: 0,
+                        border: '2px solid #3b82f6',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'filterSpin 0.7s linear infinite'
+                      }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', flex: 1 }}>
+                        Loading filters...
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#3b82f6',
+                        minWidth: '36px',
+                        textAlign: 'right'
+                      }}>
+                        {filterFetchProgress}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '5px',
+                      background: 'var(--border, #e5e7eb)',
+                      borderRadius: '99px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${filterFetchProgress}%`,
+                        background: 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                        borderRadius: '99px',
+                        transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
+                {!isFetchingFilterOptions && (
+                  <>
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
+                      <select
+                        value={currentProperty}
+                        onChange={(e) => {
+                          const property = e.target.value;
+                          if (property && !selectedProperties.find(p => p.property === property)) {
+                            const newProperty = {
+                              property,
+                              value: '',
+                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                            };
+
+                            if (property === 'created_time' || property === 'modified_time') {
+                              newProperty.dateOperator = 'on';
+                            }
+
+                            setSelectedProperties([...selectedProperties, newProperty]);
+                          }
+                          setCurrentProperty('');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          background: 'var(--surface)',
+                          color: 'var(--text)'
+                        }}
+                      >
+                        <option value="">Choose Property</option>
+                        <option value="contact_owner">Contact Owner</option>
+                        <option value="created_time">Created Time</option>
+                        <option value="tag">Tags</option>
+                        <option value="mailing_country">Mailing Country</option>
+                        <option value="mailing_state">Mailing State</option>
+                        <option value="mailing_city">Mailing City</option>
+                        <option value="created_by">Created By</option>
+                        <option value="modified_by">Modified By</option>
+                      </select>
+                    </div>
+
+
+                    {selectedProperties.map((prop, index) => (
+                      <div key={index} style={{ marginBottom: '24px', position: 'relative' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '8px'
+                        }}>
+                          <label style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>
+                            {prop.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </label>
+                          <button
+                            onClick={() => {
+                              setSelectedProperties(selectedProperties.filter((_, i) => i !== index));
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-3)',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              borderRadius: 'var(--r)'
+                            }}
+                            title="Remove filter"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        {prop.property === 'contact_owner' && (
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search contact owners..."
+                                  value={prop.searchTerm || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getUniqueValues(prop.property)
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'mailing_city' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '100px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Cities</option>
+                                  {isFetchingFilterOptions ? (
+                                    <option value="" disabled>Loading options, please wait...</option>
+                                  ) : (
+                                    getUniqueValues(prop.property).map(value => (
+                                      <option key={value} value={value}>{value}</option>
+                                    ))
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'created_by' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '100px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Created By</option>
+                                  {getCreatedByOptions().map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'modified_by' && (
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search users..."
+                                  value={prop.searchTerm || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onClick={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getModifiedByOptions()
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = true;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'created_time' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                              <select
+                                value={prop.dateOperator || 'on'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].dateOperator = e.target.value;
+                                  updated[index].value = '';
+                                  updated[index].fromDate = '';
+                                  updated[index].toDate = '';
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="on">On</option>
+                                <option value="before">Before</option>
+                                <option value="after">After</option>
+                                <option value="between">Between</option>
+                              </select>
+                            </div>
+
+                            {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                              <input
+                                type="date"
+                                value={prop.value || ''}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].value = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                            )}
+
+                            {prop.dateOperator === 'between' && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {prop.property === 'modified_time' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                              <select
+                                value={prop.dateOperator || 'on'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].dateOperator = e.target.value;
+                                  updated[index].value = '';
+                                  updated[index].fromDate = '';
+                                  updated[index].toDate = '';
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="on">On</option>
+                                <option value="before">Before</option>
+                                <option value="after">After</option>
+                                <option value="between">Between</option>
+                              </select>
+                            </div>
+
+                            {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                              <input
+                                type="date"
+                                value={prop.value || ''}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].value = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                            )}
+
+                            {prop.dateOperator === 'between' && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {prop.property === 'account_type' && (
+                          <select
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          >
+                            <option value="">Select value</option>
+                            {predefinedAccountTypes.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        )}
+
+                        {prop.property === 'tag' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search tags..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {predefinedAccountTypes.filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(tag => (
+                                          <div
+                                            key={tag}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(tag)) {
+                                                const indexToRemove = currentValues.indexOf(tag);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(tag);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(tag) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(tag) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{tag}</span>
+                                              {prop.value && prop.value.includes(tag) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((tag, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {tag}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(tag);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${tag}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'mailing_country' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '100px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search countries..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(country => (
+                                          <div
+                                            key={country}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(country)) {
+                                                const indexToRemove = currentValues.indexOf(country);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(country);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{country}</span>
+                                              {prop.value && prop.value.includes(country) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((country, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {country}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(country);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${country}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'mailing_state' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '100px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search states..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(state => (
+                                          <div
+                                            key={state}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(state)) {
+                                                const indexToRemove = currentValues.indexOf(state);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(state);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{state}</span>
+                                              {prop.value && prop.value.includes(state) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((state, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {state}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(state);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${state}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property !== 'contact_name' && prop.property !== 'contact_owner' && prop.property !== 'lead_status' && prop.property !== 'tag' && prop.property !== 'mailing_country' && prop.property !== 'mailing_state' && prop.property !== 'mailing_city' && prop.property !== 'created_time' && prop.property !== 'modified_time' && prop.property !== 'industry' && prop.property !== 'account_type' && prop.property !== 'created_by' && prop.property !== 'modified_by' && prop.property !== 'lead_source' && prop.property !== 'description' && (
+                          <input
+                            type="text"
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            placeholder="Enter value"
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setSelectedProperties([]);
+                          setCurrentProperty('');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Clear Filters
+                      </button>
+                      <button
+                        disabled={isApplyingAccountsFilters || accountsFiltersSuccess}
+                        onClick={() => {
+                          if (isApplyingAccountsFilters || accountsFiltersSuccess) return;
+                          // Collect all active filters
+                          const activeFilters = [];
+
+                          // Add contact owner filter if configured
+                          const contactOwnerProp = selectedProperties.find(prop => prop.property === 'contact_owner');
+                          if (contactOwnerProp && contactOwnerProp.value) {
+                            const selectedOwners = contactOwnerProp.value.split(',');
+                            if (selectedOwners.length > 0) {
+                              const ownersString = selectedOwners.join(',');
+                              activeFilters.push({
+                                property: 'contact_owner',
+                                value: ownersString,
+                                operator: contactOwnerProp.operator
+                              });
+                            }
+                          }
+
+                          // Add lead status filter if configured
+                          const leadStatusProp = selectedProperties.find(prop => prop.property === 'lead_status');
+                          if (leadStatusProp && leadStatusProp.value) {
+                            const selectedStatuses = leadStatusProp.value.split(',');
+                            if (selectedStatuses.length > 0) {
+                              const statusesString = selectedStatuses.join(',');
+                              activeFilters.push({
+                                property: 'lead_status',
+                                value: statusesString,
+                                operator: leadStatusProp.operator
+                              });
+                            }
+                          }
+
+                          // Add tag filter if configured
+                          const tagProp = selectedProperties.find(prop => prop.property === 'tag');
+                          if (tagProp && tagProp.value) {
+                            const selectedTags = tagProp.value.split(',');
+                            if (selectedTags.length > 0) {
+                              const tagsString = selectedTags.join(',');
+                              activeFilters.push({
+                                property: 'tag',
+                                value: tagsString,
+                                operator: tagProp.operator
+                              });
+                            }
+                          }
+
+                          // Add mailing state filter if configured
+                          const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
+                          if (mailingStateProp && mailingStateProp.value) {
+                            const selectedStates = mailingStateProp.value.split(',');
+                            if (selectedStates.length > 0) {
+                              const statesString = selectedStates.join(',');
+                              activeFilters.push({
+                                property: 'mailing_state',
+                                value: statesString,
+                                operator: mailingStateProp.operator
+                              });
+                            }
+                          }
+
+                          // Add mailing country filter if configured
+                          const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
+                          if (mailingCountryProp && mailingCountryProp.value) {
+                            const selectedCountries = mailingCountryProp.value.split(',');
+                            if (selectedCountries.length > 0) {
+                              const countriesString = selectedCountries.join(',');
+                              activeFilters.push({
+                                property: 'mailing_country',
+                                value: countriesString,
+                                operator: mailingCountryProp.operator
+                              });
+                            }
+                          }
+
+                          // Add created_by filter if configured
+                          const createdByProp = selectedProperties.find(prop => prop.property === 'created_by');
+                          if (createdByProp && createdByProp.value) {
+                            activeFilters.push({
+                              property: 'created_by',
+                              value: createdByProp.value,
+                              operator: createdByProp.operator || 'is'
+                            });
+                          }
+
+                          // Add modified_by filter if configured
+                          const modifiedByProp = selectedProperties.find(prop => prop.property === 'modified_by');
+                          if (modifiedByProp && modifiedByProp.value) {
+                            activeFilters.push({
+                              property: 'modified_by',
+                              value: modifiedByProp.value,
+                              operator: modifiedByProp.operator || 'is'
+                            });
+                          }
+
+                          // Add city filter if configured
+                          const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
+                          if (cityProp && cityProp.value) {
+                            activeFilters.push({
+                              property: 'mailing_city',
+                              value: cityProp.value,
+                              operator: cityProp.operator || 'is'
+                            });
+                          }
+
+                          // Add lead_source filter if configured
+                          const leadSourceProp = selectedProperties.find(prop => prop.property === 'lead_source');
+                          if (leadSourceProp && leadSourceProp.value) {
+                            activeFilters.push({
+                              property: 'lead_source',
+                              value: leadSourceProp.value,
+                              operator: leadSourceProp.operator || 'is'
+                            });
+                          }
+
+                          // Add description filter if configured
+                          const descriptionProp = selectedProperties.find(prop => prop.property === 'description');
+                          if (descriptionProp && descriptionProp.value) {
+                            activeFilters.push({
+                              property: 'description',
+                              value: descriptionProp.value,
+                              operator: descriptionProp.operator || 'is'
+                            });
+                          }
+
+                          // Add created_time filter if configured
+                          const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
+                          if (createdTimeProp) {
+                            if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before' || createdTimeProp.dateOperator === 'after') && createdTimeProp.value) {
+                              activeFilters.push({
+                                property: 'created_time',
+                                value: createdTimeProp.value,
+                                dateOperator: createdTimeProp.dateOperator
+                              });
+                            } else if ((createdTimeProp.dateOperator === 'between' || createdTimeProp.dateOperator === 'custom') && (createdTimeProp.fromDate && createdTimeProp.toDate || createdTimeProp.value)) {
+                              activeFilters.push({
+                                property: 'created_time',
+                                fromDate: createdTimeProp.fromDate,
+                                toDate: createdTimeProp.toDate,
+                                value: createdTimeProp.value,
+                                dateOperator: createdTimeProp.dateOperator
+                              });
+                            }
+                          }
+
+                          // Apply all filters together in single API call
+                          if (activeFilters.length > 0) {
+                            handleCombinedFilters(activeFilters);
+                          } else {
+                            setFilterSidebarOpen(false);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          border: accountsFiltersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
+                          borderRadius: 'var(--r)',
+                          background: accountsFiltersSuccess ? '#10b981' : isApplyingAccountsFilters ? '#2563eb' : 'var(--blue-600)',
+                          color: 'white',
+                          cursor: (isApplyingAccountsFilters || accountsFiltersSuccess) ? 'not-allowed' : 'pointer',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          opacity: isApplyingAccountsFilters ? 0.85 : 1,
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {accountsFiltersSuccess ? (
+                          <>
+                            <Check size={14} /> Applied!
+                          </>
+                        ) : isApplyingAccountsFilters ? (
+                          <>
+                            <div style={{
+                              width: '13px',
+                              height: '13px',
+                              border: '2px solid rgba(255,255,255,0.4)',
+                              borderTopColor: '#ffffff',
+                              borderRadius: '50%',
+                              animation: 'satyuktSpin 0.7s linear infinite'
+                            }} />
+                            Applying...
+                          </>
+                        ) : (
+                          'Apply Filters'
+                        )}
+                      </button>
+                    </div>
+                  </>)}
+              </div>
+            </div>
+
+            <div
+              onClick={() => setFilterSidebarOpen(false)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '320px',
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.3)',
+                zIndex: 999
+              }}
+            />
+          </>
+        )}
+
+      </div>
+
+      {/* Edit Dialog */}
+      {showEditDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            minWidth: '400px',
+            maxWidth: '500px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+              Edit {editDialogField.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()}
+            </h3>
+
+            {showEditDialogCustomInput ? (
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  value={editDialogCustomValue}
+                  onChange={(e) => setEditDialogCustomValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleEditDialogSave(); if (e.key === 'Escape') closeEditDialog(); }}
+                  placeholder={`Enter custom ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+            ) : isFieldWithDropdown(editDialogField) ? (
+              <div style={{ position: 'relative', marginBottom: '16px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: 'white',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: editDialogValue ? '#111827' : '#6b7280'
+                  }}
+                  onClick={() => setEditDialogDropdownOpen(!editDialogDropdownOpen)}
+                >
+                  <span>{editDialogValue || `Select ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}</span>
+                  <ChevronDown size={16} style={{ transition: 'transform 0.2s ease', transform: editDialogDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                </div>
+                {editDialogDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 10,
+                    marginTop: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {getFieldOptions(editDialogField).map(option => (
+                      <button
+                        key={option}
+                        onClick={() => handleEditDialogOptionSelect(option)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: 'none',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          color: '#111827',
+                          borderBottom: '1px solid #e5e7eb'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >
+                        {editDialogField === 'leadStatus' ? statusConfig[option]?.label || option : option}
+                      </button>
+                    ))}
+                    {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                      <button
+                        onClick={handleEditDialogCustomInput}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: 'none',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          color: '#10b981'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#ecfdf5'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >
+                        + Custom
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={editDialogValue}
+                onChange={(e) => setEditDialogValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleEditDialogSave(); if (e.key === 'Escape') closeEditDialog(); }}
+                placeholder={`Enter ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  marginBottom: '16px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+                autoFocus
+              />
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={closeEditDialog}
+                style={{
+                  padding: '8px 16px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditDialogSave}
+                style={{
+                  padding: '8px 16px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
