@@ -18,7 +18,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isMarketingUser = userRole === 'marketing';
   
   // Page activity states
-  const isOperationsActive = currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
+  const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
   const isClientActive = currentPage === 'unlock-farm' || currentPage === 'register';
   const isManagerActive = currentPage === 'unlock-farm' || currentPage === 'register';
@@ -30,7 +30,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -163,6 +163,17 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {isOperationsUser && (
           <>
             <div className="sb-section">Operations</div>
+            <div 
+              className={`sb-item ${currentPage === 'operation-dashboard' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('operation-dashboard')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Dashboard
+              <span className="sb-dot"></span>
+            </div>
             <div 
               className={`sb-item ${currentPage === 'monthly-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('monthly-acreages')}

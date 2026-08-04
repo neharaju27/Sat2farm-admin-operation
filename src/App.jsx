@@ -19,6 +19,7 @@ import Opportunities from "./components/Opportunities";
 import AccessControl from "./components/AccessControl";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
 import MarketingDashboard from "./components/MarketingDashboard";
+import OperationDashboard from "./components/OperationDashboard";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -26,7 +27,7 @@ import EarlyAccessBanner from './components/EarlyAccessBanner';
 function App() {
   const { user, loading, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
-    return localStorage.getItem('currentPage') || 'monthly-acreages';
+    return localStorage.getItem('currentPage') || 'operation-dashboard';
   });
   const [hasRedirected, setHasRedirected] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
@@ -131,9 +132,9 @@ function App() {
       localStorage.setItem('currentPage', 'unlock-farm');
     } else {
       // operation, admin, default
-      console.log('Redirecting to monthly-acreages (operation/admin/default)');
-      setCurrentPage('monthly-acreages');
-      localStorage.setItem('currentPage', 'monthly-acreages');
+      console.log('Redirecting to operation-dashboard (operation/admin/default)');
+      setCurrentPage('operation-dashboard');
+      localStorage.setItem('currentPage', 'operation-dashboard');
     }
 
     setHasRedirected(true);
@@ -187,6 +188,8 @@ function App() {
   const renderCurrentPage = () => {
     const getComponent = () => {
       switch (currentPage) {
+        case 'operation-dashboard':
+          return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
         case 'unlock-farm':
           return <UnlockFarm user={userDisplay} onPageChange={handlePageChange} />;
         case 'monthly-acreages':
@@ -223,7 +226,7 @@ function App() {
         case 'marketing-dashboard':
           return <MarketingDashboard user={userDisplay} onPageChange={handlePageChange} />;
         default:
-          return <MonthlyAcreages user={userDisplay} onPageChange={handlePageChange} />;
+          return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }
     };
 
