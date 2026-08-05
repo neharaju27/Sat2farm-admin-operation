@@ -935,7 +935,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Locking farm:', apiUrl);
 
       const response = await fetch(apiUrl, {
-        method: 'GET'
+        method: 'POST'
       });
 
       const data = await response.json();
@@ -989,7 +989,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Unlocking farm with plan:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method:'GET'
+        method:'POST'
       });
       
       if (!response.ok) {
@@ -1737,7 +1737,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Calling API:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method: 'GET'
+        method: 'POST'
       });
       
       if (!response.ok) {
