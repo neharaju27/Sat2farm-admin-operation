@@ -110,41 +110,27 @@ export default function OperationDashboard({ user, onPageChange }) {
     // Closed won includes invoiced deals (kept as-is, matches existing "Closed Won Deals" card logic)
     const totalClosedWon = closedWonCount + invoicedCount;
 
-    // Fetch all deals with pagination to calculate total deal value
-    const [dealsPage1, dealsPage2] = await Promise.all([
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&offset=0&limit=1000`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&offset=1000&limit=1000`)
+    // Fetch total deal value and invoiced+paid amount from deal stage amount API
+    const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
+    const [totalDealValueResponse, invoicedPaidAmountResponse] = await Promise.all([
+      axios.get(`${dealStageAmountApiUrl}?user=${encodedUser}`),
+      axios.get(`${dealStageAmountApiUrl}?user=${encodedUser}&stage=Invoiced,Paid`)
     ]);
 
-    const deals1 = dealsPage1.data?.data || dealsPage1.data || [];
-    const deals2 = dealsPage2.data?.data || dealsPage2.data || [];
-    const allDealsData = [...deals1, ...deals2];
+    console.log('Total Deal Value API Response:', totalDealValueResponse.data);
+    console.log('Invoiced+Paid API Response:', invoicedPaidAmountResponse.data);
 
-    console.log('Total deals fetched:', allDealsData.length);
+    const totalDealValue = parseFloat(totalDealValueResponse.data?.Total || 0);
+    console.log('Total Deal Value from API:', totalDealValue);
 
-    // Group deals by stage to debug
-    const dealsByStage = {};
-    allDealsData.forEach(deal => {
-      const stage = deal.deal_stage || 'Unknown';
-      if (!dealsByStage[stage]) {
-        dealsByStage[stage] = { count: 0, amount: 0 };
-      }
-      dealsByStage[stage].count++;
-      dealsByStage[stage].amount += parseFloat(deal.deal_amount) || 0;
-    });
-    console.log('Deals by stage:', dealsByStage);
-
-    // Calculate total deal value from all deals
-    const totalDealValue = allDealsData.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0);
-    console.log('Total Deal Value calculated:', totalDealValue);
+    const invoicedPaidData = invoicedPaidAmountResponse.data;
+    const invoicedAmount = parseFloat(invoicedPaidData?.Invoiced || 0);
+    const paidAmount = parseFloat(invoicedPaidData?.Paid || 0);
+    const totalInvoicedPaid = invoicedAmount + paidAmount;
+    console.log('Invoiced + Paid Amount from API:', totalInvoicedPaid);
 
     // Closed Won Amount: only Closed Won stage
     const closedWonAmount = closedWonResponse.data?.data?.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0) || 0;
-
-    // Invoiced + Paid Amount: calculate from all deals data
-    const invoicedPaidDeals = allDealsData.filter(deal => deal.deal_stage === 'Invoiced' || deal.deal_stage === 'Paid');
-    const totalInvoicedPaid = invoicedPaidDeals.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0);
-    console.log('Invoiced + Paid Amount calculated:', totalInvoicedPaid);
 
     setMetrics({
       leads: leadsCount,
@@ -447,12 +433,7 @@ export default function OperationDashboard({ user, onPageChange }) {
     >
       Lead Data Summary
     </h2>
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px',
-      marginBottom: '28px'
-    }}>
+    <div className="op-dashboard-grid">
       {dashboardCards.map((card, index) => {
         const Icon = card.icon;
         const barWidth = Math.min(100, (card.value / funnelBase) * 100);
@@ -603,12 +584,7 @@ export default function OperationDashboard({ user, onPageChange }) {
     >
       Deal Amount Data Summary
     </h2>
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-      gap: '16px',
-      marginBottom: '28px'
-    }}>
+    <div className="op-deal-amount-grid">
       {[
         {
           key: 'totalDealValue',

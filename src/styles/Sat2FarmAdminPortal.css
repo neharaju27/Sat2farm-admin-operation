@@ -1387,3 +1387,42 @@ button:active {
   transform: scale(1.15);
   color: #16a34a !important;
 }
+
+/* ── Operation Dashboard Responsive Grids ── */
+.op-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.op-deal-amount-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 768px) {
+  .op-dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .op-deal-amount-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .op-dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .op-deal-amount-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
