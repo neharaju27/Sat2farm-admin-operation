@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Users, Target, DollarSign, CheckCircle, FileText, Leaf,
+  Users, Target, DollarSign, CheckCircle, FileText, Leaf, Sprout, IndianRupee,
   TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio
 } from "lucide-react";
 import axios from "axios";
@@ -191,10 +191,10 @@ export default function OperationDashboard({ user, onPageChange }) {
       stage: 'Sown',
       title: 'Leads',
       value: metrics.leads,
-      icon: Users,
-      accent: palette.pine,
+      icon: Sprout,
+      accent: palette.growth,
       growth: metrics.leadsGrowth,
-      onClick: () => onPageChange('lead-pipeline')
+      onClick: null
     },
     {
       key: 'interested',
@@ -205,7 +205,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       icon: Target,
       accent: palette.amber,
       growth: 0,
-      onClick: () => onPageChange('opportunities')
+      onClick: null
     },
     {
       key: 'deals',
@@ -213,10 +213,10 @@ export default function OperationDashboard({ user, onPageChange }) {
       stage: 'Rooted',
       title: 'Deals',
       value: metrics.deals,
-      icon: DollarSign,
+      icon: IndianRupee,
       accent: palette.slate,
       growth: metrics.dealsGrowth,
-      onClick: () => onPageChange('opportunities')
+      onClick: null
     },
     {
       key: 'closedWonDeals',
@@ -227,7 +227,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       icon: CheckCircle,
       accent: palette.growth,
       growth: 0,
-      onClick: () => onPageChange('opportunities')
+      onClick: null
     },
     {
       key: 'invoiced',
@@ -247,7 +247,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       title: 'Assigned to Green Team',
       value: metrics.assignedToGreenTeam,
       icon: Leaf,
-      accent: palette.pineDeep,
+      accent: palette.teal,
       growth: 0,
       onClick: null
     }
@@ -360,10 +360,10 @@ export default function OperationDashboard({ user, onPageChange }) {
             style={{
               position: 'relative',
               overflow: 'hidden',
-              borderRadius: '16px',
-              background: 'linear-gradient(225deg, rgb(70 119 75) 0%, rgb(7 87 41) 100%)',
-              padding: '32px 32px',
-              marginBottom: '24px'
+              borderRadius: '12px',
+              background: 'linear-gradient(225deg, #ffffff 0%, #ffffff 100%)',
+              padding: '12px',
+              marginBottom: '4px'
             }}
           >
             {/* Contour-line motif */}
@@ -383,21 +383,16 @@ export default function OperationDashboard({ user, onPageChange }) {
             </svg>
 
             <div style={{ position: 'relative', zIndex: 1 }}>
-              <div
-                className="fr-eyebrow"
-                style={{ color: palette.amber, fontSize: '11px', marginBottom: '10px' }}
-              >
-                Field Report · Live Season
-              </div>
+              
               <h1
                 className="fr-display"
-                style={{ color: '#ffffff', fontSize: '30px', fontWeight: 500, margin: 0, lineHeight: 1.2 }}
+                style={{ color: '#1a1c17', fontSize: '30px', fontWeight: 500, margin: 0, lineHeight: 1.2 }}
               >
-                Welcome back, {displayName}
+                Welcome ..! {displayName}
               </h1>
               <p
                 className="fr-body"
-                style={{ color: 'rgba(255,255,255,0.72)', fontSize: '14px', marginTop: '8px', maxWidth: '480px' }}
+                style={{ color: '#2b2a29', fontSize: '14px', marginTop: '8px', maxWidth: '480px' }}
               >
                 Your pipeline, tracked the way a season grows — from the first lead
                 sown to the invoice that closes the cycle.
@@ -590,7 +585,7 @@ export default function OperationDashboard({ user, onPageChange }) {
           key: 'totalDealValue',
           title: 'Total Deal Value',
           value: metrics.totalDealValue,
-          icon: DollarSign,
+          icon: IndianRupee,
           accent: palette.slate
         },
         {
