@@ -37,7 +37,10 @@ export default function OperationDashboard({ user, onPageChange }) {
     assignedToGreenTeam: 0,
     leadsGrowth: 0,
     dealsGrowth: 0,
-    revenueGrowth: 0
+    revenueGrowth: 0,
+    totalDealValue: 0,
+    closedWonAmount: 0,
+    invoicedPaidAmount: 0
   });
 
   const displayName = user?.name || user?.fullName || user?.first_name || "Operation User";
@@ -47,8 +50,11 @@ export default function OperationDashboard({ user, onPageChange }) {
   };
 
   const formatCurrency = (num) => {
-    return '₹' + num.toLocaleString('en-IN');
-  };
+  return '₹' + num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
 
   const calculateConversionRate = (value, total) => {
     if (total === 0) return 0;
@@ -67,68 +73,116 @@ export default function OperationDashboard({ user, onPageChange }) {
   };
 
   const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const currentUserName = user?.name || user?.phone_number || 'Operation';
+  try {
+    setLoading(true);
+    const currentUserName = user?.name || user?.phone_number || 'Operation';
+    const encodedUser = encodeURIComponent(currentUserName);
+    const dealsApiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
 
-      // Fetch total leads
-      const leadsResponse = await axios.get(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}`);
-      const leadsCount = leadsResponse.data?.total || leadsResponse.data?.data?.length || leadsResponse.data?.length || 0;
+    const [
+      leadsResponse,
+      dealsResponse,
+      interestedResponse,
+      accountsResponse,
+      closedWonResponse,
+      invoicedResponse,
+      paidResponse
+    ] = await Promise.all([
+      axios.get(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodedUser}`),
+      axios.get(`${import.meta.env.VITE_FILTER_DEALS_API_URL}?user=${encodedUser}&deal_stage_is_not=Paid`),
+      axios.get(`${import.meta.env.VITE_FILTER_LEADS_API_URL}?user=${encodedUser}&offset=0&limit=100&status_is=Starter,Growth,Enterprise,Interested`),
+      axios.get(`https://api.sat2farm.com/sat2business_leads/accounts?user=${encodedUser}`),
+      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Closed Won')}&offset=0&limit=1000`),
+      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Invoiced')}&offset=0&limit=1000`),
+      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Paid')}&offset=0&limit=1000`)
+    ]);
 
-      // Fetch total deals (excluding Paid)
-      const dealsResponse = await axios.get(`${import.meta.env.VITE_FILTER_DEALS_API_URL}?user=${encodeURIComponent(currentUserName)}&deal_stage_is_not=Paid`);
-      const dealsCount = dealsResponse.data?.total || dealsResponse.data?.data?.length || dealsResponse.data?.length || 0;
+    const leadsCount = leadsResponse.data?.total || leadsResponse.data?.data?.length || leadsResponse.data?.length || 0;
+    const dealsCount = dealsResponse.data?.total || dealsResponse.data?.data?.length || dealsResponse.data?.length || 0;
+    const interestedLeadsCount = interestedResponse.data?.total || interestedResponse.data?.data?.length || interestedResponse.data?.length || 0;
+    const accountsCount = accountsResponse.data?.total || accountsResponse.data?.data?.length || accountsResponse.data?.length || 0;
+    const interestedCount = interestedLeadsCount + accountsCount;
 
-      // Fetch interested leads (status: Starter, Growth, Enterprise, Interested)
-      const interestedResponse = await axios.get(`${import.meta.env.VITE_FILTER_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=0&limit=100&status_is=Starter,Growth,Enterprise,Interested`);
-      const interestedLeadsCount = interestedResponse.data?.total || interestedResponse.data?.data?.length || interestedResponse.data?.length || 0;
+    const closedWonCount = closedWonResponse.data?.total ?? closedWonResponse.data?.count ?? (closedWonResponse.data?.data?.length || 0);
+    const invoicedCount = invoicedResponse.data?.total ?? invoicedResponse.data?.count ?? (invoicedResponse.data?.data?.length || 0);
+    const paidData = paidResponse.data?.data || paidResponse.data || [];
 
-      // Fetch total opportunities from accounts
-      const accountsResponse = await axios.get(`https://api.sat2farm.com/sat2business_leads/accounts?user=${encodeURIComponent(currentUserName)}`);
-      const accountsCount = accountsResponse.data?.total || accountsResponse.data?.data?.length || accountsResponse.data?.length || 0;
+    // Closed won includes invoiced deals (kept as-is, matches existing "Closed Won Deals" card logic)
+    const totalClosedWon = closedWonCount + invoicedCount;
 
-      // Combine interested leads + accounts for total interested
-      const interestedCount = interestedLeadsCount + accountsCount;
+    // Fetch all deals with pagination to calculate total deal value
+    const [dealsPage1, dealsPage2] = await Promise.all([
+      axios.get(`${dealsApiUrl}?user=${encodedUser}&offset=0&limit=1000`),
+      axios.get(`${dealsApiUrl}?user=${encodedUser}&offset=1000&limit=1000`)
+    ]);
 
-      // Fetch closed won deals
-      const closedWonResponse = await axios.get(`${import.meta.env.VITE_FILTER_DEALS_API_URL}?user=${encodeURIComponent(currentUserName)}&deal_stage_is=Closed Won`);
-      const closedWonCount = closedWonResponse.data?.total || closedWonResponse.data?.data?.length || closedWonResponse.data?.length || 0;
+    const deals1 = dealsPage1.data?.data || dealsPage1.data || [];
+    const deals2 = dealsPage2.data?.data || dealsPage2.data || [];
+    const allDealsData = [...deals1, ...deals2];
 
-      // Fetch invoiced deals
-      const invoicedResponse = await axios.get(`${import.meta.env.VITE_FILTER_DEALS_API_URL}?user=${encodeURIComponent(currentUserName)}&deal_stage_is=Invoiced`);
-      const invoicedCount = invoicedResponse.data?.total || invoicedResponse.data?.data?.length || invoicedResponse.data?.length || 0;
+    console.log('Total deals fetched:', allDealsData.length);
 
-      setMetrics({
-        leads: leadsCount,
-        interested: interestedCount,
-        deals: dealsCount,
-        closedWonDeals: closedWonCount,
-        invoiced: invoicedCount,
-        assignedToGreenTeam: 0, // Will need API endpoint for this
-        leadsGrowth: 0,
-        dealsGrowth: 0,
-        revenueGrowth: 0
-      });
+    // Group deals by stage to debug
+    const dealsByStage = {};
+    allDealsData.forEach(deal => {
+      const stage = deal.deal_stage || 'Unknown';
+      if (!dealsByStage[stage]) {
+        dealsByStage[stage] = { count: 0, amount: 0 };
+      }
+      dealsByStage[stage].count++;
+      dealsByStage[stage].amount += parseFloat(deal.deal_amount) || 0;
+    });
+    console.log('Deals by stage:', dealsByStage);
 
-      setLastUpdated(new Date());
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching operation dashboard data:', error);
-      setMetrics({
-        leads: 0,
-        interested: 0,
-        deals: 0,
-        closedWonDeals: 0,
-        invoiced: 0,
-        assignedToGreenTeam: 0,
-        leadsGrowth: 0,
-        dealsGrowth: 0,
-        revenueGrowth: 0
-      });
-      setLoading(false);
-      toast.error('Failed to load dashboard data');
-    }
-  };
+    // Calculate total deal value from all deals
+    const totalDealValue = allDealsData.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0);
+    console.log('Total Deal Value calculated:', totalDealValue);
+
+    // Closed Won Amount: only Closed Won stage
+    const closedWonAmount = closedWonResponse.data?.data?.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0) || 0;
+
+    // Invoiced + Paid Amount: calculate from all deals data
+    const invoicedPaidDeals = allDealsData.filter(deal => deal.deal_stage === 'Invoiced' || deal.deal_stage === 'Paid');
+    const totalInvoicedPaid = invoicedPaidDeals.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0);
+    console.log('Invoiced + Paid Amount calculated:', totalInvoicedPaid);
+
+    setMetrics({
+      leads: leadsCount,
+      interested: interestedCount,
+      deals: dealsCount,
+      closedWonDeals: totalClosedWon,
+      invoiced: invoicedCount,
+      assignedToGreenTeam: 0,
+      leadsGrowth: 0,
+      dealsGrowth: 0,
+      revenueGrowth: 0,
+      totalDealValue,
+      closedWonAmount,
+      invoicedPaidAmount: totalInvoicedPaid
+    });
+
+    setLastUpdated(new Date());
+    setLoading(false);
+  } catch (error) {
+    console.error('Error fetching operation dashboard data:', error);
+    setMetrics({
+      leads: 0,
+      interested: 0,
+      deals: 0,
+      closedWonDeals: 0,
+      invoiced: 0,
+      assignedToGreenTeam: 0,
+      leadsGrowth: 0,
+      dealsGrowth: 0,
+      revenueGrowth: 0,
+      totalDealValue: 0,
+      closedWonAmount: 0,
+      invoicedPaidAmount: 0
+    });
+    setLoading(false);
+    toast.error('Failed to load dashboard data');
+  }
+};
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -381,6 +435,18 @@ export default function OperationDashboard({ user, onPageChange }) {
   </div>
 ) : (
   <>
+    <h2
+      className="fr-display"
+      style={{
+        fontSize: '20px',
+        fontWeight: 500,
+        color: palette.ink,
+        marginBottom: '20px',
+        marginTop: '0'
+      }}
+    >
+      Lead Data Summary
+    </h2>
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -392,6 +458,18 @@ export default function OperationDashboard({ user, onPageChange }) {
         const barWidth = Math.min(100, (card.value / funnelBase) * 100);
         const isBaseline = card.key === 'leads';
         const showsConversion = card.key !== 'assignedToGreenTeam';
+
+        // Calculate conversion rate based on card type
+        let conversionRate = 0;
+        if (card.key === 'deals') {
+          conversionRate = calculateConversionRate(card.value, metrics.interested);
+        } else if (card.key === 'closedWonDeals') {
+          conversionRate = calculateConversionRate(card.value, metrics.deals);
+        } else if (card.key === 'invoiced') {
+          conversionRate = calculateConversionRate(card.value, metrics.closedWonDeals);
+        } else if (card.key === 'interested') {
+          conversionRate = calculateConversionRate(card.value, metrics.leads);
+        }
 
         return (
           <div
@@ -450,7 +528,7 @@ export default function OperationDashboard({ user, onPageChange }) {
                     lineHeight: 1.4
                   }}
                 >
-                  {isBaseline ? 'BASELINE' : `${calculateConversionRate(card.value, metrics.leads)}%`}
+                  {isBaseline ? 'BASELINE' : `${conversionRate}%`}
                 </div>
               )}
             </div>
@@ -507,6 +585,106 @@ export default function OperationDashboard({ user, onPageChange }) {
                 <ArrowUpRight size={14} />
               </div>
             )}
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Deal Amount Data Summary */}
+    <h2
+      className="fr-display"
+      style={{
+        fontSize: '20px',
+        fontWeight: 500,
+        color: palette.ink,
+        marginBottom: '20px',
+        marginTop: '0'
+      }}
+    >
+      Deal Amount Data Summary
+    </h2>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+      gap: '16px',
+      marginBottom: '28px'
+    }}>
+      {[
+        {
+          key: 'totalDealValue',
+          title: 'Total Deal Value',
+          value: metrics.totalDealValue,
+          icon: DollarSign,
+          accent: palette.slate
+        },
+        {
+          key: 'closedWonAmount',
+          title: 'Closed Won Amount',
+          value: metrics.closedWonAmount,
+          icon: CheckCircle,
+          accent: palette.growth
+        },
+        {
+          key: 'invoicedPaidAmount',
+          title: 'Invoiced + Paid Amount',
+          value: metrics.invoicedPaidAmount,
+          icon: FileText,
+          accent: palette.amberDeep
+        }
+      ].map((card, index) => {
+        const Icon = card.icon;
+        return (
+          <div
+            key={card.key}
+            className="fr-card"
+            style={{
+              animationDelay: `${index * 0.05}s`,
+              background: palette.surface,
+              borderRadius: '12px',
+              padding: '18px 20px 20px',
+              border: `1px solid #b3b4b4`,
+              transition: 'transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease',
+              position: 'relative'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.boxShadow = '0 10px 24px rgba(22, 36, 28, 0.08)';
+              e.currentTarget.style.backgroundColor = '#f0fdf4';
+              e.currentTarget.style.borderColor = '#86efac';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.backgroundColor = palette.surface;
+              e.currentTarget.style.borderColor = palette.border;
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: `${card.accent}1A`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Icon size={16} color={card.accent} />
+              </div>
+            </div>
+
+            <div
+              className="fr-mono"
+              style={{ fontSize: '30px', fontWeight: 600, color: palette.ink, marginTop: '14px', lineHeight: 1 }}
+            >
+              {formatCurrency(card.value)}
+            </div>
+
+            <div className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft, marginTop: '6px', fontWeight: 500 }}>
+              {card.title}
+            </div>
           </div>
         );
       })}
