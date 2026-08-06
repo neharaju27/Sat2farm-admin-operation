@@ -219,7 +219,7 @@ export default function UnlockFarm({ user, onPageChange }) {
     try {
       setFarmersListLoading(true);
       const response = await fetch(
-        `${farmFilterBaseUrl}?api_key=${encodeURIComponent(adminApiKey)}`,
+        `${farmFilterBaseUrl}?key=${encodeURIComponent(adminApiKey)}`,
         { method: 'GET' }
       );
 
