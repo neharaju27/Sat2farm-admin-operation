@@ -244,7 +244,16 @@ export default function Registration({ user, onPageChange }) {
       });
 
       const data = await response.json();
-      console.log('API Response:', data); // Debug: Log full response
+      console.log('API Response:', JSON.stringify(data, null, 2)); // Debug: Log full response as JSON
+      console.log('Password fields in response:', JSON.stringify({
+        password: data.password,
+        new_password: data.new_password,
+        user_password: data.user_password,
+        Password: data.Password,
+        generated_password: data.generated_password,
+        temp_password: data.temp_password,
+        allKeys: Object.keys(data)
+      }, null, 2));
 
       if (response.ok) {
         // Check if the API returned a duplicate user message
@@ -270,11 +279,11 @@ export default function Registration({ user, onPageChange }) {
           lastName: formData.lName,
           email: formData.user_email,
           phone: formData.pNumber,
-
           countryCode: formData.country_code,
           accountId: formData.acc_id,
           referralCode: formData.referal_code || '-',
           category: formData.category,
+          password: data['User Login Password'] || data.password || data.new_password || data.user_password || data.Password || data.generated_password || data.temp_password || 'Not provided',
           registrationDate: new Date().toLocaleDateString()
         };
         setRegisteredUsers(prev => [...prev, newUser]);
