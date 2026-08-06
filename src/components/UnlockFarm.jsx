@@ -205,7 +205,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   };
 
   const fetchFarmerDetailsList = async () => {
-    const farmFilterBaseUrl = import.meta.env.VITE_FARM_FILTER_DETAILS_API_URL;
+    const farmFilterBaseUrl = import.meta.env.VITE_GET_ADMIN_INFO_API_URL;
     if (!farmFilterBaseUrl) {
       toast.error('Farm filter details API URL is missing in .env');
       return;
