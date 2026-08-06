@@ -205,7 +205,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   };
 
   const fetchFarmerDetailsList = async () => {
-    const farmFilterBaseUrl = import.meta.env.VITE_GET_ADMIN_INFO_API_URL;
+    const farmFilterBaseUrl = import.meta.env.VITE_FARM_FILTER_DETAILS_API_URL;
     if (!farmFilterBaseUrl) {
       toast.error('Farm filter details API URL is missing in .env');
       return;
@@ -218,36 +218,44 @@ export default function UnlockFarm({ user, onPageChange }) {
 
     try {
       setFarmersListLoading(true);
-      const response = await fetch(
-        `${farmFilterBaseUrl}?key=${encodeURIComponent(adminApiKey)}`,
-        { method: 'GET' }
-      );
+      const apiUrl = `${farmFilterBaseUrl}?key=${encodeURIComponent(adminApiKey)}`;
+      console.log('Fetching farmers from:', apiUrl);
+      console.log('Admin key:', adminApiKey);
+      
+      const response = await fetch(apiUrl, { method: 'GET' });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      const rawList = Array.isArray(result?.data) ? result.data : [];
+      console.log('API Response:', result);
+      
+      // Handle both array response and object with data property
+      const rawList = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
+      console.log('Raw farmers list:', rawList);
+      
       const farmerMap = new Map();
 
       rawList.forEach((item) => {
-        const userId = item?.user_id;
+        // Map API field names to expected field names
+        const userId = item?.sub_admin_id || item?.user_id;
         if (!userId || farmerMap.has(userId)) return;
 
         farmerMap.set(userId, {
           id: userId,
           user_id: userId,
-          name: item.user_name || '',
-          phone: item.phone_number || item.mobile_no || '',
-          registeredDate: item.date_of_registration || '',
-          user_key: item.user_key || ''
+          name: item.full_name || item.user_name || '',
+          phone: item.mobile_no || item.phone_number || '',
+          registeredDate: item.reg_date || item.date_of_registration || '',
+          user_key: item.sub_admin_api_key || item.user_key || ''
         });
       });
 
       const uniqueFarmers = Array.from(farmerMap.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       );
+      console.log('Final farmers list:', uniqueFarmers);
       setFarmersList(uniqueFarmers);
     } catch (error) {
       console.error('Error fetching farmer details list:', error);
