@@ -2,6 +2,7 @@ import { AlertCircle, Lock } from 'lucide-react';
 
 export default function AccessControl({ user, currentPage, onPageChange, children }) {
   const isSalesUser = user?.role === 'sales' || user?.role === 'Sales';
+  const role = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
   
   // List of sales users BLOCKED from accessing unlock-farm and assign-acreage
   const blockedSalesUsers = [
@@ -29,87 +30,95 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
   );
   
   // Restrict access to unlock-farm and assign-acreages for sales users in blocked list
-  const isPageRestricted = isSalesUser && 
+  const isSalesPageRestricted = isSalesUser && 
     (currentPage === 'unlock-farm' || currentPage === 'assign-acreages') && 
     isBlockedSalesUser;
   
-  if (!isPageRestricted) {
-    // No restriction, render the children normally
-    return children;
-  }
+  // Restrict operation-dashboard to only operation/ops roles
+  const isOperationDashboardRestricted = currentPage === 'operation-dashboard' && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' &&
+    role !== 'admin';
   
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      padding: '40px',
-      backgroundColor: '#f8f7f4',
-      textAlign: 'center'
-    }}>
+  if (isSalesPageRestricted || isOperationDashboardRestricted) {
+    // Show restricted access message
+    return (
       <div style={{
-        maxWidth: '500px',
-        backgroundColor: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
         padding: '40px',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #e5e7eb'
+        backgroundColor: '#f8f7f4',
+        textAlign: 'center'
       }}>
         <div style={{
-          width: '64px',
-          height: '64px',
-          backgroundColor: '#fee2e2',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 24px'
+          maxWidth: '500px',
+          backgroundColor: 'white',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb'
         }}>
-          <Lock style={{ width: '32px', height: '32px', color: '#dc2626' }} />
-        </div>
-        
-        <h2 style={{
-          fontSize: '24px',
-          fontWeight: '600',
-          color: '#1f2937',
-          marginBottom: '16px',
-          margin: '0 0 16px 0'
-        }}>
-          Access Restricted
-        </h2>
-        
-        <p style={{
-          fontSize: '16px',
-          color: '#6b7280',
-          lineHeight: '1.5',
-          marginBottom: '24px'
-        }}>
-          This page is only accessible to specific authorized Sales users. Please contact your administrator if you believe you should have access.
-        </p>
-        
-        <div style={{
-          backgroundColor: '#fef3c7',
-          border: '1px solid #f59e0b',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '32px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px'
-        }}>
-          <AlertCircle style={{ width: '20px', height: '20px', color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
-              Login as Operations Required
-            </div>
-            <div style={{ fontSize: '14px', color: '#78350f' }}>
-              To access this page, please log in with Operations credentials instead of Sales credentials.
+          <div style={{
+            width: '64px',
+            height: '64px',
+            backgroundColor: '#fee2e2',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px'
+          }}>
+            <Lock style={{ width: '32px', height: '32px', color: '#dc2626' }} />
+          </div>
+          
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: '#1f2937',
+            marginBottom: '16px',
+            margin: '0 0 16px 0'
+          }}>
+            Access Restricted
+          </h2>
+          
+          <p style={{
+            fontSize: '16px',
+            color: '#6b7280',
+            lineHeight: '1.5',
+            marginBottom: '24px'
+          }}>
+            This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.
+          </p>
+          
+          <div style={{
+            backgroundColor: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '32px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            <AlertCircle style={{ width: '20px', height: '20px', color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
+                Login as Operations Required
+              </div>
+              <div style={{ fontSize: '14px', color: '#78350f' }}>
+                To access this page, please log in with Operations credentials.
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+  
+  // No restriction, render the children normally
+  return children;
 }
