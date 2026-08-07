@@ -659,26 +659,30 @@ export default function Opportunities({ onPageChange }) {
 
       // Build URL parameters for all filters
       filters.forEach(filter => {
-        if (['contact_owner', 'lead_status', 'tag', 'mailing_state', 'mailing_country', 'created_by', 'modified_by', 'mailing_city', 'lead_source', 'description', 'account_type', 'owner', 'status', 'tags', 'city', 'state', 'country'].includes(filter.property) && filter.value) {
-          const paramName = getFilterQueryParamKey(filter.property, filter.operator);
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'on' && filter.value) {
-          urlParams.push(`date_type=on`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'after' && filter.value) {
-          urlParams.push(`date_type=after`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && filter.dateOperator === 'before' && filter.value) {
-          urlParams.push(`date_type=before`);
-          urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
-          urlParams.push(`date_type=${filter.dateOperator}`);
-          if (filter.fromDate && filter.toDate) {
+        if (filter.property === 'created_time' || filter.property === 'createdTime') {
+          if (filter.dateOperator === 'on' && (filter.value || filter.date)) {
+            urlParams.push(`date_type=on`);
+            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+          } else if (filter.dateOperator === 'after' && (filter.value || filter.date)) {
+            urlParams.push(`date_type=after`);
+            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+          } else if (filter.dateOperator === 'before' && (filter.value || filter.date)) {
+            urlParams.push(`date_type=before`);
+            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && filter.fromDate && filter.toDate) {
+            urlParams.push(`date_type=${filter.dateOperator}`);
             urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
             urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
-          } else if (filter.value) {
-            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
+          } else if (filter.dateOperator === 'in_the_last') {
+            const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+            const count = filter.count ? parseInt(filter.count) : 1;
+            urlParams.push(`date_type=in_last`);
+            urlParams.push(`last_count=${count}`);
+            urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
           }
+        } else if (filter.property && filter.value) {
+          const paramName = getFilterQueryParamKey(filter.property, filter.operator);
+          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
         }
       });
 
@@ -8946,154 +8950,20 @@ export default function Opportunities({ onPageChange }) {
                         disabled={isApplyingAccountsFilters || accountsFiltersSuccess}
                         onClick={() => {
                           if (isApplyingAccountsFilters || accountsFiltersSuccess) return;
-                          // Collect all active filters
-                          const activeFilters = [];
-
-                          // Add contact owner filter if configured
-                          const contactOwnerProp = selectedProperties.find(prop => prop.property === 'contact_owner');
-                          if (contactOwnerProp && contactOwnerProp.value) {
-                            const selectedOwners = contactOwnerProp.value.split(',');
-                            if (selectedOwners.length > 0) {
-                              const ownersString = selectedOwners.join(',');
-                              activeFilters.push({
-                                property: 'contact_owner',
-                                value: ownersString,
-                                operator: contactOwnerProp.operator
-                              });
+                          const activeFilters = selectedProperties.filter(prop => {
+                            if (!prop.property) return false;
+                            if (prop.property === 'created_time' || prop.property === 'createdTime') {
+                              return Boolean(prop.value || prop.date || (prop.fromDate && prop.toDate) || prop.dateOperator === 'in_the_last');
                             }
-                          }
-
-                          // Add lead status filter if configured
-                          const leadStatusProp = selectedProperties.find(prop => prop.property === 'lead_status');
-                          if (leadStatusProp && leadStatusProp.value) {
-                            const selectedStatuses = leadStatusProp.value.split(',');
-                            if (selectedStatuses.length > 0) {
-                              const statusesString = selectedStatuses.join(',');
-                              activeFilters.push({
-                                property: 'lead_status',
-                                value: statusesString,
-                                operator: leadStatusProp.operator
-                              });
-                            }
-                          }
-
-                          // Add tag filter if configured
-                          const tagProp = selectedProperties.find(prop => prop.property === 'tag');
-                          if (tagProp && tagProp.value) {
-                            const selectedTags = tagProp.value.split(',');
-                            if (selectedTags.length > 0) {
-                              const tagsString = selectedTags.join(',');
-                              activeFilters.push({
-                                property: 'tag',
-                                value: tagsString,
-                                operator: tagProp.operator
-                              });
-                            }
-                          }
-
-                          // Add mailing state filter if configured
-                          const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
-                          if (mailingStateProp && mailingStateProp.value) {
-                            const selectedStates = mailingStateProp.value.split(',');
-                            if (selectedStates.length > 0) {
-                              const statesString = selectedStates.join(',');
-                              activeFilters.push({
-                                property: 'mailing_state',
-                                value: statesString,
-                                operator: mailingStateProp.operator
-                              });
-                            }
-                          }
-
-                          // Add mailing country filter if configured
-                          const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
-                          if (mailingCountryProp && mailingCountryProp.value) {
-                            const selectedCountries = mailingCountryProp.value.split(',');
-                            if (selectedCountries.length > 0) {
-                              const countriesString = selectedCountries.join(',');
-                              activeFilters.push({
-                                property: 'mailing_country',
-                                value: countriesString,
-                                operator: mailingCountryProp.operator
-                              });
-                            }
-                          }
-
-                          // Add created_by filter if configured
-                          const createdByProp = selectedProperties.find(prop => prop.property === 'created_by');
-                          if (createdByProp && createdByProp.value) {
-                            activeFilters.push({
-                              property: 'created_by',
-                              value: createdByProp.value,
-                              operator: createdByProp.operator || 'is'
-                            });
-                          }
-
-                          // Add modified_by filter if configured
-                          const modifiedByProp = selectedProperties.find(prop => prop.property === 'modified_by');
-                          if (modifiedByProp && modifiedByProp.value) {
-                            activeFilters.push({
-                              property: 'modified_by',
-                              value: modifiedByProp.value,
-                              operator: modifiedByProp.operator || 'is'
-                            });
-                          }
-
-                          // Add city filter if configured
-                          const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
-                          if (cityProp && cityProp.value) {
-                            activeFilters.push({
-                              property: 'mailing_city',
-                              value: cityProp.value,
-                              operator: cityProp.operator || 'is'
-                            });
-                          }
-
-                          // Add lead_source filter if configured
-                          const leadSourceProp = selectedProperties.find(prop => prop.property === 'lead_source');
-                          if (leadSourceProp && leadSourceProp.value) {
-                            activeFilters.push({
-                              property: 'lead_source',
-                              value: leadSourceProp.value,
-                              operator: leadSourceProp.operator || 'is'
-                            });
-                          }
-
-                          // Add description filter if configured
-                          const descriptionProp = selectedProperties.find(prop => prop.property === 'description');
-                          if (descriptionProp && descriptionProp.value) {
-                            activeFilters.push({
-                              property: 'description',
-                              value: descriptionProp.value,
-                              operator: descriptionProp.operator || 'is'
-                            });
-                          }
-
-                          // Add created_time filter if configured
-                          const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
-                          if (createdTimeProp) {
-                            if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before' || createdTimeProp.dateOperator === 'after') && createdTimeProp.value) {
-                              activeFilters.push({
-                                property: 'created_time',
-                                value: createdTimeProp.value,
-                                dateOperator: createdTimeProp.dateOperator
-                              });
-                            } else if ((createdTimeProp.dateOperator === 'between' || createdTimeProp.dateOperator === 'custom') && (createdTimeProp.fromDate && createdTimeProp.toDate || createdTimeProp.value)) {
-                              activeFilters.push({
-                                property: 'created_time',
-                                fromDate: createdTimeProp.fromDate,
-                                toDate: createdTimeProp.toDate,
-                                value: createdTimeProp.value,
-                                dateOperator: createdTimeProp.dateOperator
-                              });
-                            }
-                          }
-
-                          // Apply all filters together in single API call
+                            return Boolean(prop.value && String(prop.value).trim() !== '');
+                          });
                           if (activeFilters.length > 0) {
                             handleCombinedFilters(activeFilters);
                           } else {
+                            setIsFilterApplied(false);
+                            setCurrentFilterCriteria('');
                             setFilterSidebarOpen(false);
+                            fetchOpportunities();
                           }
                         }}
                         style={{
