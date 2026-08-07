@@ -619,7 +619,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           expiryTime: farm.expiry_time || farm.expiry || farm.expiry_date || 'N/A',
           status: farm.farm_status || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
-          clientId: farm.client_id || farm.clientId || undefined
+          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
         }));
         
         setRecentFarms(formattedFarms);
@@ -800,7 +800,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           createdTime: farm.created_time || 'N/A',
           expiryTime: farm.date_of_expiry || 'N/A',
           status: farm.farm_status || 'N/A',
-          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined
+          adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
+          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
         }));
         
         setExpiringFarms(formattedFarms);
@@ -3198,6 +3199,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                           <tr style={{borderBottom: '1px solid var(--border)'}}>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Client ID</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
@@ -3217,6 +3219,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                             <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmId}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmName}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.clientId || farm.client_id || 'N/A'}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.region}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.area}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
