@@ -20,6 +20,8 @@ import AccessControl from "./components/AccessControl";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
 import MarketingDashboard from "./components/MarketingDashboard";
 import OperationDashboard from "./components/OperationDashboard";
+import SalesDashboard from "./components/SalesDashboard";
+import AllSalesData from "./components/AllSalesData";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -119,9 +121,9 @@ function App() {
       setCurrentPage('marketing-dashboard');
       localStorage.setItem('currentPage', 'marketing-dashboard');
     } else if (role === 'sales') {
-      console.log('Redirecting to assign-acreages (sales)');
-      setCurrentPage('assign-acreages');
-      localStorage.setItem('currentPage', 'assign-acreages');
+      console.log('Redirecting to sales-dashboard (sales)');
+      setCurrentPage('sales-dashboard');
+      localStorage.setItem('currentPage', 'sales-dashboard');
     } else if (role === 'client') {
       console.log('Redirecting to client-monthly-report (client)');
       setCurrentPage('client-monthly-report');
@@ -225,6 +227,10 @@ function App() {
           return <SuperAdminDashboard user={userDisplay} onPageChange={handlePageChange} />;
         case 'marketing-dashboard':
           return <MarketingDashboard user={userDisplay} onPageChange={handlePageChange} />;
+        case 'sales-dashboard':
+          return <SalesDashboard user={userDisplay} onPageChange={handlePageChange} />;
+        case 'all-sales-data':
+          return <AllSalesData user={userDisplay} onPageChange={handlePageChange} />;
         default:
           return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }

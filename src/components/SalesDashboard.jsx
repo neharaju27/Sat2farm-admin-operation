@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Users, Target, DollarSign, CheckCircle, FileText, Leaf, Sprout, IndianRupee,
-  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio
+  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw
 } from "lucide-react";
 import axios from "axios";
 import toast from 'react-hot-toast';
@@ -25,7 +25,7 @@ const palette = {
   teal: '#14B8A6',
 };
 
-export default function OperationDashboard({ user, onPageChange }) {
+export default function SalesDashboard({ user, onPageChange }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -46,7 +46,7 @@ export default function OperationDashboard({ user, onPageChange }) {
     paidAmount: 0
   });
 
-  const displayName = user?.name || user?.fullName || user?.first_name || "Operation User";
+  const displayName = user?.name || user?.fullName || user?.first_name || "Sales User";
 
   const formatNumber = (num) => {
     return num.toLocaleString();
@@ -78,7 +78,7 @@ export default function OperationDashboard({ user, onPageChange }) {
   const fetchDashboardData = async () => {
   try {
     setLoading(true);
-    const currentUserName = user?.name || user?.phone_number || 'Operation';
+    const currentUserName = user?.name || user?.phone_number || 'Sales';
     const encodedUser = encodeURIComponent(currentUserName);
     const dealsApiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
 
@@ -152,7 +152,7 @@ export default function OperationDashboard({ user, onPageChange }) {
     setLastUpdated(new Date());
     setLoading(false);
   } catch (error) {
-    console.error('Error fetching operation dashboard data:', error);
+    console.error('Error fetching sales dashboard data:', error);
     setMetrics({
       leads: 0,
       totalOpportunities: 0,
@@ -186,8 +186,6 @@ export default function OperationDashboard({ user, onPageChange }) {
   }, []);
 
   // ---- Field Report metric definitions -----------------------------------
-  // Each metric is framed as a stage in a growing season, since Sat2Farm's
-  // whole product is about tracking crops from sowing to harvest.
   const dashboardCards = [
     {
       key: 'leads',
@@ -226,7 +224,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       key: 'closedWonDeals',
       code: '04',
       stage: 'Harvested',
-      title: 'Closed Won Deals',
+      title: 'Closed Won + Invoiced + Paid',
       value: metrics.closedWonDeals,
       icon: CheckCircle,
       accent: palette.growth,
@@ -257,12 +255,12 @@ export default function OperationDashboard({ user, onPageChange }) {
     },
     {
       key: 'assignedToGreenTeam',
-      code: '07',
+      code: '06',
       stage: 'Routed',
       title: 'Assigned to Green Team',
       value: metrics.assignedToGreenTeam,
       icon: Leaf,
-      accent: palette.growth,
+      accent: palette.teal,
       growth: 0,
       onClick: null
     }
@@ -272,7 +270,7 @@ export default function OperationDashboard({ user, onPageChange }) {
     { label: 'Sown', sub: 'Leads', value: metrics.leads, accent: palette.pine },
     { label: 'Sprouted', sub: 'Total Opportunity', value: metrics.totalOpportunities, accent: palette.amber },
     { label: 'Rooted', sub: 'Total Deals', value: metrics.deals, accent: palette.slate },
-    { label: 'Harvested', sub: 'Closed Won Deals', value: metrics.closedWonDeals, accent: palette.growth },
+    { label: 'Harvested', sub: 'Closed Won + Invoiced + Paid', value: metrics.closedWonDeals, accent: palette.growth },
     { label: 'Invoiced', sub: 'Invoiced + Paid', value: metrics.invoiced, accent: palette.amberDeep },
     { label: 'Paid', sub: 'Paid', value: metrics.paid, accent: palette.teal },
   ];
@@ -314,7 +312,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       {/* Header */}
       <div className="topbar" style={{ borderBottom: `1px solid ${palette.border}` }}>
         <div className="tb-left">
-          <div className="tb-page fr-body" style={{ fontWeight: 600, color: palette.ink }}>Dashboard</div>
+          <div className="tb-page fr-body" style={{ fontWeight: 600, color: palette.ink }}>Sales Dashboard</div>
         </div>
         <div className="tb-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
@@ -343,25 +341,6 @@ export default function OperationDashboard({ user, onPageChange }) {
             />
             {formatTimeAgo(lastUpdated)}
           </div>
-          <button
-            onClick={() => onPageChange('all-sales-data')}
-            className="fr-body"
-            style={{
-              padding: '8px 16px',
-              backgroundColor: palette.growth,
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            View All Sales Data
-          </button>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -429,7 +408,7 @@ export default function OperationDashboard({ user, onPageChange }) {
                 className="fr-body"
                 style={{ color: '#2b2a29', fontSize: '14px', marginTop: '8px', maxWidth: '480px' }}
               >
-                Your pipeline, tracked the way a season grows — from the first lead
+                Your sales pipeline, tracked the way a season grows — from the first lead
                 sown to the invoice that closes the cycle.
               </p>
             </div>
@@ -634,7 +613,7 @@ export default function OperationDashboard({ user, onPageChange }) {
         },
         {
           key: 'invoicedAmount',
-          title: 'Invoiced',
+          title: 'Invoiced + Paid Amount',
           value: metrics.invoicedAmount,
           icon: FileText,
           accent: palette.amberDeep
@@ -704,93 +683,8 @@ export default function OperationDashboard({ user, onPageChange }) {
         );
       })}
     </div>
-
-              
-
-              {/* Quick actions */}
-              <div style={{
-                background: palette.surface,
-                borderRadius: '12px',
-                padding: '24px',
-                border: `1px solid ${palette.border}`
-              }}>
-                <h3
-                  className="fr-display"
-                  style={{
-                    fontSize: '17px',
-                    fontWeight: 500,
-                    color: palette.ink,
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <TrendingUp size={18} color={palette.growth} />
-                  Field Kit
-                </h3>
-
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '12px'
-                }}>
-                  {[
-                    { label: 'Lead Pipeline', desc: 'Every seed still growing', icon: Users, page: 'lead-pipeline' },
-                    { label: 'Opportunities', desc: 'Deals moving through the field', icon: Target, page: 'opportunities' },
-                    { label: 'Acreages', desc: 'Land under management', icon: Radio, page: 'monthly-acreages' },
-                  ].map((action) => {
-                    const Icon = action.icon;
-                    return (
-                      <button
-                        key={action.page}
-                        onClick={() => onPageChange(action.page)}
-                        className="fr-body"
-                        style={{
-                          textAlign: 'left',
-                          padding: '14px 16px',
-                          backgroundColor: palette.canvas,
-                          color: palette.ink,
-                          border: `1px solid ${palette.border}`,
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          transition: 'all 0.18s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                          e.currentTarget.style.borderColor = palette.pine;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = palette.canvas;
-                          e.currentTarget.style.borderColor = palette.border;
-                        }}
-                      >
-                        <div style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '8px',
-                          background: `${palette.pine}14`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <Icon size={16} color={palette.pine} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 600 }}>{action.label}</div>
-                          <div style={{ fontSize: '11px', color: palette.inkSoft, marginTop: '1px' }}>{action.desc}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
+  </>
+)}
         </div>
       </div>
     </div>

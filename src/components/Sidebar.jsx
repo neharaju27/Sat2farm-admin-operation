@@ -30,7 +30,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -38,7 +38,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isSalesUser) {
       // Sales users can only access sales pages and unlock-farm
-      const allowedSalesPages = ['sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities'];
+      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities'];
       if (allowedSalesPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -210,7 +210,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               New Registration
               <span className="sb-dot"></span>
             </div>
-            <div 
+            <div
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}
             >
@@ -227,8 +227,20 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {isSalesUser && (
           <>
             <div className="sb-section">CRM</div>
-            
-            <div 
+
+            <div
+              className={`sb-item ${currentPage === 'sales-dashboard' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('sales-dashboard')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Dashboard
+              <span className="sb-dot"></span>
+            </div>
+
+            <div
               className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('assign-acreages')}
             >
