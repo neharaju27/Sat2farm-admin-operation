@@ -635,6 +635,10 @@ useEffect(() => {
   const formatCurrency = (num) => {
     return '₹' + num.toLocaleString('en-IN');
   };
+  const generateUniqueColor = (index, total) => {
+  const hue = Math.round((360 / Math.max(total, 1)) * index) % 360;
+  return `hsl(${hue}, 65%, 50%)`;
+};
 
   // Process lead source data for pie chart
   const getProcessedLeadSourceData = () => {
@@ -643,14 +647,22 @@ useEffect(() => {
     }
     
     const total = leadSourceData.reduce((sum, item) => sum + item.count, 0);
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
     
-    return leadSourceData.slice(0, 8).map((item, index) => ({
+    
+    // Sort first, then assign colors based on sorted position
+    const sorted = [...leadSourceData]
+    .map((item) => ({
       name: item.lead_source,
       count: item.count,
-      percentage: ((item.count / total) * 100).toFixed(1),
-      color: colors[index % colors.length]
-    })).sort((a, b) => b.count - a.count);
+      percentage: ((item.count / total) * 100).toFixed(1)
+    }))
+    .sort((a, b) => b.count - a.count);
+    
+    // Assign colors after sorting to ensure unique colors
+    return sorted.map((item, index) => ({
+      ...item,
+      color: generateUniqueColor(index,sorted.length)
+    }));
   };
 
   // Generate pie chart paths dynamically
@@ -775,7 +787,7 @@ useEffect(() => {
       <div className="content-area">
         <div className="sa-container">
           {/* Welcome Section */}
-          <div className="sa-welcome" style={{ marginBottom: '16px' }}>
+          <div className="sa-welcome" style={{ marginBottom: '8px' }}>
             <div>
               <h1 className="sa-welcome-title">
                 Welcome!
@@ -1641,34 +1653,78 @@ useEffect(() => {
                     <Target size={18} style={{ color: '#3B6D11' }} />
                   </div>
                   <div className="card-body" style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                      {/* Pie Chart */}
-                      <div style={{ position: 'relative', width: '140px', height: '140px', flexShrink: 0 }}>
-                        <svg width="140" height="140" viewBox="0 0 200 200">
-                          {generatePieChartPaths(getProcessedLeadSourceData()).map((item, index) => (
-                            <path
-                              key={index}
-                              d={item.path}
-                              fill={item.color}
-                              stroke="#ffffff"
-                              strokeWidth="2"
-                            />
-                          ))}
-                        </svg>
-                      </div>
-                      
-                      {/* Legend */}
-                      <div style={{ width: '100%' }}>
-                        {getProcessedLeadSourceData().map((item, index) => (
-                          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: item.color }}></div>
-                            <span style={{ fontSize: '12px', color: '#1a1c17', fontWeight: '500' }}>{item.name}</span>
-                            <span style={{ fontSize: '12px', color: '#5F5E5A', marginLeft: 'auto', fontWeight: '600' }}>{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+  <ReactECharts
+    key={`lead-source-bar-${getProcessedLeadSourceData().length}`}
+    notMerge={true}
+    lazyUpdate={true}
+    style={{ height: '340px', width: '100%' }}
+    option={{
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params) => {
+          const p = params[0];
+          return `${p.name}: <strong>${p.value}</strong>`;
+        }
+      },
+      grid: {
+        left: 4,
+        right: 24,
+        top: 8,
+        bottom: 8,
+        containLabel: true
+      },
+      xAxis: {
+        type: 'value',
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+        axisLabel: { color: '#6b7280', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#f3f4f6' } }
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true, // biggest source at the top
+        data: getProcessedLeadSourceData().map(item => item.name),
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+        axisLabel: {
+          color: '#374151',
+          fontSize: 11,
+          width: 110,
+          overflow: 'truncate'
+        }
+      },
+      dataZoom: [
+        {
+          type: 'slider',
+          yAxisIndex: 0,
+          width: 8,
+          right: 2,
+          start: 0,
+          end: 45, // shows top ~8 rows by default, scroll for the rest
+          showDetail: false,
+          brushSelect: false
+        },
+        { type: 'inside', yAxisIndex: 0 }
+      ],
+      series: [
+        {
+          type: 'bar',
+          barMaxWidth: 16,
+          data: getProcessedLeadSourceData().map(item => ({
+            value: item.count,
+            itemStyle: { color: item.color, borderRadius: [0, 4, 4, 0] }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: '#374151',
+            fontSize: 11,
+            fontWeight: 600
+          }
+        }
+      ]
+    }}
+  />
+</div>
                 </div>
 
                 {/* Lead Status */}
@@ -1727,131 +1783,133 @@ useEffect(() => {
                   <div className="card-title">Monthly Conversion Trend</div>
                   <TrendingUp size={18} style={{ color: '#3B6D11' }} />
                 </div>
-                <div className="card-body" style={{ padding: '24px' }}>
-                  <div style={{ marginBottom: '16px', fontSize: '14px', color: '#5F5E5A', fontWeight: '500' }}>
+                <div className="card-body" style={{ padding: '16px' }}>
+                  <div style={{ marginBottom: '12px', fontSize: '12px', color: '#5F5E5A', fontWeight: '500' }}>
                     Lead volume vs. conversions over time
                   </div>
-                  <ReactECharts
-                    option={{
-                      tooltip: {
-                        trigger: 'axis',
-                        formatter: function(params) {
-                          let result = params[0].name + '<br/>';
-                          params.forEach(param => {
-                            result += `${param.marker} ${param.seriesName}: ${param.value}<br/>`;
-                          });
-                          return result;
-                        }
-                      },
-                      grid: {
-                        left: 60,
-                        right: 40,
-                        top: 20,
-                        bottom: 60,
-                        containLabel: true
-                      },
-                      xAxis: {
-                        type: 'category',
-                        data: monthlyTrendData.map(item => item.month),
-                        axisLine: {
-                          lineStyle: {
-                            color: '#e5e7eb'
+                  <div style={{ height: '250px' }}>
+                    <ReactECharts
+                      style={{ height: '100%' }}
+                      option={{
+                        tooltip: {
+                          trigger: 'axis',
+                          formatter: function(params) {
+                            let result = params[0].name + '<br/>';
+                            params.forEach(param => {
+                              result += `${param.marker} ${param.seriesName}: ${param.value}<br/>`;
+                            });
+                            return result;
                           }
                         },
-                        axisLabel: {
-                          color: '#6b7280',
-                          fontSize: 13,
-                          fontWeight: 500
-                        }
-                      },
-                      yAxis: {
-                        type: 'value',
-                        axisLine: {
-                          lineStyle: {
-                            color: '#e5e7eb'
-                          }
+                        grid: {
+                          left: 50,
+                          right: 30,
+                          top: 20,
+                          bottom: 40,
+                          containLabel: true
                         },
-                        axisLabel: {
-                          color: '#6b7280',
-                          fontSize: 13,
-                          fontWeight: 500
-                        },
-                        splitLine: {
-                          lineStyle: {
-                            color: '#e5e7eb'
-                          }
-                        }
-                      },
-                      series: [
-                        {
-                          name: 'Leads',
-                          type: 'line',
-                          data: monthlyTrendData.map(item => item.leads),
-                          smooth: true,
-                          lineStyle: {
-                            width: 4,
-                            color: '#8B5CF6'
+                        xAxis: {
+                          type: 'category',
+                          data: monthlyTrendData.map(item => item.month),
+                          axisLine: {
+                            lineStyle: {
+                              color: '#e5e7eb'
+                            }
                           },
-                          itemStyle: {
-                            color: '#8B5CF6',
-                            borderColor: '#ffffff',
-                            borderWidth: 2
+                          axisLabel: {
+                            color: '#6b7280',
+                            fontSize: 11,
+                            fontWeight: 500
+                          }
+                        },
+                        yAxis: {
+                          type: 'value',
+                          axisLine: {
+                            lineStyle: {
+                              color: '#e5e7eb'
+                            }
                           },
-                          areaStyle: {
-                            color: {
-                              type: 'linear',
-                              x: 0,
-                              y: 0,
-                              x2: 0,
-                              y2: 1,
-                              colorStops: [
-                                { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
-                                { offset: 1, color: 'rgba(139, 92, 246, 0)' }
-                              ]
+                          axisLabel: {
+                            color: '#6b7280',
+                            fontSize: 11,
+                            fontWeight: 500
+                          },
+                          splitLine: {
+                            lineStyle: {
+                              color: '#e5e7eb'
                             }
                           }
                         },
-                        {
-                          name: 'Converted',
-                          type: 'line',
-                          data: monthlyTrendData.map(item => item.converted),
-                          smooth: true,
-                          lineStyle: {
-                            width: 4,
-                            color: '#10B981'
+                        series: [
+                          {
+                            name: 'Leads',
+                            type: 'line',
+                            data: monthlyTrendData.map(item => item.leads),
+                            smooth: true,
+                            lineStyle: {
+                              width: 3,
+                              color: '#8B5CF6'
+                            },
+                            itemStyle: {
+                              color: '#8B5CF6',
+                              borderColor: '#ffffff',
+                              borderWidth: 2
+                            },
+                            areaStyle: {
+                              color: {
+                                type: 'linear',
+                                x: 0,
+                                y: 0,
+                                x2: 0,
+                                y2: 1,
+                                colorStops: [
+                                  { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
+                                  { offset: 1, color: 'rgba(139, 92, 246, 0)' }
+                                ]
+                              }
+                            }
                           },
-                          itemStyle: {
-                            color: '#10B981',
-                            borderColor: '#ffffff',
-                            borderWidth: 2
-                          },
-                          areaStyle: {
-                            color: {
-                              type: 'linear',
-                              x: 0,
-                              y: 0,
-                              x2: 0,
-                              y2: 1,
-                              colorStops: [
-                                { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
-                                { offset: 1, color: 'rgba(16, 185, 129, 0)' }
-                              ]
+                          {
+                            name: 'Converted',
+                            type: 'line',
+                            data: monthlyTrendData.map(item => item.converted),
+                            smooth: true,
+                            lineStyle: {
+                              width: 3,
+                              color: '#10B981'
+                            },
+                            itemStyle: {
+                              color: '#10B981',
+                              borderColor: '#ffffff',
+                              borderWidth: 2
+                            },
+                            areaStyle: {
+                              color: {
+                                type: 'linear',
+                                x: 0,
+                                y: 0,
+                                x2: 0,
+                                y2: 1,
+                                colorStops: [
+                                  { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
+                                  { offset: 1, color: 'rgba(16, 185, 129, 0)' }
+                                ]
+                              }
                             }
                           }
+                        ],
+                        legend: {
+                          data: ['Leads', 'Converted'],
+                          bottom: 5,
+                          textStyle: {
+                            fontSize: 11,
+                            fontWeight: 500,
+                            color: '#1a1c17'
+                          }
                         }
-                      ],
-                      legend: {
-                        data: ['Leads', 'Converted'],
-                        bottom: 10,
-                        textStyle: {
-                          fontSize: 14,
-                          fontWeight: 500,
-                          color: '#1a1c17'
-                        }
-                      }
-                    }}
-                    style={{ height: '350px', width: '100%' }}
-                  />
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </>
