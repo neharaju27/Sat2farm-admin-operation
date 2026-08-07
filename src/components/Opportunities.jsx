@@ -640,7 +640,6 @@ export default function Opportunities({ onPageChange }) {
 
   const handleCombinedFilters = async (filters) => {
     
-    if (isApplyingAccountsFilters) return;
     setIsApplyingAccountsFilters(true);
     setAccountsFiltersSuccess(false);
     setLoading(true);
@@ -782,6 +781,7 @@ export default function Opportunities({ onPageChange }) {
       alert(`Error applying filters: ${err.message || 'Unknown error occurred'}`);
     } finally {
       setLoading(false);
+      setIsApplyingAccountsFilters(false);
     }
   };
 
@@ -8960,6 +8960,7 @@ export default function Opportunities({ onPageChange }) {
                           if (activeFilters.length > 0) {
                             handleCombinedFilters(activeFilters);
                           } else {
+                            setIsApplyingAccountsFilters(false);
                             setIsFilterApplied(false);
                             setCurrentFilterCriteria('');
                             setFilterSidebarOpen(false);
