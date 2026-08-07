@@ -2379,7 +2379,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                 <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div>
                     <a
-                      href="/sample.kml"
+                      href="./sample.kml"
                       download="sample.kml"
                       style={{color: 'var(--primary)', textDecoration: 'underline'}}
                     >
