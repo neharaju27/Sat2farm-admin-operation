@@ -1276,7 +1276,7 @@ export default function LeadPipeline({ onPageChange }) {
         url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
         successMessage = `Tags updated to ${newValue} successfully!`;
       } else if (fieldName === 'description') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_DESCRIPTION_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}`;
+        url = `${import.meta.env.VITE_UPDATE_LEAD_DESCRIPTION_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
         successMessage = `Description updated successfully!`;
       } else {
         // Use generic update approach for other fields
