@@ -2302,9 +2302,10 @@ export default function Opportunities({ onPageChange }) {
   };
 
   // â”€â”€ Editable field component (identical to LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const EditableField = ({ label, value, fieldName, type = 'text' }) => {
+  const EditableField = ({ label, value, fieldName, type = 'text', required = false }) => {
     const isEditing = editingField === fieldName;
     const containerRef = React.useRef(null);
+    const isRequired = required || fieldName === 'accountName' || fieldName === 'phoneNumber' || fieldName === 'account_name' || fieldName === 'phone';
 
     React.useEffect(() => {
       if (isEditing) {
@@ -2321,7 +2322,7 @@ export default function Opportunities({ onPageChange }) {
     return (
       <div ref={containerRef}>
         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
-          {label}
+          {label} {isRequired && <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span>}
         </label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {isEditing ? (
@@ -2954,6 +2955,14 @@ export default function Opportunities({ onPageChange }) {
   };
 
   const handleFieldUpdate = async (leadId, fieldName, newValue) => {
+    if (fieldName === 'accountName' && (!newValue || !newValue.trim())) {
+      toast.error('Account Name is a mandatory field');
+      return;
+    }
+    if (fieldName === 'phoneNumber' && (!newValue || !newValue.trim())) {
+      toast.error('Phone Number is a mandatory field');
+      return;
+    }
     // Show updating message
     toast.loading('Updating...', { id: 'field-update' });
 
@@ -2964,12 +2973,13 @@ export default function Opportunities({ onPageChange }) {
       // Account-related fields use the update-account API
       if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
         const accountName = fieldName === 'accountName' ? newValue : selectedUser?.accountName || '';
+        const phoneNumber = selectedUser?.phoneNumber || selectedUser?.phone || '';
         const accountType = fieldName === 'accountType' ? newValue : selectedUser?.accountType || '';
         const website = fieldName === 'website' ? newValue : selectedUser?.website || '';
         const dealPresent = selectedUser?.dealPresent ? 1 : 0;
         const owner = selectedUser?.contactOwner || currentUserName;
 
-        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&account_name=${encodeURIComponent(accountName)}&account_type=${encodeURIComponent(accountType)}&website=${encodeURIComponent(website)}&deal_present=${dealPresent}&status=active&owner=${encodeURIComponent(owner)}&user=${encodeURIComponent(currentUserName)}`;
+        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&account_name=${encodeURIComponent(accountName)}&phone=${encodeURIComponent(phoneNumber)}&account_type=${encodeURIComponent(accountType)}&website=${encodeURIComponent(website)}&deal_present=${dealPresent}&status=active&owner=${encodeURIComponent(owner)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'contactName') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'phoneNumber') {
@@ -2996,7 +3006,7 @@ export default function Opportunities({ onPageChange }) {
         url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'tags') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'notes') {
+      if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&notes=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'description') {
         url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
@@ -3395,11 +3405,11 @@ export default function Opportunities({ onPageChange }) {
                           <span>Contact Name</span>
                         </div>
                       </th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span></th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Alternate Number</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '180px' }}>Email</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Company Name</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Account Name</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Account Name <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span></th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Account Number</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>No. of Deals</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Account Type</th>
