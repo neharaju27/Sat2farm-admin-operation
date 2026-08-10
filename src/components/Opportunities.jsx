@@ -3029,8 +3029,6 @@ export default function Opportunities({ onPageChange }) {
         url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'tags') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-        else if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&notes=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'description') {
         url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else {
