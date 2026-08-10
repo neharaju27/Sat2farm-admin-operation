@@ -600,8 +600,26 @@ export default function LeadPipeline({ onPageChange }) {
 
         let allFetched = [...firstItems];
 
+        const totalCount = typeof firstData.total === 'number' ? firstData.total : (typeof firstData.count === 'number' ? firstData.count : 0);
+        // Fetch all remaining batches in parallel if total count exceeds 1000
+        if (totalCount > batchLimit) {
+          const batchPromises = [];
+          for (let currentOffset = batchLimit; currentOffset < totalCount; currentOffset += batchLimit) {
+            batchPromises.push(
+              fetch(buildUrl(currentOffset))
+              .then(res => res.ok ? res.json() : null)
+              .then(data => data ? parseItems(data) : [])
+              .catch(() => [])
+            );
+          }
+          const results = await Promise.all(batchPromises);
+          results.forEach(items => {
+            if (items && items.length) {
+              allFetched.push(...items);
+            }
+          });
+        }
         if (!active) return;
-
         setFilterFetchProgress(99);
 
         // --- Step 3: Transform ---
