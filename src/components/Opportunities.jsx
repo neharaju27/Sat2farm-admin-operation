@@ -468,6 +468,7 @@ export default function Opportunities({ onPageChange }) {
         }
 
         // Fetch first batch of 1000 accounts for filter options (single request)
+        // Fetch first batch of 1000 accounts for filter options
         const firstRes = await fetch(buildUrl(0));
         if (!firstRes.ok || !active) return;
         const firstData = await firstRes.json();
@@ -484,11 +485,33 @@ export default function Opportunities({ onPageChange }) {
 
         let allFetched = [...firstItems];
 
+        const totalCount = typeof firstData.total === 'number' ? firstData.total : (typeof firstData.count === 'number' ? firstData.count : 0);
+
+        // Fetch all remaining batches in parallel if total count exceeds 1000
+        if (totalCount > batchLimit) {
+          const batchPromises = [];
+          for (let currentOffset = batchLimit; currentOffset < totalCount; currentOffset += batchLimit) {
+            batchPromises.push(
+              fetch(buildUrl(currentOffset))
+                .then(res => res.ok ? res.json() : null)
+                .then(data => data ? parseItems(data) : [])
+                .catch(() => [])
+            );
+          }
+          const results = await Promise.all(batchPromises);
+          results.forEach(items => {
+            if (items && items.length) {
+              allFetched.push(...items);
+            }
+          });
+        }
+
         if (!active) return;
 
         setFilterFetchProgress(99);
 
         // --- Step 3: Transform ---
+
         const transformed = allFetched.map(opp => ({
           id: opp.id,
           contactName: opp.full_name || opp.contact_name || opp.name || '',
@@ -3006,7 +3029,7 @@ export default function Opportunities({ onPageChange }) {
         url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'tags') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
+        else if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
         url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&notes=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
       } else if (fieldName === 'description') {
         url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
