@@ -214,14 +214,15 @@ export default function Pricing({ user, onPageChange }) {
                 fontWeight: 600,
                 letterSpacing: '0.02em',
                 textTransform: 'uppercase',
-                textAlign: 'right'
+                textAlign: 'left'
               }}>Acres</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'left'
               }}>Duration</div>
               <div style={{
                 color: '#ffffff',
@@ -343,10 +344,8 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '6px'
+                  justifyContent: 'flex-end'
                 }}>
-                  <IndianRupee size={16} color={palette.inkSoft} strokeWidth={2} />
                   <span style={{
                     fontSize: '15px',
                     fontWeight: 600,
@@ -382,10 +381,8 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '6px'
+                  justifyContent: 'flex-end'
                 }}>
-                  <IndianRupee size={16} color={palette.pine} strokeWidth={2.5} />
                   <span style={{
                     fontSize: '16px',
                     fontWeight: 700,
