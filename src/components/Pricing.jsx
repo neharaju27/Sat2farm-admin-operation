@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { IndianRupee, Calendar, User, Save, Plus, Trash2 } from "lucide-react";
+import { IndianRupee, Calendar, User, Plus, Trash2 } from "lucide-react";
 import toast from 'react-hot-toast';
 import "../styles/Sat2FarmAdminPortal.css";
 
@@ -16,7 +16,7 @@ const palette = {
 
 export default function Pricing({ user, onPageChange }) {
   const [pricingRows, setPricingRows] = useState([
-    { id: 1, acres: '', duration: '1-month', discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
+    { id: 1, acres: '', duration: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
   ]);
   const [createdDateTime, setCreatedDateTime] = useState('');
 
@@ -36,40 +36,40 @@ export default function Pricing({ user, onPageChange }) {
   }, []);
 
   const formatCurrency = (num) => {
-    return '₹' + num.toLocaleString('en-IN', {
+    return '₹' + (num || 0).toLocaleString('en-IN', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     });
   };
 
-  const calculateFinalPrice = (acres, duration) => {
-    if (!acres || acres <= 0) return 0;
+  const calculatePricing = (acres, duration) => {
+    if (!acres || acres <= 0) return null;
 
-    const basePricePerAcre = 1000;
     const acresNum = parseFloat(acres);
+    let baseRatePerAcre = 400;
 
-    let durationMultiplier = 1;
-    if (duration === '6-month') {
-      durationMultiplier = 6;
+    if (duration === '1-month') {
+      baseRatePerAcre = 400;
+    } else if (duration === '6-month') {
+      baseRatePerAcre = 800;
     } else if (duration === '12-month') {
-      durationMultiplier = 12;
+      baseRatePerAcre = 1200;
     }
 
-    const baseTotal = acresNum * basePricePerAcre * durationMultiplier;
+    const actualPrice = acresNum * baseRatePerAcre;
 
-    // Discount %: FLOOR(MIN(15 * log10(acres), 70))
-    const discountPercentage = Math.floor(Math.min(15 * Math.log10(acresNum), 70));
+    // Discount % formula: Floor(Min(15 * log10(acres), 70))
+    const rawDiscount = Math.floor(Math.min(15 * Math.log10(acresNum), 70));
+    const discountPercentage = Math.max(0, rawDiscount);
 
-    // Final price: baseTotal * (1 - discount% / 100)
-    const finalPrice = baseTotal * (1 - discountPercentage / 100);
-
-    // Discount amount derived from baseTotal - finalPrice
-    const discountAmount = baseTotal - finalPrice;
+    const finalPrice = actualPrice * (1 - discountPercentage / 100);
+    const discountAmount = actualPrice - finalPrice;
 
     return {
+      actualPrice: Math.round(actualPrice),
       finalPrice: Math.round(finalPrice),
-      discountPercentage: discountPercentage.toFixed(2),
-      discountAmount: Math.round(discountAmount)
+      discountAmount: Math.round(discountAmount),
+      discountPercentage: discountPercentage
     };
   };
 
@@ -78,16 +78,18 @@ export default function Pricing({ user, onPageChange }) {
       if (row.id === id) {
         const updatedRow = { ...row, [field]: value };
         if (field === 'acres' || field === 'duration') {
-          const calculated = calculateFinalPrice(
+          const calculated = calculatePricing(
             field === 'acres' ? value : row.acres,
             field === 'duration' ? value : row.duration
           );
           if (calculated) {
+            updatedRow.actualPrice = calculated.actualPrice;
             updatedRow.discountPercentage = calculated.discountPercentage;
             updatedRow.discountAmount = calculated.discountAmount;
             updatedRow.finalPrice = calculated.finalPrice;
           } else {
             // acres cleared or invalid — reset everything back to zero
+            updatedRow.actualPrice = 0;
             updatedRow.discountPercentage = 0;
             updatedRow.discountAmount = 0;
             updatedRow.finalPrice = 0;
@@ -101,7 +103,7 @@ export default function Pricing({ user, onPageChange }) {
 
   const addRow = () => {
     const newId = Math.max(...pricingRows.map(r => r.id), 0) + 1;
-    setPricingRows([...pricingRows, { id: newId, acres: '', duration: '1-month', discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
+    setPricingRows([...pricingRows, { id: newId, acres: '', duration: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
   };
 
   const deleteRow = (id) => {
@@ -110,23 +112,6 @@ export default function Pricing({ user, onPageChange }) {
       return;
     }
     setPricingRows(pricingRows.filter(row => row.id !== id));
-  };
-
-  const handleSave = () => {
-    const validRows = pricingRows.filter(row => row.acres && row.acres > 0);
-    if (validRows.length === 0) {
-      toast.error('Please fill in at least one row with valid acreage');
-      return;
-    }
-
-    const pricingData = {
-      createdBy: displayName,
-      createdAt: createdDateTime,
-      rows: validRows
-    };
-
-    console.log('Saving pricing data:', pricingData);
-    toast.success('Pricing data saved successfully!');
   };
 
   return (
@@ -218,7 +203,7 @@ export default function Pricing({ user, onPageChange }) {
             {/* Table Header */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.3fr 1.5fr 1fr 1.5fr 0.8fr',
+              gridTemplateColumns: '1.2fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
               gap: '1px',
               background: `linear-gradient(135deg, ${palette.pine}, ${palette.growth})`,
               padding: '16px 24px'
@@ -243,6 +228,13 @@ export default function Pricing({ user, onPageChange }) {
                 fontWeight: 600,
                 letterSpacing: '0.02em',
                 textTransform: 'uppercase'
+              }}>Actual Price</div>
+              <div style={{
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+                textTransform: 'uppercase'
               }}>Discount %</div>
               <div style={{
                 color: '#ffffff',
@@ -250,7 +242,7 @@ export default function Pricing({ user, onPageChange }) {
                 fontWeight: 600,
                 letterSpacing: '0.02em',
                 textTransform: 'uppercase'
-              }}>Final  Payable Price</div>
+              }}>Final Price</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
@@ -267,7 +259,7 @@ export default function Pricing({ user, onPageChange }) {
                 key={row.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.3fr 1.5fr 1fr 1.5fr 0.8fr',
+                  gridTemplateColumns: '1.2fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
                   gap: '1px',
                   background: palette.border,
                   padding: '1px',
@@ -346,11 +338,37 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <IndianRupee size={16} color={palette.inkSoft} strokeWidth={2} />
+                  <span style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: palette.inkSoft,
+                    letterSpacing: '-0.01em'
+                  }}>
+                    {formatCurrency(row.actualPrice)}
+                  </span>
+                </div>
+                <div style={{
+                  background: palette.surface,
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
                   fontWeight: 600,
                   color: palette.growth,
                   fontSize: '15px'
                 }}>
-                  {row.discountPercentage}%
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    backgroundColor: `${palette.growth}15`,
+                    color: palette.growth,
+                    fontSize: '13px',
+                    fontWeight: 600
+                  }}>
+                    {row.discountPercentage}%
+                  </span>
                 </div>
                 <div style={{
                   background: palette.surface,
@@ -363,13 +381,13 @@ export default function Pricing({ user, onPageChange }) {
                   <span style={{
                     fontSize: '16px',
                     fontWeight: 700,
-                    color: palette.ink,
+                    color: palette.pine,
                     letterSpacing: '-0.01em'
                   }}>
                     {formatCurrency(row.finalPrice)}
                   </span>
                 </div>
-                {/* Actions cell — button sized to fit content, not stretched to fill the cell */}
+                {/* Actions cell */}
                 <div style={{
                   background: palette.surface,
                   padding: '16px',
@@ -460,41 +478,6 @@ export default function Pricing({ user, onPageChange }) {
               <Plus size={18} strokeWidth={2.5} />
               Add Row
             </button>
-
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '12px 28px',
-                backgroundColor: palette.growth,
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 4px 14px rgba(61, 131, 97, 0.3)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#2d6a4f';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(61, 131, 97, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = palette.growth;
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(61, 131, 97, 0.3)';
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <Save size={18} strokeWidth={2.5} />
-              Save Pricing
-            </button>
           </div>
 
           {/* Summary */}
@@ -537,7 +520,7 @@ export default function Pricing({ user, onPageChange }) {
               </div>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                 gap: '24px'
               }}>
                 <div style={{
@@ -563,6 +546,7 @@ export default function Pricing({ user, onPageChange }) {
                     {pricingRows.reduce((sum, row) => sum + (parseFloat(row.acres) || 0), 0).toLocaleString()}
                   </div>
                 </div>
+
                 <div style={{
                   background: `${palette.canvas}`,
                   borderRadius: '12px',
@@ -576,7 +560,61 @@ export default function Pricing({ user, onPageChange }) {
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: 500
-                  }}>Total Final Payable Price</div>
+                  }}>Total Actual Price</div>
+                  <div style={{
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: palette.inkSoft,
+                    letterSpacing: '-0.02em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.actualPrice || 0), 0))}
+                  </div>
+                </div>
+
+                <div style={{
+                  background: `${palette.canvas}`,
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${palette.border}`
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 500
+                  }}>Total Discount</div>
+                  <div style={{
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: palette.amber,
+                    letterSpacing: '-0.02em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.discountAmount || 0), 0))}
+                  </div>
+                </div>
+
+                <div style={{
+                  background: `${palette.canvas}`,
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `1px solid ${palette.border}`
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 500
+                  }}>Total Final Price</div>
                   <div style={{
                     fontSize: '24px',
                     fontWeight: 700,
@@ -586,31 +624,7 @@ export default function Pricing({ user, onPageChange }) {
                     alignItems: 'center',
                     gap: '6px'
                   }}>
-                    <IndianRupee size={20} strokeWidth={2.5} />
-                    {formatCurrency(pricingRows.reduce((sum, row) => sum + row.finalPrice, 0))}
-                  </div>
-                </div>
-                <div style={{
-                  background: `${palette.canvas}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${palette.border}`
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: palette.inkSoft,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 500
-                  }}>Average Discount</div>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: palette.amber,
-                    letterSpacing: '-0.02em'
-                  }}>
-                    {(pricingRows.reduce((sum, row) => sum + parseFloat(row.discountPercentage || 0), 0) / pricingRows.filter(r => r.acres).length || 0).toFixed(1)}%
+                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.finalPrice || 0), 0))}
                   </div>
                 </div>
               </div>

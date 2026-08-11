@@ -52,6 +52,20 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'admin';
   
   if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted) {
+    let descriptionText = "This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.";
+    let alertTitle = "Login as Operations Required";
+    let alertText = "To access this page, please log in with Operations credentials.";
+
+    if (isPricingRestricted) {
+      descriptionText = "This page is only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
+      alertTitle = "Login as Operations or Sales Required";
+      alertText = "To access this page, please log in with Operations or Sales credentials.";
+    } else if (isSalesPageRestricted) {
+      descriptionText = "Access to this feature is restricted for your account. Please contact your administrator for permission.";
+      alertTitle = "Permission Required";
+      alertText = "Your account does not have permission to access this page.";
+    }
+
     // Show restricted access message
     return (
       <div style={{
@@ -101,7 +115,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
             lineHeight: '1.5',
             marginBottom: '24px'
           }}>
-            This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.
+            {descriptionText}
           </p>
           
           <div style={{
@@ -117,10 +131,10 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
             <AlertCircle style={{ width: '20px', height: '20px', color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
-                Login as Operations Required
+                {alertTitle}
               </div>
               <div style={{ fontSize: '14px', color: '#78350f' }}>
-                To access this page, please log in with Operations credentials.
+                {alertText}
               </div>
             </div>
           </div>
