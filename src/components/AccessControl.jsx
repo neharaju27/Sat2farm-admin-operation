@@ -43,7 +43,15 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'ops' &&
     role !== 'admin';
   
-  if (isSalesPageRestricted || isOperationDashboardRestricted) {
+  // Restrict pricing to only operation and sales roles
+  const isPricingRestricted = currentPage === 'pricing' && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' &&
+    role !== 'sales' &&
+    role !== 'admin';
+  
+  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted) {
     // Show restricted access message
     return (
       <div style={{

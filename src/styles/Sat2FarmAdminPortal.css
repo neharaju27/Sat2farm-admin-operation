@@ -1400,22 +1400,29 @@ button:active {
 /* ── Operation Dashboard Responsive Grids ── */
 .op-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(7, minmax(140px, 1fr));
+  gap: 12px;
   margin-bottom: 28px;
 }
 
 .op-deal-amount-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 28px;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 1400px) {
   .op-dashboard-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .op-dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
   }
 
   .op-deal-amount-grid {
@@ -1424,10 +1431,22 @@ button:active {
   }
 }
 
+@media (max-width: 768px) {
+  .op-dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+  }
+
+  .op-deal-amount-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+}
+
 @media (max-width: 480px) {
   .op-dashboard-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
   .op-deal-amount-grid {
