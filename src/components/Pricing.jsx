@@ -213,7 +213,8 @@ export default function Pricing({ user, onPageChange }) {
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'right'
               }}>Acres</div>
               <div style={{
                 color: '#ffffff',
@@ -227,21 +228,24 @@ export default function Pricing({ user, onPageChange }) {
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'right'
               }}>Actual Price</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'right'
               }}>Discount %</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'right'
               }}>Final Price</div>
               <div style={{
                 color: '#ffffff',
@@ -289,7 +293,8 @@ export default function Pricing({ user, onPageChange }) {
                       background: palette.surface,
                       color: palette.ink,
                       fontWeight: 500,
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
+                      textAlign: 'right'
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = palette.pine;
@@ -338,6 +343,7 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'flex-end',
                   gap: '6px'
                 }}>
                   <IndianRupee size={16} color={palette.inkSoft} strokeWidth={2} />
@@ -355,6 +361,7 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'flex-end',
                   fontWeight: 600,
                   color: palette.growth,
                   fontSize: '15px'
@@ -375,6 +382,7 @@ export default function Pricing({ user, onPageChange }) {
                   padding: '16px',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'flex-end',
                   gap: '6px'
                 }}>
                   <IndianRupee size={16} color={palette.pine} strokeWidth={2.5} />
@@ -479,157 +487,6 @@ export default function Pricing({ user, onPageChange }) {
               Add Row
             </button>
           </div>
-
-          {/* Summary */}
-          {pricingRows.some(row => row.acres && row.acres > 0) && (
-            <div style={{
-              marginTop: '32px',
-              background: palette.surface,
-              borderRadius: '16px',
-              padding: '28px 32px',
-              border: `1px solid ${palette.border}`,
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '24px'
-              }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: `linear-gradient(135deg, ${palette.growth}20, ${palette.pine}20)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <IndianRupee size={20} color={palette.pine} strokeWidth={2.5} />
-                </div>
-                <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: palette.ink,
-                  letterSpacing: '-0.01em',
-                  margin: 0
-                }}>
-                  Pricing Summary
-                </h3>
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '24px'
-              }}>
-                <div style={{
-                  background: `${palette.canvas}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${palette.border}`
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: palette.inkSoft,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 500
-                  }}>Total Acres</div>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: palette.ink,
-                    letterSpacing: '-0.02em'
-                  }}>
-                    {pricingRows.reduce((sum, row) => sum + (parseFloat(row.acres) || 0), 0).toLocaleString()}
-                  </div>
-                </div>
-
-                <div style={{
-                  background: `${palette.canvas}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${palette.border}`
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: palette.inkSoft,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 500
-                  }}>Total Actual Price</div>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: palette.inkSoft,
-                    letterSpacing: '-0.02em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.actualPrice || 0), 0))}
-                  </div>
-                </div>
-
-                <div style={{
-                  background: `${palette.canvas}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${palette.border}`
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: palette.inkSoft,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 500
-                  }}>Total Discount</div>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: palette.amber,
-                    letterSpacing: '-0.02em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.discountAmount || 0), 0))}
-                  </div>
-                </div>
-
-                <div style={{
-                  background: `${palette.canvas}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `1px solid ${palette.border}`
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    color: palette.inkSoft,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 500
-                  }}>Total Final Price</div>
-                  <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
-                    color: palette.growth,
-                    letterSpacing: '-0.02em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    {formatCurrency(pricingRows.reduce((sum, row) => sum + (row.finalPrice || 0), 0))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       </div>
