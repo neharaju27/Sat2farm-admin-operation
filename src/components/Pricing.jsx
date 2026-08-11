@@ -16,7 +16,7 @@ const palette = {
 
 export default function Pricing({ user, onPageChange }) {
   const [pricingRows, setPricingRows] = useState([
-    { id: 1, acres: '', duration: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
+    { id: 1, acres: '', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
   ]);
   const [createdDateTime, setCreatedDateTime] = useState('');
 
@@ -42,17 +42,17 @@ export default function Pricing({ user, onPageChange }) {
     });
   };
 
-  const calculatePricing = (acres, duration) => {
+  const calculatePricing = (acres, plan) => {
     if (!acres || acres <= 0) return null;
 
     const acresNum = parseFloat(acres);
     let baseRatePerAcre = 400;
 
-    if (duration === '1-month') {
+    if (plan === '1-month') {
       baseRatePerAcre = 400;
-    } else if (duration === '6-month') {
+    } else if (plan === '6-month') {
       baseRatePerAcre = 800;
-    } else if (duration === '12-month') {
+    } else if (plan === '12-month') {
       baseRatePerAcre = 1200;
     }
 
@@ -77,10 +77,10 @@ export default function Pricing({ user, onPageChange }) {
     setPricingRows(rows => rows.map(row => {
       if (row.id === id) {
         const updatedRow = { ...row, [field]: value };
-        if (field === 'acres' || field === 'duration') {
+        if (field === 'acres' || field === 'plan') {
           const calculated = calculatePricing(
             field === 'acres' ? value : row.acres,
-            field === 'duration' ? value : row.duration
+            field === 'plan' ? value : row.plan
           );
           if (calculated) {
             updatedRow.actualPrice = calculated.actualPrice;
@@ -103,7 +103,7 @@ export default function Pricing({ user, onPageChange }) {
 
   const addRow = () => {
     const newId = Math.max(...pricingRows.map(r => r.id), 0) + 1;
-    setPricingRows([...pricingRows, { id: newId, acres: '', duration: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
+    setPricingRows([...pricingRows, { id: newId, acres: '', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
   };
 
   const deleteRow = (id) => {
@@ -223,7 +223,7 @@ export default function Pricing({ user, onPageChange }) {
                 letterSpacing: '0.02em',
                 textTransform: 'uppercase',
                 textAlign: 'left'
-              }}>Duration</div>
+              }}>plan</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
@@ -309,8 +309,8 @@ export default function Pricing({ user, onPageChange }) {
                 </div>
                 <div style={{ background: palette.surface, padding: '16px' }}>
                   <select
-                    value={row.duration}
-                    onChange={(e) => handleRowChange(row.id, 'duration', e.target.value)}
+                    value={row.plan}
+                    onChange={(e) => handleRowChange(row.id, 'plan', e.target.value)}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
