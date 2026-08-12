@@ -53,11 +53,15 @@ export default function OperationDashboard({ user, onPageChange }) {
   };
 
   const formatCurrency = (num) => {
-  return '₹' + num.toLocaleString('en-IN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  });
-};
+    if (num >= 100000) {
+      const lakhs = (num / 100000).toFixed(1);
+      return `₹${lakhs} L`;
+    }
+    return '₹' + num.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  };
 
   const calculateConversionRate = (value, total) => {
     if (total === 0) return 0;
