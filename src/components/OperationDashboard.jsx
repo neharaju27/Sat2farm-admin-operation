@@ -250,7 +250,7 @@ export default function OperationDashboard({ user, onPageChange }) {
       stage: 'Paid',
       title: 'Paid',
       value: metrics.paid,
-      icon: DollarSign,
+      icon: IndianRupee,
       accent: palette.teal,
       growth: 0,
       onClick: null
@@ -643,7 +643,7 @@ export default function OperationDashboard({ user, onPageChange }) {
           key: 'paidAmount',
           title: 'Paid Amount',
           value: metrics.paidAmount,
-          icon: DollarSign,
+          icon: IndianRupee,
           accent: palette.teal
         }
       ].map((card, index) => {
