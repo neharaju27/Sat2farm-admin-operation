@@ -2932,10 +2932,14 @@ export default function Opportunities({ onPageChange }) {
                   border: 'none',
                   borderRadius: 'var(--r)',
                   fontSize: '10px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
+                title="Save"
               >
-                <Check size={14} style={{ color: "var(--blue-600)" }} />
+                <Check size={14} style={{ color: 'white' }} />
               </button>
               <button
                 onClick={cancelDealEdit}
