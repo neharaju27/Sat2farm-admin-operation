@@ -2480,9 +2480,13 @@ export default function LeadPipeline({ onPageChange }) {
                   border: 'none',
                   borderRadius: 'var(--r)',
                   fontSize: '10px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-              ><Check size={14} style={{ color: "var(--blue-600)" }} /></button>
+                title="Save"
+              ><Check size={14} style={{ color: 'white' }} /></button>
               <button
                 onClick={cancelEdit}
                 style={{
