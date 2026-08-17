@@ -2365,7 +2365,7 @@ export default function Opportunities({ onPageChange }) {
                 }}
                 autoFocus
               />
-              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} /></button>
+              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Save"><Check size={14} style={{ color: 'white' }} /></button>
               <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
             </>
           ) : (
