@@ -1758,7 +1758,7 @@ export default function Opportunities({ onPageChange }) {
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
-    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Pragya','Alisha'];
+    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Pragya','Alisha',,'Rohith S','Shyamli','Fathima'];
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
     if (saved) {
       try {
@@ -1773,7 +1773,7 @@ export default function Opportunities({ onPageChange }) {
 
   // â”€â”€ Helper: get all available owners combining predefined & dynamic loaded data â”€â”€
   const getAllAvailableOwners = () => {
-    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Alisha','Pragya'];
+    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Alisha','Pragya','Rohith S','Shyamli','Fathima'];
     const ownersFromKanban = Object.values(kanbanDeals || {})
       .flat()
       .map(d => d.deal_owner || d.owner || d.contactOwner)
