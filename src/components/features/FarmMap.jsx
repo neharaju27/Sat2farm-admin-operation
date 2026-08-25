@@ -365,7 +365,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                     </div>
                     <div style={{fontSize: '13px', display: 'flex', gap: '4px'}}>
                       <span style={{color: 'rgba(255,255,255,0.7)'}}>Area:</span>
-                      <span>{farmData.area ? (farmData.area * 2.47105).toFixed(2) + ' acres' : 'N/A'}</span>
+                      <span>{farmData.area ? farmData.area.toFixed(2) + ' acres' : 'N/A'}</span>
                     </div>
                     <div style={{fontSize: '13px', display: 'flex', gap: '4px'}}>
                       <span style={{color: 'rgba(255,255,255,0.7)'}}>Location:</span>
