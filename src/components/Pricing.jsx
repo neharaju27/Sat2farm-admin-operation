@@ -16,7 +16,7 @@ const palette = {
 
 export default function Pricing({ user, onPageChange }) {
   const [pricingRows, setPricingRows] = useState([
-    { id: 1, acres: '', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
+    { id: 1, acres: '', currency: 'INR', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }
   ]);
   const [createdDateTime, setCreatedDateTime] = useState('');
 
@@ -35,11 +35,22 @@ export default function Pricing({ user, onPageChange }) {
     setCreatedDateTime(formatted);
   }, []);
 
-  const formatCurrency = (num) => {
-    return '₹' + (num || 0).toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
+  const formatCurrency = (num, currency = 'INR') => {
+    const conversionRate = 0.0104515; // 1 INR = 0.0104515 USD (40000 INR = 418.06 USD)
+    let displayAmount = num || 0;
+    
+    if (currency === 'USD') {
+      displayAmount = displayAmount * conversionRate;
+      return '$' + displayAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    } else {
+      return '₹' + displayAmount.toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    }
   };
 
   const calculatePricing = (acres, plan) => {
@@ -103,7 +114,7 @@ export default function Pricing({ user, onPageChange }) {
 
   const addRow = () => {
     const newId = Math.max(...pricingRows.map(r => r.id), 0) + 1;
-    setPricingRows([...pricingRows, { id: newId, acres: '', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
+    setPricingRows([...pricingRows, { id: newId, acres: '', currency: 'INR', plan: '1-month', actualPrice: 0, discountPercentage: 0, discountAmount: 0, finalPrice: 0 }]);
   };
 
   const deleteRow = (id) => {
@@ -203,7 +214,7 @@ export default function Pricing({ user, onPageChange }) {
             {/* Table Header */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.2fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
+              gridTemplateColumns: '1.2fr 1fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
               gap: '1px',
               background: `linear-gradient(135deg, ${palette.pine}, ${palette.growth})`,
               padding: '16px 24px'
@@ -216,6 +227,14 @@ export default function Pricing({ user, onPageChange }) {
                 textTransform: 'uppercase',
                 textAlign: 'left'
               }}>Acres</div>
+              <div style={{
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+                textTransform: 'uppercase',
+                textAlign: 'left'
+              }}>Currency</div>
               <div style={{
                 color: '#ffffff',
                 fontSize: '13px',
@@ -264,7 +283,7 @@ export default function Pricing({ user, onPageChange }) {
                 key={row.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1.2fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
+                  gridTemplateColumns: '1.2fr 1fr 1.3fr 1.4fr 1.1fr 1.4fr 0.8fr',
                   gap: '1px',
                   background: palette.border,
                   padding: '1px',
@@ -306,6 +325,37 @@ export default function Pricing({ user, onPageChange }) {
                       e.target.style.boxShadow = 'none';
                     }}
                   />
+                </div>
+                <div style={{ background: palette.surface, padding: '16px' }}>
+                  <select
+                    value={row.currency}
+                    onChange={(e) => handleRowChange(row.id, 'currency', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      backgroundColor: palette.surface,
+                      cursor: 'pointer',
+                      color: palette.ink,
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = palette.pine;
+                      e.target.style.boxShadow = `0 0 0 3px ${palette.pine}20`;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = palette.border;
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  >
+                    <option value="INR">Rupees</option>
+                    <option value="USD">USD</option>
+                  </select>
                 </div>
                 <div style={{ background: palette.surface, padding: '16px' }}>
                   <select
@@ -352,7 +402,7 @@ export default function Pricing({ user, onPageChange }) {
                     color: palette.inkSoft,
                     letterSpacing: '-0.01em'
                   }}>
-                    {formatCurrency(row.actualPrice)}
+                    {formatCurrency(row.actualPrice, row.currency)}
                   </span>
                 </div>
                 <div style={{
@@ -389,7 +439,7 @@ export default function Pricing({ user, onPageChange }) {
                     color: palette.pine,
                     letterSpacing: '-0.01em'
                   }}>
-                    {formatCurrency(row.finalPrice)}
+                    {formatCurrency(row.finalPrice, row.currency)}
                   </span>
                 </div>
                 {/* Actions cell */}
