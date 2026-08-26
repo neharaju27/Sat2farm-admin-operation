@@ -35,23 +35,24 @@ export default function Pricing({ user, onPageChange }) {
     setCreatedDateTime(formatted);
   }, []);
 
-  const formatCurrency = (num, currency = 'INR') => {
-    const conversionRate = 0.0104515; // 1 INR = 0.0104515 USD (40000 INR = 418.06 USD)
-    let displayAmount = num || 0;
-    
-    if (currency === 'USD') {
-      displayAmount = displayAmount * conversionRate;
-      return '$' + displayAmount.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
-    } else {
-      return '₹' + displayAmount.toLocaleString('en-IN', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      });
-    }
-  };
+  const USD_DIVISOR = 80; // matches sheet formula: Total cost (USD) = Total cost / 80
+
+const formatCurrency = (num, currency = 'INR') => {
+  let displayAmount = num || 0;
+
+  if (currency === 'USD') {
+    displayAmount = displayAmount / USD_DIVISOR;
+    return '$' + displayAmount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  } else {
+    return '₹' + displayAmount.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  }
+};
 
   const calculatePricing = (acres, plan) => {
     if (!acres || acres <= 0) return null;
