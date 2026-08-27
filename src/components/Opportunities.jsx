@@ -2993,13 +2993,17 @@ export default function Opportunities({ onPageChange }) {
         };
 
         const apiFieldName = fieldMapping[editingDealField];
+        let queryUrl =
+          `${apiUrl}?deal_id=${encodeURIComponent(selectedDeal.deal_id)}&user=${encodeURIComponent(currentUserName)}`;
         if (apiFieldName) {
           requestBody[apiFieldName] = editDealValue;
+          queryUrl +=
+             `&${encodeURIComponent(apiFieldName)}=${encodeURIComponent(editDealValue)}`;
         }
 
         
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(queryUrl, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -3265,6 +3269,14 @@ export default function Opportunities({ onPageChange }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
     }, [isEditing]);
+
+    const handleSave = () => {
+      const val = type === 'textarea'
+        ? (textareaRef.current ? textareaRef.current.value : editDealValue)
+        : editDealValue;
+      
+      saveDealEdit(val);
+    };
 
     const handleTextareaChange = (e) => {
       setLocalTextareaValue(e.target.value);
