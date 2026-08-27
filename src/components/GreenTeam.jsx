@@ -957,15 +957,16 @@ export default function GreenTeam({ onPageChange }) {
         return;
       }
 
-      // Call PUT /stage API
-      if (!GREEN_TEAM_UPDATE_STAGE_URL) {
+      // Call PUT API to update current_stage
+      if (!GREEN_TEAM_PUT_URL) {
         toast.error('API URL not configured');
         return;
       }
 
-      const response = await axios.put(GREEN_TEAM_UPDATE_STAGE_URL, {
-        assignment_id: assignmentToUpdate.id?.toString() || assignmentToUpdate.deal_id?.toString(),
-        stage: newStage,
+      const response = await axios.put(GREEN_TEAM_PUT_URL, {
+        id: assignmentToUpdate.id?.toString() || assignmentToUpdate.deal_id?.toString(),
+        deal_id: assignmentToUpdate.deal_id,
+        current_stage: newStage,
         changed_by: user?.name || user?.phone_number || 'operation'
       }, {
         headers: {
@@ -974,48 +975,15 @@ export default function GreenTeam({ onPageChange }) {
         }
       });
 
-      // Use API response timestamp if available
-      const apiTimestamp = response.data?.created_at || response.data?.timestamp || response.data?.updated_at;
+      console.log('Stage update API response:', response.data);
 
-      // Update local state after successful API call
-      const updatedAssignments = greenTeamAssignments.map(assignment => {
-        // Check both id and deal_id for compatibility
-        if (assignment.id.toString() === dealId || assignment.deal_id?.toString() === dealId) {
-          // Use API timestamp if available, otherwise fallback to current time
-          const timestampToUse = apiTimestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
-          
-          const updatedHistory = {
-            ...assignment.stage_history,
-            [newStage]: timestampToUse
-          };
-          
-          // Only add new timeline event, preserve existing timeline
-          const newTimelineEvent = {
-            id: Date.now(),
-            field: 'stage_change',
-            activity_type: 'stage_changed',
-            created_at: timestampToUse,
-            changed_by: user?.name || user?.phone_number || 'operation',
-            old_value: oldStage,
-            new_value: newStage
-          };
-          
-          // Preserve existing timeline and add new event
-          const existingTimeline = assignment.timeline || [];
-          const updatedTimeline = [...existingTimeline, newTimelineEvent];
-          
-          return { 
-            ...assignment, 
-            stage: newStage,
-            stage_history: updatedHistory,
-            timeline: updatedTimeline
-          };
-        }
-        return assignment;
-      });
-      
-      setGreenTeamAssignments(updatedAssignments);
-      toast.success(`Assignment moved from ${oldStage} to ${newStage}`);
+      if (response.data && response.data.success) {
+        // Refresh assignments to get updated data from API
+        await fetchGreenTeamAssignments();
+        toast.success(`Assignment moved from ${oldStage} to ${newStage}`);
+      } else {
+        toast.error('Failed to update assignment stage');
+      }
     } catch (error) {
       console.error('Error updating assignment stage:', error);
       toast.error('Failed to update assignment stage');
