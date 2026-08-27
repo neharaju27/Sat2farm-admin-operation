@@ -10,8 +10,7 @@ import satyuktLogo from '../assets/satyukt.webp';
 import axios from 'axios';
 
 const GREEN_TEAM_GET_ASSIGNMENTS_URL = import.meta.env.VITE_GREEN_TEAM_GET_ASSIGNMENTS_URL;
-const GREEN_TEAM_UPDATE_STAGE_URL = import.meta.env.VITE_GREEN_TEAM_UPDATE_STAGE_URL;
-const GREEN_TEAM_PUT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
+const GREEN_TEAM_POST_ASSIGNMENT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
 
 // Get icon for timeline field
 const getTimelineIcon = (field) => {
@@ -474,7 +473,9 @@ export default function GreenTeam({ onPageChange }) {
   const fetchGreenTeamAssignments = async () => {
     try {
       setLoading(true);
-      
+      console.log('Starting Green Team assignments fetch...');
+      console.log('Current assignments count before refresh:', greenTeamAssignments.length);
+
       if (!GREEN_TEAM_GET_ASSIGNMENTS_URL) {
         console.error('Green Team API URL not configured');
         setError('API URL not configured');
@@ -586,17 +587,61 @@ export default function GreenTeam({ onPageChange }) {
             if (assignment.timeline && assignment.timeline.length > 0) {
               const constructedHistory = {};
               assignment.timeline.forEach(item => {
-                if (item.action === 'stage changed' && item.description) {
-                  const match = item.description.match(/moved from (.+?) to (.+?)$/i);
-                  if (match) {
-                    const targetStage = match[2].trim();
-                    constructedHistory[targetStage] = item.created_at;
+                // Handle multiple action types for stage changes
+                if ((item.action === 'stage changed' || item.action === 'stage_changed' || item.action === 'assignment updated') && item.description) {
+                  const properMatch = item.description.match(/moved from (.+?) to (.+?)$/i);
+                  const malformedMatch = item.description.match(/Assignment stage changed from (.+?) to (.+?)$/i);
+                  const updatedMatch = item.description.match(/Assignment updated stage (.+?) to (.+?)$/i);
+                  const genericMatch = item.description.match(/(.+?) from (.+?) to (.+?)$/i);
+
+                  if (properMatch) {
+                    const fromStage = properMatch[1].trim();
+                    const toStage = properMatch[2].trim();
+                    constructedHistory[fromStage] = item.created_at;
+                    constructedHistory[toStage] = item.created_at;
+                  } else if (malformedMatch) {
+                    const fromStage = malformedMatch[1].trim();
+                    const toStage = malformedMatch[2].trim();
+                    if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                      constructedHistory[fromStage] = item.created_at;
+                    }
+                    if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                      constructedHistory[toStage] = item.created_at;
+                    }
+                  } else if (updatedMatch) {
+                    const fromStage = updatedMatch[1].trim();
+                    const toStage = updatedMatch[2].trim();
+                    constructedHistory[fromStage] = item.created_at;
+                    constructedHistory[toStage] = item.created_at;
+                  } else if (genericMatch) {
+                    const fromStage = genericMatch[2].trim();
+                    const toStage = genericMatch[3].trim();
+                    if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                      constructedHistory[fromStage] = item.created_at;
+                    }
+                    if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                      constructedHistory[toStage] = item.created_at;
+                    }
                   }
-                } else if (item.action === 'assignment created') {
+                } else if (item.action === 'assignment created' || item.action === 'assignment_created') {
                   const initialStage = item.stage || assignment.current_stage || 'New Assignment';
                   constructedHistory[initialStage] = item.created_at;
                 }
+                
+                // Also check for field-based stage changes
+                if (item.field === 'stage_change' && item.new_value) {
+                  constructedHistory[item.new_value] = item.created_at;
+                  if (item.old_value) {
+                    constructedHistory[item.old_value] = item.created_at;
+                  }
+                }
               });
+              
+              // Ensure current stage is always included
+              if (assignment.current_stage && !constructedHistory[assignment.current_stage]) {
+                constructedHistory[assignment.current_stage] = assignment.created_at || new Date().toISOString();
+              }
+              
               // Only use constructed history if it has data, otherwise keep API stage_history
               if (Object.keys(constructedHistory).length > 0) {
                 mappedAssignment.stage_history = constructedHistory;
@@ -701,7 +746,9 @@ export default function GreenTeam({ onPageChange }) {
 
         const stageResults = await Promise.all(stagePromises);
         const allAssignments = stageResults.flat();
-        
+
+        console.log('Fetched assignments count:', allAssignments.length);
+        console.log('Sample assignment stages:', allAssignments.map(a => ({ id: a.id, stage: a.stage, current_stage: a.current_stage })));
 
         setGreenTeamAssignments(allAssignments);
         setError(null);
@@ -712,6 +759,7 @@ export default function GreenTeam({ onPageChange }) {
       setGreenTeamAssignments([]);
     } finally {
       setLoading(false);
+      console.log('Fetch completed, loading set to false');
     }
   };
 
@@ -724,7 +772,7 @@ export default function GreenTeam({ onPageChange }) {
   const saveAssignmentDetails = async () => {
     try {
       setSavingAssignmentDetails(true);
-      if (!GREEN_TEAM_PUT_URL) {
+      if (!GREEN_TEAM_POST_ASSIGNMENT_URL) {
         toast.error('API URL not configured');
         return;
       }
@@ -755,7 +803,7 @@ export default function GreenTeam({ onPageChange }) {
         }
       });
 
-      const response = await axios.put(GREEN_TEAM_PUT_URL, payload, {
+      const response = await axios.put(GREEN_TEAM_POST_ASSIGNMENT_URL, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
@@ -851,17 +899,61 @@ export default function GreenTeam({ onPageChange }) {
         if (freshData.timeline && freshData.timeline.length > 0) {
           const constructedHistory = {};
           freshData.timeline.forEach(item => {
-            if (item.action === 'stage changed' && item.description) {
-              const match = item.description.match(/moved from (.+?) to (.+?)$/i);
-              if (match) {
-                const targetStage = match[2].trim();
-                constructedHistory[targetStage] = item.created_at;
+            // Handle multiple action types for stage changes
+            if ((item.action === 'stage changed' || item.action === 'stage_changed' || item.action === 'assignment updated') && item.description) {
+              const properMatch = item.description.match(/moved from (.+?) to (.+?)$/i);
+              const malformedMatch = item.description.match(/Assignment stage changed from (.+?) to (.+?)$/i);
+              const updatedMatch = item.description.match(/Assignment updated stage (.+?) to (.+?)$/i);
+              const genericMatch = item.description.match(/(.+?) from (.+?) to (.+?)$/i);
+
+              if (properMatch) {
+                const fromStage = properMatch[1].trim();
+                const toStage = properMatch[2].trim();
+                constructedHistory[fromStage] = item.created_at;
+                constructedHistory[toStage] = item.created_at;
+              } else if (malformedMatch) {
+                const fromStage = malformedMatch[1].trim();
+                const toStage = malformedMatch[2].trim();
+                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[fromStage] = item.created_at;
+                }
+                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[toStage] = item.created_at;
+                }
+              } else if (updatedMatch) {
+                const fromStage = updatedMatch[1].trim();
+                const toStage = updatedMatch[2].trim();
+                constructedHistory[fromStage] = item.created_at;
+                constructedHistory[toStage] = item.created_at;
+              } else if (genericMatch) {
+                const fromStage = genericMatch[2].trim();
+                const toStage = genericMatch[3].trim();
+                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[fromStage] = item.created_at;
+                }
+                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[toStage] = item.created_at;
+                }
               }
-            } else if (item.action === 'assignment created') {
+            } else if (item.action === 'assignment created' || item.action === 'assignment_created') {
               const initialStage = item.stage || assignment.current_stage || 'New Assignment';
               constructedHistory[initialStage] = item.created_at;
             }
+            
+            // Also check for field-based stage changes
+            if (item.field === 'stage_change' && item.new_value) {
+              constructedHistory[item.new_value] = item.created_at;
+              if (item.old_value) {
+                constructedHistory[item.old_value] = item.created_at;
+              }
+            }
           });
+          
+          // Ensure current stage is always included
+          if (freshData.current_stage && !constructedHistory[freshData.current_stage]) {
+            constructedHistory[freshData.current_stage] = freshData.created_at || new Date().toISOString();
+          }
+          
           updatedAssignment.stage_history = constructedHistory;
 
       }
@@ -902,17 +994,61 @@ export default function GreenTeam({ onPageChange }) {
         if (freshData.length > 0) {
           const constructedHistory = {};
           freshData.forEach(item => {
-            if (item.action === 'stage changed' && item.description) {
-              const match = item.description.match(/moved from (.+?) to (.+?)$/i);
-              if (match) {
-                const targetStage = match[2].trim();
-                constructedHistory[targetStage] = item.created_at;
+            // Handle multiple action types for stage changes
+            if ((item.action === 'stage changed' || item.action === 'stage_changed' || item.action === 'assignment updated') && item.description) {
+              const properMatch = item.description.match(/moved from (.+?) to (.+?)$/i);
+              const malformedMatch = item.description.match(/Assignment stage changed from (.+?) to (.+?)$/i);
+              const updatedMatch = item.description.match(/Assignment updated stage (.+?) to (.+?)$/i);
+              const genericMatch = item.description.match(/(.+?) from (.+?) to (.+?)$/i);
+
+              if (properMatch) {
+                const fromStage = properMatch[1].trim();
+                const toStage = properMatch[2].trim();
+                constructedHistory[fromStage] = item.created_at;
+                constructedHistory[toStage] = item.created_at;
+              } else if (malformedMatch) {
+                const fromStage = malformedMatch[1].trim();
+                const toStage = malformedMatch[2].trim();
+                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[fromStage] = item.created_at;
+                }
+                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[toStage] = item.created_at;
+                }
+              } else if (updatedMatch) {
+                const fromStage = updatedMatch[1].trim();
+                const toStage = updatedMatch[2].trim();
+                constructedHistory[fromStage] = item.created_at;
+                constructedHistory[toStage] = item.created_at;
+              } else if (genericMatch) {
+                const fromStage = genericMatch[2].trim();
+                const toStage = genericMatch[3].trim();
+                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[fromStage] = item.created_at;
+                }
+                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                  constructedHistory[toStage] = item.created_at;
+                }
               }
-            } else if (item.action === 'assignment created') {
+            } else if (item.action === 'assignment created' || item.action === 'assignment_created') {
               const initialStage = item.stage || assignment.current_stage || 'New Assignment';
               constructedHistory[initialStage] = item.created_at;
             }
+            
+            // Also check for field-based stage changes
+            if (item.field === 'stage_change' && item.new_value) {
+              constructedHistory[item.new_value] = item.created_at;
+              if (item.old_value) {
+                constructedHistory[item.old_value] = item.created_at;
+              }
+            }
           });
+          
+          // Ensure current stage is always included
+          if (assignment.current_stage && !constructedHistory[assignment.current_stage]) {
+            constructedHistory[assignment.current_stage] = assignment.created_at || new Date().toISOString();
+          }
+          
           updatedAssignment.stage_history = constructedHistory;
   
         }
@@ -957,18 +1093,40 @@ export default function GreenTeam({ onPageChange }) {
         return;
       }
 
-      // Call PUT API to update current_stage
-      if (!GREEN_TEAM_PUT_URL) {
+      // Call POST API for stage update (Lambda handles both POST and PUT)
+      if (!GREEN_TEAM_POST_ASSIGNMENT_URL) {
         toast.error('API URL not configured');
         return;
       }
 
-      const response = await axios.put(GREEN_TEAM_PUT_URL, {
-        id: assignmentToUpdate.id?.toString() || assignmentToUpdate.deal_id?.toString(),
-        deal_id: assignmentToUpdate.deal_id,
-        current_stage: newStage,
+      console.log('Updating stage for assignment:', {
+        assignment_id: assignmentToUpdate.id?.toString() || assignmentToUpdate.deal_id?.toString(),
+        oldStage: oldStage,
+        newStage: newStage,
         changed_by: user?.name || user?.phone_number || 'operation'
-      }, {
+      });
+
+      console.log('Assignment data:', assignmentToUpdate);
+      console.log('Available IDs:', {
+        id: assignmentToUpdate.id,
+        deal_id: assignmentToUpdate.deal_id,
+        assignment_id: assignmentToUpdate.assignment_id
+      });
+
+      // Use the correct deal_id from the assignment data
+      const dealIdToSend = assignmentToUpdate.deal_id || assignmentToUpdate.assignment_id || assignmentToUpdate.id;
+
+      const payload = {
+        deal_id: dealIdToSend?.toString(),
+        current_stage: newStage,
+        changed_by: user?.name || user?.phone_number || 'operation',
+        // Include timeline description to ensure proper timeline entry
+        timeline_description: `Assignment stage changed from ${oldStage} to ${newStage}`
+      };
+
+      console.log('Payload being sent:', payload);
+
+      const response = await axios.put(GREEN_TEAM_POST_ASSIGNMENT_URL, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
@@ -976,28 +1134,88 @@ export default function GreenTeam({ onPageChange }) {
       });
 
       console.log('Stage update API response:', response.data);
+      console.log('Stage update status:', response.status);
+      console.log('Full response:', response);
+      console.log('Timeline result from API:', response.data.timeline_result);
 
-      if (response.data && response.data.success) {
-        // Refresh assignments to get updated data from API
-        await fetchGreenTeamAssignments();
-        toast.success(`Assignment moved from ${oldStage} to ${newStage}`);
-      } else {
-        toast.error('Failed to update assignment stage');
+      // Handle the case where no changes were needed
+      if (response.data.message === 'No field values were changed') {
+        console.log('No changes needed - assignment already has the correct stage');
+        console.log('Database stage:', response.data.current_stage);
+        console.log('Frontend showing as:', oldStage);
+        toast.success(`Assignment already in ${response.data.current_stage} stage`);
+        // Refresh data to ensure frontend is in sync with database
+        console.log('Triggering data refresh to sync with database...');
+        fetchGreenTeamAssignments();
+        return;
       }
+
+      // Use API response timestamp if available
+      const apiTimestamp = response.data?.created_at || response.data?.timestamp || response.data?.updated_at;
+
+      // Update local state after successful API call
+      const updatedAssignments = greenTeamAssignments.map(assignment => {
+        // Check both id and deal_id for compatibility
+        if (assignment.id.toString() === dealId || assignment.deal_id?.toString() === dealId) {
+          // Use API timestamp if available, otherwise fallback to current time
+          const timestampToUse = apiTimestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
+          
+          const updatedHistory = {
+            ...assignment.stage_history,
+            [newStage]: timestampToUse
+          };
+          
+          // Only add new timeline event, preserve existing timeline
+          const newTimelineEvent = {
+            id: Date.now(),
+            field: 'stage_change',
+            activity_type: 'stage_changed',
+            created_at: timestampToUse,
+            changed_by: user?.name || user?.phone_number || 'operation',
+            old_value: oldStage,
+            new_value: newStage
+          };
+          
+          // Preserve existing timeline and add new event
+          const existingTimeline = assignment.timeline || [];
+          const updatedTimeline = [...existingTimeline, newTimelineEvent];
+          
+          return { 
+            ...assignment, 
+            stage: newStage,
+            stage_history: updatedHistory,
+            timeline: updatedTimeline
+          };
+        }
+        return assignment;
+      });
+      
+      setGreenTeamAssignments(updatedAssignments);
+      toast.success(`Assignment moved from ${oldStage} to ${newStage}`);
+
+      // Refresh data to ensure UI is in sync with database
+      setTimeout(() => {
+        fetchGreenTeamAssignments();
+      }, 500);
     } catch (error) {
       console.error('Error updating assignment stage:', error);
-      toast.error('Failed to update assignment stage');
+      console.error('Error response data:', error.response?.data);
+      console.error('Error response data string:', JSON.stringify(error.response?.data, null, 2));
+      console.error('Error status:', error.response?.status);
+      console.error('Error headers:', error.response?.headers);
+      console.error('Full error:', error);
+      toast.error(`Failed to update assignment stage: ${error.response?.data?.message || error.message}`);
     }
   };
 
   // Submit assignment to Green Team API
   const submitToGreenTeam = async (assignmentData) => {
     try {
-      if (!GREEN_TEAM_GET_ASSIGNMENTS_URL) {
+      if (!GREEN_TEAM_POST_ASSIGNMENT_URL) {
         throw new Error('API URL not configured');
       }
 
-      const response = await axios.post(GREEN_TEAM_GET_ASSIGNMENTS_URL, assignmentData, {
+      const response = await axios.post(GREEN_TEAM_POST_ASSIGNMENT_URL, assignmentData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
@@ -1183,20 +1401,21 @@ export default function GreenTeam({ onPageChange }) {
               alignItems: 'center',
               gap: '8px',
               fontSize: '14px',
+              fontWeight: '500',
               color: '#475569',
               transition: 'all 0.2s'
             }}
-            onMouseEnter={(e) => {
+            onMouseOver={(e) => {
               e.target.style.backgroundColor = '#f1f5f9';
               e.target.style.borderColor = '#cbd5e1';
             }}
-            onMouseLeave={(e) => {
+            onMouseOut={(e) => {
               e.target.style.backgroundColor = 'white';
               e.target.style.borderColor = '#e2e8f0';
             }}
           >
             <RefreshCw size={16} />
-            Refresh
+            Refresh Data
           </button>
         </div>
       </div>
@@ -3049,8 +3268,73 @@ export default function GreenTeam({ onPageChange }) {
                       {(() => {
 
                         
-                        // Use API stage_history or construct from timeline
-                        const stageHistoryData = selectedAssignment.stage_history || {};
+                        // Construct stage history from timeline to ensure accuracy
+                        const stageHistoryFromTimeline = {};
+                        if (selectedAssignment.timeline && selectedAssignment.timeline.length > 0) {
+                          selectedAssignment.timeline.forEach(item => {
+                            // Handle multiple action types for stage changes
+                            if ((item.action === 'stage changed' || item.action === 'stage_changed' || item.action === 'assignment updated') && item.description) {
+                              // Handle both proper format and Lambda's malformed format
+                              const properMatch = item.description.match(/moved from (.+?) to (.+?)$/i);
+                              const malformedMatch = item.description.match(/Assignment stage changed from (.+?) to (.+?)$/i);
+                              const updatedMatch = item.description.match(/Assignment updated stage (.+?) to (.+?)$/i);
+                              const genericMatch = item.description.match(/(.+?) from (.+?) to (.+?)$/i);
+
+                              if (properMatch) {
+                                const fromStage = properMatch[1].trim();
+                                const toStage = properMatch[2].trim();
+                                stageHistoryFromTimeline[fromStage] = item.created_at;
+                                stageHistoryFromTimeline[toStage] = item.created_at;
+                              } else if (malformedMatch) {
+                                const fromStage = malformedMatch[1].trim();
+                                const toStage = malformedMatch[2].trim();
+                                // Skip if the stage looks like a timestamp (YYYY-MM-DD HH:MM:SS)
+                                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                                  stageHistoryFromTimeline[fromStage] = item.created_at;
+                                }
+                                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                                  stageHistoryFromTimeline[toStage] = item.created_at;
+                                }
+                              } else if (updatedMatch) {
+                                const fromStage = updatedMatch[1].trim();
+                                const toStage = updatedMatch[2].trim();
+                                stageHistoryFromTimeline[fromStage] = item.created_at;
+                                stageHistoryFromTimeline[toStage] = item.created_at;
+                              } else if (genericMatch) {
+                                const fromStage = genericMatch[2].trim();
+                                const toStage = genericMatch[3].trim();
+                                if (!fromStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                                  stageHistoryFromTimeline[fromStage] = item.created_at;
+                                }
+                                if (!toStage.match(/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/)) {
+                                  stageHistoryFromTimeline[toStage] = item.created_at;
+                                }
+                              }
+                            } else if (item.action === 'assignment created' || item.action === 'assignment_created') {
+                              const initialStage = item.stage || selectedAssignment.current_stage || selectedAssignment.stage || 'New Assignment';
+                              stageHistoryFromTimeline[initialStage] = item.created_at;
+                            }
+                            
+                            // Also check for field-based stage changes
+                            if (item.field === 'stage_change' && item.new_value) {
+                              stageHistoryFromTimeline[item.new_value] = item.created_at;
+                              if (item.old_value) {
+                                stageHistoryFromTimeline[item.old_value] = item.created_at;
+                              }
+                            }
+                          });
+                        }
+                        
+                        // Ensure current stage is always included
+                        if (selectedAssignment.stage && !stageHistoryFromTimeline[selectedAssignment.stage]) {
+                          stageHistoryFromTimeline[selectedAssignment.stage] = selectedAssignment.created_at || selectedAssignment.assigned_date || new Date().toISOString();
+                        }
+
+                        // Use timeline-constructed history, fallback to API stage_history
+                        const stageHistoryData = Object.keys(stageHistoryFromTimeline).length > 0
+                          ? stageHistoryFromTimeline
+                          : (selectedAssignment.stage_history || {});
+
                         const stageEntries = Object.entries(stageHistoryData)
                           .sort((a, b) => new Date(b[1]) - new Date(a[1])); // Sort by date descending
                         
@@ -3200,12 +3484,28 @@ export default function GreenTeam({ onPageChange }) {
                           // Parse stage change from description
                           let oldStage = null;
                           let newStage = null;
-                          if (item.action === 'stage changed' && item.description) {
-                            const match = item.description.match(/moved from (.+?) to (.+?)$/i);
-                            if (match) {
-                              oldStage = match[1].trim();
-                              newStage = match[2].trim();
+                          if ((item.action === 'stage changed' || item.action === 'stage_changed' || item.action === 'assignment updated') && item.description) {
+                            const properMatch = item.description.match(/moved from (.+?) to (.+?)$/i);
+                            const malformedMatch = item.description.match(/Assignment stage changed from (.+?) to (.+?)$/i);
+                            const updatedMatch = item.description.match(/Assignment updated stage (.+?) to (.+?)$/i);
+                            const genericMatch = item.description.match(/(.+?) from (.+?) to (.+?)$/i);
+                            
+                            if (properMatch) {
+                              oldStage = properMatch[1].trim();
+                              newStage = properMatch[2].trim();
+                            } else if (malformedMatch) {
+                              oldStage = malformedMatch[1].trim();
+                              newStage = malformedMatch[2].trim();
+                            } else if (updatedMatch) {
+                              oldStage = updatedMatch[1].trim();
+                              newStage = updatedMatch[2].trim();
+                            } else if (genericMatch) {
+                              oldStage = genericMatch[2].trim();
+                              newStage = genericMatch[3].trim();
                             }
+                          } else if (item.field === 'stage_change') {
+                            oldStage = item.old_value;
+                            newStage = item.new_value;
                           }
                           
                           return (

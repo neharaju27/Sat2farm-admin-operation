@@ -1850,8 +1850,7 @@ export default function Opportunities({ onPageChange }) {
   const saveGreenTeamAssignmentDetails = async () => {
     try {
       setSavingGreenTeamDetails(true);
-      const GREEN_TEAM_PUT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
-      if (!GREEN_TEAM_PUT_URL) {
+      if (!GREEN_TEAM_POST_ASSIGNMENT_URL) {
         toast.error('API URL not configured');
         return;
       }
@@ -1870,7 +1869,7 @@ export default function Opportunities({ onPageChange }) {
         }
       });
 
-      const response = await axios.put(GREEN_TEAM_PUT_URL, payload, {
+      const response = await axios.post(GREEN_TEAM_POST_ASSIGNMENT_URL, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
@@ -2413,6 +2412,12 @@ export default function Opportunities({ onPageChange }) {
         return;
       }
 
+      console.log('Updating deal stage:', {
+        deal_id: dealId,
+        deal_stage: newStage,
+        user: currentUserName
+      });
+
       const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: {
@@ -2425,11 +2430,14 @@ export default function Opportunities({ onPageChange }) {
         }),
       });
 
+      console.log('Stage update API response status:', response.status);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('Stage update API response data:', result);
       
 
       toast.dismiss();
@@ -2993,17 +3001,13 @@ export default function Opportunities({ onPageChange }) {
         };
 
         const apiFieldName = fieldMapping[editingDealField];
-        let queryUrl =
-          `${apiUrl}?deal_id=${encodeURIComponent(selectedDeal.deal_id)}&user=${encodeURIComponent(currentUserName)}`;
         if (apiFieldName) {
           requestBody[apiFieldName] = editDealValue;
-          queryUrl +=
-             `&${encodeURIComponent(apiFieldName)}=${encodeURIComponent(editDealValue)}`;
         }
 
         
 
-        const response = await fetch(queryUrl, {
+        const response = await fetch(apiUrl, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -3269,14 +3273,6 @@ export default function Opportunities({ onPageChange }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
     }, [isEditing]);
-
-    const handleSave = () => {
-      const val = type === 'textarea'
-        ? (textareaRef.current ? textareaRef.current.value : editDealValue)
-        : editDealValue;
-      
-      saveDealEdit(val);
-    };
 
     const handleTextareaChange = (e) => {
       setLocalTextareaValue(e.target.value);
