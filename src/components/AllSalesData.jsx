@@ -64,7 +64,7 @@ export default function AllSalesData({ user, onPageChange }) {
       // List of sales users
       const salesUsers = [
       'Aymen','Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
-        'Mustaqeem', 'Akhil Kumar M','Amith', 'Rohini','Ashok', 'Lipsa', 'Pragya', 'Alisha','Shyamli', 'Rohith S',
+        'Mustaqeem', 'Akhil Kumar M','Amith', 'Rohini','Ashok', 'Lipsa', 'Pragya', 'Alisha','Shyamli', 'Rohith S' ,'Fathima',
       ];
 
       const salesDataPromises = salesUsers.map(async (salesName) => {
