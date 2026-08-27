@@ -63,7 +63,7 @@ export default function AllSalesData({ user, onPageChange }) {
       setLoading(true);
       // List of sales users
       const salesUsers = [
-        'Nirosha', 'Aymen','Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
+      'Aymen','Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
         'Mustaqeem', 'Akhil Kumar M','Amith', 'Rohini','Ashok', 'Lipsa', 'Pragya', 'Alisha','Shyamli', 'Rohith S',
       ];
 
