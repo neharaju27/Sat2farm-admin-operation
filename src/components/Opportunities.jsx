@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 import satyuktLogo from '../assets/satyukt.webp';
+import axios from 'axios';
+
+const GREEN_TEAM_POST_ASSIGNMENT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
 
 // Satyukt Full Page Loading Component (Matching User Mockup)
 const SatyuktLoader = ({ message, subtitle }) => (
@@ -848,6 +851,26 @@ export default function Opportunities({ onPageChange }) {
   const [editDealValue, setEditDealValue] = useState('');
   const [showDeleteDealModal, setShowDeleteDealModal] = useState(false);
   const [dealToDelete, setDealToDelete] = useState(null);
+  const [showPaidDealForm, setShowPaidDealForm] = useState(false);
+  const [paidDealFormData, setPaidDealFormData] = useState({
+    type: '',
+    adminNumber: '',
+    farmerNumber: '',
+    totalAcres: '',
+    plan: '',
+    adminName: '',
+    farmerName: '',
+    description: '',
+    partnerName: '',
+    partnerNumber: '',
+    registerNumber: '',
+    mailId: '',
+    applicationName: '',
+    website: '',
+    plan1MonthAcres: '',
+    plan6MonthsAcres: '',
+    plan12MonthsAcres: ''
+  });
   const [showCustomDealTypeInput, setShowCustomDealTypeInput] = useState(false);
   const [showCustomDealStageInput, setShowCustomDealStageInput] = useState(false);
   const [showCustomDealOwnerInput, setShowCustomDealOwnerInput] = useState(false);
@@ -1742,6 +1765,152 @@ export default function Opportunities({ onPageChange }) {
     return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
   });
 
+  const [greenTeamAssignedDealIds, setGreenTeamAssignedDealIds] = useState([]);
+  const [showGreenTeamAssignmentDetails, setShowGreenTeamAssignmentDetails] = useState(false);
+  const [greenTeamAssignmentDetails, setGreenTeamAssignmentDetails] = useState(null);
+  const [loadingGreenTeamDetails, setLoadingGreenTeamDetails] = useState(false);
+  const [isEditingGreenTeamDetails, setIsEditingGreenTeamDetails] = useState(false);
+  const [editingGreenTeamDetails, setEditingGreenTeamDetails] = useState({});
+  const [savingGreenTeamDetails, setSavingGreenTeamDetails] = useState(false);
+
+  // Fetch Green Team assignments to check which deal IDs are already assigned
+  const fetchGreenTeamAssignedDealIds = async () => {
+    try {
+      const GREEN_TEAM_GET_ASSIGNMENTS_URL = import.meta.env.VITE_GREEN_TEAM_GET_ASSIGNMENTS_URL;
+      if (!GREEN_TEAM_GET_ASSIGNMENTS_URL) {
+        return;
+      }
+
+      const response = await axios.get(GREEN_TEAM_GET_ASSIGNMENTS_URL, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+        }
+      });
+
+      if (response.data && response.data.assignments && Array.isArray(response.data.assignments)) {
+        const assignedDealIds = response.data.assignments.map(assignment => assignment.deal_id?.toString());
+        setGreenTeamAssignedDealIds(assignedDealIds);
+        console.log('Green Team assigned deal IDs:', assignedDealIds);
+      }
+    } catch (error) {
+      console.error('Error fetching Green Team assignments:', error);
+    }
+  };
+
+  // Helper function to check if a deal is assigned to Green Team
+  const isDealAssignedToGreenTeam = (deal) => {
+    const dealId = deal.deal_id?.toString() || deal.id?.toString();
+    return greenTeamAssignedDealIds.includes(dealId);
+  };
+
+  // Fetch Green Team assignment details for a specific deal
+  const fetchGreenTeamAssignmentDetails = async (dealId) => {
+    try {
+      setLoadingGreenTeamDetails(true);
+      const GREEN_TEAM_GET_ASSIGNMENTS_URL = import.meta.env.VITE_GREEN_TEAM_GET_ASSIGNMENTS_URL;
+      if (!GREEN_TEAM_GET_ASSIGNMENTS_URL) {
+        setLoadingGreenTeamDetails(false);
+        return;
+      }
+
+      const response = await axios.get(GREEN_TEAM_GET_ASSIGNMENTS_URL, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+        }
+      });
+
+      if (response.data && response.data.assignments && Array.isArray(response.data.assignments)) {
+        const assignment = response.data.assignments.find(a => a.deal_id?.toString() === dealId.toString());
+        if (assignment) {
+          // Ensure these fields are preserved with fallbacks
+          const assignmentWithFallbacks = {
+            ...assignment,
+            contact_name: assignment.contact_name || '-',
+            amount: assignment.amount || '-',
+            closing_date: assignment.closing_date || '-'
+          };
+          setGreenTeamAssignmentDetails(assignmentWithFallbacks);
+          setEditingGreenTeamDetails(assignmentWithFallbacks);
+          setShowGreenTeamAssignmentDetails(true);
+        } else {
+          toast.error('Assignment details not found');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Green Team assignment details:', error);
+      toast.error('Failed to fetch assignment details');
+    } finally {
+      setLoadingGreenTeamDetails(false);
+    }
+  };
+
+  // Save Green Team assignment details
+  const saveGreenTeamAssignmentDetails = async () => {
+    try {
+      setSavingGreenTeamDetails(true);
+      const GREEN_TEAM_PUT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
+      if (!GREEN_TEAM_PUT_URL) {
+        toast.error('API URL not configured');
+        return;
+      }
+
+      // Build the payload with only changed fields
+      const payload = {
+        deal_id: editingGreenTeamDetails.deal_id
+      };
+
+      // Add fields that have changed (excluding non-editable fields)
+      const editableFields = ['type', 'admin_number', 'admin_name', 'farmer_number', 'farmer_name', 'total_acres', 'plan', 'description'];
+      
+      editableFields.forEach(field => {
+        if (editingGreenTeamDetails[field] !== greenTeamAssignmentDetails[field]) {
+          payload[field] = editingGreenTeamDetails[field];
+        }
+      });
+
+      const response = await axios.put(GREEN_TEAM_PUT_URL, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+        }
+      });
+
+      if (response.data) {
+        toast.success('Assignment details updated successfully');
+        setGreenTeamAssignmentDetails(editingGreenTeamDetails);
+        setIsEditingGreenTeamDetails(false);
+        // Refresh the assignment list
+        fetchGreenTeamAssignedDealIds();
+      }
+    } catch (error) {
+      console.error('Error saving Green Team assignment details:', error);
+      toast.error('Failed to update assignment details');
+    } finally {
+      setSavingGreenTeamDetails(false);
+    }
+  };
+
+  // Handle field change in edit mode
+  const handleGreenTeamFieldChange = (field, value) => {
+    setEditingGreenTeamDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Cancel editing
+  const cancelGreenTeamEditing = () => {
+    setEditingGreenTeamDetails(greenTeamAssignmentDetails);
+    setIsEditingGreenTeamDetails(false);
+  };
+
+  // Fetch Green Team assignments when component mounts
+  useEffect(() => {
+    fetchGreenTeamAssignedDealIds();
+  }, []);
+
   const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedLeadSources');
     return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
@@ -1758,7 +1927,7 @@ export default function Opportunities({ onPageChange }) {
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
-    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Pragya','Alisha',,'Rohith S','Shyamli','Fathima'];
+    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Pragya','Alisha'];
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
     if (saved) {
       try {
@@ -1773,7 +1942,7 @@ export default function Opportunities({ onPageChange }) {
 
   // â”€â”€ Helper: get all available owners combining predefined & dynamic loaded data â”€â”€
   const getAllAvailableOwners = () => {
-    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Alisha','Pragya','Rohith S','Shyamli','Fathima'];
+    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Alisha','Pragya'];
     const ownersFromKanban = Object.values(kanbanDeals || {})
       .flat()
       .map(d => d.deal_owner || d.owner || d.contactOwner)
@@ -2305,6 +2474,322 @@ export default function Opportunities({ onPageChange }) {
     setShowDealInfoModal(true);
   };
 
+  const handlePaidDealFormSubmit = async () => {
+    // Validate required fields based on type
+    if (paidDealFormData.type === 'Other Project') {
+      if (!paidDealFormData.type || !paidDealFormData.totalAcres) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+    } else if (paidDealFormData.type === 'Partner') {
+      if (!paidDealFormData.type || !paidDealFormData.partnerName || !paidDealFormData.partnerNumber) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      // Validate that at least one plan field is filled
+      if (!paidDealFormData.plan1MonthAcres && !paidDealFormData.plan6MonthsAcres && !paidDealFormData.plan12MonthsAcres) {
+        toast.error('Please fill in at least one plan field (1 month, 6 months, or 12 months)');
+        return;
+      }
+    } else if (paidDealFormData.type === 'Whilelable') {
+      if (!paidDealFormData.type || !paidDealFormData.registerNumber || !paidDealFormData.mailId ||
+          !paidDealFormData.applicationName) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      // Validate that at least one plan field is filled
+      if (!paidDealFormData.plan1MonthAcres && !paidDealFormData.plan6MonthsAcres && !paidDealFormData.plan12MonthsAcres) {
+        toast.error('Please fill in at least one plan field (1 month, 6 months, or 12 months)');
+        return;
+      }
+    } else if (paidDealFormData.type === 'Admin') {
+      if (!paidDealFormData.type || !paidDealFormData.adminNumber || !paidDealFormData.farmerNumber) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      // Validate that at least one plan field is filled
+      if (!paidDealFormData.plan1MonthAcres && !paidDealFormData.plan6MonthsAcres && !paidDealFormData.plan12MonthsAcres) {
+        toast.error('Please fill in at least one plan field (1 month, 6 months, or 12 months)');
+        return;
+      }
+    } else if (paidDealFormData.type === 'Api') {
+      if (!paidDealFormData.type || !paidDealFormData.adminName || !paidDealFormData.adminNumber || !paidDealFormData.farmerNumber) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      // Validate that at least one plan field is filled
+      if (!paidDealFormData.plan1MonthAcres && !paidDealFormData.plan6MonthsAcres && !paidDealFormData.plan12MonthsAcres) {
+        toast.error('Please fill in at least one plan field (1 month, 6 months, or 12 months)');
+        return;
+      }
+    } else {
+      if (!paidDealFormData.type) {
+        toast.error('Please select a type');
+        return;
+      }
+    }
+
+    try {
+      toast.loading('Submitting to Green Team...');
+      
+      // Use API's created_at format for consistency with backend
+      const currentAPITime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      console.log('Current API time:', currentAPITime);
+      
+      // Clean amount - remove ₹ symbol and formatting
+      const cleanAmount = selectedDeal.amount ? selectedDeal.amount.replace(/₹|,/g, '').trim() : '';
+      
+      // Clean closing date - if it's formatted, convert to standard format
+      const cleanClosingDate = selectedDeal.closing_date && selectedDeal.closing_date !== '-' 
+        ? new Date(selectedDeal.closing_date).toISOString().split('T')[0] 
+        : '';
+      
+      // Prepare the submission data based on type
+      let submissionData;
+      
+      if (paidDealFormData.type === 'Admin') {
+        // For Create Admin Account, only send specific fields as per requirement
+        submissionData = {
+          deal_id: selectedDeal.deal_id,
+          deal_name: selectedDeal.deal_name || null,
+          contact_name: selectedDeal.contact_name || null,
+          amount: cleanAmount || null,
+          closing_date: cleanClosingDate || null,
+          type: paidDealFormData.type || null,
+          admin_name: paidDealFormData.adminName || null,
+          admin_number: paidDealFormData.adminNumber || null,
+          farmer_name: paidDealFormData.farmerName || null,
+          farmer_number: paidDealFormData.farmerNumber || null,
+          total_acres: paidDealFormData.totalAcres || null,
+          plan: paidDealFormData.plan || null,
+          description: paidDealFormData.description || null,
+          submitted_by: user?.name || user?.phone_number || 'operation',
+          created_at: currentAPITime,
+          current_stage: 'New Assignment',
+          partner_name: '',
+          partner_number: '',
+          register_number: null,
+          mail_id: null,
+          application_name: null,
+          website: null,
+          plan_1_month_acres: paidDealFormData.plan1MonthAcres ? parseFloat(paidDealFormData.plan1MonthAcres) : null,
+          plan_6_months_acres: paidDealFormData.plan6MonthsAcres ? parseFloat(paidDealFormData.plan6MonthsAcres) : null,
+          plan_12_months_acres: paidDealFormData.plan12MonthsAcres ? parseFloat(paidDealFormData.plan12MonthsAcres) : null
+        };
+      } else if (paidDealFormData.type === 'Partner') {
+        // For Create Partner Account, send partner-specific fields with deal information
+        submissionData = {
+          deal_id: selectedDeal.deal_id,
+          deal_name: selectedDeal.deal_name || null,
+          contact_name: selectedDeal.contact_name || null,
+          amount: cleanAmount || null,
+          closing_date: cleanClosingDate || null,
+          type: paidDealFormData.type || 'Partner',
+          admin_name: null,
+          admin_number: null,
+          farmer_name: null,
+          farmer_number: null,
+          total_acres: paidDealFormData.totalAcres || null,
+          plan: paidDealFormData.plan || null,
+          description: paidDealFormData.description || null,
+          submitted_by: user?.name || user?.phone_number || 'operation',
+          created_at: currentAPITime,
+          current_stage: 'New Assignment',
+          partner_name: paidDealFormData.partnerName || null,
+          partner_number: paidDealFormData.partnerNumber || null,
+          register_number: null,
+          mail_id: null,
+          application_name: null,
+          website: null,
+          plan_1_month_acres: paidDealFormData.plan1MonthAcres ? parseFloat(paidDealFormData.plan1MonthAcres) : null,
+          plan_6_months_acres: paidDealFormData.plan6MonthsAcres ? parseFloat(paidDealFormData.plan6MonthsAcres) : null,
+          plan_12_months_acres: paidDealFormData.plan12MonthsAcres ? parseFloat(paidDealFormData.plan12MonthsAcres) : null
+        };
+      } else if (paidDealFormData.type === 'Whilelable') {
+        // For Whilelable Client, send whilelable-specific fields with deal information
+        submissionData = {
+          deal_id: selectedDeal.deal_id,
+          deal_name: selectedDeal.deal_name || null,
+          contact_name: selectedDeal.contact_name || null,
+          amount: cleanAmount || null,
+          closing_date: cleanClosingDate || null,
+          type: paidDealFormData.type || 'Whilelable',
+          admin_name: null,
+          admin_number: null,
+          farmer_name: null,
+          farmer_number: null,
+          total_acres: paidDealFormData.totalAcres || null,
+          plan: paidDealFormData.plan || null,
+          description: paidDealFormData.description || null,
+          submitted_by: user?.name || user?.phone_number || 'operation',
+          created_at: currentAPITime,
+          current_stage: 'New Assignment',
+          partner_name: null,
+          partner_number: null,
+          register_number: paidDealFormData.registerNumber || null,
+          mail_id: paidDealFormData.mailId || null,
+          application_name: paidDealFormData.applicationName || null,
+          website: paidDealFormData.website || null,
+          plan_1_month_acres: paidDealFormData.plan1MonthAcres ? parseFloat(paidDealFormData.plan1MonthAcres) : null,
+          plan_6_months_acres: paidDealFormData.plan6MonthsAcres ? parseFloat(paidDealFormData.plan6MonthsAcres) : null,
+          plan_12_months_acres: paidDealFormData.plan12MonthsAcres ? parseFloat(paidDealFormData.plan12MonthsAcres) : null
+        };
+      } else if (paidDealFormData.type === 'Api') {
+        // For API Creation, send API-specific fields like Admin
+        submissionData = {
+          deal_id: selectedDeal.deal_id,
+          deal_name: selectedDeal.deal_name || null,
+          contact_name: selectedDeal.contact_name || null,
+          amount: cleanAmount || null,
+          closing_date: cleanClosingDate || null,
+          type: paidDealFormData.type || null,
+          admin_name: paidDealFormData.adminName || null,
+          admin_number: paidDealFormData.adminNumber || null,
+          farmer_name: paidDealFormData.farmerName || null,
+          farmer_number: paidDealFormData.farmerNumber || null,
+          total_acres: paidDealFormData.totalAcres || null,
+          plan: paidDealFormData.plan || null,
+          description: paidDealFormData.description || null,
+          submitted_by: user?.name || user?.phone_number || 'operation',
+          created_at: currentAPITime,
+          current_stage: 'New Assignment',
+          partner_name: null,
+          partner_number: null,
+          register_number: null,
+          mail_id: null,
+          application_name: null,
+          website: null,
+          plan_1_month_acres: paidDealFormData.plan1MonthAcres ? parseFloat(paidDealFormData.plan1MonthAcres) : null,
+          plan_6_months_acres: paidDealFormData.plan6MonthsAcres ? parseFloat(paidDealFormData.plan6MonthsAcres) : null,
+          plan_12_months_acres: paidDealFormData.plan12MonthsAcres ? parseFloat(paidDealFormData.plan12MonthsAcres) : null
+        };
+      } else {
+        // For other types, send all fields
+        submissionData = {
+          deal_id: selectedDeal.deal_id,
+          deal_name: selectedDeal.deal_name || null,
+          contact_name: selectedDeal.contact_name || null,
+          amount: cleanAmount || null,
+          closing_date: cleanClosingDate || null,
+          type: paidDealFormData.type || 'Other Project',
+          admin_name: paidDealFormData.adminName || null,
+          admin_number: paidDealFormData.adminNumber || null,
+          farmer_name: paidDealFormData.farmerName || null,
+          farmer_number: paidDealFormData.farmerNumber || null,
+          total_acres: paidDealFormData.totalAcres || null,
+          plan: paidDealFormData.plan || null,
+          description: paidDealFormData.description || null,
+          submitted_by: user?.name || user?.phone_number || 'operation',
+          created_at: currentAPITime,
+          current_stage: 'New Assignment',
+          partner_name: null,
+          partner_number: null,
+          register_number: null,
+          mail_id: null,
+          application_name: null,
+          website: null,
+          plan_1_month_acres: paidDealFormData.plan1MonthAcres ? parseFloat(paidDealFormData.plan1MonthAcres) : null,
+          plan_6_months_acres: paidDealFormData.plan6MonthsAcres ? parseFloat(paidDealFormData.plan6MonthsAcres) : null,
+          plan_12_months_acres: paidDealFormData.plan12MonthsAcres ? parseFloat(paidDealFormData.plan12MonthsAcres) : null
+        };
+      }
+
+      // Console logging for deal information and form details
+      console.log('=== GREEN TEAM ASSIGNMENT SUBMISSION ===');
+      console.log('Deal Information:', {
+        deal_id: selectedDeal.deal_id,
+        deal_name: selectedDeal.deal_name,
+        contact_name: selectedDeal.contact_name,
+        amount: selectedDeal.amount,
+        cleanAmount: cleanAmount,
+        closing_date: selectedDeal.closing_date,
+        cleanClosingDate: cleanClosingDate,
+        deal_type: selectedDeal.deal_type,
+        deal_stage: selectedDeal.deal_stage,
+        contact_owner: selectedDeal.contact_owner,
+        account_name: selectedDeal.account_name,
+        account_number: selectedDeal.account_number,
+        created_time: selectedDeal.created_time,
+        created_by: selectedDeal.created_by
+      });
+      console.log('Form Details:', {
+        type: paidDealFormData.type,
+        admin_number: paidDealFormData.adminNumber,
+        farmer_number: paidDealFormData.farmerNumber,
+        total_acres: paidDealFormData.totalAcres,
+        plan: paidDealFormData.plan,
+        admin_name: paidDealFormData.adminName,
+        farmer_name: paidDealFormData.farmerName,
+        partner_name: paidDealFormData.partnerName,
+        partner_number: paidDealFormData.partnerNumber,
+        register_number: paidDealFormData.registerNumber,
+        mail_id: paidDealFormData.mailId,
+        application_name: paidDealFormData.applicationName,
+        website: paidDealFormData.website,
+        plan_1_month_acres: paidDealFormData.plan1MonthAcres,
+        plan_6_months_acres: paidDealFormData.plan6MonthsAcres,
+        plan_12_months_acres: paidDealFormData.plan12MonthsAcres
+      });
+      console.log('Final Submission Data:', submissionData);
+      console.log('Submitted by:', user?.name || user?.phone_number || 'operation');
+      console.log('=== END GREEN TEAM ASSIGNMENT SUBMISSION ===');
+
+      // Submit to API
+      if (!GREEN_TEAM_POST_ASSIGNMENT_URL) {
+        toast.dismiss();
+        toast.error('API URL not configured');
+        return;
+      }
+
+      const response = await axios.post(GREEN_TEAM_POST_ASSIGNMENT_URL, submissionData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+        }
+      }).catch(error => {
+        console.error('API Error Details:', error.response?.data);
+        console.error('API Error Status:', error.response?.status);
+        console.error('API Error Headers:', error.response?.headers);
+        throw error;
+      });
+      
+      if (response.data) {
+        toast.dismiss();
+        toast.success('Successfully assigned to Green Team');
+        
+        // Refresh Green Team assigned deal IDs
+        await fetchGreenTeamAssignedDealIds();
+        
+        // Reset form and close modal
+        setShowPaidDealForm(false);
+        setPaidDealFormData({
+          type: '',
+          adminNumber: '',
+          farmerNumber: '',
+          totalAcres: '',
+          plan: '',
+          adminName: '',
+          farmerName: '',
+          description: '',
+          partnerName: '',
+          partnerNumber: '',
+          registerNumber: '',
+          mailId: '',
+          applicationName: '',
+          website: '',
+          plan1MonthAcres: '',
+          plan6MonthsAcres: '',
+          plan12MonthsAcres: ''
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error submitting to Green Team:', error);
+      toast.dismiss();
+      toast.error('Failed to assign to Green Team');
+    }
+  };
+
   // â”€â”€ Fetch timeline data for a lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchTimeline = async (leadId) => {
     setTimelineLoading(true);
@@ -2365,7 +2850,7 @@ export default function Opportunities({ onPageChange }) {
                 }}
                 autoFocus
               />
-              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Save"><Check size={14} style={{ color: 'white' }} /></button>
+              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} /></button>
               <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
             </>
           ) : (
@@ -2932,14 +3417,10 @@ export default function Opportunities({ onPageChange }) {
                   border: 'none',
                   borderRadius: 'var(--r)',
                   fontSize: '10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  cursor: 'pointer'
                 }}
-                title="Save"
               >
-                <Check size={14} style={{ color: 'white' }} />
+                <Check size={14} style={{ color: "var(--blue-600)" }} />
               </button>
               <button
                 onClick={cancelDealEdit}
@@ -7275,6 +7756,85 @@ export default function Opportunities({ onPageChange }) {
                     Deal Information
                   </h2>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {selectedDeal.deal_stage === 'Paid' && !isDealAssignedToGreenTeam(selectedDeal) && (
+                      <button
+                        onClick={() => setShowPaidDealForm(true)}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#dcfce7',
+                          color: '#16a34a',
+                          border: 'none',
+                          borderRadius: 'var(--r)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        Assign to Green Team
+                      </button>
+                    )}
+                    {selectedDeal.deal_stage === 'Paid' && isDealAssignedToGreenTeam(selectedDeal) && (
+                      <button
+                        onClick={() => fetchGreenTeamAssignmentDetails(selectedDeal.deal_id || selectedDeal.id)}
+                        disabled={loadingGreenTeamDetails}
+                        style={{
+                          padding: '8px 16px',
+                          background: loadingGreenTeamDetails ? '#e5e7eb' : '#dcfce7',
+                          color: loadingGreenTeamDetails ? '#6b7280' : '#16a34a',
+                          border: loadingGreenTeamDetails ? '1px solid #d1d5db' : '1px solid #86efac',
+                          borderRadius: 'var(--r)',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: loadingGreenTeamDetails ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s',
+                          opacity: loadingGreenTeamDetails ? 0.7 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!loadingGreenTeamDetails) {
+                            e.target.style.background = '#bbf7d0';
+                            e.target.style.borderColor = '#16a34a';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!loadingGreenTeamDetails) {
+                            e.target.style.background = '#dcfce7';
+                            e.target.style.borderColor = '#86efac';
+                          }
+                        }}
+                      >
+                        {loadingGreenTeamDetails ? (
+                          <>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              border: '2px solid #6b7280',
+                              borderTop: '2px solid transparent',
+                              borderRadius: '50%',
+                              animation: 'spin 1s linear infinite',
+                              '@keyframes spin': {
+                                '0%': { transform: 'rotate(0deg)' },
+                                '100%': { transform: 'rotate(360deg)' }
+                              }
+                            }} />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={16} />
+                            <span>Assigned to Green Team</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <style>{`
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}</style>
                     <button
                       onClick={() => { setDealToDelete(selectedDeal); setShowDeleteDealModal(true); }}
                       style={{
@@ -7441,6 +8001,1288 @@ export default function Opportunities({ onPageChange }) {
                     <button onClick={() => { if (isDeletingDealState) return; setShowDeleteDealModal(false); setDealToDelete(null); }} disabled={isDeletingDealState} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.5 : 1 }}>Cancel</button>
                     <button onClick={handleDeleteDeal} disabled={isDeletingDealState} style={{ backgroundColor: isDeletingDealState ? '#ef4444' : '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: '600', cursor: isDeletingDealState ? 'not-allowed' : 'pointer', opacity: isDeletingDealState ? 0.6 : 1 }}>{isDeletingDealState ? 'Deleting...' : 'Delete'}</button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Paid Deal Form Modal */}
+          {showPaidDealForm && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1003 }}>
+              <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r)', maxWidth: '500px', width: '92%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '24px 24px 16px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-display)'
+                  }}>
+                    Assign to Green Team
+                  </h2>
+                  <button
+                    onClick={() => { setShowPaidDealForm(false); setPaidDealFormData({ type: '', adminNumber: '', farmerNumber: '', totalAcres: '', plan: '', adminName: '', farmerName: '', description: '' }); }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-3)',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                      Type <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      <div
+                        onClick={() => setPaidDealFormData({ ...paidDealFormData, type: 'Admin' })}
+                        style={{
+                          padding: '12px',
+                          border: paidDealFormData.type === 'Admin' ? '2px solid var(--green-600)' : '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          backgroundColor: paidDealFormData.type === 'Admin' ? 'var(--green-50)' : 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Create Admin Account
+                      </div>
+                      <div
+                        onClick={() => setPaidDealFormData({ ...paidDealFormData, type: 'Partner' })}
+                        style={{
+                          padding: '12px',
+                          border: paidDealFormData.type === 'Partner' ? '2px solid var(--green-600)' : '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          backgroundColor: paidDealFormData.type === 'Partner' ? 'var(--green-50)' : 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Create Partner Account
+                      </div>
+                      <div
+                        onClick={() => setPaidDealFormData({ ...paidDealFormData, type: 'Whilelable' })}
+                        style={{
+                          padding: '12px',
+                          border: paidDealFormData.type === 'Whilelable' ? '2px solid var(--green-600)' : '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          backgroundColor: paidDealFormData.type === 'Whilelable' ? 'var(--green-50)' : 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Whilelable Client
+                      </div>
+                      <div
+                        onClick={() => setPaidDealFormData({ ...paidDealFormData, type: 'Api' })}
+                        style={{
+                          padding: '12px',
+                          border: paidDealFormData.type === 'Api' ? '2px solid var(--green-600)' : '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          backgroundColor: paidDealFormData.type === 'Api' ? 'var(--green-50)' : 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        API Creation
+                      </div>
+                      <div
+                        onClick={() => setPaidDealFormData({ ...paidDealFormData, type: 'Other Project' })}
+                        style={{
+                          padding: '12px',
+                          border: paidDealFormData.type === 'Other Project' ? '2px solid var(--green-600)' : '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          backgroundColor: paidDealFormData.type === 'Other Project' ? 'var(--green-50)' : 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s',
+                          gridColumn: 'span 2'
+                        }}
+                      >
+                        Other Project
+                      </div>
+                    </div>
+                  </div>
+                  {paidDealFormData.type === 'Admin' && (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Admin Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.adminName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, adminName: e.target.value })}
+                          placeholder="Enter admin name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Admin Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.adminNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, adminNumber: e.target.value })}
+                          placeholder="Enter admin number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Farmer Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.farmerName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, farmerName: e.target.value })}
+                          placeholder="Enter farmer name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Farmer Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.farmerNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, farmerNumber: e.target.value })}
+                          placeholder="Enter farmer number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Plan & Acres <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>1 month:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan1MonthAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan1MonthAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>6 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan6MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan6MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>12 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan12MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan12MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {paidDealFormData.type === 'Partner' && (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Partner Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.partnerName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, partnerName: e.target.value })}
+                          placeholder="Enter partner name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Partner Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.partnerNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, partnerNumber: e.target.value })}
+                          placeholder="Enter partner number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Plan & Acres <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>1 month:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan1MonthAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan1MonthAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>6 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan6MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan6MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>12 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan12MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan12MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {paidDealFormData.type === 'Whilelable' && (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Register Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.registerNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, registerNumber: e.target.value })}
+                          placeholder="Enter register number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Mail ID <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={paidDealFormData.mailId}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, mailId: e.target.value })}
+                          placeholder="Enter mail id"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Application Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.applicationName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, applicationName: e.target.value })}
+                          placeholder="Enter application name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Website
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.website}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, website: e.target.value })}
+                          placeholder="Enter website (optional)"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Plan & Acres <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>1 month:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan1MonthAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan1MonthAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>6 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan6MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan6MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>12 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan12MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan12MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {paidDealFormData.type === 'Api' && (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Admin Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.adminName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, adminName: e.target.value })}
+                          placeholder="Enter admin name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Admin Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.adminNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, adminNumber: e.target.value })}
+                          placeholder="Enter admin number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Farmer Name <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.farmerName}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, farmerName: e.target.value })}
+                          placeholder="Enter farmer name"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Farmer Number <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paidDealFormData.farmerNumber}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, farmerNumber: e.target.value })}
+                          placeholder="Enter farmer number"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Plan & Acres <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>1 month:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan1MonthAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan1MonthAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>6 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan6MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan6MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text)', minWidth: '70px' }}>12 months:</span>
+                            <input
+                              type="number"
+                              value={paidDealFormData.plan12MonthsAcres || ''}
+                              onChange={(e) => setPaidDealFormData({ ...paidDealFormData, plan12MonthsAcres: e.target.value })}
+                              placeholder="Enter acres"
+                              min="0"
+                              style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                outline: 'none',
+                                backgroundColor: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {paidDealFormData.type === 'Other Project' && (
+                    <>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                          Total Acres <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={paidDealFormData.totalAcres}
+                          onChange={(e) => setPaidDealFormData({ ...paidDealFormData, totalAcres: e.target.value })}
+                          placeholder="Enter total acres"
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button
+                    onClick={() => { setShowPaidDealForm(false); setPaidDealFormData({ type: '', adminNumber: '', farmerNumber: '', totalAcres: '', plan: '', adminName: '', farmerName: '', description: '', partnerName: '', partnerNumber: '', registerNumber: '', mailId: '', applicationName: '', website: '', plan1MonthAcres: '', plan6MonthsAcres: '', plan12MonthsAcres: '' }); }}
+                    style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePaidDealFormSubmit}
+                    style={{ backgroundColor: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Green Team Assignment Details Modal */}
+          {showGreenTeamAssignmentDetails && greenTeamAssignmentDetails && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+              <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r)', maxWidth: '700px', width: '92%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                {/* Modal header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '24px 24px 16px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: 'var(--text)',
+                    fontFamily: 'var(--font-display)'
+                  }}>
+                    Green Team Assignment Details
+                  </h2>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => { 
+                        setShowGreenTeamAssignmentDetails(false); 
+                        setGreenTeamAssignmentDetails(null); 
+                        setIsEditingGreenTeamDetails(false);
+                        setEditingGreenTeamDetails({});
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-3)',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal body */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                  {/* Deal Information Section */}
+                  <div style={{
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Deal Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Name</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.deal_name || '-'}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal ID</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.deal_id || '-'}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.contact_name || '-'}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Amount</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.amount || '-'}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Closing Date</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.closing_date || '-'}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Submitted By</label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          color: 'var(--text)'
+                        }}>{greenTeamAssignmentDetails.submitted_by || '-'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+
+                  {/* Assignment Details Section */}
+                  <div style={{
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Assignment Details
+                    </h3>
+                    
+                    {/* Type-specific display logic */}
+                    {(greenTeamAssignmentDetails.type === 'Admin' || greenTeamAssignmentDetails.type === 'Api') ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Type</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            textTransform: 'capitalize'
+                          }}>{greenTeamAssignmentDetails.type || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Assigned Date</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at ? formatDateSafe(greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at) : '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Admin Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.admin_name || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Admin Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.admin_number || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Farmer Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.farmer_name || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Farmer Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.farmer_number || '-'}</div>
+                        </div>
+                        {greenTeamAssignmentDetails.plan_1_month_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 1 Month Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_1_month_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_6_months_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 6 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_6_months_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_12_months_acres && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 12 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_12_months_acres}</div>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                          <div style={{
+                            padding: '12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            lineHeight: '1.5',
+                            minHeight: '80px'
+                          }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
+                        </div>
+                      </div>
+                    ) : greenTeamAssignmentDetails.type === 'Partner' ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Type</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            textTransform: 'capitalize'
+                          }}>{greenTeamAssignmentDetails.type || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Assigned Date</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at ? formatDateSafe(greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at) : '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Partner Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.partner_name || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Partner Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.partner_number || '-'}</div>
+                        </div>
+                        {greenTeamAssignmentDetails.plan_1_month_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 1 Month Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_1_month_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_6_months_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 6 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_6_months_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_12_months_acres && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 12 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_12_months_acres}</div>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                          <div style={{
+                            padding: '12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            lineHeight: '1.5',
+                            minHeight: '80px'
+                          }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
+                        </div>
+                      </div>
+                    ) : greenTeamAssignmentDetails.type === 'Whilelable' ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Type</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            textTransform: 'capitalize'
+                          }}>{greenTeamAssignmentDetails.type || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Assigned Date</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at ? formatDateSafe(greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at) : '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Register Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.register_number || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Email ID</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.mail_id || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Application Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.application_name || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Website</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.website || '-'}</div>
+                        </div>
+                        {greenTeamAssignmentDetails.plan_1_month_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 1 Month Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_1_month_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_6_months_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 6 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_6_months_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_12_months_acres && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 12 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_12_months_acres}</div>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                          <div style={{
+                            padding: '12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            lineHeight: '1.5',
+                            minHeight: '80px'
+                          }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* For other types, show all fields */
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Type</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            textTransform: 'capitalize'
+                          }}>{greenTeamAssignmentDetails.type || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Assigned Date</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at ? formatDateSafe(greenTeamAssignmentDetails.assigned_date || greenTeamAssignmentDetails.created_at) : '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Total Acres</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.total_acres ? `${greenTeamAssignmentDetails.total_acres} acres` : '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.plan || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Admin Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.admin_number || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Farmer Number</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.farmer_number || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Admin Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.admin_name || '-'}</div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Farmer Name</label>
+                          <div style={{
+                            padding: '8px 12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)'
+                          }}>{greenTeamAssignmentDetails.farmer_name || '-'}</div>
+                        </div>
+                        {greenTeamAssignmentDetails.plan_1_month_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 1 Month Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_1_month_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_6_months_acres && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 6 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_6_months_acres}</div>
+                          </div>
+                        )}
+                        {greenTeamAssignmentDetails.plan_12_months_acres && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Plan 12 Months Acres</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              color: 'var(--text)'
+                            }}>{greenTeamAssignmentDetails.plan_12_months_acres}</div>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                          <div style={{
+                            padding: '12px',
+                            background: 'var(--gray-100)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            fontSize: '13px',
+                            color: 'var(--text)',
+                            lineHeight: '1.5',
+                            minHeight: '80px'
+                          }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Modal footer */}
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button
+                    onClick={() => { 
+                      setShowGreenTeamAssignmentDetails(false); 
+                      setGreenTeamAssignmentDetails(null); 
+                      setIsEditingGreenTeamDetails(false);
+                      setEditingGreenTeamDetails({});
+                    }}
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--r)',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>

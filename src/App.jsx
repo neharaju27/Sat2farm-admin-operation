@@ -16,6 +16,7 @@ import ClientMonthlyReport from "./components/ClientMonthlyReport";
 import ManagerMonthlyReport from "./components/ManagerMonthlyReport";
 import LeadPipeline from "./components/LeadPipeline";
 import Opportunities from "./components/Opportunities";
+import GreenTeam from "./components/GreenTeam";
 import AccessControl from "./components/AccessControl";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
 import MarketingDashboard from "./components/MarketingDashboard";
@@ -82,22 +83,25 @@ function App() {
     if (savedPage) {
       // Check if user is manager and saved page is lead-pipeline
       let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
-      
+
       // Partner users always go to super-admin-dashboard
       if (role === 'partner') {
-        console.log('Partner user, redirecting to super-admin-dashboard');
         setCurrentPage('super-admin-dashboard');
         localStorage.setItem('currentPage', 'super-admin-dashboard');
         setHasRedirected(true);
         return;
+      } else if (role.includes('tech')) {
+        // Tech Department users always go to green-team
+        setCurrentPage('green-team');
+        localStorage.setItem('currentPage', 'green-team');
+        setHasRedirected(true);
+        return;
       } else if (role === 'manager' && savedPage === 'lead-pipeline') {
         // Manager trying to access lead-pipeline - redirect to unlock-farm instead
-        console.log('Manager user trying to access lead-pipeline, redirecting to unlock-farm');
         setCurrentPage('unlock-farm');
         localStorage.setItem('currentPage', 'unlock-farm');
       } else if (role === 'client' && savedPage !== 'client-monthly-report' && savedPage !== 'unlock-farm' && savedPage !== 'register') {
         // Client trying to access other pages - redirect to client-monthly-report instead
-        console.log('Client user trying to access other page, redirecting to client-monthly-report');
         setCurrentPage('client-monthly-report');
         localStorage.setItem('currentPage', 'client-monthly-report');
       } else {
@@ -111,31 +115,26 @@ function App() {
     // Fresh login — redirect based on role
     let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
 
-    console.log('User logged in, detected role:', role);
-
     if (role === 'partner') {
-      console.log('Redirecting to super-admin-dashboard (partner)');
       setCurrentPage('super-admin-dashboard');
       localStorage.setItem('currentPage', 'super-admin-dashboard');
     } else if (role === 'marketing') {
-      console.log('Redirecting to marketing-dashboard (marketing)');
       setCurrentPage('marketing-dashboard');
       localStorage.setItem('currentPage', 'marketing-dashboard');
     } else if (role === 'sales') {
-      console.log('Redirecting to sales-dashboard (sales)');
       setCurrentPage('sales-dashboard');
       localStorage.setItem('currentPage', 'sales-dashboard');
     } else if (role === 'client') {
-      console.log('Redirecting to client-monthly-report (client)');
       setCurrentPage('client-monthly-report');
       localStorage.setItem('currentPage', 'client-monthly-report');
+    } else if (role.includes('tech')) {
+      setCurrentPage('green-team');
+      localStorage.setItem('currentPage', 'green-team');
     } else if (role === 'manager' || role === 'test' || role === 'user') {
-      console.log('Redirecting to unlock-farm (manager)');
       setCurrentPage('unlock-farm');
       localStorage.setItem('currentPage', 'unlock-farm');
     } else {
       // operation, admin, default
-      console.log('Redirecting to operation-dashboard (operation/admin/default)');
       setCurrentPage('operation-dashboard');
       localStorage.setItem('currentPage', 'operation-dashboard');
     }
@@ -172,19 +171,23 @@ function App() {
   const shouldShowBanner = () => {
     if (!userDisplay) return false;
     const role = (userDisplay.role || '').toLowerCase().trim();
-    
+
     if (role === 'operation' || role === 'operations') {
       return currentPage === 'monthly-acreages' || currentPage === 'sat2farm-admin-portal';
     }
-    
+
     if (role === 'sales') {
       return currentPage === 'assign-acreages';
     }
-    
+
     if (role === 'manager') {
       return currentPage === 'unlock-farm';
     }
-    
+
+    if (role === 'tech department' || role === 'tech-department' || role === 'tech') {
+      return false; // Tech Department users don't see banners
+    }
+
     return true;
   };
 
@@ -224,6 +227,8 @@ function App() {
           return <LeadPipeline user={userDisplay} onPageChange={handlePageChange} />;
         case 'opportunities':
           return <Opportunities user={userDisplay} onPageChange={handlePageChange} />;
+        case 'green-team':
+          return <GreenTeam user={userDisplay} onPageChange={handlePageChange} />;
         case 'super-admin-dashboard':
           return <SuperAdminDashboard user={userDisplay} onPageChange={handlePageChange} />;
         case 'marketing-dashboard':

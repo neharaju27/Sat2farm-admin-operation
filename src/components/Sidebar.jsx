@@ -16,6 +16,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isManagerUser = userRole === 'manager' || userRole === 'admin';
   const isPartnerUser = userRole === 'partner';
   const isMarketingUser = userRole === 'marketing';
+  const isTechDepartmentUser = userRole?.includes('tech') || userRole === 'tech department' || userRole === 'tech-department' || userRole === 'tech';
   
   // Page activity states
   const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
@@ -30,7 +31,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -76,6 +77,14 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       } else {
         alert('Access denied: Marketing users cannot access this page');
       }
+    } else if (isTechDepartmentUser) {
+      // Tech Department users can only access Green Team
+      const allowedTechDepartmentPages = ['green-team'];
+      if (allowedTechDepartmentPages.includes(page)) {
+        onPageChange(page);
+      } else {
+        alert('Access denied: Tech Department users can only access Green Team');
+      }
     } else {
       // Default fallback
       onPageChange(page);
@@ -105,11 +114,12 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         <div className="sb-logo-sub">ADMIN PORTAL · v2.4</div>
       </div>
       <div className="sb-role">Viewing as: <span>{
-        user?.role === 'sales' || user?.role === 'Sales' ? 'Sales' : 
-        user?.role === 'client' || user?.role === 'Client' ? 'Client' : 
-        user?.role === 'manager' || user?.role === 'Manager' ? 'Manager' :
-        user?.role === 'partner' || user?.role === 'Partner' ? 'Partner' :
-        user?.role === 'marketing' || user?.role === 'Marketing' ? 'Marketing' :
+        user?.role?.toLowerCase().includes('sales') ? 'Sales' :
+        user?.role?.toLowerCase().includes('client') ? 'Client' :
+        user?.role?.toLowerCase().includes('manager') ? 'Manager' :
+        user?.role?.toLowerCase().includes('partner') ? 'Partner' :
+        user?.role?.toLowerCase().includes('marketing') ? 'Marketing' :
+        user?.role?.toLowerCase().includes('tech') ? 'Tech Department' :
         'Operations'
       }</span></div>
       
@@ -132,35 +142,56 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             
             {satyuktCrmOpen && (
               <div style={{marginLeft: '12px'}}>
-                <div 
-                  className={`sb-item ${currentPage === 'lead-pipeline' ? 'active' : ''}`}
-                  onClick={() => handleNavigationClick('lead-pipeline')}
-                >
-                  <svg className="ic" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
-                  Lead Pipeline
-                </div>
-                <div 
-                  className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
-                  onClick={() => handleNavigationClick('opportunities')}
-                >
-                  <svg className="ic" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
-                  </svg>
-                  Opportunities
-                </div>
+                {/* Lead Pipeline and Opportunities - Only for Operations and Sales Users */}
+                {!isTechDepartmentUser && (
+                  <>
+                    <div
+                      className={`sb-item ${currentPage === 'lead-pipeline' ? 'active' : ''}`}
+                      onClick={() => handleNavigationClick('lead-pipeline')}
+                    >
+                      <svg className="ic" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                        <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                      Lead Pipeline
+                    </div>
+                    <div
+                      className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
+                      onClick={() => handleNavigationClick('opportunities')}
+                    >
+                      <svg className="ic" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                        <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                        <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                      </svg>
+                      Opportunities
+                    </div>
+                  </>
+                )}
+                {/* Green Team Section - Only for Operations Users */}
+                {isOperationsUser && (
+                  <div
+                    className={`sb-item ${currentPage === 'green-team' ? 'active' : ''}`}
+                    onClick={() => handleNavigationClick('green-team')}
+                  >
+                    <svg className="ic" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                      <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Green Team
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
-        {/* Operations Section - Only for Operations Users */}
-        {isOperationsUser && (
+        {/* Operations Section - Only for Operations Users (not Tech Department) */}
+        {isOperationsUser && !isTechDepartmentUser && (
           <>
             <div className="sb-section">Operations</div>
             <div 
@@ -230,6 +261,27 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               Pricing
+              <span className="sb-dot"></span>
+            </div>
+          </>
+        )}
+
+        {/* Tech Department Section - Only for Tech Department Users */}
+        {isTechDepartmentUser && (
+          <>
+            <div className="sb-section">Tech Department</div>
+            <div
+              className={`sb-item ${currentPage === 'green-team' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('green-team')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Green Team
               <span className="sb-dot"></span>
             </div>
           </>
