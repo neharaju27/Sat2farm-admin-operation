@@ -1,0 +1,148 @@
+import { AlertCircle, Lock } from 'lucide-react';
+
+export default function AccessControl({ user, currentPage, onPageChange, children }) {
+  const isSalesUser = user?.role === 'sales' || user?.role === 'Sales';
+  const role = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
+  
+  // List of sales users BLOCKED from accessing unlock-farm and assign-acreage
+  const blockedSalesUsers = [
+    'Chaturya',
+    'Priyanshu',
+    'Bhagwati',
+    'Harshitha',
+    'Shurti',
+    'Vijay K B',
+    'Mustaqeem',
+    'Amith',
+    'Rohini',
+    'Likhitha',
+    'Hemanth',
+    'Ashok',
+    'Lipsa',
+    'Pragya',
+    'Alisha'
+  ];
+  
+  // Get user name from various possible fields
+  const userName = user?.name || user?.full_name || user?.first_name || user?.username || '';
+  
+  // Check if current sales user is in the blocked list
+  const isBlockedSalesUser = blockedSalesUsers.some(blockedName => 
+    userName.toLowerCase().includes(blockedName.toLowerCase())
+  );
+  
+  // Restrict access to unlock-farm and assign-acreages for sales users in blocked list
+  const isSalesPageRestricted = isSalesUser && 
+    (currentPage === 'unlock-farm' || currentPage === 'assign-acreages') && 
+    isBlockedSalesUser;
+  
+  // Restrict operation-dashboard to only operation/ops roles
+  const isOperationDashboardRestricted = currentPage === 'operation-dashboard' && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' &&
+    role !== 'admin';
+  
+  // Restrict pricing to only operation and sales roles
+  const isPricingRestricted = currentPage === 'pricing' && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' &&
+    role !== 'sales' &&
+    role !== 'admin';
+  
+  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted) {
+    let descriptionText = "This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.";
+    let alertTitle = "Login as Operations Required";
+    let alertText = "To access this page, please log in with Operations credentials.";
+
+    if (isPricingRestricted) {
+      descriptionText = "This page is only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
+      alertTitle = "Login as Operations or Sales Required";
+      alertText = "To access this page, please log in with Operations or Sales credentials.";
+    } else if (isSalesPageRestricted) {
+      descriptionText = "Access to this feature is restricted for your account. Please contact your administrator for permission.";
+      alertTitle = "Permission Required";
+      alertText = "Your account does not have permission to access this page.";
+    }
+
+    // Show restricted access message
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        padding: '40px',
+        backgroundColor: '#f8f7f4',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          maxWidth: '500px',
+          backgroundColor: 'white',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            backgroundColor: '#fee2e2',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px'
+          }}>
+            <Lock style={{ width: '32px', height: '32px', color: '#dc2626' }} />
+          </div>
+          
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: '#1f2937',
+            marginBottom: '16px',
+            margin: '0 0 16px 0'
+          }}>
+            Access Restricted
+          </h2>
+          
+          <p style={{
+            fontSize: '16px',
+            color: '#6b7280',
+            lineHeight: '1.5',
+            marginBottom: '24px'
+          }}>
+            {descriptionText}
+          </p>
+          
+          <div style={{
+            backgroundColor: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '32px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            <AlertCircle style={{ width: '20px', height: '20px', color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
+                {alertTitle}
+              </div>
+              <div style={{ fontSize: '14px', color: '#78350f' }}>
+                {alertText}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // No restriction, render the children normally
+  return children;
+}
