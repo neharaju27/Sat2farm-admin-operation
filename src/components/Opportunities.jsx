@@ -7323,7 +7323,7 @@ export default function Opportunities({ onPageChange }) {
 
                   </div>{/* end left panel */}
 
-                  {/* â”€â”€ Right panel: tabs (Timeline / Notes / Activities / Pipelines) â”€â”€ */}
+                  {/* ——— Right panel: tabs (Timeline / Notes / Activities / Pipelines) ——— */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     {/* Tabs */}
                     <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 20px', flexShrink: 0 }}>
@@ -7331,7 +7331,7 @@ export default function Opportunities({ onPageChange }) {
                         { id: 'timeline', label: 'Timeline' },
                         { id: 'notes', label: 'Notes' },
                         { id: 'activities', label: 'Activities' },
-                        { id: 'pipelines', label: 'Pipelines', count: 1 }
+                        { id: 'pipelines', label: 'Pipelines' }
                       ].map(tab => (
                         <button key={tab.id} onClick={() => setActiveModalTab(tab.id)}
                           style={{ padding: '14px 16px', border: 'none', borderBottom: activeModalTab === tab.id ? '2px solid var(--green-600)' : '2px solid transparent', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', color: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--text-3)', fontWeight: activeModalTab === tab.id ? '600' : '500', display: 'flex', alignItems: 'center', gap: '6px' }}>

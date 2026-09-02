@@ -6947,22 +6947,89 @@ export default function LeadPipeline({ onPageChange }) {
                                     </div>
                                   </div>
                                   <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                                  <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
-                                    <span>
-                                      {item.activity_type ? String(item.activity_type).replace(/_/g, ' ') : (item.field === 'note' ? 'Note added' : item.field === 'task' ? 'Task added' : `${item.field || 'field'} updated`)} by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span>
-                                    </span>
-                                  </div>
-                                  <div style={{ fontSize: '14px', color: 'var(--text)', fontStyle: 'Georgia' }}>
-                                    {item.field === 'note' ? (
-                                      <span>' {item.new_value} '</span>
-                                    ) : item.field === 'task' ? (
-                                      <span>' {item.new_value} '</span>
-                                    ) : item.old_value === null || item.old_value === '' ? (
-                                      <span>' {item.new_value} '</span>
-                                    ) : (
-                                      <span>{`' ${item.old_value} '  to  ' ${item.new_value} '`}</span>
-                                    )}
-                                  </div>
+                                    <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
+                                      <span>
+                                        {(() => {
+                                          const field = item?.field ? String(item.field).trim().toLowerCase() : '';
+                                          const act = item?.activity_type ? String(item.activity_type).trim().toLowerCase() : '';
+
+                                          if (act === 'lead_created') return 'Lead created';
+                                          if (act === 'note_added' || field === 'note') return 'Note added';
+                                          if (act === 'note_updated') return 'Note updated';
+                                          if (act === 'task_created' || field === 'task') return 'Task created';
+                                          if (act === 'task_updated') return 'Task updated';
+                                          if (act === 'deal_created') return 'Deal created';
+                                          if (act === 'deal_deleted') return 'Deal deleted';
+
+                                          const map = {
+                                            deal_stage: 'Deal Stage',
+                                            stage: 'Deal Stage',
+                                            deal_name: 'Deal Name',
+                                            deal_amount: 'Deal Amount',
+                                            amount: 'Deal Amount',
+                                            deal_probability: 'Deal Probability',
+                                            probability: 'Deal Probability',
+                                            deal_type: 'Deal Type',
+                                            deal_owner: 'Deal Owner',
+                                            deal_close_date: 'Closing Date',
+                                            close_date: 'Closing Date',
+                                            contact_name: 'Contact Name',
+                                            full_name: 'Contact Name',
+                                            company_name: 'Company Name',
+                                            account_name: 'Account Name',
+                                            account_number: 'Account Number',
+                                            phone_number: 'Phone Number',
+                                            alternate_number: 'Alternate Number',
+                                            contact_owner: 'Contact Owner',
+                                            owner: 'Contact Owner',
+                                            lead_source: 'Lead Source',
+                                            lead_status: 'Lead Status',
+                                            status: 'Status',
+                                            account_type: 'Account Type',
+                                            city: 'City',
+                                            state: 'State',
+                                            country: 'Country',
+                                            tags: 'Tags',
+                                            description: 'Description'
+                                          };
+
+                                          let label = map[field];
+                                          if (!label) {
+                                            if (field) {
+                                              label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                            } else if (act) {
+                                              label = act.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                            } else {
+                                              label = 'Field';
+                                            }
+                                          }
+                                          return `${label} updated`;
+                                        })()} by <span style={{ fontWeight: 'bold' }}>{item.changed_by || 'Operation'}</span>
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>
+                                      {(() => {
+                                        const hasOld = item.old_value !== null && item.old_value !== undefined && String(item.old_value).trim() !== '';
+                                        const hasNew = item.new_value !== null && item.new_value !== undefined && String(item.new_value).trim() !== '';
+
+                                        if (item.activity_type === 'deal_deleted') {
+                                          return <span>&lsquo;{item.old_value || item.new_value}&rsquo;</span>;
+                                        }
+                                        if (item.field === 'note' || item.field === 'task') {
+                                          return <span>&lsquo;{item.new_value || item.old_value}&rsquo;</span>;
+                                        }
+                                        if (hasOld && hasNew && String(item.old_value).trim() !== String(item.new_value).trim()) {
+                                          return <span>From &lsquo;<strong>{item.old_value}</strong>&rsquo; to &lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                        }
+                                        if (hasNew) {
+                                          return <span>&lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                        }
+                                        if (hasOld) {
+                                          return <span>&lsquo;<strong>{item.old_value}</strong>&rsquo;</span>;
+                                        }
+                                        return null;
+                                      })()}
+                                    </div>
                                 </div>
                               );
                             })}
@@ -7474,7 +7541,7 @@ export default function LeadPipeline({ onPageChange }) {
                   <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Contact Information</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name *</label>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <input
                         type="text"
                         name="fullName"
@@ -7491,7 +7558,7 @@ export default function LeadPipeline({ onPageChange }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number *</label>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <input
                         type="tel"
                         name="phone"
@@ -7527,7 +7594,7 @@ export default function LeadPipeline({ onPageChange }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Email</label>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Email <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <input
                         type="email"
                         name="email"
@@ -7628,7 +7695,7 @@ export default function LeadPipeline({ onPageChange }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Country</label>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Country <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <input
                         type="text"
                         name="country"
