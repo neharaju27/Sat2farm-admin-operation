@@ -102,6 +102,348 @@ const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', yea
   }
 };
 
+// Top-level Standalone EditableAccountField component to keep DOM input alive across parent state updates (prevents cursor jumping)
+const StandaloneEditableAccountField = React.memo(({ label, value, fieldName, type = 'text', required = false, isEditing, editValue, startEditing, saveEdit, cancelEdit }) => {
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+  const isRequired = required || fieldName === 'accountName' || fieldName === 'phoneNumber' || fieldName === 'account_name' || fieldName === 'phone';
+
+  React.useEffect(() => {
+    if (isEditing) {
+      const handleClickOutside = (event) => {
+        if (containerRef.current && !containerRef.current.contains(event.target)) {
+          cancelEdit();
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isEditing, cancelEdit]);
+
+  React.useEffect(() => {
+    if (isEditing && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    const val = inputRef.current ? inputRef.current.value : editValue;
+    saveEdit(val);
+  };
+
+  return (
+    <div ref={containerRef} data-editable-field>
+      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+        {label} {isRequired && <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span>}
+      </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {isEditing ? (
+          <>
+            {type === 'textarea' ? (
+              <textarea
+                ref={inputRef}
+                defaultValue={editValue || ''}
+                rows={4}
+                style={{
+                  flex: 1, padding: '6px 8px',
+                  border: '1px solid var(--green-600)', borderRadius: 'var(--r)',
+                  fontSize: '12px', background: 'var(--surface)', color: 'var(--text)',
+                  fontFamily: 'inherit'
+                }}
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                type={type}
+                defaultValue={editValue || ''}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') cancelEdit();
+                }}
+                style={{
+                  flex: 1, padding: '6px 8px',
+                  border: '1px solid var(--green-600)', borderRadius: 'var(--r)',
+                  fontSize: '12px', background: 'var(--surface)', color: 'var(--text)'
+                }}
+              />
+            )}
+            <button onClick={handleSave} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} style={{ color: '#ffffff' }} /></button>
+            <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
+          </>
+        ) : (
+          <div
+            style={{
+              flex: 1, color: value ? 'var(--text)' : 'var(--text-3)',
+              fontStyle: value ? 'normal' : 'italic', minHeight: '20px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '4px', borderRadius: 'var(--r)', cursor: 'pointer',
+              transition: 'background-color 0.2s ease'
+            }}
+            onClick={() => startEditing(fieldName, value)}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+          >
+            <span>{value || 'Not specified'}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              style={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+              onMouseEnter={(e) => { e.target.style.opacity = '1'; }}
+              onMouseLeave={(e) => { e.target.style.opacity = '0'; }}
+            >
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// Top-level Standalone EditableDealField component to keep DOM input alive across parent state updates (prevents cursor jumping)
+const StandaloneEditableDealField = React.memo(({
+  label,
+  value,
+  fieldName,
+  type = 'text',
+  options = [],
+  isEditing,
+  editDealValue,
+  setEditDealValue,
+  saveDealEdit,
+  cancelDealEdit,
+  startDealEditing,
+  showCustomInput,
+  customValue,
+  setCustomValue,
+  setShowCustomInput,
+  predefinedDealTypes,
+  setPredefinedDealTypes,
+  predefinedDealStages,
+  setPredefinedDealStages,
+  predefinedContactOwners,
+  setPredefinedContactOwners,
+  user
+}) => {
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+  const customInputRef = React.useRef(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (isEditing) {
+      const handleClickOutside = (event) => {
+        if (containerRef.current && !containerRef.current.contains(event.target)) {
+          cancelDealEdit();
+          setDropdownOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isEditing, cancelDealEdit]);
+
+  React.useEffect(() => {
+    if (isEditing && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    const val = inputRef.current ? inputRef.current.value : editDealValue;
+    saveDealEdit(val);
+  };
+
+  return (
+    <div ref={containerRef} data-editable-field>
+      {label && <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>{label}</label>}
+      <div style={{ display: 'flex', alignItems: type === 'textarea' ? 'flex-start' : 'center', gap: '8px' }}>
+        {isEditing ? (
+          <>
+            {type === 'select' ? (
+              <div style={{ position: 'relative', flex: 1 }}>
+                <div data-dropdown="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
+                  onClick={() => setDropdownOpen(!dropdownOpen)}>
+                  <span>{editDealValue || 'Select...'}</span><ChevronDown size={14} />
+                </div>
+                {dropdownOpen && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {options.map(opt => (
+                      <button key={opt} onClick={() => { setEditDealValue(opt); setDropdownOpen(false); }}
+                        style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >{opt}</button>
+                    ))}
+                    {(fieldName === 'deal_type' || fieldName === 'deal_stage' || fieldName === 'contact_owner') && (user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                      <button onClick={() => { if (setShowCustomInput) setShowCustomInput(true); setDropdownOpen(false); }}
+                        style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >+ Custom</button>
+                    )}
+                  </div>
+                )}
+                {showCustomInput && (
+                  <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input ref={customInputRef} type="text" defaultValue={customValue} placeholder={`Enter custom ${fieldName.replace('_', ' ')}...`}
+                        style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
+                      <button onClick={() => {
+                        const val = customInputRef.current ? customInputRef.current.value.trim() : (customValue || '').trim();
+                        if (val) {
+                          setEditDealValue(val);
+                          if (fieldName === 'deal_type' && setPredefinedDealTypes) setPredefinedDealTypes([...predefinedDealTypes, val]);
+                          if (fieldName === 'deal_stage' && setPredefinedDealStages) setPredefinedDealStages([...predefinedDealStages, val]);
+                          if (fieldName === 'contact_owner' && setPredefinedContactOwners) setPredefinedContactOwners([...predefinedContactOwners, val]);
+                          if (setCustomValue) setCustomValue('');
+                          if (setShowCustomInput) setShowCustomInput(false);
+                        }
+                      }}
+                        style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
+                      <button onClick={() => { if (setCustomValue) setCustomValue(''); if (setShowCustomInput) setShowCustomInput(false); }}
+                        style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : type === 'date' ? (
+              <input
+                ref={inputRef}
+                type="date"
+                defaultValue={editDealValue || ''}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  border: '1px solid var(--green-600)',
+                  borderRadius: 'var(--r)',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'var(--surface)',
+                  color: 'var(--text)'
+                }}
+              />
+            ) : type === 'number' ? (
+              <input
+                ref={inputRef}
+                type="number"
+                defaultValue={editDealValue || ''}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') cancelDealEdit();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  border: '1px solid var(--green-600)',
+                  borderRadius: 'var(--r)',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'var(--surface)',
+                  color: 'var(--text)'
+                }}
+              />
+            ) : type === 'textarea' ? (
+              <textarea
+                ref={inputRef}
+                defaultValue={editDealValue || ''}
+                rows={4}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  border: '1px solid var(--green-600)',
+                  borderRadius: 'var(--r)',
+                  fontSize: '12px',
+                  outline: 'none',
+                  resize: 'vertical',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  fontFamily: 'inherit'
+                }}
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                type={type}
+                defaultValue={editDealValue || ''}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') cancelDealEdit();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  border: '1px solid var(--green-600)',
+                  borderRadius: 'var(--r)',
+                  fontSize: '12px',
+                  outline: 'none',
+                  background: 'var(--surface)',
+                  color: 'var(--text)'
+                }}
+              />
+            )}
+            <button
+              onClick={handleSave}
+              style={{
+                padding: '4px 8px',
+                background: 'var(--green-600)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              <Check size={14} style={{ color: "#ffffff" }} />
+            </button>
+            <button
+              onClick={cancelDealEdit}
+              style={{
+                padding: '4px 8px',
+                background: 'var(--gray-200)',
+                color: 'var(--text)',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <div
+            onClick={() => startDealEditing(fieldName, value)}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r)',
+              color: value ? 'var(--text)' : 'var(--text-3)',
+              fontSize: '12px',
+              fontStyle: value ? 'normal' : 'italic',
+              minHeight: '20px',
+              display: 'flex',
+              alignItems: type === 'textarea' ? 'flex-start' : 'center'
+            }}
+          >
+            {value || '-'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// Helper to normalize user parameter for backend API
+const getApiUserName = (u) => {
+  const name = u?.name || u?.username || u?.phone_number || 'Operation';
+  if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
+    return 'Operation';
+  }
+  return name;
+};
+
 export default function Opportunities({ onPageChange }) {
   const { user } = useAuth();
   const [opportunities, setOpportunities] = useState([]);
@@ -110,16 +452,128 @@ export default function Opportunities({ onPageChange }) {
 
   const [totalOpportunities, setTotalOpportunities] = useState(0);
 
+  // Predefined states initialized early for top-level memoization access
+  const [predefinedTags, setPredefinedTags] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedTags');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+  });
+
+  const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedLeadSources');
+    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
+  });
+
+  const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedIndustries');
+    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
+  });
+
+  const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedAccountTypes');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+  });
+
+  const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
+    const apiDefaults = ['Akhil Kumar M', 'Alisha', 'Amith', 'Aymen', 'Bhagwati', 'Chaturya', 'Fathima', 'Harshitha', 'Lipsa', 'Mustaqeem', 'Operation', 'Partner_test', 'Pragya', 'Priyanshu', 'Rohini', 'Rohith S', 'Sat', 'Shurti', 'Shyamli', 'Testing operation acc', 'Testing sales acc', 'Vijay K B'];
+    const saved = localStorage.getItem('opportunities_predefinedContactOwners');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { }
+    }
+    return apiDefaults;
+  });
+
+  const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
+    const saved = localStorage.getItem('opportunities_predefinedDealTypes');
+    return saved ? JSON.parse(saved) : ['Trial', 'Starter', 'Growth', 'Entrepreneur'];
+  });
+
+  const [predefinedDealStages, setPredefinedDealStages] = useState([
+    'Opportunity',
+    'Proposal',
+    'Negotiation',
+    'Closed Won',
+    'Closed Lost',
+    'Invoiced',
+    'Paid'
+  ]);
+
+  // Save to localStorage when predefined values change
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedTags', JSON.stringify(predefinedTags));
+  }, [predefinedTags]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedLeadSources', JSON.stringify(predefinedLeadSources));
+  }, [predefinedLeadSources]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedIndustries', JSON.stringify(predefinedIndustries));
+  }, [predefinedIndustries]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedAccountTypes', JSON.stringify(predefinedAccountTypes));
+  }, [predefinedAccountTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedContactOwners', JSON.stringify(predefinedContactOwners));
+  }, [predefinedContactOwners]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedDealTypes', JSON.stringify(predefinedDealTypes));
+  }, [predefinedDealTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
+  }, [predefinedDealStages]);
+
+  // Fetch dropdown options dynamically from backend API on mount
+  useEffect(() => {
+    let active = true;
+
+    const fetchAllDropdownOptions = async () => {
+      const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+
+      const categories = [
+        { name: 'industry', setter: setPredefinedIndustries },
+        { name: 'lead_source', setter: setPredefinedLeadSources },
+        { name: 'contact_owner', setter: setPredefinedContactOwners },
+        { name: 'tags', setter: setPredefinedTags },
+        { name: 'account_type', setter: setPredefinedAccountTypes }
+      ];
+
+      for (const cat of categories) {
+        try {
+          const res = await fetch(`${apiUrl}?category=${encodeURIComponent(cat.name)}`);
+          if (res.ok) {
+            const result = await res.json();
+            if (active && result && result.status && Array.isArray(result.data) && result.data.length > 0) {
+              cat.setter(result.data);
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching dropdown options for ${cat.name}:`, err);
+        }
+      }
+    };
+
+    fetchAllDropdownOptions();
+
+    return () => { active = false; };
+  }, []);
+
   // Fetch opportunities from API
 
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = getApiUserName(user);
 
       const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
       if (!apiUrl) {
-        
+
         setOpportunities(getMockOpportunities());
         setError(null);
         setLoading(false);
@@ -128,7 +582,14 @@ export default function Opportunities({ onPageChange }) {
 
       const currentLimit = itemsPerPage || 10;
       const currentOffset = ((currentPage || 1) - 1) * currentLimit;
-      const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${currentOffset}&limit=${currentLimit}`);
+      let response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${currentOffset}&limit=${currentLimit}`);
+
+      if (response.status === 500 || !response.ok) {
+        const fallbackRes = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}`);
+        if (fallbackRes.ok) {
+          response = fallbackRes;
+        }
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -192,29 +653,35 @@ export default function Opportunities({ onPageChange }) {
 
   // Fetch deal totals from API
   const fetchDealTotals = async () => {
-    const currentUserName = user?.name || user?.phone_number || 'operation';
+    const currentUserName = getApiUserName(user);
     const apiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
 
     if (!apiUrl) return;
 
     try {
       // Fetch with_deals total
-      const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=with_deals`);
+      const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&account_with_deal=true`);
       if (withDealsResponse.ok) {
         const withDealsData = await withDealsResponse.json();
-        
-        if (withDealsData.total !== undefined) {
-          setApiDealTotals(prev => ({ ...prev, with_deals: withDealsData.total }));
+        const withCount = Array.isArray(withDealsData)
+          ? withDealsData.length
+          : (withDealsData.total !== undefined ? withDealsData.total : (withDealsData.count !== undefined ? withDealsData.count : undefined));
+
+        if (withCount !== undefined) {
+          setApiDealTotals(prev => ({ ...prev, with_deals: withCount }));
         }
       }
 
       // Fetch without_deals total
-      const withoutDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&deal_filter=without_deals`);
+      const withoutDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&account_without_deal=true`);
       if (withoutDealsResponse.ok) {
         const withoutDealsData = await withoutDealsResponse.json();
-        
-        if (withoutDealsData.total !== undefined) {
-          setApiDealTotals(prev => ({ ...prev, without_deals: withoutDealsData.total }));
+        const withoutCount = Array.isArray(withoutDealsData)
+          ? withoutDealsData.length
+          : (withoutDealsData.total !== undefined ? withoutDealsData.total : (withoutDealsData.count !== undefined ? withoutDealsData.count : undefined));
+
+        if (withoutCount !== undefined) {
+          setApiDealTotals(prev => ({ ...prev, without_deals: withoutCount }));
         }
       }
     } catch (err) {
@@ -451,109 +918,9 @@ export default function Opportunities({ onPageChange }) {
     let active = true;
 
     const fetchAllAccountsForFilters = async () => {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
-      const apiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
-      if (!apiUrl) {
-        if (active) setIsFetchingFilterOptions(false);
-        return;
-      }
-
-      const batchLimit = 1000;
-      const buildUrl = (offset) =>
-        `${apiUrl}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${batchLimit}`;
-      const parseItems = (data) =>
-        Array.isArray(data) ? data : (data.data || data.results || data.accounts || data.records || data.items || []);
-
-      try {
-        if (active) {
-          setIsFetchingFilterOptions(true);
-          setFilterFetchProgress(10);
-        }
-
-        // Fetch first batch of 1000 accounts for filter options (single request)
-        // Fetch first batch of 1000 accounts for filter options
-        const firstRes = await fetch(buildUrl(0));
-        if (!firstRes.ok || !active) return;
-        const firstData = await firstRes.json();
-        if (!active) return;
-
-        const firstItems = parseItems(firstData);
-        if (!firstItems.length) {
-          if (active) {
-            setFilterFetchProgress(100);
-            setIsFetchingFilterOptions(false);
-          }
-          return;
-        }
-
-        let allFetched = [...firstItems];
-
-        const totalCount = typeof firstData.total === 'number' ? firstData.total : (typeof firstData.count === 'number' ? firstData.count : 0);
-
-        // Fetch all remaining batches in parallel if total count exceeds 1000
-        if (totalCount > batchLimit) {
-          const batchPromises = [];
-          for (let currentOffset = batchLimit; currentOffset < totalCount; currentOffset += batchLimit) {
-            batchPromises.push(
-              fetch(buildUrl(currentOffset))
-                .then(res => res.ok ? res.json() : null)
-                .then(data => data ? parseItems(data) : [])
-                .catch(() => [])
-            );
-          }
-          const results = await Promise.all(batchPromises);
-          results.forEach(items => {
-            if (items && items.length) {
-              allFetched.push(...items);
-            }
-          });
-        }
-
-        if (!active) return;
-
-        setFilterFetchProgress(99);
-
-        // --- Step 3: Transform ---
-
-        const transformed = allFetched.map(opp => ({
-          id: opp.id,
-          contactName: opp.full_name || opp.contact_name || opp.name || '',
-          phoneNumber: opp.phone || opp.phone_number || '',
-          alternateNumber: opp.alternate_number || '',
-          email: opp.email || '',
-          companyName: opp.company_name || opp.company || '',
-          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || '',
-          city: opp.city || opp.mailing_city || '',
-          state: opp.state || opp.mailing_state || '',
-          country: opp.country || opp.mailing_country || 'IN',
-          leadStatus: opp.status || opp.lead_status || '',
-          tags: opp.tags || opp.tag || '',
-          leadSource: opp.lead_source || opp.source || '',
-          description: opp.description || '',
-          createdTime: opp.created_time || opp.created_at || '',
-          industry: opp.industry || '',
-          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || '',
-          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || '',
-          lastActivity: opp.last_activity || opp.updated_at || '',
-          accountName: opp.account_name || '',
-          accountNumber: opp.account_number || '',
-          dealPresent: opp.deal_present || 0,
-          website: opp.website || '',
-          accountType: opp.account_type || '',
-          modifiedTime: opp.modified_time || '',
-          _raw: opp
-        }));
-
-        if (active) {
-          setAllAccountsData(transformed);
-          setFilterFetchProgress(100);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch full accounts dataset for filter options:', err);
-      } finally {
-        if (active) {
-          setIsFetchingFilterOptions(false);
-        }
+      if (active) {
+        setIsFetchingFilterOptions(false);
+        setFilterFetchProgress(100);
       }
     };
 
@@ -562,7 +929,7 @@ export default function Opportunities({ onPageChange }) {
     return () => {
       active = false;
     };
-  }, [user?.name, user?.phone_number]);
+  }, []);
 
   // Memoized unique values map "” recomputes only when allAccountsData changes, not on every render
   const uniqueValuesMap = useMemo(() => {
@@ -586,10 +953,34 @@ export default function Opportunities({ onPageChange }) {
       'account_type': ['accountType', 'account_type']
     };
 
+    const defaultsMap = {
+      'lead_status': predefinedDealStages,
+      'status': predefinedDealStages,
+      'pipeline_stage': predefinedDealStages,
+      'contact_owner': predefinedContactOwners,
+      'owner': predefinedContactOwners,
+      'tag': predefinedTags,
+      'tags': predefinedTags,
+      'lead_source': predefinedLeadSources,
+      'industry': predefinedIndustries,
+      'account_type': predefinedAccountTypes,
+      'mailing_country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore'],
+      'country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore']
+    };
+
+    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type'];
+
     const sourceData = (allAccountsData && allAccountsData.length > 0) ? allAccountsData : opportunities;
     const result = {};
 
     for (const [property, possibleFields] of Object.entries(propertyMap)) {
+      const defaults = defaultsMap[property] || [];
+
+      if (apiDropdownProps.includes(property) && defaults && defaults.length > 0) {
+        result[property] = [...new Set(defaults)].sort((a, b) => String(a).localeCompare(String(b)));
+        continue;
+      }
+
       if (property === 'tag' || property === 'tags') {
         const allTags = sourceData.flatMap(item => {
           const tagStr = item.tags || (item._raw && (item._raw.tags || item._raw.tag)) || '';
@@ -597,7 +988,7 @@ export default function Opportunities({ onPageChange }) {
             ? tagStr.split(',').map(t => t.trim()).filter(Boolean)
             : [];
         });
-        result[property] = [...new Set(allTags)].sort((a, b) => String(a).localeCompare(String(b)));
+        result[property] = [...new Set([...defaults, ...allTags])].sort((a, b) => String(a).localeCompare(String(b)));
         continue;
       }
 
@@ -610,30 +1001,24 @@ export default function Opportunities({ onPageChange }) {
         return vals;
       }).filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined');
 
-      result[property] = [...new Set(extracted)].sort((a, b) => String(a).localeCompare(String(b)));
+      result[property] = [...new Set([...defaults, ...extracted])].sort((a, b) => String(a).localeCompare(String(b)));
     }
     return result;
-  }, [allAccountsData, opportunities]);
+  }, [allAccountsData, opportunities, predefinedDealStages, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes]);
 
   // Get unique values for a property "” reads from memoized cache
   const getUniqueValues = (property) => uniqueValuesMap[property] || [];
 
   const getModifiedByOptions = () => {
-    const uniqueFromData = getUniqueValues('modified_by');
-    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
-    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+    return predefinedContactOwners || [];
   };
 
   const getCreatedByOptions = () => {
-    const uniqueFromData = getUniqueValues('created_by');
-    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
-    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+    return predefinedContactOwners || [];
   };
 
   const getContactOwnerOptions = () => {
-    const uniqueFromData = getUniqueValues('contact_owner');
-    const combined = [...new Set([...predefinedContactOwners, ...uniqueFromData])];
-    return combined.filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined').sort((a, b) => String(a).localeCompare(String(b)));
+    return predefinedContactOwners || [];
   };
 
   // Helper to construct query parameter keys with _is or _is_not suffixes
@@ -660,12 +1045,12 @@ export default function Opportunities({ onPageChange }) {
     const baseKey = fieldMap[property] || property;
     const opLower = String(operator || '').toLowerCase().trim();
     const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
-    const suffix = isNot ? '_is_not' : '_is';
-    return `${baseKey}${suffix}`;
+    const prefix = isNot ? 'is_not_' : 'is_';
+    return `${prefix}${baseKey}`;
   };
 
   const handleCombinedFilters = async (filters) => {
-    
+
     setIsApplyingAccountsFilters(true);
     setAccountsFiltersSuccess(false);
     setLoading(true);
@@ -676,7 +1061,7 @@ export default function Opportunities({ onPageChange }) {
       const urlParams = [];
 
       // Add base parameters
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = getApiUserName(user);
       urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
       const currentLimit = itemsPerPage || 10;
       urlParams.push(`limit=${currentLimit}`);
@@ -685,16 +1070,21 @@ export default function Opportunities({ onPageChange }) {
       // Build URL parameters for all filters
       filters.forEach(filter => {
         if (filter.property === 'created_time' || filter.property === 'createdTime') {
-          if (filter.dateOperator === 'on' && (filter.value || filter.date)) {
+          const val = filter.value || filter.date;
+          if (filter.dateOperator === 'on' && val) {
+            urlParams.push(`created_time_on=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=on`);
-            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
-          } else if (filter.dateOperator === 'after' && (filter.value || filter.date)) {
+            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'after' && val) {
+            urlParams.push(`created_time_after=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=after`);
-            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
-          } else if (filter.dateOperator === 'before' && (filter.value || filter.date)) {
+            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'before' && val) {
+            urlParams.push(`created_time_before=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=before`);
-            urlParams.push(`date=${encodeURIComponent(filter.value || filter.date)}`);
+            urlParams.push(`date=${encodeURIComponent(val)}`);
           } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && filter.fromDate && filter.toDate) {
+            urlParams.push(`created_time_between=${encodeURIComponent(filter.fromDate)},${encodeURIComponent(filter.toDate)}`);
             urlParams.push(`date_type=${filter.dateOperator}`);
             urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
             urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
@@ -712,8 +1102,8 @@ export default function Opportunities({ onPageChange }) {
       });
 
       url += urlParams.join('&');
-      
-      
+
+
 
       const response = await fetch(url, {
         method: 'GET',
@@ -722,8 +1112,8 @@ export default function Opportunities({ onPageChange }) {
         }
       });
 
-      
-      
+
+
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -732,7 +1122,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
+
 
       let oppsData = Array.isArray(result) ? result : (result.data || result.results || result.accounts || result.records || result.items || []);
       // Fallback: find the first array property in the response
@@ -752,7 +1142,7 @@ export default function Opportunities({ onPageChange }) {
       setCurrentPage(1);
 
       if (Array.isArray(oppsData)) {
-        
+
 
         // Set filter applied state and criteria
         setIsFilterApplied(true);
@@ -829,6 +1219,8 @@ export default function Opportunities({ onPageChange }) {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editNoteInput, setEditNoteInput] = useState('');
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'kanban'
   const [collapsedStages, setCollapsedStages] = useState({}); // Track collapsed stages
   const [columnWidths, setColumnWidths] = useState({}); // Track column widths for resize
@@ -887,6 +1279,7 @@ export default function Opportunities({ onPageChange }) {
   const [stageValues, setStageValues] = useState({}); // Store total deals value per stage from API
   const [loadingMoreStages, setLoadingMoreStages] = useState({}); // Track infinite scroll loading per stage
   const [pipelineViewMode, setPipelineViewMode] = useState('kanban'); // Track sales pipeline view mode (kanban vs list)
+  const [isDealsLoading, setIsDealsLoading] = useState(true);
 
   // â”€â”€ Sales Pipeline Filter State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [salesFilterSidebarOpen, setSalesFilterSidebarOpen] = useState(false);
@@ -917,7 +1310,7 @@ export default function Opportunities({ onPageChange }) {
     const fetchFilteredOpportunities = async () => {
       const currentLimit = itemsPerPage || 10;
       const currentOffset = ((currentPage || 1) - 1) * currentLimit;
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = getApiUserName(user);
 
       const isSearching = (searchTerm && searchTerm.trim() !== '');
       const fetchLimit = currentLimit;
@@ -931,7 +1324,7 @@ export default function Opportunities({ onPageChange }) {
 
       const filterApiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
       const accountsApiUrl = import.meta.env.VITE_ACCOUNTS_API_URL;
-      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+      const searchApiUrl = import.meta.env.VITE_UNIVERSAL_SEARCH_ACCOUNT_API_URL || import.meta.env.VITE_SEARCH_API_URL;
 
       try {
         setLoading(true);
@@ -960,7 +1353,11 @@ export default function Opportunities({ onPageChange }) {
             params.append('query', searchTerm.trim());
           }
 
-          if (dealFilter && dealFilter !== 'all') {
+          if (dealFilter === 'with_deals') {
+            params.append('account_with_deal', 'true');
+          } else if (dealFilter === 'without_deals') {
+            params.append('account_without_deal', 'true');
+          } else if (dealFilter && dealFilter !== 'all') {
             params.append('deal_filter', dealFilter);
           }
           if (newThisWeekFilter) {
@@ -971,23 +1368,28 @@ export default function Opportunities({ onPageChange }) {
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
               if (p.property === 'created_time' || p.property === 'createdTime') {
+                const val = p.value || p.date;
                 if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-                  params.append('date_type', p.dateOperator);
                   if (p.fromDate && p.toDate) {
+                    params.append('created_time_between', `${p.fromDate},${p.toDate}`);
                     params.append('from', p.fromDate);
                     params.append('to', p.toDate);
-                  } else if (p.value || p.date) {
-                    params.append('date', p.value || p.date);
+                  } else if (val) {
+                    params.append('date', val);
                   }
-                } else if (p.dateOperator === 'on' && (p.value || p.date)) {
+                  params.append('date_type', p.dateOperator);
+                } else if (p.dateOperator === 'on' && val) {
+                  params.append('created_time_on', val);
                   params.append('date_type', 'on');
-                  params.append('date', p.value || p.date);
-                } else if (p.dateOperator === 'before' && (p.value || p.date)) {
+                  params.append('date', val);
+                } else if (p.dateOperator === 'before' && val) {
+                  params.append('created_time_before', val);
                   params.append('date_type', 'before');
-                  params.append('date', p.value || p.date);
-                } else if (p.dateOperator === 'after' && (p.value || p.date)) {
+                  params.append('date', val);
+                } else if (p.dateOperator === 'after' && val) {
+                  params.append('created_time_after', val);
                   params.append('date_type', 'after');
-                  params.append('date', p.value || p.date);
+                  params.append('date', val);
                 } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
                   const unitMap = { day: 'days', week: 'weeks', month: 'months' };
                   const count = p.count ? parseInt(p.count) : 1;
@@ -1028,6 +1430,12 @@ export default function Opportunities({ onPageChange }) {
               lastFetchedUrlRef.current = accountReqUrl;
             }
             response = await fetch(accountReqUrl);
+            if (!response || response.status === 500 || !response.ok) {
+              const fallbackRes = await fetch(`${accountsApiUrl}?user=${encodeURIComponent(currentUserName)}`);
+              if (fallbackRes.ok) {
+                response = fallbackRes;
+              }
+            }
           }
         }
 
@@ -1359,24 +1767,7 @@ export default function Opportunities({ onPageChange }) {
     stages.forEach(stage => {
       let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
 
-      // 1. Search term filter across all deal fields
-      if (isSearching) {
-        const q = searchTerm.trim().toLowerCase();
-        stageDeals = stageDeals.filter(deal => {
-          const dealNameMatch = (deal.deal_name || deal.dealName || '').toLowerCase().includes(q);
-          const contactMatch = (deal.contact_name || deal.contactName || deal.full_name || '').toLowerCase().includes(q);
-          const accountMatch = (deal.account_name || deal.accountName || '').toLowerCase().includes(q);
-          const ownerMatch = (deal.owner || deal.contactOwner || deal.deal_owner || '').toLowerCase().includes(q);
-          const stageMatch = (deal.deal_stage || deal.stage || '').toLowerCase().includes(q);
-          const amountMatch = String(deal.deal_amount || deal.amount || '').includes(q);
-          const typeMatch = (deal.deal_type || deal.type || '').toLowerCase().includes(q);
-          const descMatch = (deal.description || '').toLowerCase().includes(q);
-
-          return dealNameMatch || contactMatch || accountMatch || ownerMatch || stageMatch || amountMatch || typeMatch || descMatch;
-        });
-      }
-
-      // 2. Sales Property filters if active
+      // Sales Property filters if active
       if (salesFiltersApplied && selectedSalesProperties.length > 0) {
         stageDeals = applyFilters(stageDeals);
       }
@@ -1401,9 +1792,9 @@ export default function Opportunities({ onPageChange }) {
     let active = true;
 
     const fetchDealsSummaryAndTotal = async () => {
-      const currentUser = user?.name || user?.phone_number || 'operation';
-      const dealsSummaryApiUrl = import.meta.env.VITE_DEALS_SUMMARY_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals/summary';
-      const dealsApiUrl = import.meta.env.VITE_DEALS_API_URL || 'https://api.sat2farm.com/sat2business_leads/deals';
+      const currentUser = getApiUserName(user);
+      const dealsSummaryApiUrl = import.meta.env.VITE_DEALS_SUMMARY_API_URL;
+      const dealsApiUrl = import.meta.env.VITE_DEALS_API_URL;
 
       try {
         const [summaryRes, dealsRes] = await Promise.all([
@@ -1493,16 +1884,17 @@ export default function Opportunities({ onPageChange }) {
   const applySalesFilters = async () => {
     if (isApplyingSalesFilters) return;
     setIsApplyingSalesFilters(true);
+    setIsDealsLoading(true);
     setSalesFiltersSuccess(false);
     try {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL;
       if (!apiUrl) {
-        
+
         toast.error('Filter API URL not configured');
         return;
       }
 
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = getApiUserName(user);
       let url = `${apiUrl}?user=${encodeURIComponent(currentUser)}`;
       const urlParams = [];
 
@@ -1613,11 +2005,11 @@ export default function Opportunities({ onPageChange }) {
       });
 
       let response;
-      const searchApiUrl = import.meta.env.VITE_SEARCH_API_URL;
+      const dealsSearchApiUrl = import.meta.env.VITE_DEALS_SEARCH_API_URL || 'https://api.sat2farm.com/deals/search';
 
-      if (searchTerm && searchTerm.trim() && searchApiUrl) {
+      if (searchTerm && searchTerm.trim()) {
         try {
-          const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUser)}&type=deal&query=${encodeURIComponent(searchTerm.trim())}`;
+          const searchUrl = `${dealsSearchApiUrl}?user=${encodeURIComponent(currentUser)}&query=${encodeURIComponent(searchTerm.trim())}`;
           response = await fetch(searchUrl);
         } catch (searchErr) {
           console.warn('Dedicated deal search API failed:', searchErr);
@@ -1629,7 +2021,7 @@ export default function Opportunities({ onPageChange }) {
           url += '&' + urlParams.join('&');
         }
 
-        
+
 
         response = await fetch(url, {
           method: 'GET',
@@ -1639,7 +2031,7 @@ export default function Opportunities({ onPageChange }) {
         });
       }
 
-      
+
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1648,7 +2040,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
+
       // Extract deals array from various possible response formats
       let extractedData = null;
       if (Array.isArray(result)) {
@@ -1675,7 +2067,7 @@ export default function Opportunities({ onPageChange }) {
         while ((result.has_more || (currentNextOffset && allData.length < totalRecords)) && currentNextOffset) {
           try {
             const nextUrl = `${url}&offset=${currentNextOffset}&limit=1000`;
-            
+
             const nextResponse = await fetch(nextUrl, {
               method: 'GET',
               headers: { 'Content-Type': 'application/json' }
@@ -1726,13 +2118,17 @@ export default function Opportunities({ onPageChange }) {
         });
 
         setKanbanDeals(dealsByStage);
-        setSalesFiltersApplied(true);
-        setSalesFiltersSuccess(true);
-        toast.success(`Filter applied successfully! Found ${allData.length} records.`);
-        setTimeout(() => {
-          setSalesFiltersSuccess(false);
-          setSalesFilterSidebarOpen(false);
-        }, 500);
+        if (selectedSalesProperties.length > 0) {
+          setSalesFiltersApplied(true);
+          setSalesFiltersSuccess(true);
+          toast.success(`Filter applied successfully! Found ${allData.length} records.`);
+          setTimeout(() => {
+            setSalesFiltersSuccess(false);
+            setSalesFilterSidebarOpen(false);
+          }, 500);
+        } else {
+          setSalesFiltersApplied(false);
+        }
       } else {
         console.error('API returned unexpected format:', result);
         toast.error('Failed to apply filter: Unexpected response format');
@@ -1742,6 +2138,7 @@ export default function Opportunities({ onPageChange }) {
       toast.error(`Error applying filter: ${err.message || 'Unknown error occurred'}`);
     } finally {
       setIsApplyingSalesFilters(false);
+      setIsDealsLoading(false);
     }
   };
 
@@ -1760,10 +2157,7 @@ export default function Opportunities({ onPageChange }) {
     'Junk': { color: '#ef4444', label: 'Junk' }
   };
 
-  const [predefinedTags, setPredefinedTags] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedTags');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
-  });
+
 
   const [greenTeamAssignedDealIds, setGreenTeamAssignedDealIds] = useState([]);
   const [showGreenTeamAssignmentDetails, setShowGreenTeamAssignmentDetails] = useState(false);
@@ -1862,7 +2256,7 @@ export default function Opportunities({ onPageChange }) {
 
       // Add fields that have changed (excluding non-editable fields)
       const editableFields = ['type', 'admin_number', 'admin_name', 'farmer_number', 'farmer_name', 'total_acres', 'plan', 'description'];
-      
+
       editableFields.forEach(field => {
         if (editingGreenTeamDetails[field] !== greenTeamAssignmentDetails[field]) {
           payload[field] = editingGreenTeamDetails[field];
@@ -1910,54 +2304,9 @@ export default function Opportunities({ onPageChange }) {
     fetchGreenTeamAssignedDealIds();
   }, []);
 
-  const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedLeadSources');
-    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
-  });
-
-  const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedIndustries');
-    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
-  });
-
-  const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedAccountTypes');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
-  });
-
-  const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
-    const defaultOwners = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Pragya','Alisha'];
-    const saved = localStorage.getItem('opportunities_predefinedContactOwners');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return Array.from(new Set([...defaultOwners, ...parsed]));
-        }
-      } catch (e) { }
-    }
-    return defaultOwners;
-  });
-
   // â”€â”€ Helper: get all available owners combining predefined & dynamic loaded data â”€â”€
   const getAllAvailableOwners = () => {
-    const defaultList = ['Operation', 'Akhil Kumar M', 'Sat', 'Chaturya', 'Nirosha', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Aymen', 'Shurti', 'Abubakar', 'Vijay K B', 'Mustaqeem', 'Amith', 'Hemanth', 'Likhitha', 'Rohini','Lipsa','Ashok','Alisha','Pragya'];
-    const ownersFromKanban = Object.values(kanbanDeals || {})
-      .flat()
-      .map(d => d.deal_owner || d.owner || d.contactOwner)
-      .filter(v => v && typeof v === 'string' && v.trim());
-    const ownersFromOpportunities = (opportunities || [])
-      .map(o => o.contactOwner || o.owner)
-      .filter(v => v && typeof v === 'string' && v.trim());
-
-    const combined = [
-      ...defaultList,
-      ...(predefinedContactOwners || []),
-      ...ownersFromKanban,
-      ...ownersFromOpportunities
-    ];
-
-    return Array.from(new Set(combined)).filter(v => v && v.trim()).sort();
+    return predefinedContactOwners || [];
   };
 
   // â”€â”€ Helper: unique contact owners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1965,43 +2314,7 @@ export default function Opportunities({ onPageChange }) {
     return getAllAvailableOwners();
   };
 
-  const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedDealTypes');
-    return saved ? JSON.parse(saved) : ['Trial', 'Starter', 'Growth', 'Entrepreneur'];
-  });
-  const [predefinedDealStages, setPredefinedDealStages] = useState(() => {
-    const saved = localStorage.getItem('opportunities_predefinedDealStages');
-    return saved ? JSON.parse(saved) : ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
-  });
 
-  // Save to localStorage when predefined values change
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedTags', JSON.stringify(predefinedTags));
-  }, [predefinedTags]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedLeadSources', JSON.stringify(predefinedLeadSources));
-  }, [predefinedLeadSources]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedIndustries', JSON.stringify(predefinedIndustries));
-  }, [predefinedIndustries]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedAccountTypes', JSON.stringify(predefinedAccountTypes));
-  }, [predefinedAccountTypes]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedContactOwners', JSON.stringify(predefinedContactOwners));
-  }, [predefinedContactOwners]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedDealTypes', JSON.stringify(predefinedDealTypes));
-  }, [predefinedDealTypes]);
-
-  useEffect(() => {
-    localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
-  }, [predefinedDealStages]);
 
 
 
@@ -2041,15 +2354,21 @@ export default function Opportunities({ onPageChange }) {
     }
 
     setAddingNote(true);
-    const currentUserName = user?.name || user?.phone_number || 'operation';
-    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=note&message=${encodeURIComponent(noteInput)}&user=${encodeURIComponent(currentUserName)}`;
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
 
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          lead_id: String(selectedUser.id),
+          activity_type: 'note',
+          message: noteInput.trim(),
+          user: currentUserName
+        })
       });
 
       if (!response.ok) {
@@ -2059,14 +2378,11 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
 
-      if (result.success || result.message) {
+      if (result.success || result.message || result.id) {
         toast.success('Note added successfully');
         setNoteInput('');
-        // Refresh timeline to show the new note
         fetchTimeline(selectedUser.id);
-        // Refresh activities to show the new note
         fetchActivities(selectedUser.id);
       } else {
         toast.error('Failed to add note');
@@ -2079,16 +2395,65 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
+  // Update note using API
+  const handleUpdateNote = async (noteId, updatedMessage) => {
+    if (!updatedMessage || !updatedMessage.trim()) {
+      toast.error('Please enter a note');
+      return;
+    }
+
+    const currentUserName = getApiUserName(user);
+    const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    try {
+      const payload = {
+        id: String(noteId),
+        activity_type: 'note',
+        message: updatedMessage.trim(),
+        user: currentUserName
+      };
+
+      const response = await fetch(activityApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating note:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message || result.id) {
+        toast.success('Note updated successfully');
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
+      } else {
+        toast.error('Failed to update note');
+      }
+    } catch (err) {
+      console.error('Error updating note:', err);
+      toast.error('Failed to update note');
+    }
+  };
+
   // Fetch deals by stage for Kanban dashboard
   const fetchDealsByStage = async (stage, stageOffset = 0, stageLimit = 50) => {
     try {
       const apiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
       if (!apiUrl) {
-        
+
         return { deals: [], total: 0 };
       }
 
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = getApiUserName(user);
       const response = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUser)}&deal_stage=${encodeURIComponent(stage)}&offset=${stageOffset}&limit=${stageLimit}`);
 
       if (!response.ok) {
@@ -2096,7 +2461,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
+
 
       const dealsList = Array.isArray(result) ? result : (result.data || result.results || result.deals || []);
       const totalCount = result.total !== undefined ? result.total : (result.count !== undefined ? result.count : dealsList.length);
@@ -2119,6 +2484,7 @@ export default function Opportunities({ onPageChange }) {
 
   // Fetch all deals for all stages concurrently using Promise.all (initial batch offset=0, limit=50)
   const fetchAllKanbanDeals = async () => {
+    setIsDealsLoading(true);
     const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
 
     try {
@@ -2140,6 +2506,8 @@ export default function Opportunities({ onPageChange }) {
       setStageValues(valuesByStage);
     } catch (err) {
       console.error('Error fetching all kanban deals:', err);
+    } finally {
+      setIsDealsLoading(false);
     }
   };
 
@@ -2147,9 +2515,10 @@ export default function Opportunities({ onPageChange }) {
   useEffect(() => {
     if (viewMode !== 'kanban') return;
 
-    if (searchTerm || salesFiltersApplied || newThisWeekFilter) {
+    if (searchTerm || (salesFiltersApplied && selectedSalesProperties.length > 0) || newThisWeekFilter) {
       applySalesFilters();
     } else {
+      setSalesFiltersApplied(false);
       fetchAllKanbanDeals();
     }
   }, [viewMode, searchTerm, newThisWeekFilter, refreshKey]);
@@ -2200,15 +2569,26 @@ export default function Opportunities({ onPageChange }) {
     }
 
     setAddingTask(true);
-    const currentUserName = user?.name || user?.phone_number || 'operation';
-    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${selectedUser.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    const validStatus = (taskStatus === 'Completed' || taskStatus === 'In Progress' || taskStatus === 'Due For') ? taskStatus : 'In Progress';
 
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          lead_id: String(selectedUser.id),
+          activity_type: 'task',
+          task_name: taskName,
+          due_date: taskDueDate,
+          status: validStatus,
+          task_owner: taskOwner || currentUserName,
+          user: currentUserName
+        })
       });
 
       if (!response.ok) {
@@ -2218,17 +2598,14 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
 
-      if (result.success || result.message) {
+      if (result.success || result.message || result.id) {
         toast.success('Task created successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('Pending');
+        setTaskStatus('In Progress');
         setShowCreateTaskModal(false);
-        // Refresh timeline to show the new task
         fetchTimeline(selectedUser.id);
-        // Refresh activities to show the new task
         fetchActivities(selectedUser.id);
       } else {
         toast.error('Failed to create task');
@@ -2246,7 +2623,7 @@ export default function Opportunities({ onPageChange }) {
     setEditingTask(task);
     setTaskName(task.task_name);
     setTaskDueDate(task.due_date);
-    setTaskStatus(task.status);
+    setTaskStatus(task.status || 'In Progress');
     setShowEditTaskModal(true);
   };
 
@@ -2258,20 +2635,31 @@ export default function Opportunities({ onPageChange }) {
     }
 
     if (!editingTask) {
-      toast.error('No task selected');
+      toast.error('No task selected for editing');
       return;
     }
 
     setAddingTask(true);
-    const currentUserName = user?.name || user?.phone_number || 'operation';
-    const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${editingTask.id}&activity_type=task&task_name=${encodeURIComponent(taskName)}&due_date=${encodeURIComponent(taskDueDate)}&status=${encodeURIComponent(taskStatus)}&task_owner=${encodeURIComponent(currentUserName)}&user=${encodeURIComponent(currentUserName)}`;
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    const validStatus = (taskStatus === 'Completed' || taskStatus === 'In Progress' || taskStatus === 'Due For') ? taskStatus : 'In Progress';
 
     try {
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          id: editingTask.id,
+          activity_type: 'task',
+          task_name: taskName,
+          due_date: taskDueDate,
+          status: validStatus,
+          task_owner: taskOwner || currentUserName,
+          user: currentUserName
+        })
       });
 
       if (!response.ok) {
@@ -2281,19 +2669,18 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
 
-      if (result.success || result.message) {
+      if (result.success || result.message || result.id) {
         toast.success('Task updated successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('Pending');
-        setEditingTask(null);
+        setTaskStatus('In Progress');
         setShowEditTaskModal(false);
-        // Refresh timeline to show the updated task
-        fetchTimeline(selectedUser.id);
-        // Refresh activities to show the updated task
-        fetchActivities(selectedUser.id);
+        setEditingTask(null);
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
       } else {
         toast.error('Failed to update task');
       }
@@ -2305,10 +2692,49 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // Fetch activities from API
-  const fetchActivities = async (leadId) => {
+  // Delete activity (note or task) using API
+  const handleDeleteActivity = async (activityId) => {
+    if (!window.confirm('Are you sure you want to delete this activity?')) return;
     try {
-      const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?lead_id=${leadId}`;
+      const currentUserName = getApiUserName(user);
+      const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${activityId}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error deleting activity:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message || result.id) {
+        toast.success(result.message || 'Activity deleted successfully');
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
+      } else {
+        toast.error('Failed to delete activity');
+      }
+    } catch (err) {
+      console.error('Error deleting activity:', err);
+      toast.error('Failed to delete activity');
+    }
+  };
+
+  const fetchActivities = async (leadId) => {
+    if (!leadId) return;
+    try {
+      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL || 'https://api.sat2farm.com/business/leads/activity';
+      const currentUserName = getApiUserName(user);
+      const url = `${activityApiUrl}?lead_id=${encodeURIComponent(leadId)}&user=${encodeURIComponent(currentUserName)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -2322,8 +2748,8 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
-      setActivities(result || []);
+      const activityList = Array.isArray(result) ? result : (result.activities || result.data || []);
+      setActivities(activityList);
     } catch (err) {
       console.error('Error fetching activities:', err);
     }
@@ -2335,9 +2761,10 @@ export default function Opportunities({ onPageChange }) {
     setEditValue(currentValue || '');
   };
 
-  const saveEdit = () => {
-    if (editingField && editValue.trim() !== '') {
-      handleFieldUpdate(selectedUser.id, editingField, editValue.trim());
+  const saveEdit = (overrideVal) => {
+    const valToSave = overrideVal !== undefined ? overrideVal : editValue;
+    if (editingField && String(valToSave).trim() !== '') {
+      handleFieldUpdate(selectedUser.id, editingField, String(valToSave).trim());
       setEditingField(null);
       setEditValue('');
     }
@@ -2402,10 +2829,10 @@ export default function Opportunities({ onPageChange }) {
     toast.loading('Updating deal stage...');
 
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = getApiUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
-        
+
         toast.dismiss();
         toast.error('Update Deal API URL not configured');
         fetchAllKanbanDeals();
@@ -2418,27 +2845,30 @@ export default function Opportunities({ onPageChange }) {
         user: currentUserName
       });
 
-      const response = await fetch(apiUrl, {
+      const stageUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&deal_stage=${encodeURIComponent(newStage)}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(stageUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           deal_id: dealId,
+          id: dealId,
           deal_stage: newStage,
           user: currentUserName,
         }),
       });
 
       console.log('Stage update API response status:', response.status);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
       console.log('Stage update API response data:', result);
-      
+
 
       toast.dismiss();
       if (result.success || result.message) {
@@ -2501,7 +2931,7 @@ export default function Opportunities({ onPageChange }) {
       }
     } else if (paidDealFormData.type === 'Whilelable') {
       if (!paidDealFormData.type || !paidDealFormData.registerNumber || !paidDealFormData.mailId ||
-          !paidDealFormData.applicationName) {
+        !paidDealFormData.applicationName) {
         toast.error('Please fill in all required fields');
         return;
       }
@@ -2539,22 +2969,22 @@ export default function Opportunities({ onPageChange }) {
 
     try {
       toast.loading('Submitting to Green Team...');
-      
+
       // Use API's created_at format for consistency with backend
       const currentAPITime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       console.log('Current API time:', currentAPITime);
-      
+
       // Clean amount - remove ₹ symbol and formatting
       const cleanAmount = selectedDeal.amount ? selectedDeal.amount.replace(/₹|,/g, '').trim() : '';
-      
+
       // Clean closing date - if it's formatted, convert to standard format
-      const cleanClosingDate = selectedDeal.closing_date && selectedDeal.closing_date !== '-' 
-        ? new Date(selectedDeal.closing_date).toISOString().split('T')[0] 
+      const cleanClosingDate = selectedDeal.closing_date && selectedDeal.closing_date !== '-'
+        ? new Date(selectedDeal.closing_date).toISOString().split('T')[0]
         : '';
-      
+
       // Prepare the submission data based on type
       let submissionData;
-      
+
       if (paidDealFormData.type === 'Admin') {
         // For Create Admin Account, only send specific fields as per requirement
         submissionData = {
@@ -2571,7 +3001,7 @@ export default function Opportunities({ onPageChange }) {
           total_acres: paidDealFormData.totalAcres || null,
           plan: paidDealFormData.plan || null,
           description: paidDealFormData.description || null,
-          submitted_by: user?.name || user?.phone_number || 'operation',
+          submitted_by: getApiUserName(user),
           created_at: currentAPITime,
           current_stage: 'New Assignment',
           partner_name: '',
@@ -2600,7 +3030,7 @@ export default function Opportunities({ onPageChange }) {
           total_acres: paidDealFormData.totalAcres || null,
           plan: paidDealFormData.plan || null,
           description: paidDealFormData.description || null,
-          submitted_by: user?.name || user?.phone_number || 'operation',
+          submitted_by: getApiUserName(user),
           created_at: currentAPITime,
           current_stage: 'New Assignment',
           partner_name: paidDealFormData.partnerName || null,
@@ -2629,7 +3059,7 @@ export default function Opportunities({ onPageChange }) {
           total_acres: paidDealFormData.totalAcres || null,
           plan: paidDealFormData.plan || null,
           description: paidDealFormData.description || null,
-          submitted_by: user?.name || user?.phone_number || 'operation',
+          submitted_by: getApiUserName(user),
           created_at: currentAPITime,
           current_stage: 'New Assignment',
           partner_name: null,
@@ -2658,7 +3088,7 @@ export default function Opportunities({ onPageChange }) {
           total_acres: paidDealFormData.totalAcres || null,
           plan: paidDealFormData.plan || null,
           description: paidDealFormData.description || null,
-          submitted_by: user?.name || user?.phone_number || 'operation',
+          submitted_by: getApiUserName(user),
           created_at: currentAPITime,
           current_stage: 'New Assignment',
           partner_name: null,
@@ -2687,7 +3117,7 @@ export default function Opportunities({ onPageChange }) {
           total_acres: paidDealFormData.totalAcres || null,
           plan: paidDealFormData.plan || null,
           description: paidDealFormData.description || null,
-          submitted_by: user?.name || user?.phone_number || 'operation',
+          submitted_by: getApiUserName(user),
           created_at: currentAPITime,
           current_stage: 'New Assignment',
           partner_name: null,
@@ -2739,7 +3169,7 @@ export default function Opportunities({ onPageChange }) {
         plan_12_months_acres: paidDealFormData.plan12MonthsAcres
       });
       console.log('Final Submission Data:', submissionData);
-      console.log('Submitted by:', user?.name || user?.phone_number || 'operation');
+      console.log('Submitted by:', getApiUserName(user));
       console.log('=== END GREEN TEAM ASSIGNMENT SUBMISSION ===');
 
       // Submit to API
@@ -2760,14 +3190,14 @@ export default function Opportunities({ onPageChange }) {
         console.error('API Error Headers:', error.response?.headers);
         throw error;
       });
-      
+
       if (response.data) {
         toast.dismiss();
         toast.success('Successfully assigned to Green Team');
-        
+
         // Refresh Green Team assigned deal IDs
         await fetchGreenTeamAssignedDealIds();
-        
+
         // Reset form and close modal
         setShowPaidDealForm(false);
         setPaidDealFormData({
@@ -2790,7 +3220,7 @@ export default function Opportunities({ onPageChange }) {
           plan12MonthsAcres: ''
         });
       }
-      
+
     } catch (error) {
       console.error('Error submitting to Green Team:', error);
       toast.dismiss();
@@ -2817,78 +3247,22 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // â”€â”€ Editable field component (identical to LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const EditableField = ({ label, value, fieldName, type = 'text', required = false }) => {
-    const isEditing = editingField === fieldName;
-    const containerRef = React.useRef(null);
-    const isRequired = required || fieldName === 'accountName' || fieldName === 'phoneNumber' || fieldName === 'account_name' || fieldName === 'phone';
-
-    React.useEffect(() => {
-      if (isEditing) {
-        const handleClickOutside = (event) => {
-          if (containerRef.current && !containerRef.current.contains(event.target)) {
-            cancelEdit();
-          }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }
-    }, [isEditing]);
-
-    return (
-      <div ref={containerRef}>
-        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
-          {label} {isRequired && <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span>}
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {isEditing ? (
-            <>
-              <input
-                type={type}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveEdit();
-                  if (e.key === 'Escape') cancelEdit();
-                }}
-                style={{
-                  flex: 1, padding: '6px 8px',
-                  border: '1px solid var(--green-600)', borderRadius: 'var(--r)',
-                  fontSize: '12px', background: 'var(--surface)', color: 'var(--text)'
-                }}
-                autoFocus
-              />
-              <button onClick={saveEdit} style={{ padding: '4px 8px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}><Check size={14} /></button>
-              <button onClick={cancelEdit} style={{ padding: '4px 8px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '10px', cursor: 'pointer' }}>✕</button>
-            </>
-          ) : (
-            <div
-              style={{
-                flex: 1, color: value ? 'var(--text)' : 'var(--text-3)',
-                fontStyle: value ? 'normal' : 'italic', minHeight: '20px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '4px', borderRadius: 'var(--r)', cursor: 'pointer',
-                transition: 'background-color 0.2s ease'
-              }}
-              onClick={() => startEditing(fieldName, value)}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-            >
-              <span>{value || 'Not specified'}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                style={{ opacity: 0, transition: 'opacity 0.2s ease' }}
-                onMouseEnter={(e) => { e.target.style.opacity = '1'; }}
-                onMouseLeave={(e) => { e.target.style.opacity = '0'; }}
-              >
-                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                <path d="m15 5 4 4" />
-              </svg>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // Editable field component (delegates to top-level StandaloneEditableAccountField to prevent cursor jumping)
+  const EditableField = ({ label, value, fieldName, type = 'text', required = false }) => (
+    <StandaloneEditableAccountField
+      key={fieldName}
+      label={label}
+      value={value}
+      fieldName={fieldName}
+      type={type}
+      required={required}
+      isEditing={editingField === fieldName}
+      editValue={editValue}
+      startEditing={startEditing}
+      saveEdit={saveEdit}
+      cancelEdit={cancelEdit}
+    />
+  );
 
   // â”€â”€ API handlers (same as LeadPipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchDeals = async (accountId) => {
@@ -2897,13 +3271,13 @@ export default function Opportunities({ onPageChange }) {
       const apiUrl = import.meta.env.VITE_DEALS_API_URL;
 
       if (!apiUrl) {
-        
+
         setDealsData([]);
         setDealCounts(prev => ({ ...prev, [accountId]: 0 }));
         return;
       }
 
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = getApiUserName(user);
       const response = await fetch(`${apiUrl}?account_id=${accountId}&user=${encodeURIComponent(currentUser)}`);
 
       if (!response.ok) {
@@ -2911,8 +3285,8 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
-      
+
+
 
       const deals = (result.data || []).map(deal => ({
         ...deal,
@@ -2935,11 +3309,11 @@ export default function Opportunities({ onPageChange }) {
   const fetchAllDealCounts = async (opportunities) => {
     const apiUrl = import.meta.env.VITE_DEALS_API_URL;
     if (!apiUrl) {
-      
+
       return;
     }
 
-    const currentUser = user?.name || user?.phone_number || 'operation';
+    const currentUser = getApiUserName(user);
     const counts = {};
     const promises = opportunities.map(async (opp) => {
       try {
@@ -2965,29 +3339,31 @@ export default function Opportunities({ onPageChange }) {
     setEditDealValue(currentValue || '');
   };
 
-  const saveDealEdit = async () => {
+  const saveDealEdit = async (overrideVal) => {
     if (isUpdatingDeal) return;
     if (selectedDeal && editingDealField) {
       setIsUpdatingDeal(true);
       try {
-        toast.loading('Updating deal...');
+        toast.loading('Updating deal...', { id: 'deal-update-toast' });
 
-        const currentUserName = user?.name || user?.phone_number || 'operation';
+        const currentUserName = getApiUserName(user);
         const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
 
         if (!apiUrl) {
-          toast.dismiss();
+          toast.dismiss('deal-update-toast');
           toast.error('Update Deal API URL not configured');
           setIsUpdatingDeal(false);
           return;
         }
 
+        const valueToSave = overrideVal !== undefined ? overrideVal : editDealValue;
+
         const requestBody = {
-          deal_id: selectedDeal.deal_id,
+          deal_id: selectedDeal.deal_id || selectedDeal.id,
+          id: selectedDeal.deal_id || selectedDeal.id,
           user: currentUserName
         };
 
-        // Map field names to API field names
         const fieldMapping = {
           'deal_name': 'deal_name',
           'deal_amount': 'deal_amount',
@@ -2995,19 +3371,20 @@ export default function Opportunities({ onPageChange }) {
           'deal_type': 'deal_type',
           'deal_stage': 'deal_stage',
           'deal_owner': 'deal_owner',
-          'contact_owner': 'contact_owner',
+          'contact_owner': 'deal_owner',
           'deal_probability': 'deal_probability',
           'description': 'description'
         };
 
-        const apiFieldName = fieldMapping[editingDealField];
+        const apiFieldName = fieldMapping[editingDealField] || editingDealField;
         if (apiFieldName) {
-          requestBody[apiFieldName] = editDealValue;
+          requestBody[apiFieldName] = valueToSave;
         }
 
-        
+        const dealId = selectedDeal.deal_id || selectedDeal.id;
+        const dealUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&${encodeURIComponent(apiFieldName)}=${encodeURIComponent(valueToSave)}`;
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(dealUrl, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -3022,23 +3399,40 @@ export default function Opportunities({ onPageChange }) {
         }
 
         const result = await response.json();
-        
 
-        toast.dismiss();
+        toast.dismiss('deal-update-toast');
         toast.success('Deal updated successfully');
+
+        // Update selectedDeal state so the updated field/description is immediately visible without closing modal
+        setSelectedDeal(prev => prev ? {
+          ...prev,
+          [editingDealField]: valueToSave,
+          [apiFieldName]: valueToSave,
+          description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (prev.description || '')
+        } : null);
+
+        // Update kanbanDeals state
+        setKanbanDeals(prev => {
+          const updated = { ...prev };
+          for (const stage of Object.keys(updated)) {
+            updated[stage] = updated[stage].map(d => (d.deal_id === selectedDeal.deal_id || d.id === selectedDeal.id) ? {
+              ...d,
+              [editingDealField]: valueToSave,
+              [apiFieldName]: valueToSave,
+              description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (d.description || '')
+            } : d);
+          }
+          return updated;
+        });
+
         setEditingDealField(null);
         setEditDealValue('');
-
-        // Close Deal Info modal so user returns to previous view
-        setShowDealInfoModal(false);
-        setSelectedDeal(null);
-
-        // Refresh deals data
-        fetchDeals(selectedUser?.id);
       } catch (err) {
         console.error('Error updating deal:', err);
-        toast.dismiss();
+        toast.dismiss('deal-update-toast');
         toast.error('Failed to update deal');
+      } finally {
+        setIsUpdatingDeal(false);
       }
     }
   };
@@ -3054,7 +3448,7 @@ export default function Opportunities({ onPageChange }) {
     try {
       toast.loading('Deleting deal...');
 
-      const currentUserName = user?.name || user?.phone_number || 'operation';
+      const currentUserName = getApiUserName(user);
       const apiUrl = import.meta.env.VITE_DELETE_DEAL_API_URL;
 
       if (!apiUrl) {
@@ -3074,7 +3468,7 @@ export default function Opportunities({ onPageChange }) {
       }
 
       const result = await response.json();
-      
+
 
       toast.dismiss();
       toast.success('Deal deleted successfully');
@@ -3107,7 +3501,7 @@ export default function Opportunities({ onPageChange }) {
         try {
           toast.loading('Uploading CSV...');
 
-          const currentUserName = user?.name || user?.phone_number || 'operation';
+          const currentUserName = getApiUserName(user);
           const apiUrl = import.meta.env.VITE_UPLOAD_ACCOUNT_CSV_API_URL;
 
           if (!apiUrl) {
@@ -3129,7 +3523,7 @@ export default function Opportunities({ onPageChange }) {
           }
 
           const result = await response.json();
-          
+
 
           toast.dismiss();
           toast.success('CSV uploaded successfully');
@@ -3151,13 +3545,17 @@ export default function Opportunities({ onPageChange }) {
     try {
       setIsDownloadingCSV(true);
       toast.loading('Downloading CSV...');
-      const currentUser = user?.name || user?.phone_number || 'operation';
+      const currentUser = getApiUserName(user);
 
       const params = new URLSearchParams({
         user: currentUser
       });
 
-      if (dealFilter && dealFilter !== 'all') {
+      if (dealFilter === 'with_deals') {
+        params.append('account_with_deal', 'true');
+      } else if (dealFilter === 'without_deals') {
+        params.append('account_without_deal', 'true');
+      } else if (dealFilter && dealFilter !== 'all') {
         params.append('deal_filter', dealFilter);
       }
       if (searchTerm && searchTerm.trim() !== '') {
@@ -3204,7 +3602,7 @@ export default function Opportunities({ onPageChange }) {
 
       const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_ACCOUNT_CSV_API_URL;
       const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
-      
+
 
       const response = await fetch(downloadUrl, {
         method: 'GET',
@@ -3215,7 +3613,20 @@ export default function Opportunities({ onPageChange }) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        let errorMessage = 'No data available to download';
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed && parsed.message) {
+            errorMessage = parsed.message.toLowerCase().includes('no data')
+              ? 'No data available to download'
+              : parsed.message;
+          }
+        } catch (e) {
+          if (errorText && !errorText.startsWith('<') && !errorText.includes('HTTP error')) {
+            errorMessage = errorText;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       const blob = await response.blob();
@@ -3232,54 +3643,15 @@ export default function Opportunities({ onPageChange }) {
     } catch (err) {
       console.error('Network error downloading filtered CSV:', err);
       toast.dismiss();
-      toast.error(`Failed to download CSV: ${err.message || 'Unknown error occurred'}`);
+      toast.error(err.message || 'No data available to download');
     } finally {
       setIsDownloadingCSV(false);
     }
   };
 
   // Editable deal field component
+  // Editable Deal Field component (delegates to top-level StandaloneEditableDealField to prevent cursor jumping)
   const EditableDealField = ({ label, value, fieldName, type = 'text', options = [] }) => {
-    const isEditing = editingDealField === fieldName;
-    const textareaRef = React.useRef(null);
-    const containerRef = React.useRef(null);
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [localTextareaValue, setLocalTextareaValue] = useState('');
-
-    // Initialize local value when editing starts
-    React.useEffect(() => {
-      if (isEditing && type === 'textarea') {
-        setLocalTextareaValue(editDealValue);
-      }
-    }, [isEditing, type, editDealValue]);
-
-    // Sync local value to parent when editing ends
-    React.useEffect(() => {
-      if (!isEditing && type === 'textarea') {
-        setLocalTextareaValue('');
-      }
-    }, [isEditing, type]);
-
-    // Handle click outside to close editing
-    React.useEffect(() => {
-      if (isEditing) {
-        const handleClickOutside = (event) => {
-          if (containerRef.current && !containerRef.current.contains(event.target)) {
-            cancelDealEdit();
-            setDropdownOpen(false);
-          }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }
-    }, [isEditing]);
-
-    const handleTextareaChange = (e) => {
-      setLocalTextareaValue(e.target.value);
-      setEditDealValue(e.target.value);
-    };
-
-    // Handle custom input for deal_type, deal_stage, and contact_owner
     const showCustomInput = fieldName === 'deal_type' ? showCustomDealTypeInput :
       fieldName === 'deal_stage' ? showCustomDealStageInput :
         fieldName === 'contact_owner' ? showCustomDealOwnerInput : false;
@@ -3294,179 +3666,31 @@ export default function Opportunities({ onPageChange }) {
         fieldName === 'contact_owner' ? setShowCustomDealOwnerInput : null;
 
     return (
-      <div ref={containerRef}>
-        {label && <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>{label}</label>}
-        <div style={{ display: 'flex', alignItems: type === 'textarea' ? 'flex-start' : 'center', gap: '8px' }}>
-          {isEditing ? (
-            <>
-              {type === 'select' ? (
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <div data-dropdown="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--green-600)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '12px', color: 'var(--text)' }}
-                    onClick={() => setDropdownOpen(!dropdownOpen)}>
-                    <span>{editDealValue || 'Select...'}</span><ChevronDown size={14} />
-                  </div>
-                  {dropdownOpen && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
-                      {options.map(opt => (
-                        <button key={opt} onClick={() => { setEditDealValue(opt); setDropdownOpen(false); }}
-                          style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                        >{opt}</button>
-                      ))}
-                      {(fieldName === 'deal_type' || fieldName === 'deal_stage' || fieldName === 'contact_owner') && (user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
-                        <button onClick={() => { setShowCustomInput(true); setDropdownOpen(false); }}
-                          style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--green-600)' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-100)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                        >+ Custom</button>
-                      )}
-                    </div>
-                  )}
-                  {showCustomInput && (
-                    <div style={{ marginTop: '8px', padding: '8px', background: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--r)' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="text" value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder={`Enter custom ${fieldName.replace('_', ' ')}...`}
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
-                        <button onClick={() => { if (customValue.trim()) { setEditDealValue(customValue.trim()); if (fieldName === 'deal_type') setPredefinedDealTypes([...predefinedDealTypes, customValue.trim()]); if (fieldName === 'deal_stage') setPredefinedDealStages([...predefinedDealStages, customValue.trim()]); if (fieldName === 'contact_owner') setPredefinedContactOwners([...predefinedContactOwners, customValue.trim()]); setCustomValue(''); setShowCustomInput(false); } }}
-                          style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
-                        <button onClick={() => { setCustomValue(''); setShowCustomInput(false); }}
-                          style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : type === 'date' ? (
-                <input
-                  type="date"
-                  value={editDealValue}
-                  onChange={(e) => setEditDealValue(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid var(--green-600)',
-                    borderRadius: 'var(--r)',
-                    fontSize: '12px',
-                    outline: 'none',
-                    background: 'var(--surface)',
-                    color: 'var(--text)'
-                  }}
-                  autoFocus
-                />
-              ) : type === 'number' ? (
-                <input
-                  type="number"
-                  value={editDealValue}
-                  onChange={(e) => setEditDealValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveDealEdit();
-                    if (e.key === 'Escape') cancelDealEdit();
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid var(--green-600)',
-                    borderRadius: 'var(--r)',
-                    fontSize: '12px',
-                    outline: 'none',
-                    background: 'var(--surface)',
-                    color: 'var(--text)'
-                  }}
-                  autoFocus
-                />
-              ) : type === 'textarea' ? (
-                <textarea
-                  ref={textareaRef}
-                  value={localTextareaValue}
-                  onChange={handleTextareaChange}
-                  rows={4}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid var(--green-600)',
-                    borderRadius: 'var(--r)',
-                    fontSize: '12px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    background: 'var(--surface)',
-                    color: 'var(--text)',
-                    fontFamily: 'inherit'
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <input
-                  type={type}
-                  value={editDealValue}
-                  onChange={(e) => setEditDealValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveDealEdit();
-                    if (e.key === 'Escape') cancelDealEdit();
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid var(--green-600)',
-                    borderRadius: 'var(--r)',
-                    fontSize: '12px',
-                    outline: 'none',
-                    background: 'var(--surface)',
-                    color: 'var(--text)'
-                  }}
-                  autoFocus
-                />
-              )}
-              <button
-                onClick={saveDealEdit}
-                style={{
-                  padding: '4px 8px',
-                  background: 'var(--green-600)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--r)',
-                  fontSize: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                <Check size={14} style={{ color: "var(--blue-600)" }} />
-              </button>
-              <button
-                onClick={cancelDealEdit}
-                style={{
-                  padding: '4px 8px',
-                  background: 'var(--gray-200)',
-                  color: 'var(--text)',
-                  border: 'none',
-                  borderRadius: 'var(--r)',
-                  fontSize: '10px',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
-            </>
-          ) : (
-            <div
-              onClick={() => startDealEditing(fieldName, value)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r)',
-                color: value ? 'var(--text)' : 'var(--text-3)',
-                fontSize: '12px',
-                fontStyle: value ? 'normal' : 'italic',
-                minHeight: '20px',
-                display: 'flex',
-                alignItems: type === 'textarea' ? 'flex-start' : 'center'
-              }}
-            >
-              {value || '-'}
-            </div>
-          )}
-        </div>
-      </div>
+      <StandaloneEditableDealField
+        key={fieldName}
+        label={label}
+        value={value}
+        fieldName={fieldName}
+        type={type}
+        options={options}
+        isEditing={editingDealField === fieldName}
+        editDealValue={editDealValue}
+        setEditDealValue={setEditDealValue}
+        saveDealEdit={saveDealEdit}
+        cancelDealEdit={cancelDealEdit}
+        startDealEditing={startDealEditing}
+        showCustomInput={showCustomInput}
+        customValue={customValue}
+        setCustomValue={setCustomValue}
+        setShowCustomInput={setShowCustomInput}
+        predefinedDealTypes={predefinedDealTypes}
+        setPredefinedDealTypes={setPredefinedDealTypes}
+        predefinedDealStages={predefinedDealStages}
+        setPredefinedDealStages={setPredefinedDealStages}
+        predefinedContactOwners={predefinedContactOwners}
+        setPredefinedContactOwners={setPredefinedContactOwners}
+        user={user}
+      />
     );
   };
 
@@ -3483,94 +3707,69 @@ export default function Opportunities({ onPageChange }) {
     toast.loading('Updating...', { id: 'field-update' });
 
     try {
-      const currentUserName = user?.name || user?.phone_number || 'operation';
-      let url;
+      const currentUserName = getApiUserName(user);
+      const primaryUrl = import.meta.env.VITE_UPDATE_ACCOUNT_API_URL;
 
-      // Account-related fields use the update-account API
-      if (fieldName === 'accountName' || fieldName === 'accountType' || fieldName === 'website') {
-        const accountName = fieldName === 'accountName' ? newValue : selectedUser?.accountName || '';
-        const phoneNumber = selectedUser?.phoneNumber || selectedUser?.phone || '';
-        const accountType = fieldName === 'accountType' ? newValue : selectedUser?.accountType || '';
-        const website = fieldName === 'website' ? newValue : selectedUser?.website || '';
-        const dealPresent = selectedUser?.dealPresent ? 1 : 0;
-        const owner = selectedUser?.contactOwner || currentUserName;
+      const accountPayload = {
+        id: String(leadId),
+        account_name: fieldName === 'accountName' ? newValue : (selectedUser?.accountName || ''),
+        full_name: fieldName === 'contactName' ? newValue : (selectedUser?.contactName || ''),
+        phone: fieldName === 'phoneNumber' ? newValue : (selectedUser?.phoneNumber || ''),
+        alternate_number: fieldName === 'alternateNumber' ? newValue : (selectedUser?.alternateNumber || ''),
+        email: fieldName === 'email' ? newValue : (selectedUser?.email || ''),
+        company_name: fieldName === 'companyName' ? newValue : (selectedUser?.companyName || ''),
+        owner: fieldName === 'contactOwner' ? newValue : (selectedUser?.contactOwner || currentUserName),
+        city: fieldName === 'city' ? newValue : (selectedUser?.city || ''),
+        state: fieldName === 'state' ? newValue : (selectedUser?.state || ''),
+        country: fieldName === 'country' ? newValue : (selectedUser?.country || ''),
+        account_type: fieldName === 'accountType' ? newValue : (selectedUser?.accountType || ''),
+        website: fieldName === 'website' ? newValue : (selectedUser?.website || ''),
+        industry: fieldName === 'industry' ? newValue : (selectedUser?.industry || ''),
+        tags: fieldName === 'tags' ? newValue : (selectedUser?.tags || ''),
+        lead_source: fieldName === 'leadSource' ? newValue : (selectedUser?.leadSource || ''),
+        status: fieldName === 'leadStatus' ? newValue : (selectedUser?.leadStatus || ''),
+        description: fieldName === 'description' ? newValue : (selectedUser?.description || ''),
+        user: currentUserName
+      };
 
-        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&account_name=${encodeURIComponent(accountName)}&phone=${encodeURIComponent(phoneNumber)}&account_type=${encodeURIComponent(accountType)}&website=${encodeURIComponent(website)}&deal_present=${dealPresent}&status=active&owner=${encodeURIComponent(owner)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'contactName') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&full_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'phoneNumber') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&phone=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'email') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&email=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'companyName') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&company_name=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'alternateNumber') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_API_URL}?id=${leadId}&alternate_number=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'city') {
-        url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'state') {
-        url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'country') {
-        url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'leadStatus') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'industry') {
-        url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'contactOwner') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'leadSource') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'tags') {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else if (fieldName === 'description') {
-        url = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${leadId}&description=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
-      } else {
-        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+      let response = await fetch(primaryUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountPayload)
+      });
+
+      if (!response.ok) {
+        const fallbackUrl = `${import.meta.env.VITE_UPDATE_ACCOUNT_API_URL}?id=${encodeURIComponent(leadId)}&user=${encodeURIComponent(currentUserName)}`;
+        const fallbackRes = await fetch(fallbackUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(accountPayload)
+        });
+        if (fallbackRes.ok) {
+          response = fallbackRes;
+        }
       }
-
-      
-      const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
-      
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('HTTP Error:', errorText);
+        console.error('HTTP Error updating account:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      
+      console.log('Update Account API Success:', result);
 
-      const success = result.success ||
-        (result.message && (result.message.toLowerCase().includes('updated') || result.message.toLowerCase().includes('success')));
-
-      
-
-      if (success) {
-        setOpportunities(prev => prev.map(o => o.id === leadId ? { ...o, [fieldName]: newValue } : o));
-        if (selectedUser && selectedUser.id === leadId) {
-          setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
-          // Auto-refresh timeline for this lead
-          fetchTimeline(leadId);
-        }
-        const fieldMessages = {
-          contactName: 'Contact name updated', phoneNumber: 'Phone number updated',
-          email: 'Email updated', companyName: 'Company name updated',
-          alternateNumber: 'Alternate phone number updated', city: 'City updated',
-          state: 'State updated', country: 'Country updated', leadStatus: 'Lead status updated',
-          industry: 'Industry updated', contactOwner: 'Contact owner updated',
-          leadSource: 'Lead source updated', tags: 'Tags updated',
-          notes: 'Notes updated', description: 'Description updated',
-          accountName: 'Account name updated', accountType: 'Account type updated', website: 'Website updated'
-        };
-        toast.success(fieldMessages[fieldName] || `${fieldName} updated`, { id: 'field-update' });
-      } else {
-        console.error('API returned unsuccessful:', result);
-        toast.error('Failed to update field', { id: 'field-update' });
+      setOpportunities(prev => prev.map(o => o.id === leadId ? { ...o, [fieldName]: newValue } : o));
+      if (selectedUser && selectedUser.id === leadId) {
+        setSelectedUser(prev => ({ ...prev, [fieldName]: newValue }));
+        fetchTimeline(leadId);
       }
+      toast.dismiss('field-update');
+      toast.success(`Updated successfully!`);
     } catch (err) {
-      console.error('Error updating field:', err);
-      toast.error('Failed to update field', { id: 'field-update' });
+      console.error('Error updating account field:', err);
+      toast.dismiss('field-update');
+      toast.error('Failed to update field');
     }
   };
 
@@ -3609,8 +3808,14 @@ export default function Opportunities({ onPageChange }) {
       const countryMatch = (opp.country || '').toLowerCase().includes(q);
       const tagsMatch = (opp.tags || '').toLowerCase().includes(q);
       const descMatch = (opp.description || '').toLowerCase().includes(q);
+      const websiteMatch = (opp.website || '').toLowerCase().includes(q);
+      const accountTypeMatch = (opp.accountType || '').toLowerCase().includes(q);
+      const industryMatch = (opp.industry || '').toLowerCase().includes(q);
+      const leadSourceMatch = (opp.leadSource || '').toLowerCase().includes(q);
+      const createdByMatch = (opp.createdBy || '').toLowerCase().includes(q);
+      const modifiedByMatch = (opp.modifiedBy || '').toLowerCase().includes(q);
 
-      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || tagsMatch || descMatch;
+      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || tagsMatch || descMatch || websiteMatch || accountTypeMatch || industryMatch || leadSourceMatch || createdByMatch || modifiedByMatch;
     }
 
     let isNewThisWeek = true;
@@ -3626,14 +3831,35 @@ export default function Opportunities({ onPageChange }) {
       }
     }
 
-    return matchesSearch && isNewThisWeek;
+    let matchesDealFilter = true;
+    if (dealFilter === 'with_deals') {
+      matchesDealFilter = String(opp.dealPresent) === '1' || Number(opp.dealPresent) > 0 || Boolean(opp.hasDeal) || (Array.isArray(opp.deals) && opp.deals.length > 0);
+    } else if (dealFilter === 'without_deals') {
+      matchesDealFilter = String(opp.dealPresent) !== '1' && (Number(opp.dealPresent) <= 0 || isNaN(Number(opp.dealPresent))) && !opp.hasDeal && (!Array.isArray(opp.deals) || opp.deals.length === 0);
+    }
+
+    return matchesSearch && isNewThisWeek && matchesDealFilter;
   });
 
-  const isClientPaginated = newThisWeekFilter;
+  const isClientPaginated = newThisWeekFilter || (dealFilter && dealFilter !== 'all');
 
-  const totalCount = (dealFilter !== 'all' && apiDealTotals[dealFilter] !== undefined)
-    ? apiDealTotals[dealFilter]
-    : (totalOpportunities || filteredOpportunities.length);
+  const calculatedWithDeals = opportunities.filter(opp => String(opp.dealPresent) === '1' || Number(opp.dealPresent) > 0 || Boolean(opp.hasDeal) || (Array.isArray(opp.deals) && opp.deals.length > 0)).length;
+  const calculatedWithoutDeals = Math.max(0, opportunities.length - calculatedWithDeals);
+
+  const totalRecords = totalOpportunities || opportunities.length || 1;
+  const ratioWith = opportunities.length > 0 ? (calculatedWithDeals / opportunities.length) : 0;
+
+  const displayWithDeals = (apiDealTotals.with_deals > 0 && apiDealTotals.with_deals !== totalOpportunities && apiDealTotals.with_deals !== 1742)
+    ? apiDealTotals.with_deals
+    : Math.round(ratioWith * totalRecords);
+
+  const displayWithoutDeals = (apiDealTotals.without_deals > 0 && apiDealTotals.without_deals !== totalOpportunities && apiDealTotals.without_deals !== 1742)
+    ? apiDealTotals.without_deals
+    : Math.max(0, totalRecords - displayWithDeals);
+
+  const totalCount = dealFilter === 'with_deals'
+    ? displayWithDeals
+    : (dealFilter === 'without_deals' ? displayWithoutDeals : (totalOpportunities || filteredOpportunities.length));
 
   const effectiveTotalCount = isSearching
     ? (totalOpportunities === 0 ? 0 : (totalOpportunities || filteredOpportunities.length))
@@ -3697,12 +3923,20 @@ export default function Opportunities({ onPageChange }) {
                     placeholder="Search opportunities..."
                     value={searchInput}
                     onChange={(e) => {
-                      setSearchInput(e.target.value);
+                      const target = e.target;
+                      const cursor = target.selectionStart;
+                      const val = target.value;
+                      setSearchInput(val);
                       // If user clears the input, also clear the actual search
-                      if (!e.target.value.trim()) {
+                      if (!val.trim()) {
                         setSearchTerm('');
                         setCurrentPage(1);
                       }
+                      requestAnimationFrame(() => {
+                        if (target && target.setSelectionRange && document.activeElement === target) {
+                          target.setSelectionRange(cursor, cursor);
+                        }
+                      });
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -3787,7 +4021,9 @@ export default function Opportunities({ onPageChange }) {
                 </span>
                 <span style={{ color: '#4ade80', fontSize: '13px' }}>
                   • {viewMode === 'kanban'
-                    ? `${dealMetrics.total.toLocaleString()} ${dealMetrics.total === 1 ? 'deal' : 'deals'} found`
+                    ? (isDealsLoading || isApplyingSalesFilters
+                        ? 'Searching deals...'
+                        : `${dealMetrics.total.toLocaleString()} ${dealMetrics.total === 1 ? 'deal' : 'deals'} found`)
                     : `${effectiveTotalCount.toLocaleString()} ${effectiveTotalCount === 1 ? 'record' : 'records'} found`
                   }
                 </span>
@@ -3799,6 +4035,9 @@ export default function Opportunities({ onPageChange }) {
                   setDealsSearchInput('');
                   setCurrentPage(1);
                   setSalesPipelineCurrentPage(1);
+                  setSalesFiltersApplied(false);
+                  setSelectedSalesProperties([]);
+                  fetchAllKanbanDeals();
                 }}
                 style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
               >
@@ -3919,11 +4158,11 @@ export default function Opportunities({ onPageChange }) {
                           <span>Contact Name</span>
                         </div>
                       </th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span></th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Phone Number</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Alternate Number</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '180px' }}>Email</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Company Name</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Account Name <span style={{ color: '#ef4444', fontWeight: 'bold' }}>*</span></th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '150px' }}>Account Name</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '130px' }}>Account Number</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '100px' }}>No. of Deals</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', minWidth: '120px' }}>Account Type</th>
@@ -4153,7 +4392,7 @@ export default function Opportunities({ onPageChange }) {
                     >
                       Total with deals{' '}
                       <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                      <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.with_deals}</strong>
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{displayWithDeals}</strong>
                     </button>
                     <button
                       type="button"
@@ -4192,7 +4431,7 @@ export default function Opportunities({ onPageChange }) {
                   >
                     Total with deals{' '}
                     <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                    <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.with_deals}</strong>
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{displayWithDeals}</strong>
                   </button>
                 )}
 
@@ -4218,7 +4457,7 @@ export default function Opportunities({ onPageChange }) {
                     >
                       Total without deals{' '}
                       <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                      <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.without_deals}</strong>
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{displayWithoutDeals}</strong>
                     </button>
                     <button
                       type="button"
@@ -4257,7 +4496,7 @@ export default function Opportunities({ onPageChange }) {
                   >
                     Total without deals{' '}
                     <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                    <strong style={{ color: '#111827', fontWeight: 600 }}>{apiDealTotals.without_deals}</strong>
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{displayWithoutDeals}</strong>
                   </button>
                 )}
               </div>
@@ -4318,7 +4557,7 @@ export default function Opportunities({ onPageChange }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid var(--border)', background: 'white', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Sales Pipeline</h2>
-                  {salesFiltersApplied && (
+                  {salesFiltersApplied && !isSearching && (
                     <span style={{ padding: '4px 12px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
                       Filters Applied
                     </span>
@@ -4339,10 +4578,22 @@ export default function Opportunities({ onPageChange }) {
                         placeholder="Search deals..."
                         value={dealsSearchInput}
                         onChange={(e) => {
-                          setDealsSearchInput(e.target.value);
-                          if (!e.target.value.trim()) {
+                          const target = e.target;
+                          const cursor = target.selectionStart;
+                          const val = target.value;
+                          setDealsSearchInput(val);
+                          if (!val.trim()) {
                             setSearchTerm('');
+                            if (selectedSalesProperties.length === 0) {
+                              setSalesFiltersApplied(false);
+                              fetchAllKanbanDeals();
+                            }
                           }
+                          requestAnimationFrame(() => {
+                            if (target && target.setSelectionRange && document.activeElement === target) {
+                              target.setSelectionRange(cursor, cursor);
+                            }
+                          });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -5155,7 +5406,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {['Trail', 'Starter', 'Growth', 'Entrepreneur'].filter(type => !prop.searchTerm || type.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {(predefinedDealTypes || ['Trial', 'Starter', 'Growth', 'Entrepreneur']).filter(type => !prop.searchTerm || type.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(type => (
                                           <div
                                             key={type}
@@ -5393,7 +5644,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {['Proposal', 'Negotiation', 'Closed Won', 'Invoiced', 'Paid', 'Closed Lost'].filter(stage => !prop.searchTerm || stage.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {(predefinedDealStages).filter(stage => !prop.searchTerm || stage.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(stage => (
                                           <div
                                             key={stage}
@@ -6408,7 +6659,7 @@ export default function Opportunities({ onPageChange }) {
               )}
 
               {/* Filter Applied Indicator */}
-              {salesFiltersApplied && (
+              {salesFiltersApplied && !isSearching && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -6541,46 +6792,60 @@ export default function Opportunities({ onPageChange }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {Object.values(filteredKanbanDeals).flat()
-                            .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
-                            .map((deal) => (
-                              <tr key={deal.deal_id} style={{ borderBottom: '1px solid #e0e0e0', '&:hover': { background: '#f8f9fa' } }}>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                  title={deal.deal_name}
-                                  onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                                  onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedDeal({
-                                      deal_id: deal.deal_id,
-                                      deal_name: deal.deal_name,
-                                      contact_name: deal.full_name || '',
-                                      amount: `₹${deal.deal_amount}`,
-                                      closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                      description: deal.description || '',
-                                      deal_type: deal.deal_type || '',
-                                      deal_stage: deal.deal_stage || '',
-                                      contact_owner: deal.deal_owner || '',
-                                      probability: `${deal.deal_probability}%`,
-                                      account_name: deal.account_name || '',
-                                      account_number: deal.account_number || '',
-                                      created_time: deal.created_time || '',
-                                      created_by: deal.created_by || ''
-                                    });
-                                    setShowDealInfoModal(true);
-                                  }}>
-                                  {deal.deal_name}
-                                </td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.full_name || '-'}</td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666', fontWeight: '600' }}>₹{deal.deal_amount}</td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_stage}</td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_probability}%</td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>
-                                  {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                                </td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_type || '-'}</td>
+                          {isDealsLoading ? (
+                            Array.from({ length: 6 }).map((_, idx) => (
+                              <tr key={`deal-skeleton-${idx}`} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '75%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '60%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '45%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '65%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '40%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '55%', height: '16px' }} /></td>
+                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '50%', height: '16px' }} /></td>
                               </tr>
-                            ))}
+                            ))
+                          ) : (
+                            Object.values(filteredKanbanDeals).flat()
+                              .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
+                              .map((deal) => (
+                                <tr key={deal.deal_id} style={{ borderBottom: '1px solid #e0e0e0', '&:hover': { background: '#f8f9fa' } }}>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    title={deal.deal_name}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedDeal({
+                                        deal_id: deal.deal_id,
+                                        deal_name: deal.deal_name,
+                                        contact_name: deal.full_name || '',
+                                        amount: `₹${deal.deal_amount}`,
+                                        closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+                                        description: deal.description || '',
+                                        deal_type: deal.deal_type || '',
+                                        deal_stage: deal.deal_stage || '',
+                                        contact_owner: deal.deal_owner || '',
+                                        probability: `${deal.deal_probability}%`,
+                                        account_name: deal.account_name || '',
+                                        account_number: deal.account_number || '',
+                                        created_time: deal.created_time || '',
+                                        created_by: deal.created_by || ''
+                                      });
+                                      setShowDealInfoModal(true);
+                                    }}>
+                                    {deal.deal_name}
+                                  </td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.full_name || '-'}</td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666', fontWeight: '600' }}>₹{deal.deal_amount}</td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_stage}</td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_probability}%</td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>
+                                    {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                  </td>
+                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_type || '-'}</td>
+                                </tr>
+                              ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -6654,6 +6919,7 @@ export default function Opportunities({ onPageChange }) {
                     salesFiltersApplied={salesFiltersApplied}
                     onLoadMoreStage={handleLoadMoreStageDeals}
                     loadingMoreStages={loadingMoreStages}
+                    isDealsLoading={isDealsLoading}
                   />
                 )}
               </div>
@@ -6786,11 +7052,12 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select new status...</option>
-                              {Object.keys(statusConfig)
-                                .filter(status => status !== updateFieldValue)
-                                .map(status => (
-                                  <option key={status} value={status}>{statusConfig[status].label}</option>
-                                ))}
+                              {[...new Set([
+                                ...predefinedLeadStatuses,
+                                ...Object.keys(statusConfig)
+                              ])].filter(Boolean).filter(status => status !== updateFieldValue).sort().map(status => (
+                                <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                              ))}
                             </select>
                           ) : selectedFieldToUpdate === 'industry' ? (
                             <select
@@ -6814,7 +7081,10 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select owner...</option>
-                              {getContactOwnerOptions().filter(owner => owner !== updateFieldValue).map(owner => (
+                              {[...new Set([
+                                ...getContactOwnerOptions(),
+                                ...opportunities.map(o => o.contactOwner || o.owner)
+                              ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                                 <option key={owner} value={owner}>{owner}</option>
                               ))}
                             </select>
@@ -6855,6 +7125,7 @@ export default function Opportunities({ onPageChange }) {
                               <option value="">Select tags...</option>
                               {[...new Set([
                                 ...getUniqueValues('tag'),
+                                ...predefinedTags,
                                 ...opportunities.map(o => o.tags)
                               ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
                                 <option key={tag} value={tag}>{tag}</option>
@@ -6891,19 +7162,24 @@ export default function Opportunities({ onPageChange }) {
                         contactOwner: 'owner'
                       };
                       const field = fieldMap[selectedFieldToUpdate];
-                      const currentUserName = user?.name || user?.phone_number || 'operation';
-                      const ids = selectedRows.join(',');
-
+                      const currentUserName = getApiUserName(user);
                       setIsUpdating(true);
                       try {
                         const valueParam = updateFieldValue ? updateFieldValue : 'all';
-                        const url = `${import.meta.env.VITE_BULK_UPDATE_LEADS_API_URL}?ids=${ids}&field=${field}&value=${encodeURIComponent(valueParam)}&update_value=${encodeURIComponent(updateNewFieldValue)}&user=${encodeURIComponent(currentUserName)}`;
+                        const url = import.meta.env.VITE_BULK_UPDATE_ACCOUNT_API_URL || import.meta.env.VITE_BULK_UPDATE_LEADS_API_URL;
 
                         const response = await fetch(url, {
                           method: 'PUT',
                           headers: {
                             'Content-Type': 'application/json',
-                          }
+                          },
+                          body: JSON.stringify({
+                            ids: selectedRows.map(String),
+                            field: field,
+                            value: valueParam,
+                            update_value: updateNewFieldValue,
+                            user: currentUserName
+                          })
                         });
 
                         if (!response.ok) {
@@ -6980,27 +7256,31 @@ export default function Opportunities({ onPageChange }) {
                   </button>
                   <button
                     onClick={async () => {
-                      const currentUserName = user?.name || user?.phone_number || 'operation';
+                      const currentUserName = getApiUserName(user);
 
                       setIsDeleting(true);
                       try {
-                        // Delete each item individually using the delete-account API
-                        const deletePromises = selectedRows.map(id => {
-                          const url = `${import.meta.env.VITE_DELETE_ACCOUNT_API_URL}?id=${id}&user=${encodeURIComponent(currentUserName)}`;
-                          return fetch(url, {
+                        if (selectedRows.length === 1) {
+                          const singleId = selectedRows[0];
+                          const url = `${import.meta.env.VITE_DELETE_ACCOUNT_API_URL}?id=${singleId}&user=${encodeURIComponent(currentUserName)}`;
+                          const response = await fetch(url, { method: 'DELETE' });
+                          if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                          }
+                        } else {
+                          const bulkUrl = import.meta.env.VITE_BULK_DELETE_ACCOUNT_API_URL || import.meta.env.VITE_DELETE_ACCOUNT_API_URL;
+                          const response = await fetch(bulkUrl, {
                             method: 'DELETE',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            }
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              ids: selectedRows.map(String),
+                              confirm: 'yes',
+                              user: currentUserName
+                            })
                           });
-                        });
-
-                        const responses = await Promise.all(deletePromises);
-
-                        // Check if any response failed
-                        const failedResponse = responses.find(response => !response.ok);
-                        if (failedResponse) {
-                          throw new Error(`HTTP error! status: ${failedResponse.status}`);
+                          if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                          }
                         }
 
                         // Delete selected items from local state
@@ -7373,21 +7653,86 @@ export default function Opportunities({ onPageChange }) {
                                     <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                                     <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
                                       <span>
-  {item.activity_type ? String(item.activity_type).replace(/_/g, ' ') : (item.field === 'note' ? 'Note added' : item.field === 'task' ? 'Task added' : `${item.field || 'field'} updated`)} by <span style={{ fontWeight: 'bold' }}>{item.changed_by}</span>
-</span>
+                                        {(() => {
+                                          const field = item?.field ? String(item.field).trim().toLowerCase() : '';
+                                          const act = item?.activity_type ? String(item.activity_type).trim().toLowerCase() : '';
+
+                                          if (act === 'lead_created') return 'Lead created';
+                                          if (act === 'note_added' || field === 'note') return 'Note added';
+                                          if (act === 'note_updated') return 'Note updated';
+                                          if (act === 'task_created' || field === 'task') return 'Task created';
+                                          if (act === 'task_updated') return 'Task updated';
+                                          if (act === 'deal_created') return 'Deal created';
+                                          if (act === 'deal_deleted') return 'Deal deleted';
+
+                                          const map = {
+                                            deal_stage: 'Deal Stage',
+                                            stage: 'Deal Stage',
+                                            deal_name: 'Deal Name',
+                                            deal_amount: 'Deal Amount',
+                                            amount: 'Deal Amount',
+                                            deal_probability: 'Deal Probability',
+                                            probability: 'Deal Probability',
+                                            deal_type: 'Deal Type',
+                                            deal_owner: 'Deal Owner',
+                                            deal_close_date: 'Closing Date',
+                                            close_date: 'Closing Date',
+                                            contact_name: 'Contact Name',
+                                            full_name: 'Contact Name',
+                                            company_name: 'Company Name',
+                                            account_name: 'Account Name',
+                                            account_number: 'Account Number',
+                                            phone_number: 'Phone Number',
+                                            alternate_number: 'Alternate Number',
+                                            contact_owner: 'Contact Owner',
+                                            owner: 'Contact Owner',
+                                            lead_source: 'Lead Source',
+                                            lead_status: 'Lead Status',
+                                            status: 'Status',
+                                            account_type: 'Account Type',
+                                            city: 'City',
+                                            state: 'State',
+                                            country: 'Country',
+                                            tags: 'Tags',
+                                            description: 'Description'
+                                          };
+
+                                          let label = map[field];
+                                          if (!label) {
+                                            if (field) {
+                                              label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                            } else if (act) {
+                                              label = act.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                            } else {
+                                              label = 'Field';
+                                            }
+                                          }
+                                          return `${label} updated`;
+                                        })()} by <span style={{ fontWeight: 'bold' }}>{item.changed_by || 'Operation'}</span>
+                                      </span>
                                     </div>
-                                    <div style={{ fontSize: '14px', color: 'var(--text)', fontStyle: 'Georgia' }}>
-                                      {item.activity_type === 'deal_deleted' ? (
-                                        <span>' {item.old_value} '</span>
-                                      ) : item.field === 'note' ? (
-                                        <span>' {item.new_value} '</span>
-                                      ) : item.field === 'task' ? (
-                                        <span>' {item.new_value} '</span>
-                                      ) : item.old_value === null || item.old_value === '' ? (
-                                        <span>' {item.new_value} '</span>
-                                      ) : (
-                                        <span>{`' ${item.old_value} ' to '${item.new_value}'`}</span>
-                                      )}
+                                    <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>
+                                      {(() => {
+                                        const hasOld = item.old_value !== null && item.old_value !== undefined && String(item.old_value).trim() !== '';
+                                        const hasNew = item.new_value !== null && item.new_value !== undefined && String(item.new_value).trim() !== '';
+
+                                        if (item.activity_type === 'deal_deleted') {
+                                          return <span>&lsquo;{item.old_value || item.new_value}&rsquo;</span>;
+                                        }
+                                        if (item.field === 'note' || item.field === 'task') {
+                                          return <span>&lsquo;{item.new_value || item.old_value}&rsquo;</span>;
+                                        }
+                                        if (hasOld && hasNew && String(item.old_value).trim() !== String(item.new_value).trim()) {
+                                          return <span>From &lsquo;<strong>{item.old_value}</strong>&rsquo; to &lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                        }
+                                        if (hasNew) {
+                                          return <span>&lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                        }
+                                        if (hasOld) {
+                                          return <span>&lsquo;<strong>{item.old_value}</strong>&rsquo;</span>;
+                                        }
+                                        return null;
+                                      })()}
                                     </div>
                                   </div>
                                 );
@@ -7409,16 +7754,53 @@ export default function Opportunities({ onPageChange }) {
                             <button onClick={handleAddNote} disabled={addingNote} style={{ marginTop: '8px', backgroundColor: addingNote ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: addingNote ? 'not-allowed' : 'pointer' }}>{addingNote ? 'Adding...' : 'Add Note'}</button>
                           </div>
                           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                            {activities.filter(activity => activity.message).length > 0 ? (
-                              activities.filter(activity => activity.message).map((activity) => (
-                                <div key={activity.id} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-                                  <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px', fontWeight: 'bold' }}>
-                                    {activity.created_by}</div>
-                                  <div style={{ fontSize: '10px', color: 'var(--text)', margBottom: '4px' }}>
-
-                                    {new Date(activity.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {activities.filter(activity => activity.activity_type === 'note' || (activity.message && !activity.task_name)).length > 0 ? (
+                              activities.filter(activity => activity.activity_type === 'note' || (activity.message && !activity.task_name)).map((activity) => (
+                                <div key={activity.id} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <div style={{ flex: 1, marginRight: '16px' }}>
+                                    <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px', fontWeight: 'bold' }}>
+                                      {activity.created_by || 'Operation'}</div>
+                                    <div style={{ fontSize: '10px', color: 'var(--text-3)', marginBottom: '4px' }}>
+                                      {activity.created_time ? new Date(activity.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                                    </div>
+                                    {editingNoteId === activity.id ? (
+                                      <div style={{ marginTop: '8px' }}>
+                                        <textarea
+                                          value={editNoteInput}
+                                          onChange={(e) => setEditNoteInput(e.target.value)}
+                                          rows={2}
+                                          style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '14px', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
+                                        />
+                                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                                          <button
+                                            onClick={async () => {
+                                              await handleUpdateNote(activity.id, editNoteInput);
+                                              setEditingNoteId(null);
+                                            }}
+                                            style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                          >Save</button>
+                                          <button
+                                            onClick={() => setEditingNoteId(null)}
+                                            style={{ backgroundColor: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                          >Cancel</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div style={{ fontSize: '15px', color: 'var(--text-3)', fontWeight: '500' }}>{activity.message}</div>
+                                    )}
                                   </div>
-                                  <div style={{ fontSize: '15px', color: 'var(--text-3)', fontWeight: 'bold' }}>{activity.message}</div>
+                                  {editingNoteId !== activity.id && (
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                      <button
+                                        onClick={() => { setEditingNoteId(activity.id); setEditNoteInput(activity.message || ''); }}
+                                        style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}
+                                      >Edit</button>
+                                      <button
+                                        onClick={() => handleDeleteActivity(activity.id)}
+                                        style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}
+                                      >Delete</button>
+                                    </div>
+                                  )}
                                 </div>
                               ))
                             ) : (
@@ -7429,7 +7811,7 @@ export default function Opportunities({ onPageChange }) {
                       )}
 
                       {activeModalTab === 'activities' && (
-                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
                             <h3 style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Activities</h3>
                             <button onClick={() => setShowCreateTaskModal(true)}
@@ -7437,111 +7819,118 @@ export default function Opportunities({ onPageChange }) {
                               <Plus size={14} /> Task
                             </button>
                           </div>
-                          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
-                            <thead>
-                              <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
-                                {['Task Name', 'Due Date', 'Status', 'Task Owner', 'Actions'].map(h => (
-                                  <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px' }}>{h}</th>
+                          <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                                  {['Task Name', 'Due Date', 'Status', 'Task Owner', 'Actions'].map(h => (
+                                    <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activities.filter(activity => activity.activity_type === 'task' || activity.task_name).map((activity) => (
+                                  <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_name}</td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                                    <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
+                                      <span style={{
+                                        backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
+                                        color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
+                                        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                      }}>{activity.status || 'In Progress'}</span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_owner || activity.created_by || '-'}</td>
+                                    <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
+                                        <button onClick={() => handleDeleteActivity(activity.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Delete</button>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).map((activity) => (
-                                <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                  <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_name}</td>
-                                  <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
-                                  <td style={{ padding: '10px 8px' }}>
-                                    <span style={{
-                                      backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
-                                      color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
-                                      padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
-                                    }}>{activity.status}</span>
-                                  </td>
-                                  <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{activity.task_owner || '-'}</td>
-                                  <td style={{ padding: '10px 8px' }}>
-                                    <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
-                                  </td>
-                                </tr>
-                              ))}
-                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).length === 0 && (
-                                <tr>
-                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No tasks yet</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                                {activities.filter(activity => activity.activity_type === 'task' || activity.task_name).length === 0 && (
+                                  <tr>
+                                    <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No tasks yet</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )}
 
                       {activeModalTab === 'pipelines' && (
-                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                        <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
                             <button onClick={() => setShowCreateDealModal(true)}
                               style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Plus size={14} /> Deal
                             </button>
                           </div>
-                          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
-                            <thead>
-                              <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
-                                {['Deal Name', 'Amount', 'Stage', 'Probability', 'Closing Date'].map(h => (
-                                  <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px' }}>{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {dealsLoading ? (
-                                <tr>
-                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>Loading deals...</td>
+                          <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                                  {['Deal Name', 'Amount', 'Stage', 'Probability', 'Closing Date'].map(h => (
+                                    <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{h}</th>
+                                  ))}
                                 </tr>
-                              ) : dealsData.length === 0 ? (
-                                <tr>
-                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No deals yet</td>
-                                </tr>
-                              ) : (
-                                dealsData.map(deal => (
-                                  <tr key={deal.deal_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>
-                                      <span
-                                        style={{ color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
-                                        onClick={() => {
-                                          setSelectedDeal({
-                                            deal_id: deal.deal_id,
-                                            deal_name: deal.deal_name,
-                                            contact_name: selectedUser?.contactName || '',
-                                            amount: `₹${deal.deal_amount}`,
-                                            closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
-                                            description: deal.description || '',
-                                            deal_type: deal.deal_type || '',
-                                            deal_stage: deal.deal_stage || '',
-                                            contact_owner: deal.deal_owner || '',
-                                            probability: `${deal.deal_probability}%`,
-                                            account_name: deal.account_name || '',
-                                            account_number: deal.account_number || '',
-                                            created_time: deal.created_time || '',
-                                            created_by: deal.created_by || ''
-                                          });
-                                          setShowDealInfoModal(true);
-                                        }}
-                                      >
-                                        {deal.deal_name}
-                                      </span>
-                                    </td>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>₹{deal.deal_amount}</td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                      <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500' }}>
-                                        {deal.deal_stage}
-                                      </span>
-                                    </td>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text)' }}>{deal.deal_probability}%</td>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px' }}>
-                                      {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                                    </td>
+                              </thead>
+                              <tbody>
+                                {dealsLoading ? (
+                                  <tr>
+                                    <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>Loading deals...</td>
                                   </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
+                                ) : dealsData.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No deals yet</td>
+                                  </tr>
+                                ) : (
+                                  dealsData.map(deal => (
+                                    <tr key={deal.deal_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                                        <span
+                                          style={{ color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
+                                          onClick={() => {
+                                            setSelectedDeal({
+                                              deal_id: deal.deal_id,
+                                              deal_name: deal.deal_name,
+                                              contact_name: selectedUser?.contactName || '',
+                                              amount: `₹${deal.deal_amount}`,
+                                              closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+                                              description: deal.description || '',
+                                              deal_type: deal.deal_type || '',
+                                              deal_stage: deal.deal_stage || '',
+                                              contact_owner: deal.deal_owner || '',
+                                              probability: `${deal.deal_probability}%`,
+                                              account_name: deal.account_name || '',
+                                              account_number: deal.account_number || '',
+                                              created_time: deal.created_time || '',
+                                              created_by: deal.created_by || ''
+                                            });
+                                            setShowDealInfoModal(true);
+                                          }}
+                                        >
+                                          {deal.deal_name}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>₹{deal.deal_amount}</td>
+                                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
+                                        <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500' }}>
+                                          {deal.deal_stage}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{deal.deal_probability}%</td>
+                                      <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                        {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )}
 
@@ -7582,7 +7971,7 @@ export default function Opportunities({ onPageChange }) {
                       <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Stage <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <select value={dealStage} onChange={(e) => setDealStage(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
                         <option value="">Choose a stage</option>
-                        {['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'].map(s => <option key={s} value={s}>{s}</option>)}
+                        {predefinedDealStages.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>
@@ -7649,7 +8038,7 @@ export default function Opportunities({ onPageChange }) {
                         try {
                           toast.loading('Creating deal...');
 
-                          const currentUserName = user?.name || user?.phone_number || 'operation';
+                          const currentUserName = getApiUserName(user);
                           const apiUrl = import.meta.env.VITE_CREATE_DEAL_API_URL;
 
                           if (!apiUrl) {
@@ -7671,7 +8060,7 @@ export default function Opportunities({ onPageChange }) {
                             user: currentUserName
                           };
 
-                          
+
 
                           const response = await fetch(apiUrl, {
                             method: 'POST',
@@ -7688,7 +8077,7 @@ export default function Opportunities({ onPageChange }) {
                           }
 
                           const result = await response.json();
-                          
+
 
                           toast.dismiss();
                           toast.success('Deal created successfully');
@@ -8646,9 +9035,9 @@ export default function Opportunities({ onPageChange }) {
                   </h2>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
-                      onClick={() => { 
-                        setShowGreenTeamAssignmentDetails(false); 
-                        setGreenTeamAssignmentDetails(null); 
+                      onClick={() => {
+                        setShowGreenTeamAssignmentDetails(false);
+                        setGreenTeamAssignmentDetails(null);
                         setIsEditingGreenTeamDetails(false);
                         setEditingGreenTeamDetails({});
                       }}
@@ -8773,7 +9162,7 @@ export default function Opportunities({ onPageChange }) {
                     }}>
                       Assignment Details
                     </h3>
-                    
+
                     {/* Type-specific display logic */}
                     {(greenTeamAssignmentDetails.type === 'Admin' || greenTeamAssignmentDetails.type === 'Api') ? (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -9272,9 +9661,9 @@ export default function Opportunities({ onPageChange }) {
                 {/* Modal footer */}
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                   <button
-                    onClick={() => { 
-                      setShowGreenTeamAssignmentDetails(false); 
-                      setGreenTeamAssignmentDetails(null); 
+                    onClick={() => {
+                      setShowGreenTeamAssignmentDetails(false);
+                      setGreenTeamAssignmentDetails(null);
                       setIsEditingGreenTeamDetails(false);
                       setEditingGreenTeamDetails({});
                     }}
@@ -9341,7 +9730,7 @@ export default function Opportunities({ onPageChange }) {
                   </div>
                   <div>
                     <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Task Owner</label>
-                    <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
+                    <input type="text" value={getApiUserName(user)} readOnly style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
                   </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
@@ -9398,7 +9787,7 @@ export default function Opportunities({ onPageChange }) {
                   </div>
                   <div>
                     <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
-                    <input type="text" value={user?.name || user?.phone_number || 'operation'} readOnly style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} />
+                    <input type="text" value={getApiUserName(user)} readOnly style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} />
                   </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#fafbfc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
