@@ -24,6 +24,17 @@ const dropZoneStyle = {
   minHeight: 0,
 };
 
+const KanbanSkeletonCard = () => (
+  <div className="skeleton-card">
+    <div className="skeleton-shimmer" style={{ height: '14px', width: '75%', marginBottom: '10px' }} />
+    <div className="skeleton-shimmer" style={{ height: '12px', width: '45%', marginBottom: '12px' }} />
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="skeleton-shimmer" style={{ height: '11px', width: '35%' }} />
+      <div className="skeleton-shimmer" style={{ height: '11px', width: '25%' }} />
+    </div>
+  </div>
+);
+
 export default function SalesPipelineKanbanBoard({
   filteredKanbanDeals,
   kanbanDeals,
@@ -38,7 +49,8 @@ export default function SalesPipelineKanbanBoard({
   isSearching = false,
   salesFiltersApplied = false,
   onLoadMoreStage,
-  loadingMoreStages = {}
+  loadingMoreStages = {},
+  isDealsLoading = false
 }) {
   const getDealsForColumn = useCallback(
     (columnId) => {
@@ -111,7 +123,7 @@ export default function SalesPipelineKanbanBoard({
               <div
                 key={column.id}
                 style={{
-                  width: columnWidths[column.id] || '200px',
+                  width: columnWidths[column.id] || '250px',
                   background: 'white',
                   borderRadius: '8px',
                   border: '1px solid #e0e0e0',
@@ -140,7 +152,7 @@ export default function SalesPipelineKanbanBoard({
                       marginBottom: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                       <button
                         onClick={() =>
                           setCollapsedStages((prev) => ({
@@ -163,7 +175,7 @@ export default function SalesPipelineKanbanBoard({
                           <ChevronDown size={16} />
                         )}
                       </button>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {column.title}
                       </span>
                     </div>
@@ -175,9 +187,14 @@ export default function SalesPipelineKanbanBoard({
                         padding: '4px 10px',
                         borderRadius: '12px',
                         fontWeight: '600',
+                        flexShrink: 0
                       }}
                     >
-                      {totalStageCount}
+                      {isDealsLoading ? (
+                        <span className="skeleton-shimmer" style={{ display: 'inline-block', width: '20px', height: '12px', borderRadius: '4px' }} />
+                      ) : (
+                        totalStageCount
+                      )}
                     </span>
                   </div>
                   {!collapsedStages[column.id] && (
@@ -191,9 +208,13 @@ export default function SalesPipelineKanbanBoard({
                       }}
                     >
                       <span>Total Value</span>
-                      <span style={{ fontWeight: '600', color: '#14B474' }}>
-                        ₹{totalValue.toLocaleString()}
-                      </span>
+                      {isDealsLoading ? (
+                        <div className="skeleton-shimmer" style={{ width: '60px', height: '14px', borderRadius: '4px' }} />
+                      ) : (
+                        <span style={{ fontWeight: '600', color: '#14B474' }}>
+                          ₹{totalValue.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -204,47 +225,61 @@ export default function SalesPipelineKanbanBoard({
                     style={dropZoneStyle}
                     onScroll={(e) => handleColumnScroll(column.stage, e)}
                   >
-                    {deals.map((deal) => (
-                      <KanbanDraggableCard
-                        key={deal.deal_id || deal.id}
-                        dealId={deal.deal_id || deal.id}
-                        columnId={column.id}
-                        style={cardStyle}
-                        onClick={() => onDealClick(deal)}
-                      >
-                        <div
-                          style={{
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            color: '#333',
-                            marginBottom: '6px',
-                          }}
+                    {isDealsLoading ? (
+                      <>
+                        <KanbanSkeletonCard />
+                        <KanbanSkeletonCard />
+                        <KanbanSkeletonCard />
+                      </>
+                    ) : (
+                      deals.map((deal) => (
+                        <KanbanDraggableCard
+                          key={deal.deal_id || deal.id}
+                          dealId={deal.deal_id || deal.id}
+                          columnId={column.id}
+                          style={{ ...cardStyle, overflow: 'hidden' }}
+                          onClick={() => onDealClick(deal)}
                         >
-                          {deal.deal_name}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                          {deal.deal_type}
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <span style={{ fontSize: '11px', color: '#888' }}>{deal.deal_owner}</span>
-                          <span
+                          <div
                             style={{
-                              fontSize: '11px',
-                              color: '#14B474',
+                              fontSize: '13px',
                               fontWeight: '600',
+                              color: '#333',
+                              marginBottom: '6px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              wordBreak: 'break-word'
+                            }}
+                            title={deal.deal_name}
+                          >
+                            {deal.deal_name}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {deal.deal_type}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
                             }}
                           >
-                            ₹{parseFloat(deal.deal_amount || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </KanbanDraggableCard>
-                    ))}
+                            <span style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.deal_owner}</span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#14B474',
+                                fontWeight: '600',
+                                flexShrink: 0
+                              }}
+                            >
+                              ₹{parseFloat(deal.deal_amount || 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </KanbanDraggableCard>
+                      ))
+                    )}
                     {loadingMoreStages[column.stage] && (
                       <div style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#6b7280' }}>
                         Loading more deals...
