@@ -1766,17 +1766,11 @@ export default function Opportunities({ onPageChange }) {
 
     stages.forEach(stage => {
       let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
-
-      // Sales Property filters if active
-      if (salesFiltersApplied && selectedSalesProperties.length > 0) {
-        stageDeals = applyFilters(stageDeals);
-      }
-
       filteredByStage[stage] = stageDeals;
     });
 
     return filteredByStage;
-  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
+  }, [kanbanDeals]);
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -2121,7 +2115,7 @@ export default function Opportunities({ onPageChange }) {
         if (selectedSalesProperties.length > 0) {
           setSalesFiltersApplied(true);
           setSalesFiltersSuccess(true);
-          toast.success(`Filter applied successfully! Found ${allData.length} records.`);
+          toast.success(`Filter applied (${allData.length.toLocaleString()} records found)`, { id: 'sales-filter-toast' });
           setTimeout(() => {
             setSalesFiltersSuccess(false);
             setSalesFilterSidebarOpen(false);
