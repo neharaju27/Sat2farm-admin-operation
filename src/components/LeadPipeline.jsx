@@ -2449,6 +2449,19 @@ export default function LeadPipeline({ onPageChange }) {
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={() => {
+                // Show pop up message informing user about mandatory CSV columns
+                toast('Please ensure your CSV file includes the mandatory columns: Name, Country, Email, and Phone.', {
+                  id: 'csv-mandatory-columns-toast',
+                  icon: 'ℹ️',
+                  duration: 6000,
+                  style: {
+                    background: '#1e293b',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '500'
+                  }
+                });
+
                 // Create file input element
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
@@ -6869,7 +6882,7 @@ export default function LeadPipeline({ onPageChange }) {
                           <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Loading timeline...</div>
                         ) : timelineData.length > 0 ? (
                           <div style={{ paddingLeft: '32px', borderLeft: '2px solid var(--border)', marginLeft: '20px' }}>
-                                  {timelineData.map((item, index) => {
+                            {timelineData.map((item, index) => {
                               const IconComponent = getTimelineIcon(item.field);
                               return (
                                 <div key={item.id} style={{ paddingBottom: index < timelineData.length - 1 ? '20px' : '0' }}>
