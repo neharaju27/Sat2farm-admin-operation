@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronUp, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
 import satyuktLogo from '../assets/satyukt.webp';
 
@@ -98,13 +98,121 @@ const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', yea
   }
 };
 
+// Helper to extract clean, user-friendly error messages from API responses or error objects
+const extractErrorMessage = (error, defaultMsg = 'An error occurred') => {
+  if (!error) return defaultMsg;
+
+  let textToParse = error;
+
+  // If error is an Error object
+  if (error instanceof Error) {
+    textToParse = error.message || defaultMsg;
+  }
+
+  // If error is an object
+  if (typeof textToParse === 'object' && textToParse !== null) {
+    const obj = textToParse;
+    if (obj.message && obj.info) return `${obj.message}: ${obj.info}`;
+    if (obj.message) return obj.message;
+    if (obj.info) return obj.info;
+    if (obj.error) return typeof obj.error === 'string' ? obj.error : extractErrorMessage(obj.error, defaultMsg);
+    if (obj.detail) return obj.detail;
+  }
+
+  const str = String(textToParse).trim();
+
+  // Try parsing JSON substring if embedded in string like "HTTP error! status: 400 - { ... }"
+  const jsonMatch = str.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed) {
+        if (parsed.message && parsed.info) return `${parsed.message}: ${parsed.info}`;
+        if (parsed.message) return parsed.message;
+        if (parsed.info) return parsed.info;
+        if (parsed.error) return typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        if (parsed.detail) return parsed.detail;
+      }
+    } catch (e) { }
+  }
+
+  // Clean raw HTTP status string if present
+  let cleaned = str.replace(/^HTTP error! status: \d+\s*-\s*/i, '').trim();
+  if (cleaned && !cleaned.startsWith('<')) {
+    return cleaned;
+  }
+
+  return defaultMsg;
+};
+
+// Helper to format clean, human-readable filter descriptions (e.g. Created time before: 2026-09-17)
+const formatFilterDescription = (filter) => {
+  if (!filter) return '';
+
+  const rawProp = filter.property || '';
+  const propMap = {
+    'contact_owner': 'Contact owner',
+    'lead_status': 'Lead status',
+    'tag': 'Tags',
+    'tags': 'Tags',
+    'mailing_city': 'City',
+    'city': 'City',
+    'mailing_state': 'State',
+    'state': 'State',
+    'mailing_country': 'Country',
+    'country': 'Country',
+    'lead_source': 'Lead source',
+    'description': 'Description',
+    'created_by': 'Created by',
+    'modified_by': 'Modified by',
+    'created_time': 'Created time'
+  };
+
+  const propName = propMap[rawProp] || rawProp.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  // Date Filters
+  if (rawProp === 'created_time' || rawProp === 'createdTime') {
+    const op = String(filter.dateOperator || 'on').toLowerCase().trim();
+    if (op === 'before') {
+      return `${propName} before: ${filter.value || filter.toDate || ''}`;
+    }
+    if (op === 'after') {
+      return `${propName} after: ${filter.value || filter.fromDate || ''}`;
+    }
+    if (op === 'between' || op === 'custom') {
+      if (filter.fromDate && filter.toDate) {
+        return `${propName} between: ${filter.fromDate} and ${filter.toDate}`;
+      }
+      return `${propName} between: ${filter.value || ''}`;
+    }
+    if (op === 'in_the_last' || op === 'in_last') {
+      const count = filter.count || 1;
+      const period = filter.period || 'days';
+      return `${propName} in the last: ${count} ${period}`;
+    }
+    if (op === 'on') {
+      return `${propName} on: ${filter.value || ''}`;
+    }
+    return `${propName} ${op}: ${filter.value || ''}`;
+  }
+
+  // Text / Choice Filters with operator (is, is not / isn't)
+  const opStr = String(filter.operator || 'is').toLowerCase().trim();
+  const isNot = opStr.includes('not') || opStr.includes("isn't") || opStr.includes('isnt') || opStr === 'is_not';
+  const opLabel = isNot ? 'is not' : 'is';
+
+  return `${propName} ${opLabel}: ${filter.value || ''}`;
+};
+
 // Top-level Standalone EditableLeadField component to keep DOM input alive across parent state updates (prevents cursor jumping)
 const StandaloneEditableLeadField = React.memo(({ label, value, fieldName, type = 'text', isEditing, editValue, setEditValue, startEditing, saveEdit, cancelEdit }) => {
   const containerRef = React.useRef(null);
   const inputRef = React.useRef(null);
+  const isSavingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (isEditing) {
+      isSavingRef.current = false;
       const handleClickOutside = (event) => {
         if (containerRef.current && !containerRef.current.contains(event.target)) {
           cancelEdit();
@@ -122,6 +230,8 @@ const StandaloneEditableLeadField = React.memo(({ label, value, fieldName, type 
   }, [isEditing]);
 
   const handleSave = () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     const val = inputRef.current ? inputRef.current.value : editValue;
     saveEdit(val);
   };
@@ -389,6 +499,28 @@ export default function LeadPipeline({ onPageChange }) {
   const [showEditDialogCustomInput, setShowEditDialogCustomInput] = useState(false);
   const [editDialogCustomValue, setEditDialogCustomValue] = useState('');
 
+  // ── Single Execution Guards & Loading States ─────────────────────────────
+  const pendingFieldUpdatesRef = useRef(new Set());
+  const isCreatingLeadRef = useRef(false);
+  const [isCreatingLead, setIsCreatingLead] = useState(false);
+  const isAddingNoteRef = useRef(false);
+  const updatingNoteIdRef = useRef(null);
+  const [updatingNoteId, setUpdatingNoteId] = useState(null);
+  const isAddingTaskRef = useRef(false);
+  const isUpdatingTaskRef = useRef(false);
+  const deletingActivityIdRef = useRef(null);
+  const [deletingActivityId, setDeletingActivityId] = useState(null);
+  const updatingActivityCreatedByRef = useRef(new Set());
+  const deletingLeadIdRef = useRef(null);
+  const [deletingLeadId, setDeletingLeadId] = useState(null);
+  const isImportingCSVRef = useRef(false);
+  const [isImportingCSV, setIsImportingCSV] = useState(false);
+  const isBulkUpdatingRef = useRef(false);
+  const isConvertingRef = useRef(false);
+  const isBulkDeletingRef = useRef(false);
+  const isSavingEditDialogRef = useRef(false);
+  const [isSavingEditDialog, setIsSavingEditDialog] = useState(false);
+
   // Close filter property dropdowns when clicking anywhere outside
   useEffect(() => {
     const handleClickOutsidePropertyDropdown = (event) => {
@@ -449,32 +581,41 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleEditDialogSave = async () => {
+    if (isSavingEditDialogRef.current || isSavingEditDialog) return;
     const valueToSave = showEditDialogCustomInput ? editDialogCustomValue : editDialogValue;
     if (!valueToSave.trim() || !editDialogRowId || !editDialogField) {
       toast.error('Please enter a value');
       return;
     }
 
-    await handleFieldUpdate(editDialogRowId, editDialogField, valueToSave.trim());
+    isSavingEditDialogRef.current = true;
+    setIsSavingEditDialog(true);
 
-    // Update predefined options if custom value was added
-    if (showEditDialogCustomInput && valueToSave.trim()) {
-      if (editDialogField === 'industry') {
-        setPredefinedIndustries([...predefinedIndustries, valueToSave.trim()]);
-        saveCustomDropdownOption('industry', valueToSave.trim());
-      } else if (editDialogField === 'contactOwner') {
-        setPredefinedContactOwners([...predefinedContactOwners, valueToSave.trim()]);
-        saveCustomDropdownOption('contact_owner', valueToSave.trim());
-      } else if (editDialogField === 'leadSource') {
-        setPredefinedLeadSources([...predefinedLeadSources, valueToSave.trim()]);
-        saveCustomDropdownOption('lead_source', valueToSave.trim());
-      } else if (editDialogField === 'tags') {
-        setPredefinedTags([...predefinedTags, valueToSave.trim()]);
-        saveCustomDropdownOption('tags', valueToSave.trim());
+    try {
+      await handleFieldUpdate(editDialogRowId, editDialogField, valueToSave.trim());
+
+      // Update predefined options if custom value was added
+      if (showEditDialogCustomInput && valueToSave.trim()) {
+        if (editDialogField === 'industry') {
+          setPredefinedIndustries([...predefinedIndustries, valueToSave.trim()]);
+          saveCustomDropdownOption('industry', valueToSave.trim());
+        } else if (editDialogField === 'contactOwner') {
+          setPredefinedContactOwners([...predefinedContactOwners, valueToSave.trim()]);
+          saveCustomDropdownOption('contact_owner', valueToSave.trim());
+        } else if (editDialogField === 'leadSource') {
+          setPredefinedLeadSources([...predefinedLeadSources, valueToSave.trim()]);
+          saveCustomDropdownOption('lead_source', valueToSave.trim());
+        } else if (editDialogField === 'tags') {
+          setPredefinedTags([...predefinedTags, valueToSave.trim()]);
+          saveCustomDropdownOption('tags', valueToSave.trim());
+        }
       }
-    }
 
-    closeEditDialog();
+      closeEditDialog();
+    } finally {
+      isSavingEditDialogRef.current = false;
+      setIsSavingEditDialog(false);
+    }
   };
 
   const handleEditDialogOptionSelect = (value) => {
@@ -546,6 +687,27 @@ export default function LeadPipeline({ onPageChange }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showRemainingSummary, setShowRemainingSummary] = useState(false);
+
+  // Fetch status summary metrics directly from backend API
+  useEffect(() => {
+    const fetchStatusSummary = async () => {
+      try {
+        const currentUserName = getApiUserName(user);
+        const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL || 'https://api.sat2farm.com/business/leads/status-summary';
+        const url = `${summaryApiUrl}?user=${encodeURIComponent(currentUserName)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setApiStatusSummary(data);
+        }
+      } catch (err) {
+        console.error('Error fetching lead status summary:', err);
+      }
+    };
+
+    fetchStatusSummary();
+  }, [user, refreshKey]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [isLast50Mode, setIsLast50Mode] = useState(false);
@@ -797,6 +959,12 @@ export default function LeadPipeline({ onPageChange }) {
 
         setLeads(transformedLeads);
         setError(null);
+
+        // Show clean toast popup when filter finishes fetching
+        if (hasActiveFilter && !isSearching) {
+          const filterCount = totalCount !== undefined ? totalCount : transformedLeads.length;
+          toast.success(`Filter applied (${filterCount.toLocaleString()} records found)`, { id: 'filter-applied-toast' });
+        }
       } catch (err) {
         console.error('Error fetching leads:', err);
         setError('Failed to load leads. Please try again.');
@@ -989,6 +1157,8 @@ export default function LeadPipeline({ onPageChange }) {
 
   // Add note using API
   const handleAddNote = async () => {
+    if (isAddingNoteRef.current || addingNote) return;
+
     if (!noteInput.trim()) {
       toast.error('Please enter a note');
       return;
@@ -999,6 +1169,7 @@ export default function LeadPipeline({ onPageChange }) {
       return;
     }
 
+    isAddingNoteRef.current = true;
     setAddingNote(true);
     const currentUserName = getApiUserName(user);
     const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
@@ -1040,17 +1211,22 @@ export default function LeadPipeline({ onPageChange }) {
       console.error('Error adding note:', err);
       toast.error('Failed to add note');
     } finally {
+      isAddingNoteRef.current = false;
       setAddingNote(false);
     }
   };
 
   // Update note using API
   const handleUpdateNote = async (noteId, updatedMessage) => {
+    if (updatingNoteIdRef.current === noteId || updatingNoteId === noteId) return;
+
     if (!updatedMessage || !updatedMessage.trim()) {
       toast.error('Please enter a note');
       return;
     }
 
+    updatingNoteIdRef.current = noteId;
+    setUpdatingNoteId(noteId);
     const currentUserName = getApiUserName(user);
     const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
 
@@ -1090,11 +1266,16 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Error updating note:', err);
       toast.error('Failed to update note');
+    } finally {
+      updatingNoteIdRef.current = null;
+      setUpdatingNoteId(null);
     }
   };
 
   // Add task using API
   const handleAddTask = async () => {
+    if (isAddingTaskRef.current || addingTask) return;
+
     if (!taskName.trim()) {
       toast.error('Please enter task name');
       return;
@@ -1105,6 +1286,7 @@ export default function LeadPipeline({ onPageChange }) {
       return;
     }
 
+    isAddingTaskRef.current = true;
     setAddingTask(true);
     const currentUserName = getApiUserName(user);
     const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
@@ -1152,6 +1334,7 @@ export default function LeadPipeline({ onPageChange }) {
       console.error('Error adding task:', err);
       toast.error('Failed to create task');
     } finally {
+      isAddingTaskRef.current = false;
       setAddingTask(false);
     }
   };
@@ -1168,6 +1351,8 @@ export default function LeadPipeline({ onPageChange }) {
 
   // Update task using API
   const handleUpdateTask = async () => {
+    if (isUpdatingTaskRef.current || addingTask) return;
+
     if (!taskName.trim()) {
       toast.error('Please enter task name');
       return;
@@ -1178,6 +1363,7 @@ export default function LeadPipeline({ onPageChange }) {
       return;
     }
 
+    isUpdatingTaskRef.current = true;
     setAddingTask(true);
     const currentUserName = getApiUserName(user);
     const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
@@ -1229,6 +1415,7 @@ export default function LeadPipeline({ onPageChange }) {
       console.error('Error updating task:', err);
       toast.error('Failed to update task');
     } finally {
+      isUpdatingTaskRef.current = false;
       setAddingTask(false);
     }
   };
@@ -1309,7 +1496,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleDeleteActivity = async (activityId) => {
+    if (deletingActivityIdRef.current === activityId || deletingActivityId === activityId) return;
     if (!window.confirm('Are you sure you want to delete this activity?')) return;
+
+    deletingActivityIdRef.current = activityId;
+    setDeletingActivityId(activityId);
+
     try {
       const currentUserName = getApiUserName(user);
       const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${activityId}&user=${encodeURIComponent(currentUserName)}`;
@@ -1334,10 +1526,16 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Error deleting activity:', err);
       toast.error('Failed to delete activity');
+    } finally {
+      deletingActivityIdRef.current = null;
+      setDeletingActivityId(null);
     }
   };
 
   const handleUpdateActivityCreatedBy = async (activityId, newCreatedBy) => {
+    if (updatingActivityCreatedByRef.current.has(activityId)) return;
+    updatingActivityCreatedByRef.current.add(activityId);
+
     try {
       const currentUserName = getApiUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_ACTIVITY_CREATED_BY_API_URL;
@@ -1363,6 +1561,8 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Error updating activity created_by:', err);
       toast.error('Failed to update activity author');
+    } finally {
+      updatingActivityCreatedByRef.current.delete(activityId);
     }
   };
 
@@ -1392,14 +1592,57 @@ export default function LeadPipeline({ onPageChange }) {
     return leads.filter(lead => lead.leadStatus === status);
   };
 
+  const STATUS_KEY_MAP = {
+    'yet_to_contact': 'Yet to Contact',
+    'attempted_to_contact': 'Attempted to Contact',
+    'contacted': 'Contacted',
+    'starter': 'Starter',
+    'growth': 'Growth',
+    'enterprise': 'Enterprise',
+    'follow_up_1': 'Follow-up 1',
+    'follow_up_2': 'Follow-up 2',
+    'in_discussion': 'In Discussion',
+    'interested': 'Interested',
+    'junk': 'Junk'
+  };
+
   const getStatusSummary = () => {
+    if (apiStatusSummary && typeof apiStatusSummary === 'object' && !Array.isArray(apiStatusSummary)) {
+      const items = [];
+      Object.entries(apiStatusSummary).forEach(([key, count]) => {
+        if (typeof count === 'number') {
+          let status = STATUS_KEY_MAP[key.toLowerCase()];
+          if (!status) {
+            const cleanKey = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            const match = Object.keys(statusConfig).find(s => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === cleanKey);
+            if (match) {
+              status = match;
+            } else {
+              status = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            }
+          }
+
+          const label = statusConfig[status]?.label || status;
+          const color = statusConfig[status]?.color || '#6b7280';
+
+          items.push({
+            status,
+            count,
+            color,
+            label
+          });
+        }
+      });
+      return items;
+    }
+
     const counts = {};
     leads.forEach(lead => {
       const status = lead.leadStatus || 'Unknown';
       counts[status] = (counts[status] || 0) + 1;
     });
 
-    const allowedStatuses = ['Enterprise', 'Growth', 'Starter', 'In Discussion'];
+    const allowedStatuses = Object.keys(statusConfig);
 
     const orderedStatuses = allowedStatuses.filter(status => counts[status] > 0);
 
@@ -1493,30 +1736,14 @@ export default function LeadPipeline({ onPageChange }) {
       matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || ownerMatch || cityMatch || stateMatch || countryMatch || statusMatch || tagsMatch || sourceMatch || descMatch;
     }
 
-    // 2. New This Week filter
-    let isNewThisWeek = true;
-    if (newThisWeekFilter) {
-      if (!lead.createdTime) {
-        isNewThisWeek = false;
-      } else {
-        const createdDate = parseDateRobust(lead.createdTime);
-        const now = new Date();
-        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        sevenDaysAgo.setHours(0, 0, 0, 0);
-        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
-      }
-    }
-
     const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
-    return matchesSearch && (!newThisWeekFilter || isNewThisWeek) && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
-  const isClientPaginated = newThisWeekFilter;
-  const displayedLeads = isClientPaginated
-    ? filteredLeads.slice(offset, offset + limit)
-    : filteredLeads;
+
+  const displayedLeads = filteredLeads;
   const effectiveTotalLeads = isSearching
     ? (totalLeads === 0 ? 0 : (totalLeads || filteredLeads.length))
-    : (isClientPaginated ? filteredLeads.length : (totalLeads || leads.length));
+    : (totalLeads || leads.length);
 
   const statusSummary = getStatusSummary();
 
@@ -1538,6 +1765,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleFieldUpdate = async (leadId, fieldName, newValue) => {
+    const updateKey = `${leadId}_${fieldName}`;
+    if (pendingFieldUpdatesRef.current.has(updateKey)) {
+      return;
+    }
+    pendingFieldUpdatesRef.current.add(updateKey);
+
     toast.loading('Updating...', { id: 'field-update' });
 
     try {
@@ -1637,7 +1870,8 @@ export default function LeadPipeline({ onPageChange }) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        const cleanMsg = extractErrorMessage(errorText, `Failed to update ${fieldName}`);
+        throw new Error(cleanMsg);
       }
 
       const result = await response.json();
@@ -1683,11 +1917,14 @@ export default function LeadPipeline({ onPageChange }) {
         toast.success(fieldMessages[fieldName] || successMessage, { id: 'field-update' });
       } else {
         console.error('API returned failure:', result);
-        toast.error(`Failed to update ${fieldName}: ${result.message || 'Unknown error'}`, { id: 'field-update' });
+        const cleanMsg = extractErrorMessage(result, `Failed to update ${fieldName}`);
+        toast.error(cleanMsg, { id: 'field-update' });
       }
     } catch (err) {
       console.error('Network error updating lead field:', err);
-      toast.error('Failed to update field', { id: 'field-update' });
+      toast.error(extractErrorMessage(err, 'Failed to update field'), { id: 'field-update' });
+    } finally {
+      pendingFieldUpdatesRef.current.delete(updateKey);
     }
   };
 
@@ -1723,16 +1960,20 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleDeleteLead = async (leadId) => {
+    if (deletingLeadIdRef.current === leadId || deletingLeadId === leadId) return;
+
     // Confirm deletion
     const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action cannot be undone.');
     if (!confirmDelete) {
       return;
     }
 
+    deletingLeadIdRef.current = leadId;
+    setDeletingLeadId(leadId);
+
     try {
       const currentUserName = getApiUserName(user);
       const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}&user=${encodeURIComponent(currentUserName)}`;
-
 
       const response = await fetch(url, {
         method: 'DELETE',
@@ -1748,7 +1989,6 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       const result = await response.json();
-
 
       if (result.success || result.message === 'deleted' || response.ok) {
 
@@ -1771,6 +2011,9 @@ export default function LeadPipeline({ onPageChange }) {
     } catch (err) {
       console.error('Network error deleting lead:', err);
       alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      deletingLeadIdRef.current = null;
+      setDeletingLeadId(null);
     }
   };
 
@@ -1972,6 +2215,9 @@ export default function LeadPipeline({ onPageChange }) {
   const handleContactNameUpdate = async (leadId, newContactName) => handleFieldUpdate(leadId, 'contactName', newContactName);
 
   const handleCreateLead = async (leadData) => {
+    if (isCreatingLeadRef.current || isCreatingLead) return;
+    isCreatingLeadRef.current = true;
+    setIsCreatingLead(true);
 
     toast.loading('Adding lead...', { id: 'create-lead' });
 
@@ -1991,14 +2237,14 @@ export default function LeadPipeline({ onPageChange }) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
         toast.dismiss('create-lead');
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        const cleanMsg = extractErrorMessage(errorText, 'Failed to create lead');
+        throw new Error(cleanMsg);
       }
 
       const result = await response.json();
 
 
       if (result.success || result.message || response.ok) {
-
         // Refresh the leads list
         fetchLeads();
         setShowAddModal(false);
@@ -2007,197 +2253,40 @@ export default function LeadPipeline({ onPageChange }) {
       } else {
         console.error('API returned failure:', result);
         toast.dismiss('create-lead');
-        toast.error('Failed to create lead');
+        const cleanMsg = extractErrorMessage(result, 'Failed to create lead');
+        toast.error(cleanMsg);
       }
     } catch (err) {
       console.error('Network error creating lead:', err);
       toast.dismiss('create-lead');
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+      const cleanMsg = extractErrorMessage(err, 'Failed to create lead');
+      toast.error(cleanMsg);
+    } finally {
+      isCreatingLeadRef.current = false;
+      setIsCreatingLead(false);
     }
   };
 
-  const handleCombinedFilters = async (filters) => {
+  const handleCombinedFilters = (filters) => {
     if (isApplyingFilters) return;
     setIsApplyingFilters(true);
     setFiltersSuccess(false);
 
-    setLoading(true);
+    // Update filter state so useEffect handles the single fetch call cleanly without status_is_not=junk
+    setSelectedProperties(filters);
+    setIsFilterApplied(true);
+    setOffset(0);
+    setRefreshKey(prev => prev + 1);
 
-    try {
-      let url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?`;
-      const urlParams = [];
+    const filterDescriptions = (filters || []).map(filter => formatFilterDescription(filter)).filter(Boolean);
+    setCurrentFilterCriteria(filterDescriptions.join(', '));
 
-      // Add base parameters
-      const currentUserName = getApiUserName(user);
-      urlParams.push(`user=${encodeURIComponent(currentUserName)}`);
-      urlParams.push('status_is_not=junk');
-
-      // Build URL parameters for all filters
-      filters.forEach(filter => {
-        if (filter.property === 'contact_owner' && filter.value) {
-          const operator = filter.operator === 'isn\'t' ? 'is_not' : 'is';
-          const paramName = `owner_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'lead_status' && filter.value) {
-          const operator = filter.operator === 'isn\'t' || filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `status_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'tag' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `tags_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'mailing_state' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `state_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'mailing_country' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `country_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_by' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `created_by_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'modified_by' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `modified_by_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'mailing_city' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `city_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'lead_source' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `lead_source_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'description' && filter.value) {
-          const operator = filter.operator === 'is not' ? 'is_not' : 'is';
-          const paramName = `description_${operator}`;
-          urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
-        } else if (filter.property === 'created_time' && (filter.dateOperator === 'between' || filter.dateOperator === 'custom')) {
-          urlParams.push(`date_type=${filter.dateOperator}`);
-          if (filter.fromDate && filter.toDate) {
-            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
-          } else if (filter.value) {
-            urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-          }
-        } else if (filter.property === 'created_time' && (filter.dateOperator === 'in_the_last' || filter.dateOperator === 'in_last')) {
-          const unitMap = { day: 'days', week: 'weeks', month: 'months' };
-          const count = filter.count ? parseInt(filter.count) : 1;
-          urlParams.push(`date_type=in_last`);
-          urlParams.push(`last_count=${count}`);
-          urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
-        }
-      });
-
-      url += urlParams.join('&');
-
-
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-
-
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-
-
-      if (result.data && Array.isArray(result.data)) {
-        let allData = [...result.data];
-        const totalRecords = result.total || allData.length;
-
-
-
-
-
-        // Transform the filtered leads data
-        const transformedLeads = allData.map(lead => ({
-          id: lead.id,
-          contactName: lead.full_name || 'Unknown',
-          phoneNumber: lead.phone || '',
-          alternateNumber: lead.alternate_number || '',
-          email: lead.email || '',
-          companyName: lead.company_name || '',
-          contactOwner: lead.owner || 'Unassigned',
-          city: lead.city || '',
-          state: lead.state || '',
-          country: lead.country || 'IN',
-          leadStatus: lead.status || 'New',
-          tags: lead.tags || '',
-          leadSource: lead.lead_source || '',
-          description: lead.description || '',
-          createdTime: lead.created_time || new Date().toISOString(),
-          industry: lead.industry || '',
-          createdBy: lead.created_by || 'System',
-          modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
-        }));
-
-
-
-
-        // Debug: Show unique states in the data
-        const uniqueStates = [...new Set(transformedLeads.map(lead => lead.state).filter(state => state))];
-
-
-        // Debug: Show Karnataka records
-        const karnatakaRecords = transformedLeads.filter(lead =>
-          lead.state && lead.state.toLowerCase().includes('karnatak')
-        );
-
-        setLeads(transformedLeads);
-        if (result && result.total !== undefined) {
-          setTotalLeads(result.total);
-        } else {
-          setTotalLeads(transformedLeads.length);
-        }
-        setOffset(0);
-        setError(null);
-
-        // Update filter state with combined criteria
-        setIsFilterApplied(true);
-        const filterDescriptions = filters.map(filter => {
-          const operator = filter.operator === 'isn\'t' ? 'is not' : 'is';
-          const property = filter.property.replace('_', ' ');
-          return `${property.charAt(0).toUpperCase() + property.slice(1)} ${operator}: ${filter.value}`;
-        });
-        setCurrentFilterCriteria(filterDescriptions.join(', '));
-
-        // Show toast message for successful filtering
-        const filterCount = result.total || transformedLeads.length;
-        if (filters.length === 1) {
-          toast.success(`Filter applied: ${filterDescriptions[0]} (${filterCount} records found)`);
-        } else {
-          toast.success(`${filters.length} filters applied (${filterCount} records found)`);
-        }
-        setFiltersSuccess(true);
-        setTimeout(() => {
-          setFiltersSuccess(false);
-          setFilterSidebarOpen(false);
-        }, 500);
-      } else {
-        console.error('API returned unexpected format:', result);
-        alert(`Failed to filter leads: Unexpected response format`);
-      }
-    } catch (err) {
-      console.error('Network error filtering leads:', err);
-      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
-    } finally {
-      setLoading(false);
+    setFiltersSuccess(true);
+    setTimeout(() => {
+      setFiltersSuccess(false);
+      setFilterSidebarOpen(false);
       setIsApplyingFilters(false);
-    }
+    }, 300);
   };
 
 
@@ -2220,15 +2309,15 @@ export default function LeadPipeline({ onPageChange }) {
   );
 
   const handleCSVImport = async (file) => {
+    if (isImportingCSVRef.current || isImportingCSV) return;
+    isImportingCSVRef.current = true;
+    setIsImportingCSV(true);
 
-    toast('Note: Contact Name, Phone Number, Email, and Country are required fields in the CSV.', {
-      icon: 'ℹ️',
-      duration: 5000
-    });
+    toast.dismiss();
+    const toastId = 'csv-import-toast';
+    toast.loading('Uploading CSV...', { id: toastId });
 
     try {
-      toast.loading('Uploading CSV...');
-
       const formData = new FormData();
       formData.append('file', file);
       formData.append('csv_file', file);
@@ -2245,7 +2334,8 @@ export default function LeadPipeline({ onPageChange }) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        const cleanMsg = extractErrorMessage(errorText, 'Failed to upload CSV');
+        throw new Error(cleanMsg);
       }
 
       const result = await response.json();
@@ -2255,17 +2345,19 @@ export default function LeadPipeline({ onPageChange }) {
 
         // Refresh leads data to show newly imported leads
         await fetchLeads();
-        toast.dismiss();
-        toast.success(`Successfully imported ${result.total_added || result.imported_count || result.count || 'unknown number of'} leads!`);
+        toast.success(`Successfully imported ${result.total_added || result.imported_count || result.count || 'unknown number of'} leads!`, { id: toastId, duration: 4000 });
       } else {
         console.error('API returned failure:', result);
-        toast.dismiss();
-        toast.error(`Failed to import CSV: ${result.message || 'Unknown error'}`);
+        const cleanMsg = extractErrorMessage(result, 'Failed to import CSV');
+        toast.error(cleanMsg, { id: toastId, duration: 6000 });
       }
     } catch (err) {
       console.error('Error uploading CSV:', err);
-      toast.dismiss();
-      toast.error(`Error uploading CSV: ${err.message || 'Unknown error occurred'}`);
+      const cleanMsg = extractErrorMessage(err, 'Error uploading CSV');
+      toast.error(cleanMsg, { id: toastId, duration: 6000 });
+    } finally {
+      isImportingCSVRef.current = false;
+      setIsImportingCSV(false);
     }
   };
 
@@ -2357,10 +2449,6 @@ export default function LeadPipeline({ onPageChange }) {
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={() => {
-                toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
-                  icon: 'ℹ️',
-                  duration: 5000
-                });
                 // Create file input element
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
@@ -2688,7 +2776,7 @@ export default function LeadPipeline({ onPageChange }) {
                 Filtered Results: {currentFilterCriteria}
               </span>
               <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
-                ({(totalLeads || leads.length).toLocaleString()} records found)
+                ({loading ? '...' : (effectiveTotalLeads || 0).toLocaleString()} records found)
               </span>
             </div>
             <button
@@ -3206,87 +3294,130 @@ export default function LeadPipeline({ onPageChange }) {
                 )}
               </span>
 
-              {statusSummary.map(({ status, count, label }) => {
-                const isActive = filterStatus === status;
-                const itemContent = (
-                  <>
-                    {label}{' '}
-                    <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
-                    <strong style={{ color: '#111827', fontWeight: 600 }}>{count}</strong>
-                  </>
-                );
+              {(() => {
+                const contactedItem = statusSummary.find(item => item.status.toLowerCase() === 'contacted');
+                const primaryStatuses = contactedItem ? [contactedItem] : statusSummary.slice(0, 1);
+                const remainingStatuses = contactedItem
+                  ? statusSummary.filter(item => item.status.toLowerCase() !== 'contacted')
+                  : statusSummary.slice(1);
 
-                if (isActive) {
+                const hasActiveRemainingFilter = remainingStatuses.some(item => filterStatus === item.status);
+                const isRemainingExpanded = showRemainingSummary || hasActiveRemainingFilter;
+
+                const renderItem = ({ status, count, label }) => {
+                  const isActive = filterStatus === status;
+                  const itemContent = (
+                    <>
+                      {label}{' '}
+                      <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{count}</strong>
+                    </>
+                  );
+
+                  if (isActive) {
+                    return (
+                      <span
+                        key={status}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleStatusSummaryClick(status)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            border: 'none',
+                            background: '#dcfce7',
+                            color: '#374151',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontFamily: 'inherit',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {itemContent}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterStatus('all');
+                            setOffset(0);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            color: '#2563eb',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontFamily: 'inherit'
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    );
+                  }
+
                   return (
-                    <span
+                    <button
                       key={status}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
+                      type="button"
+                      onClick={() => handleStatusSummaryClick(status)}
+                      title={`Filter by ${label}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#4b5563',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap'
+                      }}
                     >
+                      {itemContent}
+                    </button>
+                  );
+                };
+
+                return (
+                  <>
+                    {primaryStatuses.map(renderItem)}
+
+                    {remainingStatuses.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => handleStatusSummaryClick(status)}
+                        onClick={() => setShowRemainingSummary(prev => !prev)}
+                        title={isRemainingExpanded ? "Hide details" : "Show remaining summary"}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          border: 'none',
-                          background: '#dcfce7',
+                          gap: '4px',
+                          padding: '3px 10px',
+                          borderRadius: '16px',
+                          border: '1px solid #d1d5db',
+                          background: isRemainingExpanded ? '#f3f4f6' : '#ffffff',
                           color: '#374151',
+                          fontSize: '12px',
+                          fontWeight: 500,
                           cursor: 'pointer',
-                          fontSize: '13px',
-                          fontFamily: 'inherit',
+                          transition: 'all 0.15s ease',
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        {itemContent}
+                        <span>{isRemainingExpanded ? 'Hide Details' : `+ ${remainingStatuses.length} More`}</span>
+                        {isRemainingExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterStatus('all');
-                          setOffset(0);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                          color: '#2563eb',
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          fontFamily: 'inherit'
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </span>
-                  );
-                }
+                    )}
 
-                return (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => handleStatusSummaryClick(status)}
-                    title={`Filter by ${label}`}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      color: '#4b5563',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontFamily: 'inherit',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#111827'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#4b5563'; }}
-                  >
-                    {itemContent}
-                  </button>
+                    {isRemainingExpanded && remainingStatuses.map(renderItem)}
+                  </>
                 );
-              })}
+              })()}
             </div>
           </div>
         )}
@@ -4455,7 +4586,7 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
-                        {/* Other properties with dropdown options */}
+                        {/* Mailing City special case with Is/Is Not/Contains and multiple selection */}
                         {prop.property === 'mailing_city' && (
                           <div>
                             <div style={{ display: 'flex', gap: '12px' }}>
@@ -4479,31 +4610,150 @@ export default function LeadPipeline({ onPageChange }) {
                                 >
                                   <option value="is">Is</option>
                                   <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <select
-                                  value={prop.value}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Cities</option>
-                                  {getUniqueValues(prop.property).map(value => (
-                                    <option key={value} value={value}>{value}</option>
-                                  ))}
-                                </select>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search cities..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(city => (
+                                          <div
+                                            key={city}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(city)) {
+                                                const indexToRemove = currentValues.indexOf(city);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(city);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{city}</span>
+                                              {prop.value && prop.value.split(',').includes(city) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').filter(Boolean).map((city, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {city}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(city);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${city}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -7645,6 +7895,8 @@ export default function LeadPipeline({ onPageChange }) {
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                 <button
                   onClick={() => {
+                    if (isCreatingLeadRef.current || isCreatingLead) return;
+
                     // Collect form data
                     const form = document.querySelector('#addLeadForm');
                     if (!form) {
@@ -7689,6 +7941,7 @@ export default function LeadPipeline({ onPageChange }) {
                     // Call API to create lead
                     handleCreateLead(leadData);
                   }}
+                  disabled={isCreatingLead}
                   style={{
                     flex: 1,
                     padding: '10px',
@@ -7696,12 +7949,13 @@ export default function LeadPipeline({ onPageChange }) {
                     color: 'white',
                     border: 'none',
                     borderRadius: 'var(--r)',
-                    cursor: 'pointer',
+                    cursor: isCreatingLead ? 'not-allowed' : 'pointer',
                     fontSize: '14px',
-                    fontWeight: '500'
+                    fontWeight: '500',
+                    opacity: isCreatingLead ? 0.5 : 1
                   }}
                 >
-                  Add Lead
+                  {isCreatingLead ? 'Adding Lead...' : 'Add Lead'}
                 </button>
                 <button
                   onClick={() => setShowAddModal(false)}
@@ -7980,7 +8234,8 @@ export default function LeadPipeline({ onPageChange }) {
 
                       if (!response.ok) {
                         const errorText = await response.text();
-                        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to update fields');
+                        throw new Error(cleanMsg);
                       }
 
                       const data = await response.json();
@@ -8009,8 +8264,9 @@ export default function LeadPipeline({ onPageChange }) {
                       setUpdateNewFieldValue('');
                     } catch (error) {
                       console.error('Error updating fields:', error);
-                      toast.error('Failed to update fields. Please try again.');
+                      toast.error(extractErrorMessage(error, 'Failed to update fields. Please try again.'));
                     } finally {
+                      isBulkUpdatingRef.current = false;
                       setIsUpdating(false);
                     }
                   }}
@@ -8138,7 +8394,8 @@ export default function LeadPipeline({ onPageChange }) {
                         const errorText = await response.text();
                         console.error('Error moving to account:', errorText);
                         toast.dismiss('convert-lead-toast');
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to convert lead');
+                        throw new Error(cleanMsg);
                       }
                       const result = await response.json();
 
@@ -8153,13 +8410,15 @@ export default function LeadPipeline({ onPageChange }) {
                         setSelectedRows([]);
                         fetchLeads();
                       } else {
-                        toast.error('Failed to convert lead');
+                        const cleanMsg = extractErrorMessage(result, 'Failed to convert lead');
+                        toast.error(cleanMsg);
                       }
                     } catch (err) {
                       console.error('Error moving to account:', err);
                       toast.dismiss('convert-lead-toast');
-                      toast.error(`Failed to convert lead: ${err.message || 'Unknown error'}`);
+                      toast.error(extractErrorMessage(err, 'Failed to convert lead'));
                     } finally {
+                      isConvertingRef.current = false;
                       setIsConverting(false);
                     }
                   }}
@@ -8232,7 +8491,8 @@ export default function LeadPipeline({ onPageChange }) {
 
                       if (!response.ok) {
                         const errorText = await response.text();
-                        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to delete items');
+                        throw new Error(cleanMsg);
                       }
 
                       const data = await response.json();
@@ -8244,8 +8504,9 @@ export default function LeadPipeline({ onPageChange }) {
                       toast.success(`Deleted ${selectedRows.length} item(s)`);
                     } catch (error) {
                       console.error('Error deleting items:', error);
-                      toast.error('Failed to delete items. Please try again.');
+                      toast.error(extractErrorMessage(error, 'Failed to delete items. Please try again.'));
                     } finally {
+                      isBulkDeletingRef.current = false;
                       setIsDeleting(false);
                     }
                   }}
@@ -8424,6 +8685,7 @@ export default function LeadPipeline({ onPageChange }) {
                 </button>
                 <button
                   onClick={handleEditDialogSave}
+                  disabled={isSavingEditDialog}
                   style={{
                     padding: '8px 16px',
                     background: '#3b82f6',
@@ -8432,10 +8694,11 @@ export default function LeadPipeline({ onPageChange }) {
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '500',
-                    cursor: 'pointer'
+                    cursor: isSavingEditDialog ? 'not-allowed' : 'pointer',
+                    opacity: isSavingEditDialog ? 0.5 : 1
                   }}
                 >
-                  Save
+                  {isSavingEditDialog ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>

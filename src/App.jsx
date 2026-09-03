@@ -361,21 +361,46 @@ function App() {
       </div>
       <Toaster
         position="top-center"
+        containerStyle={{ zIndex: 99999, top: 24 }}
         toastOptions={{
           duration: 5000,
           style: {
-            background: '#f0fdf4',
-            color: '#166534',
-            border: '1px solid #86efac',
-            borderRadius: '8px',
-            padding: '12px 16px',
+            borderRadius: '10px',
+            padding: '14px 18px',
             fontSize: '14px',
             fontWeight: '500',
+            maxWidth: '650px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            wordBreak: 'break-word',
           },
           success: {
+            style: {
+              background: '#f0fdf4',
+              color: '#166534',
+              border: '1px solid #86efac',
+            },
             iconTheme: {
               primary: '#22c55e',
               secondary: '#ffffff',
+            },
+          },
+          error: {
+            duration: 6000,
+            style: {
+              background: '#fef2f2',
+              color: '#991b1b',
+              border: '1px solid #fca5a5',
+            },
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#ffffff',
+            },
+          },
+          loading: {
+            style: {
+              background: '#f8fafc',
+              color: '#1e293b',
+              border: '1px solid #cbd5e1',
             },
           },
         }}
