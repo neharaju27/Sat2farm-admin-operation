@@ -13,6 +13,10 @@ import LSWI from './features/LSWI';
 import Irrigation from './features/Irrigation';
 import SoilReport from './features/SoilReport';
 import ImageAdvisory from './features/ImageAdvisory';
+import NDCI from './features/NDCI';
+import NDTI from './features/NDTI';
+import TimeSeries from './features/TimeSeries';
+import Guideline from './features/Guideline';
 
 export default function UnlockFarm({ user, onPageChange }) {
   // Set currentRole based on actual user role
@@ -121,6 +125,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [featureFarmId, setFeatureFarmId] = useState(null); // store selected farm_id for features
   const [featureClientId, setFeatureClientId] = useState(null); // store selected client_id for features
   const [featureFarmStatus, setFeatureFarmStatus] = useState(null); // store farm status for features
+  const [featureFarmCategory, setFeatureFarmCategory] = useState(null); // store farm category for features
 
   const getSelectedFarmerId = (farmer = selectedFarmer) =>
     farmer?.user_id || farmer?.userId || farmer?.id;
@@ -3084,10 +3089,34 @@ export default function UnlockFarm({ user, onPageChange }) {
                           </button>
                           {(currentRole === 'partner' || currentRole === 'manager') && (
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 setFeatureFarmId(searchResult.farmId || searchResult.farm_id);
                                 setFeatureClientId(searchResult.clientId);
                                 setFeatureFarmStatus(searchResult.status);
+                                
+                                // Fetch farm category from farm details API
+                                try {
+                                  const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${searchResult.farmId || searchResult.farm_id}`;
+                                  const response = await fetch(apiUrl, {
+                                    method: 'GET',
+                                    headers: {
+                                      'Content-Type': 'application/json'
+                                    }
+                                  });
+                                  
+                                  if (response.ok) {
+                                    const data = await response.json();
+                                    if ((data.status === 'Success' || data.success) && data.data) {
+                                      const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+                                      const farmInfo = farmArray[0] || {};
+                                      setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
+                                    }
+                                  }
+                                } catch (error) {
+                                  console.error('Error fetching farm category:', error);
+                                  setFeatureFarmCategory('');
+                                }
+                                
                                 openModal('feature-dashboard');
                               }}
                               style={{
@@ -3274,31 +3303,29 @@ export default function UnlockFarm({ user, onPageChange }) {
                                           setFeatureFarmId(farm.farmId);
                                           setFeatureFarmStatus(farm.status);
                                           
-                                          // If clientId is missing, fetch it from farm details API
-                                          if (!farm.clientId) {
-                                            try {
-                                              const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
-                                              const response = await fetch(apiUrl, {
-                                                method: 'GET',
-                                                headers: {
-                                                  'Content-Type': 'application/json'
-                                                }
-                                              });
-                                              
-                                              if (response.ok) {
-                                                const data = await response.json();
-                                                if ((data.status === 'Success' || data.success) && data.data) {
-                                                  const farmArray = Array.isArray(data.data) ? data.data : [data.data];
-                                                  const farmInfo = farmArray[0] || {};
-                                                  setFeatureClientId(farmInfo.client_id || undefined);
-                                                }
+                                          // Fetch clientId and category from farm details API
+                                          try {
+                                            const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
+                                            const response = await fetch(apiUrl, {
+                                              method: 'GET',
+                                              headers: {
+                                                'Content-Type': 'application/json'
                                               }
-                                            } catch (error) {
-                                              console.error('Error fetching client ID:', error);
-                                              setFeatureClientId(undefined);
+                                            });
+                                            
+                                            if (response.ok) {
+                                              const data = await response.json();
+                                              if ((data.status === 'Success' || data.success) && data.data) {
+                                                const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+                                                const farmInfo = farmArray[0] || {};
+                                                setFeatureClientId(farmInfo.client_id || farm.clientId || undefined);
+                                                setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
+                                              }
                                             }
-                                          } else {
-                                            setFeatureClientId(farm.clientId);
+                                          } catch (error) {
+                                            console.error('Error fetching farm details:', error);
+                                            setFeatureClientId(farm.clientId || undefined);
+                                            setFeatureFarmCategory('');
                                           }
                                           
                                           openModal('feature-dashboard');
@@ -3376,12 +3403,14 @@ export default function UnlockFarm({ user, onPageChange }) {
             setFeatureFarmId(null);
             setFeatureClientId(null);
             setFeatureFarmStatus(null);
+            setFeatureFarmCategory(null);
           }} 
           onFeatureSelect={(feature) => {
             setModalOpen(null);
             setFeatureModalOpen(feature.name);
           }}
           farmStatus={featureFarmStatus}
+          farmCategory={featureFarmCategory}
         />
       )}
 
@@ -3396,6 +3425,10 @@ export default function UnlockFarm({ user, onPageChange }) {
       {featureModalOpen === 'Irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Image Advisory' && <ImageAdvisory onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'NDCI' && <NDCI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'NDTI' && <NDTI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Time Series' && <TimeSeries onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Guideline' && <Guideline onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} />}
     </div>
   );
 }

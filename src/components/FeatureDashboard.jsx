@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
 import { X, Lock } from 'lucide-react';
 
-export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus }) {
+export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus, farmCategory }) {
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [showLockedPopup, setShowLockedPopup] = useState(false);
 
   // Determine feature status based on farm status
   const isFarmUnlocked = String(farmStatus).toLowerCase() === 'unlocked';
   const featureStatus = isFarmUnlocked ? 'Active' : 'Inactive';
+
+  // Check if farm category is tank
+  const isTankCategory = String(farmCategory || '').toLowerCase() === 'tank';
+  // Check if farm category is polyhouse
+  const isPolyhouseCategory = String(farmCategory || '').toLowerCase() === 'polyhouse';
+  // Check if farm category is farm
+  const isFarmCategory = String(farmCategory || '').toLowerCase() === 'farm';
+  // Check if farm category is garden
+  const isGardenCategory = String(farmCategory || '').toLowerCase() === 'garden';
 
   // Show locked popup when farm is locked
   useEffect(() => {
@@ -22,72 +31,137 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus 
       name: 'Farm Map',
       description: 'Interactive map view of all your farms with boundaries and locations',
       status: 'Active',
-      icon: '🗺️'
+      icon: '🗺️',
+      visibleFor: ['all']
+    },
+    {
+      id: 11,
+      name: 'Guideline',
+      description: 'Guidelines and best practices for tank management',
+      status: featureStatus,
+      icon: '📋',
+      visibleFor: ['tank']
     },
     {
       id: 2,
       name: 'Weather',
       description: 'Real-time weather data and forecasts for your farm locations',
       status: featureStatus,
-      icon: '🌤️'
+      icon: '🌤️',
+      visibleFor: ['polyhouse', 'garden', 'farm','tank']
+    },
+    {
+      id: 12,
+      name: 'NDCI',
+      description: 'Normalized Difference Chlorophyll Index for water quality analysis',
+      status: featureStatus,
+      icon: '�',
+      visibleFor: ['tank']
+    },
+    {
+      id: 13,
+      name: 'NDTI',
+      description: 'Normalized Difference Turbidity Index for water clarity monitoring',
+      status: featureStatus,
+      icon: '💧',
+      visibleFor: ['tank']
+    },
+    {
+      id: 14,
+      name: 'Time Series',
+      description: 'Time series analysis for tank water level monitoring',
+      status: featureStatus,
+      icon: '📈',
+      visibleFor: ['tank']
     },
     {
       id: 3,
       name: 'Crop Calendar',
       description: 'Crop scheduling and planting calendar for optimal growth cycles',
       status: featureStatus,
-      icon: '📅'
+      icon: '📅',
+      visibleFor: ['polyhouse', 'garden', 'farm']
     },
     {
       id: 4,
       name: 'Pest and Disease',
       description: 'Pest detection and disease monitoring for crop protection',
       status: featureStatus,
-      icon: '🐛'
+      icon: '🐛',
+      visibleFor: ['polyhouse', 'garden', 'farm']
     },
     {
       id: 5,
       name: 'Soil Moisture',
       description: 'Soil moisture levels and irrigation recommendations',
       status: featureStatus,
-      icon: '💧'
+      icon: '💧',
+      visibleFor: ['farm']
     },
     {
       id: 6,
       name: 'Crop Health',
       description: 'Crop health monitoring and growth analysis',
       status: featureStatus,
-      icon: '🌱'
+      icon: '🌱',
+      visibleFor: ['farm']
     },
     {
       id: 7,
       name: 'LSWI',
       description: 'Land Surface Water Index for vegetation water content analysis',
       status: featureStatus,
-      icon: '💧'
+      icon: '💧',
+      visibleFor: ['farm']
     },
     {
       id: 8,
       name: 'Image Advisory',
       description: 'Satellite imagery and aerial photos for farm analysis',
       status: featureStatus,
-      icon: '🖼️'
+      icon: '🖼️',
+      visibleFor: ['polyhouse', 'garden', 'farm']
     },
     {
       id: 9,
       name: 'Irrigation',
       description: 'Smart irrigation recommendations based on crop needs and weather',
       status: featureStatus,
-      icon: '🚿'
+      icon: '🚿',
+      visibleFor: ['farm']
     },
     {
       id: 10,
       name: 'Soil Report',
       description: 'Detailed soil analysis and nutrient recommendations for your farms',
       status: featureStatus,
-      icon: '🌍'
+      icon: '🌍',
+      visibleFor: ['farm']
     }
   ];
+
+  // Filter features based on farm category
+  const visibleFeatures = features.filter(feature => {
+    const visibleFor = feature.visibleFor;
+    const categories = Array.isArray(visibleFor) ? visibleFor : [visibleFor];
+    
+    if (isTankCategory) {
+      // For tank category, show tank-specific features and features marked as 'all'
+      return categories.includes('tank') || categories.includes('all');
+    } else if (isPolyhouseCategory) {
+      // For polyhouse category, show polyhouse-specific features and features marked as 'all'
+      return categories.includes('polyhouse') || categories.includes('all');
+    } else if (isGardenCategory) {
+      // For garden category, show garden-specific features and features marked as 'all'
+      return categories.includes('garden') || categories.includes('all');
+    } else if (isFarmCategory) {
+      // For farm category, show farm-specific features and features marked as 'all'
+      return categories.includes('farm') || categories.includes('all');
+    } else {
+      // For other categories, show only features marked as 'all'
+      return categories.includes('all');
+    }
+  });
 
   return (
     <div className="modal-overlay">
@@ -109,7 +183,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus 
           </div>
 
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px'}}>
-            {features.map((feature) => (
+            {visibleFeatures.map((feature) => (
               <div
                 key={feature.id}
                 style={{
