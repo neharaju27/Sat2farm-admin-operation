@@ -3,6 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
+<<<<<<< HEAD
+=======
+
+import AccountMultiSelect from './filter/AccountMultiSelect';
+>>>>>>> 049b12c (account and deal ui bugs fix)
 import satyuktLogo from '../assets/satyukt.webp';
 import axios from 'axios';
 
@@ -1049,6 +1054,11 @@ export default function Opportunities({ onPageChange }) {
     return `${prefix}${baseKey}`;
   };
 
+<<<<<<< HEAD
+=======
+  
+
+>>>>>>> 049b12c (account and deal ui bugs fix)
   const handleCombinedFilters = async (filters) => {
 
     setIsApplyingAccountsFilters(true);
@@ -1765,12 +1775,24 @@ export default function Opportunities({ onPageChange }) {
     const filteredByStage = {};
 
     stages.forEach(stage => {
+<<<<<<< HEAD
       let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+=======
+      const stageDeals = Array.isArray(kanbanDeals[stage])
+        ? kanbanDeals[stage]
+        : [];
+
+      // API already returned filtered deals
+>>>>>>> 049b12c (account and deal ui bugs fix)
       filteredByStage[stage] = stageDeals;
     });
 
     return filteredByStage;
+<<<<<<< HEAD
   }, [kanbanDeals]);
+=======
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
+>>>>>>> 049b12c (account and deal ui bugs fix)
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -2115,7 +2137,11 @@ export default function Opportunities({ onPageChange }) {
         if (selectedSalesProperties.length > 0) {
           setSalesFiltersApplied(true);
           setSalesFiltersSuccess(true);
+<<<<<<< HEAD
           toast.success(`Filter applied (${allData.length.toLocaleString()} records found)`, { id: 'sales-filter-toast' });
+=======
+          toast.success(`Filter applied successfully! Found ${allData.length} records.`);
+>>>>>>> 049b12c (account and deal ui bugs fix)
           setTimeout(() => {
             setSalesFiltersSuccess(false);
             setSalesFilterSidebarOpen(false);
@@ -3398,12 +3424,44 @@ export default function Opportunities({ onPageChange }) {
         toast.success('Deal updated successfully');
 
         // Update selectedDeal state so the updated field/description is immediately visible without closing modal
+<<<<<<< HEAD
         setSelectedDeal(prev => prev ? {
           ...prev,
           [editingDealField]: valueToSave,
           [apiFieldName]: valueToSave,
           description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (prev.description || '')
         } : null);
+=======
+        setSelectedDeal(prev => {
+        if (!prev) return null;
+
+        const updatedDeal = {
+          ...prev,
+          [editingDealField]: valueToSave,
+          [apiFieldName]: valueToSave,
+          description:
+            (editingDealField === 'description' || apiFieldName === 'description')
+              ? valueToSave
+              : (prev.description || '')
+        };
+
+        // Closing Date UI uses `closing_date`,
+        // while API/update field uses `deal_close_date`
+        if (editingDealField === 'deal_close_date') {
+          updatedDeal.closing_date = formatDateSafe(valueToSave);
+          updatedDeal.deal_close_date = valueToSave;
+        }
+
+        // Probability UI uses `probability`,
+        // while API/update field uses `deal_probability`
+        if (editingDealField === 'deal_probability') {
+          updatedDeal.probability = `${valueToSave}%`;
+          updatedDeal.deal_probability = valueToSave;
+        }
+
+        return updatedDeal;
+      });
+>>>>>>> 049b12c (account and deal ui bugs fix)
 
         // Update kanbanDeals state
         setKanbanDeals(prev => {
@@ -3888,12 +3946,16 @@ export default function Opportunities({ onPageChange }) {
               {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
               {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
             </button>
+<<<<<<< HEAD
             <button
               onClick={handleCSVImport}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
             >
               <Upload size={16} /> Import CSV
             </button>
+=======
+            
+>>>>>>> 049b12c (account and deal ui bugs fix)
           </div>
         </div>
 
@@ -5681,9 +5743,16 @@ export default function Opportunities({ onPageChange }) {
                                             </div>
                                           </div>
                                         ))}
+<<<<<<< HEAD
                                       <div
                                         onClick={() => {
                                           if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
+=======
+                                      {(user?.role?.toLowerCase().trim() === 'operation' ||
+                                      user?.role?.toLowerCase().trim() === 'operations') && (
+                                      <div
+                                        onClick={() => {
+>>>>>>> 049b12c (account and deal ui bugs fix)
                                           const updated = [...selectedSalesProperties];
                                           updated[index].showCustomInput = true;
                                           updated[index].dropdownOpen = false;
@@ -5706,6 +5775,10 @@ export default function Opportunities({ onPageChange }) {
                                       >
                                         + Custom Stage
                                       </div>
+<<<<<<< HEAD
+=======
+                                    )}
+>>>>>>> 049b12c (account and deal ui bugs fix)
                                     </div>
                                   )}
                                 </div>
@@ -6282,7 +6355,11 @@ export default function Opportunities({ onPageChange }) {
                                               }
 
                                               updated[index].value = currentValues.join(',');
+<<<<<<< HEAD
                                               updated[index].dropdownOpen = true;
+=======
+                                              updated[index].dropdownOpen = false;
+>>>>>>> 049b12c (account and deal ui bugs fix)
                                               updated[index].searchTerm = '';
                                               setSelectedSalesProperties(updated);
                                             }}
@@ -8291,9 +8368,22 @@ export default function Opportunities({ onPageChange }) {
                             color: 'var(--text)'
                           }}>{selectedDeal.contact_name}</div>
                         </div>
+<<<<<<< HEAD
                         <EditableDealField label="Account Name" value={selectedDeal.account_name || ''} fieldName="account_name" />
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Number</label>
+=======
+                        <div>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            color: 'var(--text-3)',
+                            fontSize: '12px'
+                          }}>
+                            Account Name
+                          </label>
+
+>>>>>>> 049b12c (account and deal ui bugs fix)
                           <div style={{
                             padding: '8px 12px',
                             background: 'var(--gray-100)',
@@ -8301,7 +8391,13 @@ export default function Opportunities({ onPageChange }) {
                             borderRadius: 'var(--r)',
                             fontSize: '12px',
                             color: 'var(--text)'
+<<<<<<< HEAD
                           }}>{selectedDeal.account_number || '-'}</div>
+=======
+                          }}>
+                            {selectedDeal.account_name || '-'}
+                          </div>
+>>>>>>> 049b12c (account and deal ui bugs fix)
                         </div>
                         <EditableDealField label="Amount" value={selectedDeal.amount?.replace('₹', '') || ''} fieldName="deal_amount" type="number" />
                         <EditableDealField label="Closing Date" value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
@@ -10163,6 +10259,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
+<<<<<<< HEAD
                                 <select
                                   value={prop.value}
                                   onChange={(e) => {
@@ -10189,6 +10286,19 @@ export default function Opportunities({ onPageChange }) {
                                     ))
                                   )}
                                 </select>
+=======
+                                <AccountMultiSelect
+                                  value={prop.value}
+                                  options={getUniqueValues(prop.property)}
+                                  onChange={(newValue) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = newValue;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  placeholder="Search cities..."
+                                  loading={isFetchingFilterOptions}
+                                />
+>>>>>>> 049b12c (account and deal ui bugs fix)
                               </div>
                             </div>
                           </div>
@@ -10220,6 +10330,7 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
+<<<<<<< HEAD
                                 <select
                                   value={prop.value}
                                   onChange={(e) => {
@@ -10242,6 +10353,18 @@ export default function Opportunities({ onPageChange }) {
                                     <option key={value} value={value}>{value}</option>
                                   ))}
                                 </select>
+=======
+                                <AccountMultiSelect
+                                  value={prop.value}
+                                  options={getCreatedByOptions()}
+                                  onChange={(newValue) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = newValue;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  placeholder="Search created by..."
+                                />
+>>>>>>> 049b12c (account and deal ui bugs fix)
                               </div>
                             </div>
                           </div>
@@ -10337,7 +10460,11 @@ export default function Opportunities({ onPageChange }) {
                                             }
 
                                             updated[index].value = currentValues.join(',');
+<<<<<<< HEAD
                                             updated[index].dropdownOpen = true;
+=======
+                                            updated[index].dropdownOpen = false;
+>>>>>>> 049b12c (account and deal ui bugs fix)
                                             updated[index].searchTerm = '';
                                             setSelectedProperties(updated);
                                           }}
@@ -11226,6 +11353,10 @@ export default function Opportunities({ onPageChange }) {
                             return Boolean(prop.value && String(prop.value).trim() !== '');
                           });
                           if (activeFilters.length > 0) {
+<<<<<<< HEAD
+=======
+                            setFilterSidebarOpen(false);
+>>>>>>> 049b12c (account and deal ui bugs fix)
                             handleCombinedFilters(activeFilters);
                           } else {
                             setIsApplyingAccountsFilters(false);
@@ -11296,7 +11427,13 @@ export default function Opportunities({ onPageChange }) {
 
       {/* Edit Dialog */}
       {showEditDialog && (
+<<<<<<< HEAD
         <div style={{
+=======
+        <div 
+        onClick={closeEditDialog}
+        style={{
+>>>>>>> 049b12c (account and deal ui bugs fix)
           position: 'fixed',
           top: 0,
           left: 0,
@@ -11308,7 +11445,13 @@ export default function Opportunities({ onPageChange }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
+<<<<<<< HEAD
           <div style={{
+=======
+          <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
+>>>>>>> 049b12c (account and deal ui bugs fix)
             background: 'white',
             borderRadius: '8px',
             padding: '24px',
