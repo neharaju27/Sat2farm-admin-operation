@@ -5717,31 +5717,33 @@ export default function Opportunities({ onPageChange }) {
                                             </div>
                                           </div>
                                         ))}
-                                      <div
-                                        onClick={() => {
-                                          if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
-                                          const updated = [...selectedSalesProperties];
-                                          updated[index].showCustomInput = true;
-                                          updated[index].dropdownOpen = false;
-                                          setSelectedSalesProperties(updated);
-                                        }}
-                                        style={{
-                                          padding: '8px 12px',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          fontWeight: '500',
-                                          color: 'var(--green-600)',
-                                          borderBottom: 'none'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          e.currentTarget.style.background = 'var(--green-100)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          e.currentTarget.style.background = 'transparent';
-                                        }}
-                                      >
-                                        + Custom Stage
-                                      </div>
+                                      {(user?.role?.toLowerCase().trim() === 'operation' ||
+                                        user?.role?.toLowerCase().trim() === 'operations') && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            updated[index].showCustomInput = true;
+                                            updated[index].dropdownOpen = false;
+                                            setSelectedSalesProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            color: 'var(--green-600)',
+                                            borderBottom: 'none'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--green-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                          }}
+                                        >
+                                          + Custom Stage
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
