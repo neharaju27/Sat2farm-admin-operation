@@ -361,7 +361,6 @@ function App() {
       </div>
       <Toaster
         position="top-center"
-<<<<<<< HEAD
         containerStyle={{ zIndex: 99999, top: 24 }}
         toastOptions={{
           duration: 5000,
@@ -380,26 +379,11 @@ function App() {
               color: '#166534',
               border: '1px solid #86efac',
             },
-=======
-        toastOptions={{
-          duration: 5000,
-          style: {
-            background: '#f0fdf4',
-            color: '#166534',
-            border: '1px solid #86efac',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            fontSize: '14px',
-            fontWeight: '500',
-          },
-          success: {
->>>>>>> 049b12c (account and deal ui bugs fix)
             iconTheme: {
               primary: '#22c55e',
               secondary: '#ffffff',
             },
           },
-<<<<<<< HEAD
           error: {
             duration: 6000,
             style: {
@@ -419,8 +403,6 @@ function App() {
               border: '1px solid #cbd5e1',
             },
           },
-=======
->>>>>>> 049b12c (account and deal ui bugs fix)
         }}
       />
     </div>
