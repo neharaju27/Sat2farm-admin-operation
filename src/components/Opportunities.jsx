@@ -426,7 +426,9 @@ const StandaloneEditableDealField = React.memo(({
               fontStyle: value ? 'normal' : 'italic',
               minHeight: '20px',
               display: 'flex',
-              alignItems: type === 'textarea' ? 'flex-start' : 'center'
+              alignItems: type === 'textarea' ? 'flex-start' : 'center',
+              whiteSpace: type === 'textarea' ? 'pre-wrap' : 'normal',
+              wordWrap: type === 'textarea' ? 'break-word' : 'normal'
             }}
           >
             {value || '-'}
@@ -9030,6 +9032,29 @@ export default function Opportunities({ onPageChange }) {
                       </div>
                     </>
                   )}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                      Description
+                    </label>
+                    <textarea
+                      value={paidDealFormData.description}
+                      onChange={(e) => setPaidDealFormData({ ...paidDealFormData, description: e.target.value })}
+                      placeholder="Enter description (optional)"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        fontSize: '13px',
+                        outline: 'none',
+                        resize: 'vertical',
+                        backgroundColor: 'var(--surface)',
+                        color: 'var(--text)',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                   <button
@@ -9319,7 +9344,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9419,7 +9446,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9541,7 +9570,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9686,7 +9717,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
