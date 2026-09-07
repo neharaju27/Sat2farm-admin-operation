@@ -469,8 +469,6 @@ export default function GreenTeam({ onPageChange }) {
     }
   };
 
-<<<<<<< HEAD
-=======
   // Fetch deal details from the deals API
   const fetchDealDetails = async (dealId) => {
     try {
@@ -491,7 +489,6 @@ export default function GreenTeam({ onPageChange }) {
     }
   };
 
->>>>>>> origin/green-team
   // Fetch Green Team assignments by stage
   const fetchGreenTeamAssignments = async () => {
     try {
@@ -883,10 +880,7 @@ export default function GreenTeam({ onPageChange }) {
     
     // Try to fetch fresh timeline data from API using the assignment ID
     const assignmentId = assignment.id?.toString() || assignment.deal_id?.toString();
-<<<<<<< HEAD
-=======
     const dealId = assignment.deal_id?.toString();
->>>>>>> origin/green-team
 
     
     if (assignmentId) {
@@ -922,8 +916,6 @@ export default function GreenTeam({ onPageChange }) {
           plan_12_months_acres: freshData.plan_12_months_acres || assignment.plan_12_months_acres || ''
         };
         
-<<<<<<< HEAD
-=======
         // Fetch deal details from the deals API to populate deal information fields
         if (dealId) {
           const dealDetails = await fetchDealDetails(dealId);
@@ -936,7 +928,6 @@ export default function GreenTeam({ onPageChange }) {
           }
         }
         
->>>>>>> origin/green-team
         // Construct stage history from API timeline
         if (freshData.timeline && freshData.timeline.length > 0) {
           const constructedHistory = {};
