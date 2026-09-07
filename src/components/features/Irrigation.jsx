@@ -13,7 +13,7 @@ export default function Irrigation({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchIrrigationData();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data is not available');
     }
   }, [farmId, clientId]);
 
@@ -59,11 +59,11 @@ export default function Irrigation({ onClose, onBack, farmId, clientId }) {
         
         setIrrigationData(tableData);
       } else {
-        setError('Report will be available soon');
+        setError('Data is not available. ');
       }
     } catch (err) {
       console.error('Error fetching irrigation data:', err);
-      setError('Report will be available soon');
+      setError('Data is not available. ');
     } finally {
       setLoading(false);
     }
@@ -104,12 +104,12 @@ export default function Irrigation({ onClose, onBack, farmId, clientId }) {
 
           {error && (
             <div style={{
-              backgroundColor: '#fee2e2',
-              border: '1px solid #fca5a5',
+              backgroundColor: '#dbeafe',
+              border: '1px solid #93c5fd',
               borderRadius: '8px',
               padding: '16px',
               marginBottom: '16px',
-              color: '#dc2626'
+              color: '#2563eb'
             }}>
               {error}
             </div>
