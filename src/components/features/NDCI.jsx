@@ -18,7 +18,7 @@ export default function NDCI({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchNDCIData();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -323,7 +323,7 @@ export default function NDCI({ onClose, onBack, farmId, clientId }) {
 
           {/* Error */}
           {!loading && error && (
-            <div style={{ textAlign: 'center', padding: '60px', color: error === 'Data under process' ? '#f59e0b' : '#dc2626' }}>
+            <div style={{ textAlign: 'center', padding: '60px', color: error === 'Data under process' ? '#f59e0b' : '#2563eb' }}>
               {error}
             </div>
           )}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, MoreVertical } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import FeatureDashboard from './FeatureDashboard';
 import FarmMap from './features/FarmMap';
 import Weather from './features/Weather';
@@ -107,6 +108,8 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [variety, setVariety] = useState('');
   const [sowingDate, setSowingDate] = useState('');
   const [irrigation, setIrrigation] = useState('');
+  const [cropsList, setCropsList] = useState([]);
+  const [loadingCrops, setLoadingCrops] = useState(false);
 
   // State for farmer selection
   const [farmerSearchQuery, setFarmerSearchQuery] = useState('');
@@ -271,6 +274,31 @@ export default function UnlockFarm({ user, onPageChange }) {
     }
   };
 
+  const fetchCropsList = async () => {
+    setLoadingCrops(true);
+    try {
+      const response = await axios.get(
+        import.meta.env.VITE_CROPS_API_URL
+      );
+
+      console.log("Crops API response:", response.data);
+
+      // Your API returns a direct array
+      if (Array.isArray(response.data)) {
+        setCropsList(response.data);
+      } else {
+        console.error("Unexpected crops API response:", response.data);
+        setCropsList([]);
+      }
+
+    } catch (error) {
+      console.error("Error fetching crops:", error);
+      setCropsList([]);
+    } finally {
+      setLoadingCrops(false);
+    }
+  };
+
   const fetchFarmerApiKey = async (farmer) => {
     const farmerId = getSelectedFarmerId(farmer);
     if (!farmerId) {
@@ -320,6 +348,7 @@ export default function UnlockFarm({ user, onPageChange }) {
     setAddFarmModalStep(0);
     setSelectedPolygonCategory('');
     setSelectedUploadMethod('');
+    fetchCropsList();
     setUploadedFile(null);
     setSelectedFarmer(null);
     setFarmerSearchQuery('');
@@ -531,6 +560,17 @@ export default function UnlockFarm({ user, onPageChange }) {
       setSelectedFarmer(null);
       setFarmerSearchQuery('');
       setSelectedFarmerApiKey('');
+
+      // Refresh farm list based on role
+      if (currentRole === 'ops' || currentRole === 'sales') {
+        fetchOpsRecentFarms();
+      } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+        if (selectedView === 'added') {
+          fetchRecentFarms();
+        } else {
+          fetchExpiringFarms();
+        }
+      }
     } catch (error) {
       console.error('Error adding farm:', error);
       toast.error(`Failed to add farm: ${error.message}`);
@@ -1030,10 +1070,16 @@ export default function UnlockFarm({ user, onPageChange }) {
         setMessage(`Farm ID ${farmId} locked successfully!`);
         setShowLockConfirmModal(false);
         setFarmToLock(null);
-        
-        // Refresh the farms list
-        if (selectedView === 'added') {
-          fetchRecentFarms();
+
+        // Refresh farm list based on role
+        if (currentRole === 'ops' || currentRole === 'sales') {
+          fetchOpsRecentFarms();
+        } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+          if (selectedView === 'added') {
+            fetchRecentFarms();
+          } else {
+            fetchExpiringFarms();
+          }
         }
       } else {
         const errorMessage = data?.message || 'Failed to lock farm';
@@ -1131,13 +1177,17 @@ export default function UnlockFarm({ user, onPageChange }) {
           // Don't fail the main operation if storing details fails
         }
         
-        // Remove the unlocked farm from the appropriate list based on current view
-        if (selectedView === 'added') {
-          setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
-        } else {
-          setExpiringFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
+        // Refresh farm list based on role
+        if (currentRole === 'ops' || currentRole === 'sales') {
+          fetchOpsRecentFarms();
+        } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+          if (selectedView === 'added') {
+            fetchRecentFarms();
+          } else {
+            fetchExpiringFarms();
+          }
         }
-        
+
         // Close the modal
         setShowPlanModal(false);
         setSelectedFarmId('');
@@ -2712,18 +2762,16 @@ export default function UnlockFarm({ user, onPageChange }) {
                         <select
                           value={cropType}
                           onChange={(e) => setCropType(e.target.value)}
+                          disabled={loadingCrops}
                         >
-                          <option value="">Select crop type</option>
-                          <option value="Rice">Rice</option>
-                          <option value="Wheat">Wheat</option>
-                          <option value="Maize">Maize</option>
-                          <option value="Cotton">Cotton</option>
-                          <option value="Sugarcane">Sugarcane</option>
-                          <option value="Vegetables">Vegetables</option>
-                          <option value="Fruits">Fruits</option>
-                          <option value="Pulses">Pulses</option>
-                          <option value="Oilseeds">Oilseeds</option>
-                          <option value="Other">Other</option>
+                          <option value="">
+                            {loadingCrops ? 'Loading crops...' : 'Select crop type'}
+                          </option>
+                          {cropsList.map((crop) => (
+                            <option key={crop} value={crop}>
+                              {crop.replace(/_/g, ' ')}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
@@ -3242,7 +3290,8 @@ export default function UnlockFarm({ user, onPageChange }) {
                                 height: '32px',
                                 width: '32px'
                               }}
-                            >
+                            title="Features"
+                          >
                               <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
                             </button>
                           )}
@@ -3453,6 +3502,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                                           height: '32px',
                                           width: '32px'
                                         }}
+                                        title="Features"
                                       >
                                         <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
                                       </button>

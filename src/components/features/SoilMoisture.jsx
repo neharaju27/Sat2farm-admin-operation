@@ -15,7 +15,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchSatelliteData();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -52,7 +52,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
         await fetchChartData(validData);
       }
     } catch (err) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
               Loading satellite data...
             </div>
           ) : error ? (
-            <div style={{textAlign: 'center', padding: '40px', color: '#ef4444'}}>
+            <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
           ) : (

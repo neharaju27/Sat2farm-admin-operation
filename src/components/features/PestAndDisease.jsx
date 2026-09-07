@@ -14,7 +14,7 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchPestDiseaseData();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -36,16 +36,32 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
       );
       
       const data = response.data;
-      
+      console.log('Pest/Disease API response:', data);
+
+      // Check if API response indicates no pest/disease for current weather
+      // Response structure: {"exception": "No pest and disease attack for the current weather condition", "status": "message"}
+      if (data && data.exception && data.exception.toLowerCase().includes('no pest and disease attack')) {
+        setError('No pest/disease available for your crop');
+        setPests([]);
+        setDiseases([]);
+        return;
+      }
+
       // Separate pests and diseases
       const pestList = data.filter(item => item.Pest);
       const diseaseList = data.filter(item => item.Disease);
-      
+
+      // If both lists are empty, show custom message
+      if (pestList.length === 0 && diseaseList.length === 0) {
+        setError('No pest/disease available for your crop');
+        return;
+      }
+
       setPests(pestList);
       setDiseases(diseaseList);
     } catch (err) {
       console.error('Error fetching pest/disease data:', err);
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     } finally {
       setLoading(false);
     }
@@ -213,12 +229,12 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
 
           {error && (
             <div style={{
-              backgroundColor: '#fee2e2',
-              border: '1px solid #fca5a5',
+              backgroundColor: '#dbeafe',
+              border: '1px solid #93c5fd',
               borderRadius: '8px',
               padding: '16px',
               marginBottom: '16px',
-              color: '#dc2626'
+              color: '#2563eb'
             }}>
               {error}
             </div>

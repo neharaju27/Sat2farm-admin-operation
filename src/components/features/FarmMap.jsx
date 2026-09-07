@@ -19,13 +19,14 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
   const [saving, setSaving] = useState(false);
   const [cropsList, setCropsList] = useState([]);
   const [loadingCrops, setLoadingCrops] = useState(false);
+  
 
   useEffect(() => {
     if (farmId && clientId) {
       fetchFarmDetails();
       fetchCropsList();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -337,7 +338,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
       sowing_date: sowingDateRaw || ''
     });
   } catch (err) {
-    setError('Report will be available soon');
+    setError('Data will be available soon');
   } finally {
     setLoading(false);
   }
@@ -347,9 +348,22 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
     setLoadingCrops(true);
     try {
       const response = await axios.get(import.meta.env.VITE_CROPS_API_URL);
-      if (response.data && Array.isArray(response.data)) {
-        setCropsList(response.data);
+      console.log('Crops API response:', response.data);
+
+      // Handle different response structures
+      let crops = [];
+      if (Array.isArray(response.data)) {
+        crops = response.data;
+      } else if (response.data && Array.isArray(response.data.crops)) {
+        crops = response.data.crops;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        crops = response.data.data;
+      } else if (response.data && typeof response.data === 'object') {
+        // Try to extract array from object
+        crops = Object.values(response.data).filter(val => Array.isArray(val)).flat();
       }
+
+      setCropsList(crops);
     } catch (err) {
       console.error('Error fetching crops list:', err);
     } finally {
@@ -417,7 +431,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
               Loading farm map...
             </div>
           ) : error ? (
-            <div style={{textAlign: 'center', padding: '40px', color: '#ef4444'}}>
+            <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
           ) : (

@@ -48,7 +48,7 @@ export default function ImageAdvisory({ onClose, onBack, farmId, clientId }) {
 
       // Don't set error if no data - let the UI show "No image available" and "No data available"
     } catch (err) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
       console.error('Error fetching advisory data:', err);
     } finally {
       setLoading(false);
@@ -81,7 +81,7 @@ export default function ImageAdvisory({ onClose, onBack, farmId, clientId }) {
               Loading image advisory data...
             </div>
           ) : error ? (
-            <div style={{textAlign: 'center', padding: '40px', color: '#ef4444'}}>
+            <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
           ) : (

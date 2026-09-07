@@ -15,7 +15,7 @@ export default function TimeSeries({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchTimeSeriesData();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -319,7 +319,7 @@ export default function TimeSeries({ onClose, onBack, farmId, clientId }) {
               style={{
                 textAlign: 'center',
                 padding: '70px 20px',
-                color: '#dc2626',
+                color: '#2563eb',
                 background: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px'
