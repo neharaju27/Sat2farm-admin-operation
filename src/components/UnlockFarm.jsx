@@ -2022,9 +2022,6 @@ export default function UnlockFarm({ user, onPageChange }) {
             </div>
           </div>
         </div>
-        <div className="tb-right">
-          <button className="btn btn-primary btn-sm" onClick={() => openModal('quick-actions')}>+ New</button>
-        </div>
       </div>
 
       {/* Section Header */}
