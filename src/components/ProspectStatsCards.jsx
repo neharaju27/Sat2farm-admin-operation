@@ -1510,8 +1510,8 @@ export default function ProspectStatsCards({ user }) {
                       <th>Owner</th>
                       <th>Accounts Count</th>
                       <th>Deals Amount</th>
-                      <th>Paid Amount</th>
                       <th>Invoiced Amount</th>
+                      <th>Paid Amount</th>
                       <th>Closed Lost Amount</th>
                     </tr>
                   </thead>
@@ -1544,21 +1544,6 @@ export default function ProspectStatsCards({ user }) {
                           </td>
                           <td>
                             <div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.teal }}>
-                                {formatCurrency(owner.paid?.amount || 0)}
-                              </div>
-                              <div style={{ fontSize: '12px', color: palette.inkSoft, fontWeight: 600 }}>
-                                {owner.paid?.count || 0} paid
-                              </div>
-                              {owner.deals?.amount > 0 && (
-                                <div style={{ fontSize: '11px', color: palette.teal, fontWeight: 500, marginTop: '2px' }}>
-                                  {((owner.paid?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div>
                               <div style={{ fontSize: '16px', fontWeight: 700, color: palette.amberDeep }}>
                                 {formatCurrency(owner.paid_invoiced?.amount || 0)}
                               </div>
@@ -1568,6 +1553,21 @@ export default function ProspectStatsCards({ user }) {
                               {owner.deals?.amount > 0 && (
                                 <div style={{ fontSize: '11px', color: palette.amberDeep, fontWeight: 500, marginTop: '2px' }}>
                                   {((owner.paid_invoiced?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div>
+                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.teal }}>
+                                {formatCurrency(owner.paid?.amount || 0)}
+                              </div>
+                              <div style={{ fontSize: '12px', color: palette.inkSoft, fontWeight: 600 }}>
+                                {owner.paid?.count || 0} paid
+                              </div>
+                              {owner.deals?.amount > 0 && (
+                                <div style={{ fontSize: '11px', color: palette.teal, fontWeight: 500, marginTop: '2px' }}>
+                                  {((owner.paid?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
                                 </div>
                               )}
                             </div>
