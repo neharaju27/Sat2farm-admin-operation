@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, MoreVertical } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import FeatureDashboard from './FeatureDashboard';
 import FarmMap from './features/FarmMap';
 import Weather from './features/Weather';
@@ -107,6 +108,8 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [variety, setVariety] = useState('');
   const [sowingDate, setSowingDate] = useState('');
   const [irrigation, setIrrigation] = useState('');
+  const [cropsList, setCropsList] = useState([]);
+  const [loadingCrops, setLoadingCrops] = useState(false);
 
   // State for farmer selection
   const [farmerSearchQuery, setFarmerSearchQuery] = useState('');
@@ -271,6 +274,31 @@ export default function UnlockFarm({ user, onPageChange }) {
     }
   };
 
+  const fetchCropsList = async () => {
+    setLoadingCrops(true);
+    try {
+      const response = await axios.get(
+        import.meta.env.VITE_CROPS_API_URL
+      );
+
+      console.log("Crops API response:", response.data);
+
+      // Your API returns a direct array
+      if (Array.isArray(response.data)) {
+        setCropsList(response.data);
+      } else {
+        console.error("Unexpected crops API response:", response.data);
+        setCropsList([]);
+      }
+
+    } catch (error) {
+      console.error("Error fetching crops:", error);
+      setCropsList([]);
+    } finally {
+      setLoadingCrops(false);
+    }
+  };
+
   const fetchFarmerApiKey = async (farmer) => {
     const farmerId = getSelectedFarmerId(farmer);
     if (!farmerId) {
@@ -320,6 +348,7 @@ export default function UnlockFarm({ user, onPageChange }) {
     setAddFarmModalStep(0);
     setSelectedPolygonCategory('');
     setSelectedUploadMethod('');
+    fetchCropsList();
     setUploadedFile(null);
     setSelectedFarmer(null);
     setFarmerSearchQuery('');
@@ -334,13 +363,18 @@ export default function UnlockFarm({ user, onPageChange }) {
     return `${day}-${month}-${year}`;
   };
 
-  const toCoordinatePayload = (pairs) => {
-    if (!Array.isArray(pairs) || pairs.length < 3) return '';
+  const toCoordinatePayload = (pairs, isSinglePoint = false) => {
+    if (!Array.isArray(pairs) || pairs.length < 1) return '';
     const cleaned = pairs
       .filter((pair) => Array.isArray(pair) && pair.length >= 2)
       .map(([lng, lat]) => [Number(lng), Number(lat)])
       .filter(([lng, lat]) => !Number.isNaN(lng) && !Number.isNaN(lat));
 
+    // For single point (terrace garden), accept 1 coordinate
+    if (isSinglePoint) {
+      return cleaned.length >= 1 ? JSON.stringify(cleaned) : '';
+    }
+    // For polygon, require at least 3 coordinates
     return cleaned.length >= 3 ? JSON.stringify(cleaned) : '';
   };
 
@@ -383,18 +417,32 @@ export default function UnlockFarm({ user, onPageChange }) {
     return pairs;
   };
 
-  const buildCoordinatesPayload = (coordinateText) => {
+  const buildCoordinatesPayload = (coordinateText, polygonCategory) => {
     if (!coordinateText) return '';
+
+    let kmlPairs = [];
 
     try {
       const parsed = JSON.parse(coordinateText);
-      const payload = toCoordinatePayload(parsed);
-      if (payload) return payload;
+      kmlPairs = parsed;
     } catch {
-      // Not JSON; fallback to previous string parsing.
+      // Not JSON; fallback to KML string parsing.
+      kmlPairs = parseKmlCoordinatePairs(coordinateText);
     }
-
-    const kmlPairs = parseKmlCoordinatePairs(coordinateText);
+    
+    // For garden/terrace garden, return only the first coordinate point as JSON array [[lng,lat]]
+    if (polygonCategory && 
+      (polygonCategory.toLowerCase() === 'terrace garden' || polygonCategory.toLowerCase() === 'garden')) {
+      if (Array.isArray(kmlPairs) && kmlPairs.length > 0) {
+        const [lng, lat] = kmlPairs[0];
+        console.log('Terrace garden - using single point:', lng, lat);
+        // Return single point as JSON array: "[[longitude,latitude]]"
+        return JSON.stringify([[lng, lat]]);
+      }
+      return '';
+    }
+    
+    // For other categories, return normal polygon payload
     const payload = toCoordinatePayload(kmlPairs);
     return payload || '';
   };
@@ -412,7 +460,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       return;
     }
 
-    const coordinatesPayload = buildCoordinatesPayload(extractedCoordinates);
+    const coordinatesPayload = buildCoordinatesPayload(extractedCoordinates, selectedPolygonCategory);
     if (!coordinatesPayload) {
       toast.error('Invalid coordinates. Please upload a valid file.');
       return;
@@ -427,31 +475,76 @@ export default function UnlockFarm({ user, onPageChange }) {
     try {
       setIsAddFarmSubmitting(true);
 
-      const queryParams = new URLSearchParams({
-        name: farmName,
-        coordinates: coordinatesPayload,
-        croptype: cropType,
-        category: selectedPolygonCategory.toLowerCase().replace(/\s+/g, '_'),
-        sowingdate: formatSowingDate(sowingDate),
-        crop_variety: variety || '',
-        api_key: farmerApiKey
-      });
+      const isTerraceGarden =
+        selectedPolygonCategory.toLowerCase() === 'terrace garden' ||
+        selectedPolygonCategory.toLowerCase() === 'garden';
 
-      const apiUrl = `${addFarmBaseUrl}?${queryParams.toString()}`;
-      const response = await fetch(apiUrl, {
-        method: 'GET'
-      });
+      let result;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (isTerraceGarden) {
+        // Terrace garden uses single point with 'coordinates' parameter
+        const queryParams = new URLSearchParams({
+          name: farmName,
+          coordinates: coordinatesPayload,
+          category: 'garden',
+          croptype: cropType,
+          sowingdate: formatSowingDate(sowingDate),
+          crop_variety: variety || '',
+          api_key: farmerApiKey
+        });
+
+        const apiUrl = `${addFarmBaseUrl}?${queryParams.toString()}`;
+        console.log('Adding terrace garden:', apiUrl);
+
+        const response = await fetch(apiUrl, { method: 'GET' });
+        result = await response.json();
+        console.log('Terrace garden add response:', result);
+
+        if (result?.status && String(result.status).toLowerCase() === 'failed') {
+          throw new Error(result?.message || 'Failed to add terrace garden');
+        }
+
+        toast.success(`${selectedPolygonCategory} added successfully!`);
+
+      } else {
+        // All other categories use full polygon with 'coordinates' parameter
+        const categoryMap = {
+          'farm': 'farm',
+          'aquaculture': 'tank',
+          'polyhouse': 'polyhouse'
+        };
+
+        const normalizedCategory = selectedPolygonCategory.toLowerCase().replace(/\s+/g, '_');
+        const apiCategory = categoryMap[normalizedCategory] || normalizedCategory;
+
+        const queryParams = new URLSearchParams({
+          name: farmName,
+          coordinates: coordinatesPayload,
+          category: apiCategory,
+          api_key: farmerApiKey
+        });
+
+        // Only include crop-related fields if not aquaculture
+        if (selectedPolygonCategory.toLowerCase() !== 'aquaculture') {
+          queryParams.append('croptype', cropType);
+          queryParams.append('sowingdate', formatSowingDate(sowingDate));
+          queryParams.append('crop_variety', variety || '');
+        }
+
+        const apiUrl = `${addFarmBaseUrl}?${queryParams.toString()}`;
+        console.log('Adding farm:', apiUrl);
+
+        const response = await fetch(apiUrl, { method: 'GET' });
+        result = await response.json();
+        console.log('Farm add response:', result);
+
+        if (result?.status && String(result.status).toLowerCase() === 'failed') {
+          throw new Error(result?.message || 'Failed to add farm');
+        }
+
+        toast.success(`${selectedPolygonCategory} farm added successfully!`);
       }
 
-      const result = await response.json();
-      if (result?.status && String(result.status).toLowerCase() === 'failed') {
-        throw new Error(result?.message || 'Failed to add farm');
-      }
-
-      toast.success(`${selectedPolygonCategory} farm added successfully!`);
       console.log('Farm add API response:', result);
       setShowAddFarmModal(false);
       setAddFarmModalStep(1);
@@ -467,6 +560,17 @@ export default function UnlockFarm({ user, onPageChange }) {
       setSelectedFarmer(null);
       setFarmerSearchQuery('');
       setSelectedFarmerApiKey('');
+
+      // Refresh farm list based on role
+      if (currentRole === 'ops' || currentRole === 'sales') {
+        fetchOpsRecentFarms();
+      } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+        if (selectedView === 'added') {
+          fetchRecentFarms();
+        } else {
+          fetchExpiringFarms();
+        }
+      }
     } catch (error) {
       console.error('Error adding farm:', error);
       toast.error(`Failed to add farm: ${error.message}`);
@@ -488,7 +592,13 @@ export default function UnlockFarm({ user, onPageChange }) {
       if (coordinatesElements.length > 0) {
         const coordinates = coordinatesElements[0].textContent.trim();
         const pairs = parseKmlCoordinatePairs(coordinates);
-        const payload = toCoordinatePayload(pairs);
+        
+        // Check if this is for terrace garden (single point)
+        const isTerraceGarden = selectedPolygonCategory && 
+          (selectedPolygonCategory.toLowerCase() === 'terrace garden' || 
+           selectedPolygonCategory.toLowerCase() === 'garden');
+        
+        const payload = toCoordinatePayload(pairs, isTerraceGarden);
 
         if (payload) {
           setExtractedCoordinates(payload);
@@ -960,10 +1070,16 @@ export default function UnlockFarm({ user, onPageChange }) {
         setMessage(`Farm ID ${farmId} locked successfully!`);
         setShowLockConfirmModal(false);
         setFarmToLock(null);
-        
-        // Refresh the farms list
-        if (selectedView === 'added') {
-          fetchRecentFarms();
+
+        // Refresh farm list based on role
+        if (currentRole === 'ops' || currentRole === 'sales') {
+          fetchOpsRecentFarms();
+        } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+          if (selectedView === 'added') {
+            fetchRecentFarms();
+          } else {
+            fetchExpiringFarms();
+          }
         }
       } else {
         const errorMessage = data?.message || 'Failed to lock farm';
@@ -1061,13 +1177,17 @@ export default function UnlockFarm({ user, onPageChange }) {
           // Don't fail the main operation if storing details fails
         }
         
-        // Remove the unlocked farm from the appropriate list based on current view
-        if (selectedView === 'added') {
-          setRecentFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
-        } else {
-          setExpiringFarms(prev => prev.filter(farm => farm.farmId !== selectedFarmId));
+        // Refresh farm list based on role
+        if (currentRole === 'ops' || currentRole === 'sales') {
+          fetchOpsRecentFarms();
+        } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+          if (selectedView === 'added') {
+            fetchRecentFarms();
+          } else {
+            fetchExpiringFarms();
+          }
         }
-        
+
         // Close the modal
         setShowPlanModal(false);
         setSelectedFarmId('');
@@ -1902,9 +2022,6 @@ export default function UnlockFarm({ user, onPageChange }) {
             </div>
           </div>
         </div>
-        <div className="tb-right">
-          <button className="btn btn-primary btn-sm" onClick={() => openModal('quick-actions')}>+ New</button>
-        </div>
       </div>
 
       {/* Section Header */}
@@ -2384,16 +2501,33 @@ export default function UnlockFarm({ user, onPageChange }) {
               {addFarmModalStep === 3 && selectedUploadMethod === 'KML' && (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div>
-                    <a
-                      href="./sample.kml"
-                      download="sample.kml"
-                      style={{color: 'var(--primary)', textDecoration: 'underline'}}
-                    >
-                      Download sample KML file format here
-                    </a>
-                    <p style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic'}}>
-                      Note: Please download the sample KML file provided here. Replace the sample coordinates in the downloaded file with your own coordinates, and then proceed with the upload
-                    </p>
+                    {selectedPolygonCategory.toLowerCase() === 'terrace garden' ? (
+                      <>
+                        <a
+                          href="./terrace_garden_sample.kml"
+                          download="terrace_garden_sample.kml"
+                          style={{color: 'var(--primary)', textDecoration: 'underline'}}
+                        >
+                          Download sample KML file for Terrace Garden here
+                        </a>
+                        <p style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic'}}>
+                          Note: Terrace Garden requires only one coordinate point. Download this sample file, replace the coordinate with your own, and then proceed with the upload
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <a
+                          href="./sample.kml"
+                          download="sample.kml"
+                          style={{color: 'var(--primary)', textDecoration: 'underline'}}
+                        >
+                          Download sample KML file format here
+                        </a>
+                        <p style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '8px', fontStyle: 'italic'}}>
+                          Note: Please download the sample KML file provided here. Replace the sample coordinates in the downloaded file with your own coordinates, and then proceed with the upload
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div
@@ -2578,7 +2712,15 @@ export default function UnlockFarm({ user, onPageChange }) {
               {addFarmModalStep === 4 && (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div className="form-group">
-                    <label>Farm Name</label>
+                    <label>
+                      {selectedPolygonCategory.toLowerCase() === 'aquaculture' 
+                        ? 'Aquaculture Name' 
+                        : selectedPolygonCategory.toLowerCase() === 'polyhouse'
+                        ? 'Polyhouse Name'
+                        : selectedPolygonCategory.toLowerCase() === 'terrace garden'
+                        ? 'Garden Name'
+                        : 'Farm Name'}
+                    </label>
                     {selectedFarmer && (
                       <div style={{fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px'}}>
                         Farmer: {selectedFarmer.name} ({selectedFarmer.user_id || selectedFarmer.userId || selectedFarmer.id})
@@ -2588,7 +2730,15 @@ export default function UnlockFarm({ user, onPageChange }) {
                       type="text"
                       value={farmName}
                       onChange={(e) => setFarmName(e.target.value)}
-                      placeholder="Enter farm name"
+                      placeholder={
+                        selectedPolygonCategory.toLowerCase() === 'aquaculture' 
+                          ? 'Enter aquaculture name' 
+                          : selectedPolygonCategory.toLowerCase() === 'polyhouse'
+                          ? 'Enter polyhouse name'
+                          : selectedPolygonCategory.toLowerCase() === 'terrace garden'
+                          ? 'Enter garden name'
+                          : 'Enter farm name'
+                      }
                     />
                   </div>
 
@@ -2602,70 +2752,72 @@ export default function UnlockFarm({ user, onPageChange }) {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>Crop Type</label>
-                    <select
-                      value={cropType}
-                      onChange={(e) => setCropType(e.target.value)}
-                    >
-                      <option value="">Select crop type</option>
-                      <option value="Rice">Rice</option>
-                      <option value="Wheat">Wheat</option>
-                      <option value="Maize">Maize</option>
-                      <option value="Cotton">Cotton</option>
-                      <option value="Sugarcane">Sugarcane</option>
-                      <option value="Vegetables">Vegetables</option>
-                      <option value="Fruits">Fruits</option>
-                      <option value="Pulses">Pulses</option>
-                      <option value="Oilseeds">Oilseeds</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
+                  {selectedPolygonCategory.toLowerCase() !== 'aquaculture' && (
+                    <>
+                      <div className="form-group">
+                        <label>Crop Type</label>
+                        <select
+                          value={cropType}
+                          onChange={(e) => setCropType(e.target.value)}
+                          disabled={loadingCrops}
+                        >
+                          <option value="">
+                            {loadingCrops ? 'Loading crops...' : 'Select crop type'}
+                          </option>
+                          {cropsList.map((crop) => (
+                            <option key={crop} value={crop}>
+                              {crop.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div className="form-group">
-                    <label>Variety</label>
-                    <input
-                      type="text"
-                      value={variety}
-                      onChange={(e) => setVariety(e.target.value)}
-                      placeholder="Enter variety"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Sowing Date</label>
-                    <input
-                      type="date"
-                      value={sowingDate}
-                      onChange={(e) => setSowingDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Irrigation</label>
-                    <div style={{display: 'flex', gap: '16px', marginTop: '8px'}}>
-                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                      <div className="form-group">
+                        <label>Variety</label>
                         <input
-                          type="radio"
-                          name="irrigation"
-                          value="rainfed"
-                          checked={irrigation === 'rainfed'}
-                          onChange={(e) => setIrrigation(e.target.value)}
+                          type="text"
+                          value={variety}
+                          onChange={(e) => setVariety(e.target.value)}
+                          placeholder="Enter variety"
                         />
-                        <span>Rainfed</span>
-                      </label>
-                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Sowing Date</label>
                         <input
-                          type="radio"
-                          name="irrigation"
-                          value="irrigated"
-                          checked={irrigation === 'irrigated'}
-                          onChange={(e) => setIrrigation(e.target.value)}
+                          type="date"
+                          value={sowingDate}
+                          onChange={(e) => setSowingDate(e.target.value)}
                         />
-                        <span>Irrigated</span>
-                      </label>
-                    </div>
-                  </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Irrigation</label>
+                        <div style={{display: 'flex', gap: '16px', marginTop: '8px'}}>
+                          <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                            <input
+                              type="radio"
+                              name="irrigation"
+                              value="rainfed"
+                              checked={irrigation === 'rainfed'}
+                              onChange={(e) => setIrrigation(e.target.value)}
+                            />
+                            <span>Rainfed</span>
+                          </label>
+                          <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                            <input
+                              type="radio"
+                              name="irrigation"
+                              value="irrigated"
+                              checked={irrigation === 'irrigated'}
+                              onChange={(e) => setIrrigation(e.target.value)}
+                            />
+                            <span>Irrigated</span>
+                          </label>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
                     <button 
@@ -2676,7 +2828,11 @@ export default function UnlockFarm({ user, onPageChange }) {
                     </button>
                     <button 
                       className="btn btn-primary" 
-                      disabled={!farmName || !cropType || !sowingDate || !irrigation || isFetchingFarmerApiKey || isAddFarmSubmitting}
+                      disabled={
+                        selectedPolygonCategory.toLowerCase() === 'aquaculture' 
+                          ? (!farmName || isFetchingFarmerApiKey || isAddFarmSubmitting)
+                          : (!farmName || !cropType || !sowingDate || !irrigation || isFetchingFarmerApiKey || isAddFarmSubmitting)
+                      }
                       onClick={handleAddFarmSubmit}
                     >
                       {isAddFarmSubmitting ? 'Submitting...' : 'Submit'}
@@ -3131,7 +3287,8 @@ export default function UnlockFarm({ user, onPageChange }) {
                                 height: '32px',
                                 width: '32px'
                               }}
-                            >
+                            title="Features"
+                          >
                               <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
                             </button>
                           )}
@@ -3342,6 +3499,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                                           height: '32px',
                                           width: '32px'
                                         }}
+                                        title="Features"
                                       >
                                         <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
                                       </button>

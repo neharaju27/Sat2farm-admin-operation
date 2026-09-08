@@ -19,104 +19,285 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
   const [saving, setSaving] = useState(false);
   const [cropsList, setCropsList] = useState([]);
   const [loadingCrops, setLoadingCrops] = useState(false);
+  
 
   useEffect(() => {
     if (farmId && clientId) {
       fetchFarmDetails();
       fetchCropsList();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
   useEffect(() => {
-    if (mapRef.current && !mapInstanceRef.current) {
-      // Initialize MapLibre GL map with satellite imagery
-      const map = new maplibregl.Map({
-        container: mapRef.current,
-        style: {
-          version: 8,
-          sources: {
-            'satellite': {
-              type: 'raster',
-              tiles: ['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'],
-              tileSize: 256,
-              attribution: '© Google'
-            }
-          },
-          layers: [{
-            id: 'satellite-layer',
+    // Don't initialize while loading or if container doesn't exist
+    if (loading || !mapRef.current || mapInstanceRef.current) return;
+
+    const map = new maplibregl.Map({
+      container: mapRef.current,
+
+      style: {
+        version: 8,
+
+        sources: {
+          satellite: {
             type: 'raster',
-            source: 'satellite',
-            minzoom: 0,
-            maxzoom: 20
-          }]
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            ],
+            tileSize: 256,
+            attribution: '© Esri'
+          }
         },
-        center: [90, 25], // Center on Asia
-        zoom: 4,
-        pitch: 0,
-        bearing: 0
-      });
 
-      mapInstanceRef.current = map;
+        layers: [
+          {
+            id: 'satellite',
+            type: 'raster',
+            source: 'satellite'
+          }
+        ]
+      },
 
-      // Add controls
-      map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
-      map.addControl(new maplibregl.FullscreenControl(), 'top-right');
-      map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-right');
+      center: [0, 20],
+      zoom: 2
+    });
 
-      // Add farm polygon when data is available
-      if (farmData && farmData.coordinates && farmData.coordinates.length > 0) {
-        map.on('load', () => {
-          map.addSource('farm-polygon', {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [farmData.coordinates]
-              }
-            }
-          });
+    mapInstanceRef.current = map;
 
-          map.addLayer({
-            id: 'farm-fill',
-            type: 'fill',
-            source: 'farm-polygon',
-            layout: {},
-            paint: {
-              'fill-color': '#3b82f6',
-              'fill-opacity': 0.3
-            }
-          });
+    map.addControl(
+      new maplibregl.NavigationControl(),
+      'top-right'
+    );
 
-          map.addLayer({
-            id: 'farm-border',
-            type: 'line',
-            source: 'farm-polygon',
-            layout: {},
-            paint: {
-              'line-color': '#3b82f6',
-              'line-width': 3
-            }
-          });
+    map.on('load', () => {
+      console.log('MAP LOADED SUCCESSFULLY');
 
-          // Fit map to farm polygon
-          const bounds = new maplibregl.LngLatBounds();
-          farmData.coordinates.forEach(coord => {
-            bounds.extend(coord);
-          });
-          map.fitBounds(bounds, { padding: 50 });
-        });
-      }
-    }
+      // Important when map is inside modal
+      setTimeout(() => {
+        map.resize();
+      }, 100);
+    });
+
+    map.on('error', (e) => {
+      console.error('MAP ERROR:', e);
+    });
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+      if (mapInstanceRef.current === map) {
+        map.remove();
         mapInstanceRef.current = null;
       }
     };
+  }, [loading]);
+
+  const drawFarmOnMap = () => {
+    const map = mapInstanceRef.current;
+
+    if (!map || !farmData?.coordinates) return;
+
+    const coordinates = farmData.coordinates;
+
+    console.log('DRAWING FARM:', coordinates);
+    console.log('Farm ID:', farmData.farm_id);
+    console.log('Farm Name:', farmData.farm_name);
+
+    if (!Array.isArray(coordinates) || coordinates.length === 0) {
+      console.log('NO VALID COORDINATES');
+      return;
+    }
+
+    // Validate coordinates
+    const validCoordinates = coordinates.filter(coord => {
+      if (!Array.isArray(coord) || coord.length < 2) {
+        console.warn('Invalid coordinate format:', coord);
+        return false;
+      }
+      const [lng, lat] = coord;
+      if (typeof lng !== 'number' || typeof lat !== 'number' || 
+          !Number.isFinite(lng) || !Number.isFinite(lat)) {
+        console.warn('Invalid coordinate values:', coord);
+        return false;
+      }
+      if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+        console.warn('Coordinate out of range:', coord);
+        return false;
+      }
+      return true;
+    });
+
+    if (validCoordinates.length === 0) {
+      console.error('No valid coordinates after filtering');
+      return;
+    }
+
+    console.log('Valid coordinates count:', validCoordinates.length);
+
+    // Remove old layers
+    if (map.getLayer('farm-point')) {
+      map.removeLayer('farm-point');
+    }
+
+    if (map.getLayer('farm-fill')) {
+      map.removeLayer('farm-fill');
+    }
+
+    if (map.getLayer('farm-border')) {
+      map.removeLayer('farm-border');
+    }
+
+    // Remove old sources
+    if (map.getSource('farm-point-source')) {
+      map.removeSource('farm-point-source');
+    }
+
+    if (map.getSource('farm-polygon')) {
+      map.removeSource('farm-polygon');
+    }
+
+    // ============================================
+    // SINGLE COORDINATE - TERRACE GARDEN
+    // ============================================
+
+    if (validCoordinates.length === 1) {
+      const [lng, lat] = validCoordinates[0];
+
+      console.log('Single coordinate (Terrace Garden):', lng, lat);
+
+      map.addSource('farm-point-source', {
+        type: 'geojson',
+
+        data: {
+          type: 'Feature',
+
+          properties: {},
+
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          }
+        }
+      });
+
+      map.addLayer({
+        id: 'farm-point',
+
+        type: 'circle',
+
+        source: 'farm-point-source',
+
+        paint: {
+          'circle-radius': 12,
+          'circle-color': '#3b82f6',
+          'circle-opacity': 0.9,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 3
+        }
+      });
+
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 16,
+        duration: 3000,
+        essential: true
+      });
+
+      return;
+    }
+
+    // ============================================
+    // POLYGON - FARM / POLYHOUSE / TANK
+    // ============================================
+
+    let polygonCoordinates = [...validCoordinates];
+
+    // Close polygon if needed
+    const first = polygonCoordinates[0];
+    const last = polygonCoordinates[polygonCoordinates.length - 1];
+
+    if (
+      first[0] !== last[0] ||
+      first[1] !== last[1]
+    ) {
+      polygonCoordinates.push(first);
+    }
+
+    console.log('Polygon coordinates count:', polygonCoordinates.length);
+
+    map.addSource('farm-polygon', {
+      type: 'geojson',
+
+      data: {
+        type: 'Feature',
+
+        properties: {},
+
+        geometry: {
+          type: 'Polygon',
+
+          coordinates: [polygonCoordinates]
+        }
+      }
+    });
+
+    map.addLayer({
+      id: 'farm-fill',
+
+      type: 'fill',
+
+      source: 'farm-polygon',
+
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.3
+      }
+    });
+
+    map.addLayer({
+      id: 'farm-border',
+
+      type: 'line',
+
+      source: 'farm-polygon',
+
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': 3
+      }
+    });
+
+    const bounds = new maplibregl.LngLatBounds();
+
+    polygonCoordinates.forEach((coord) => {
+      bounds.extend(coord);
+    });
+
+    map.fitBounds(bounds, {
+      padding: 100,
+      duration: 3000,
+      maxZoom: 16
+    });
+  };
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+
+    if (!map || !farmData?.coordinates) return;
+
+    const loadAndDrawMap = () => {
+      setTimeout(() => {
+        map.resize();
+        drawFarmOnMap();
+      }, 200);
+    };
+
+    if (map.loaded()) {
+      loadAndDrawMap();
+    } else {
+      map.once('load', loadAndDrawMap);
+    }
+
   }, [farmData]);
 
   const fetchFarmDetails = async () => {
@@ -157,7 +338,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
       sowing_date: sowingDateRaw || ''
     });
   } catch (err) {
-    setError('Report will be available soon');
+    setError('Data will be available soon');
   } finally {
     setLoading(false);
   }
@@ -167,9 +348,22 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
     setLoadingCrops(true);
     try {
       const response = await axios.get(import.meta.env.VITE_CROPS_API_URL);
-      if (response.data && Array.isArray(response.data)) {
-        setCropsList(response.data);
+      console.log('Crops API response:', response.data);
+
+      // Handle different response structures
+      let crops = [];
+      if (Array.isArray(response.data)) {
+        crops = response.data;
+      } else if (response.data && Array.isArray(response.data.crops)) {
+        crops = response.data.crops;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        crops = response.data.data;
+      } else if (response.data && typeof response.data === 'object') {
+        // Try to extract array from object
+        crops = Object.values(response.data).filter(val => Array.isArray(val)).flat();
       }
+
+      setCropsList(crops);
     } catch (err) {
       console.error('Error fetching crops list:', err);
     } finally {
@@ -237,28 +431,14 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
               Loading farm map...
             </div>
           ) : error ? (
-            <div style={{textAlign: 'center', padding: '40px', color: '#ef4444'}}>
+            <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
           ) : (
-            <div style={{position: 'relative', height: '600px', backgroundColor: '#000'}}>
+            <div style={{position: 'relative', height: '600px', width:'100%', backgroundColor: '#000'}}>
               {/* Reset View Button */}
               <button
-                onClick={() => {
-                  if (mapInstanceRef.current) {
-                    if (farmData && farmData.coordinates && farmData.coordinates.length > 0) {
-                      // Fit to farm polygon
-                      const bounds = new maplibregl.LngLatBounds();
-                      farmData.coordinates.forEach(coord => {
-                        bounds.extend(coord);
-                      });
-                      mapInstanceRef.current.fitBounds(bounds, { padding: 50 });
-                    } else {
-                      // Reset to default Asia view
-                      mapInstanceRef.current.flyTo({ center: [90, 25], zoom: 4, pitch: 0, bearing: 0 });
-                    }
-                  }
-                }}
+                onClick={drawFarmOnMap}
                 style={{
                   position: 'absolute',
                   top: '16px',

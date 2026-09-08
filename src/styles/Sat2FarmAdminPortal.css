@@ -1004,7 +1004,7 @@ textarea {
 }
 
 .sa-table th {
-  padding: 18px 24px;
+  padding: 10px 16px;
   font-size: 13px;
   text-transform: uppercase;
   color: #64748B;
@@ -1014,7 +1014,7 @@ textarea {
 }
 
 .sa-table td {
-  padding: 20px 24px;
+  padding: 10px 16px;
   border-bottom: 1px solid #F1F5F9;
   vertical-align: middle;
   font-size: 15px;
@@ -1400,7 +1400,7 @@ button:active {
 /* ── Operation Dashboard Responsive Grids ── */
 .op-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(140px, 1fr));
+  grid-template-columns: repeat(8, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 28px;
 }
@@ -1414,7 +1414,7 @@ button:active {
 
 @media (min-width: 1400px) {
   .op-dashboard-grid {
-    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    grid-template-columns: repeat(8, minmax(160px, 1fr));
     gap: 14px;
   }
 }

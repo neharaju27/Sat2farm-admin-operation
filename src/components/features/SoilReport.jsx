@@ -32,7 +32,7 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchSoilReport();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -56,11 +56,11 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
       if (reportResponse.data.pdf) {
         setPdfUrl(reportResponse.data.pdf);
       } else {
-        setError('Report will be available soon');
+        setError('Data will be available soon');
       }
     } catch (err) {
       console.error('Error fetching soil report:', err);
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     } finally {
       setLoading(false);
     }
@@ -205,12 +205,12 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
 
           {error && (
             <div style={{
-              backgroundColor: '#fee2e2',
-              border: '1px solid #fca5a5',
+              backgroundColor: '#dbeafe',
+              border: '1px solid #93c5fd',
               borderRadius: '8px',
               padding: '16px',
               marginBottom: '16px',
-              color: '#dc2626'
+              color: '#2563eb'
             }}>
               {error}
             </div>

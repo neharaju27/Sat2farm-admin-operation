@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
+
+import AccountMultiSelect from './filter/AccountMultiSelect';
 import satyuktLogo from '../assets/satyukt.webp';
 import axios from 'axios';
 
@@ -432,7 +434,9 @@ const StandaloneEditableDealField = React.memo(({
               fontStyle: value ? 'normal' : 'italic',
               minHeight: '20px',
               display: 'flex',
-              alignItems: type === 'textarea' ? 'flex-start' : 'center'
+              alignItems: type === 'textarea' ? 'flex-start' : 'center',
+              whiteSpace: type === 'textarea' ? 'pre-wrap' : 'normal',
+              wordWrap: type === 'textarea' ? 'break-word' : 'normal'
             }}
           >
             {value || '-'}
@@ -1056,6 +1060,8 @@ export default function Opportunities({ onPageChange }) {
     const prefix = isNot ? 'is_not_' : 'is_';
     return `${prefix}${baseKey}`;
   };
+
+  
 
   const handleCombinedFilters = async (filters) => {
 
@@ -1773,12 +1779,16 @@ export default function Opportunities({ onPageChange }) {
     const filteredByStage = {};
 
     stages.forEach(stage => {
-      let stageDeals = Array.isArray(kanbanDeals[stage]) ? kanbanDeals[stage] : [];
+      const stageDeals = Array.isArray(kanbanDeals[stage])
+        ? kanbanDeals[stage]
+        : [];
+
+      // API already returned filtered deals
       filteredByStage[stage] = stageDeals;
     });
 
     return filteredByStage;
-  }, [kanbanDeals]);
+  }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -2123,7 +2133,7 @@ export default function Opportunities({ onPageChange }) {
         if (selectedSalesProperties.length > 0) {
           setSalesFiltersApplied(true);
           setSalesFiltersSuccess(true);
-          toast.success(`Filter applied (${allData.length.toLocaleString()} records found)`, { id: 'sales-filter-toast' });
+          toast.success(`Filter applied successfully! Found ${allData.length} records.`);
           setTimeout(() => {
             setSalesFiltersSuccess(false);
             setSalesFilterSidebarOpen(false);
@@ -3406,12 +3416,35 @@ export default function Opportunities({ onPageChange }) {
         toast.success('Deal updated successfully');
 
         // Update selectedDeal state so the updated field/description is immediately visible without closing modal
-        setSelectedDeal(prev => prev ? {
+        setSelectedDeal(prev => {
+        if (!prev) return null;
+
+        const updatedDeal = {
           ...prev,
           [editingDealField]: valueToSave,
           [apiFieldName]: valueToSave,
-          description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (prev.description || '')
-        } : null);
+          description:
+            (editingDealField === 'description' || apiFieldName === 'description')
+              ? valueToSave
+              : (prev.description || '')
+        };
+
+        // Closing Date UI uses `closing_date`,
+        // while API/update field uses `deal_close_date`
+        if (editingDealField === 'deal_close_date') {
+          updatedDeal.closing_date = formatDateSafe(valueToSave);
+          updatedDeal.deal_close_date = valueToSave;
+        }
+
+        // Probability UI uses `probability`,
+        // while API/update field uses `deal_probability`
+        if (editingDealField === 'deal_probability') {
+          updatedDeal.probability = `${valueToSave}%`;
+          updatedDeal.deal_probability = valueToSave;
+        }
+
+        return updatedDeal;
+      });
 
         // Update kanbanDeals state
         setKanbanDeals(prev => {
@@ -3893,12 +3926,15 @@ export default function Opportunities({ onPageChange }) {
               {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
               {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
             </button>
+
+            {viewMode === 'table' && (
             <button
               onClick={handleCSVImport}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
             >
               <Upload size={16} /> Import CSV
             </button>
+            )}
           </div>
         </div>
 
@@ -5686,31 +5722,33 @@ export default function Opportunities({ onPageChange }) {
                                             </div>
                                           </div>
                                         ))}
-                                      <div
-                                        onClick={() => {
-                                          if (user?.role?.toLowerCase().trim() !== 'operation' && user?.role?.toLowerCase().trim() !== 'operations') return;
-                                          const updated = [...selectedSalesProperties];
-                                          updated[index].showCustomInput = true;
-                                          updated[index].dropdownOpen = false;
-                                          setSelectedSalesProperties(updated);
-                                        }}
-                                        style={{
-                                          padding: '8px 12px',
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          fontWeight: '500',
-                                          color: 'var(--green-600)',
-                                          borderBottom: 'none'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          e.currentTarget.style.background = 'var(--green-100)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          e.currentTarget.style.background = 'transparent';
-                                        }}
-                                      >
-                                        + Custom Stage
-                                      </div>
+                                      {(user?.role?.toLowerCase().trim() === 'operation' ||
+                                        user?.role?.toLowerCase().trim() === 'operations') && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedSalesProperties];
+                                            updated[index].showCustomInput = true;
+                                            updated[index].dropdownOpen = false;
+                                            setSelectedSalesProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            color: 'var(--green-600)',
+                                            borderBottom: 'none'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--green-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                          }}
+                                        >
+                                          + Custom Stage
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -6287,7 +6325,7 @@ export default function Opportunities({ onPageChange }) {
                                               }
 
                                               updated[index].value = currentValues.join(',');
-                                              updated[index].dropdownOpen = true;
+                                              updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedSalesProperties(updated);
                                             }}
@@ -8296,9 +8334,16 @@ export default function Opportunities({ onPageChange }) {
                             color: 'var(--text)'
                           }}>{selectedDeal.contact_name}</div>
                         </div>
-                        <EditableDealField label="Account Name" value={selectedDeal.account_name || ''} fieldName="account_name" />
                         <div>
-                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Account Number</label>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            color: 'var(--text-3)',
+                            fontSize: '12px'
+                          }}>
+                            Account Name
+                          </label>
+
                           <div style={{
                             padding: '8px 12px',
                             background: 'var(--gray-100)',
@@ -8306,7 +8351,9 @@ export default function Opportunities({ onPageChange }) {
                             borderRadius: 'var(--r)',
                             fontSize: '12px',
                             color: 'var(--text)'
-                          }}>{selectedDeal.account_number || '-'}</div>
+                          }}>
+                            {selectedDeal.account_name || '-'}
+                          </div>
                         </div>
                         <EditableDealField label="Amount" value={selectedDeal.amount?.replace('₹', '') || ''} fieldName="deal_amount" type="number" />
                         <EditableDealField label="Closing Date" required={true} value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
@@ -8992,6 +9039,29 @@ export default function Opportunities({ onPageChange }) {
                       </div>
                     </>
                   )}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500' }}>
+                      Description
+                    </label>
+                    <textarea
+                      value={paidDealFormData.description}
+                      onChange={(e) => setPaidDealFormData({ ...paidDealFormData, description: e.target.value })}
+                      placeholder="Enter description (optional)"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        fontSize: '13px',
+                        outline: 'none',
+                        resize: 'vertical',
+                        backgroundColor: 'var(--surface)',
+                        color: 'var(--text)',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                   <button
@@ -9056,94 +9126,7 @@ export default function Opportunities({ onPageChange }) {
                 {/* Modal body */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-                  {/* Deal Information Section */}
-                  <div style={{
-                    padding: '16px',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r)'
-                  }}>
-                    <h3 style={{
-                      margin: '0 0 16px 0',
-                      color: 'var(--text)',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      borderBottom: '1px solid var(--border-soft)',
-                      paddingBottom: '8px'
-                    }}>
-                      Deal Information
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Name</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.deal_name || '-'}</div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal ID</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.deal_id || '-'}</div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.contact_name || '-'}</div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Amount</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.amount || '-'}</div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Closing Date</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.closing_date || '-'}</div>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Submitted By</label>
-                        <div style={{
-                          padding: '8px 12px',
-                          background: 'var(--gray-100)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          fontSize: '13px',
-                          color: 'var(--text)'
-                        }}>{greenTeamAssignmentDetails.submitted_by || '-'}</div>
-                      </div>
-                    </div>
-                  </div>
-
-
+                  
                   {/* Assignment Details Section */}
                   <div style={{
                     padding: '16px',
@@ -9281,7 +9264,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9381,7 +9366,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9503,7 +9490,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -9648,7 +9637,9 @@ export default function Opportunities({ onPageChange }) {
                             fontSize: '13px',
                             color: 'var(--text)',
                             lineHeight: '1.5',
-                            minHeight: '80px'
+                             minHeight: '80px',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
                           }}>{greenTeamAssignmentDetails.description || 'No description provided'}</div>
                         </div>
                       </div>
@@ -10168,32 +10159,17 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <select
+                                <AccountMultiSelect
                                   value={prop.value}
-                                  onChange={(e) => {
+                                  options={getUniqueValues(prop.property)}
+                                  onChange={(newValue) => {
                                     const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
+                                    updated[index].value = newValue;
                                     setSelectedProperties(updated);
                                   }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Cities</option>
-                                  {isFetchingFilterOptions ? (
-                                    <option value="" disabled>Loading options, please wait...</option>
-                                  ) : (
-                                    getUniqueValues(prop.property).map(value => (
-                                      <option key={value} value={value}>{value}</option>
-                                    ))
-                                  )}
-                                </select>
+                                  placeholder="Search cities..."
+                                  loading={isFetchingFilterOptions}
+                                />
                               </div>
                             </div>
                           </div>
@@ -10225,28 +10201,16 @@ export default function Opportunities({ onPageChange }) {
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <select
+                                <AccountMultiSelect
                                   value={prop.value}
-                                  onChange={(e) => {
+                                  options={getCreatedByOptions()}
+                                  onChange={(newValue) => {
                                     const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
+                                    updated[index].value = newValue;
                                     setSelectedProperties(updated);
                                   }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Created By</option>
-                                  {getCreatedByOptions().map(value => (
-                                    <option key={value} value={value}>{value}</option>
-                                  ))}
-                                </select>
+                                  placeholder="Search created by..."
+                                />
                               </div>
                             </div>
                           </div>
@@ -10342,7 +10306,7 @@ export default function Opportunities({ onPageChange }) {
                                             }
 
                                             updated[index].value = currentValues.join(',');
-                                            updated[index].dropdownOpen = true;
+                                            updated[index].dropdownOpen = false;
                                             updated[index].searchTerm = '';
                                             setSelectedProperties(updated);
                                           }}
@@ -11231,6 +11195,7 @@ export default function Opportunities({ onPageChange }) {
                             return Boolean(prop.value && String(prop.value).trim() !== '');
                           });
                           if (activeFilters.length > 0) {
+                            setFilterSidebarOpen(false);
                             handleCombinedFilters(activeFilters);
                           } else {
                             setIsApplyingAccountsFilters(false);
@@ -11301,7 +11266,9 @@ export default function Opportunities({ onPageChange }) {
 
       {/* Edit Dialog */}
       {showEditDialog && (
-        <div style={{
+        <div 
+        onClick={closeEditDialog}
+        style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -11313,7 +11280,9 @@ export default function Opportunities({ onPageChange }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div style={{
+          <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
             background: 'white',
             borderRadius: '8px',
             padding: '24px',

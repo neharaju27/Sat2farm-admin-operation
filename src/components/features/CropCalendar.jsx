@@ -16,7 +16,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchFarmDetails();
     } else if (farmId && !clientId) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     }
   }, [farmId, clientId]);
 
@@ -68,7 +68,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
 
       setFarmData({ ...farm, crop_type: cropType, Sowing_date: sowingDateRaw });
     } catch (err) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
 
       setCalendarData(response.data.data || response.data);
     } catch (err) {
-      setError('Report will be available soon');
+      setError('Data will be available soon');
     } finally {
       setLoading(false);
     }
@@ -208,7 +208,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
               Loading crop calendar...
             </div>
           ) : error ? (
-            <div style={{textAlign: 'center', padding: '40px', color: '#ef4444'}}>
+            <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
           ) : (

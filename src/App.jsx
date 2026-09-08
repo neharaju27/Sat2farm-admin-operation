@@ -24,6 +24,7 @@ import OperationDashboard from "./components/OperationDashboard";
 import SalesDashboard from "./components/SalesDashboard";
 import AllSalesData from "./components/AllSalesData";
 import Pricing from "./components/Pricing";
+import ProspectStatsCards from "./components/ProspectStatsCards";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -239,6 +240,8 @@ function App() {
           return <AllSalesData user={userDisplay} onPageChange={handlePageChange} />;
         case 'pricing':
           return <Pricing user={userDisplay} onPageChange={handlePageChange} />;
+        case 'prospect-stats':
+          return <ProspectStatsCards user={userDisplay} />;
         default:
           return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }

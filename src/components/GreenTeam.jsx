@@ -469,6 +469,26 @@ export default function GreenTeam({ onPageChange }) {
     }
   };
 
+  // Fetch deal details from the deals API
+  const fetchDealDetails = async (dealId) => {
+    try {
+      const DEALS_API_URL = 'https://api.sat2farm.com/deals/deals';
+      const currentUserName = user?.name || user?.phone_number || user?.username || 'Operation';
+      
+      const response = await axios.get(`${DEALS_API_URL}?deal_id=${dealId}&user=${encodeURIComponent(currentUserName)}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching deal details:', error);
+      return null;
+    }
+  };
+
   // Fetch Green Team assignments by stage
   const fetchGreenTeamAssignments = async () => {
     try {
@@ -860,6 +880,7 @@ export default function GreenTeam({ onPageChange }) {
     
     // Try to fetch fresh timeline data from API using the assignment ID
     const assignmentId = assignment.id?.toString() || assignment.deal_id?.toString();
+    const dealId = assignment.deal_id?.toString();
 
     
     if (assignmentId) {
@@ -894,6 +915,18 @@ export default function GreenTeam({ onPageChange }) {
           plan_6_months_acres: freshData.plan_6_months_acres || assignment.plan_6_months_acres || '',
           plan_12_months_acres: freshData.plan_12_months_acres || assignment.plan_12_months_acres || ''
         };
+        
+        // Fetch deal details from the deals API to populate deal information fields
+        if (dealId) {
+          const dealDetails = await fetchDealDetails(dealId);
+          if (dealDetails) {
+            // Update only the deal information fields that are present in the UI
+            updatedAssignment.deal_name = dealDetails.deal_name || updatedAssignment.deal_name;
+            updatedAssignment.contact_name = dealDetails.full_name || updatedAssignment.contact_name;
+            updatedAssignment.amount = dealDetails.deal_amount || updatedAssignment.amount;
+            updatedAssignment.closing_date = dealDetails.deal_close_date || updatedAssignment.closing_date;
+          }
+        }
         
         // Construct stage history from API timeline
         if (freshData.timeline && freshData.timeline.length > 0) {
