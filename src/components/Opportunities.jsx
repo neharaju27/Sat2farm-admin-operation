@@ -202,6 +202,7 @@ const StandaloneEditableAccountField = React.memo(({ label, value, fieldName, ty
 // Top-level Standalone EditableDealField component to keep DOM input alive across parent state updates (prevents cursor jumping)
 const StandaloneEditableDealField = React.memo(({
   label,
+  required,
   value,
   fieldName,
   type = 'text',
@@ -255,7 +256,14 @@ const StandaloneEditableDealField = React.memo(({
 
   return (
     <div ref={containerRef} data-editable-field>
-      {label && <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>{label}</label>}
+      {label && (
+        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+          {label}
+          {(required || ['Deal Name', 'Closing Date', 'Deal Stage', 'Stage', 'Deal Type'].includes(label)) && (
+            <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+          )}
+        </label>
+      )}
       <div style={{ display: 'flex', alignItems: type === 'textarea' ? 'flex-start' : 'center', gap: '8px' }}>
         {isEditing ? (
           <>
@@ -3482,10 +3490,6 @@ export default function Opportunities({ onPageChange }) {
 
   // CSV Import handler
   const handleCSVImport = () => {
-    toast('Note: Contact Name, Phone Number, Email, and Country are required fields in CSV import.', {
-      icon: 'ℹ️',
-      duration: 5000
-    });
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.csv,.xlsx,.xls';
@@ -3645,7 +3649,7 @@ export default function Opportunities({ onPageChange }) {
 
   // Editable deal field component
   // Editable Deal Field component (delegates to top-level StandaloneEditableDealField to prevent cursor jumping)
-  const EditableDealField = ({ label, value, fieldName, type = 'text', options = [] }) => {
+  const EditableDealField = ({ label, required, value, fieldName, type = 'text', options = [] }) => {
     const showCustomInput = fieldName === 'deal_type' ? showCustomDealTypeInput :
       fieldName === 'deal_stage' ? showCustomDealStageInput :
         fieldName === 'contact_owner' ? showCustomDealOwnerInput : false;
@@ -3663,6 +3667,7 @@ export default function Opportunities({ onPageChange }) {
       <StandaloneEditableDealField
         key={fieldName}
         label={label}
+        required={required}
         value={value}
         fieldName={fieldName}
         type={type}
@@ -7956,7 +7961,7 @@ export default function Opportunities({ onPageChange }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Closing Date</label>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Closing Date<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <input type="date" value={dealClosingDate} onChange={(e) => setDealClosingDate(e.target.value)}
                         style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }}
                       />
@@ -8027,7 +8032,7 @@ export default function Opportunities({ onPageChange }) {
                   <button
                     onClick={async () => {
                       if (isCreatingDeal) return;
-                      if (dealName && dealStage && dealType) {
+                      if (dealName && dealClosingDate && dealStage && dealType) {
                         setIsCreatingDeal(true);
                         try {
                           toast.loading('Creating deal...');
@@ -8279,7 +8284,7 @@ export default function Opportunities({ onPageChange }) {
                         Deal Details
                       </h3>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <EditableDealField label="Deal Name" value={selectedDeal.deal_name} fieldName="deal_name" />
+                        <EditableDealField label="Deal Name" required={true} value={selectedDeal.deal_name} fieldName="deal_name" />
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name</label>
                           <div style={{
@@ -8304,9 +8309,9 @@ export default function Opportunities({ onPageChange }) {
                           }}>{selectedDeal.account_number || '-'}</div>
                         </div>
                         <EditableDealField label="Amount" value={selectedDeal.amount?.replace('₹', '') || ''} fieldName="deal_amount" type="number" />
-                        <EditableDealField label="Closing Date" value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
-                        <EditableDealField label="Deal Type" value={selectedDeal.deal_type || ''} fieldName="deal_type" type="select" options={predefinedDealTypes} />
-                        <EditableDealField label="Deal Stage" value={selectedDeal.deal_stage || ''} fieldName="deal_stage" type="select" options={predefinedDealStages} />
+                        <EditableDealField label="Closing Date" required={true} value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
+                        <EditableDealField label="Deal Type" required={true} value={selectedDeal.deal_type || ''} fieldName="deal_type" type="select" options={predefinedDealTypes} />
+                        <EditableDealField label="Deal Stage" required={true} value={selectedDeal.deal_stage || ''} fieldName="deal_stage" type="select" options={predefinedDealStages} />
                         {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') ? (
                           <EditableDealField label="Deal Owner" value={selectedDeal.contact_owner || ''} fieldName="contact_owner" type="select" options={getContactOwnerOptions()} />
                         ) : (

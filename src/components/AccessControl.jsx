@@ -23,9 +23,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     'Alisha',
     'Shyamli',
     'Fathima',
-    'Rohith S',
-    'Supriyo',
-    'Purnima'
+    'Rohith S'
   ];
   
   // Get user name from various possible fields
@@ -55,13 +53,36 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'ops' &&
     role !== 'sales' &&
     role !== 'admin';
+
+  // Restrict CRM and Sales pages to only operation and sales roles
+  const isCrmOrSalesPage = [
+    'lead-pipeline',
+    'opportunities',
+    'sales-dashboard',
+    'all-sales-data',
+    'sales-clients',
+    'client-team',
+    'client-alloc',
+    'sales-acreage'
+  ].includes(currentPage);
+
+  const isCrmSalesRestricted = isCrmOrSalesPage && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' && 
+    role !== 'sales' &&
+    role !== 'admin';
   
-  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted) {
+  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted || isCrmSalesRestricted) {
     let descriptionText = "This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.";
     let alertTitle = "Login as Operations Required";
     let alertText = "To access this page, please log in with Operations credentials.";
 
-    if (isPricingRestricted) {
+    if (isCrmSalesRestricted) {
+      descriptionText = "CRM and Sales data pages are only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
+      alertTitle = "Permission Required";
+      alertText = "Your account role does not have permission to access CRM or Sales data.";
+    } else if (isPricingRestricted) {
       descriptionText = "This page is only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
       alertTitle = "Login as Operations or Sales Required";
       alertText = "To access this page, please log in with Operations or Sales credentials.";
