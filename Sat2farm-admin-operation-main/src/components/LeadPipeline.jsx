@@ -1,0 +1,8995 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronUp, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
+import toast from 'react-hot-toast';
+import satyuktLogo from '../assets/satyukt.webp';
+
+// Satyukt Full Page Loading Component (Matching User Mockup)
+const SatyuktLoader = ({ message, subtitle }) => (
+  <div className="satyukt-full-loader-wrapper">
+    <div className="satyukt-logo-spinner-outer">
+      <div className="satyukt-logo-spinner-ring" />
+      <div className="satyukt-logo-spinner-core">
+        <img src={satyuktLogo} alt="Satyukt" className="satyukt-logo-img" />
+      </div>
+    </div>
+    <h2 className="satyukt-loader-headline">
+      {message || 'Loading leads from Satyukt CRM...'}
+    </h2>
+    <p className="satyukt-loader-subtext">
+      {subtitle || 'Fetching your latest leads. This may take a few seconds.'}
+    </p>
+    <div className="satyukt-loader-progress-track">
+      <div className="satyukt-loader-progress-fill" />
+    </div>
+    <div className="satyukt-loader-caution">
+      <span className="satyukt-dot-green">•</span> Please don't close or refresh this page
+    </div>
+  </div>
+);
+
+// Satyukt Empty State Component (Matching User Mockup)
+const SatyuktEmptyState = ({ title, subtitle, onRefresh }) => (
+  <div className="satyukt-empty-state-wrapper">
+    <div className="satyukt-empty-icon-box">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="20" width="48" height="34" rx="6" fill="#22c55e" fillOpacity="0.15" />
+        <path d="M12 24C12 21.7909 13.7909 20 16 20H26L30 24H52C54.2091 24 56 25.7909 56 28V48C56 50.2091 54.2091 52 52 52H12V24Z" fill="#16a34a" />
+        <path d="M18 16H30L34 20H46C48.2091 20 50 21.7909 50 24V26H14V20C14 17.7909 15.7909 16 18 16Z" fill="#86efac" />
+        <circle cx="40" cy="40" r="9" fill="white" stroke="#0f172a" strokeWidth="3" />
+        <line x1="46" y1="46" x2="54" y2="54" stroke="#0f172a" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    </div>
+    <h3 className="satyukt-empty-title">{title || 'No leads to display'}</h3>
+    <p className="satyukt-empty-subtext">{subtitle || 'Leads from Satyukt CRM will appear here.'}</p>
+    {onRefresh && (
+      <button onClick={onRefresh} className="satyukt-empty-refresh-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+        Refresh
+      </button>
+    )}
+  </div>
+);
+
+// Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
+const parseDateRobust = (dateStr) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+  const str = String(dateStr).trim();
+  if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
+
+  // 1. Try DD-MM-YYYY HH:mm:ss or DD-MM-YYYY HH:mm or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dmyMatch) {
+    const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 2. Try YYYY-MM-DD HH:mm:ss or YYYY-MM-DD HH:mm
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (ymdMatch) {
+    const [, year, month, day, hours = '0', minutes = '0', seconds = '0'] = ymdMatch;
+    const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 3. Try standard JS Date parsing
+  let d = new Date(str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str);
+  if (!isNaN(d.getTime())) return d;
+
+  d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
+};
+
+const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', year: 'numeric' }, formatType = 'date') => {
+  if (!dateStr) return '-';
+  const d = parseDateRobust(dateStr);
+  if (!d) return (dateStr === 'Invalid Date' ? '-' : dateStr) || '-';
+  try {
+    return formatType === 'datetime' ? d.toLocaleString('en-IN', options) : d.toLocaleDateString('en-IN', options);
+  } catch (err) {
+    return dateStr || '-';
+  }
+};
+
+const formatDateToDDMMYYYY = (dateStr) => {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  if (!str) return '';
+  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) return str;
+  const parts = str.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(parts[2])}-${pad(parts[1])}-${parts[0]}`;
+  }
+  return str;
+};
+
+// Helper to extract clean, user-friendly error messages from API responses or error objects
+const extractErrorMessage = (error, defaultMsg = 'An error occurred') => {
+  if (!error) return defaultMsg;
+
+  let textToParse = error;
+
+  // If error is an Error object
+  if (error instanceof Error) {
+    textToParse = error.message || defaultMsg;
+  }
+
+  // If error is an object
+  if (typeof textToParse === 'object' && textToParse !== null) {
+    const obj = textToParse;
+    if (obj.message && obj.info) return `${obj.message}: ${obj.info}`;
+    if (obj.message) return obj.message;
+    if (obj.info) return obj.info;
+    if (obj.error) return typeof obj.error === 'string' ? obj.error : extractErrorMessage(obj.error, defaultMsg);
+    if (obj.detail) return obj.detail;
+  }
+
+  const str = String(textToParse).trim();
+
+  // Try parsing JSON substring if embedded in string like "HTTP error! status: 400 - { ... }"
+  const jsonMatch = str.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed) {
+        if (parsed.message && parsed.info) return `${parsed.message}: ${parsed.info}`;
+        if (parsed.message) return parsed.message;
+        if (parsed.info) return parsed.info;
+        if (parsed.error) return typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        if (parsed.detail) return parsed.detail;
+      }
+    } catch (e) { }
+  }
+
+  // Clean raw HTTP status string if present
+  let cleaned = str.replace(/^HTTP error! status: \d+\s*-\s*/i, '').trim();
+  if (cleaned && !cleaned.startsWith('<')) {
+    return cleaned;
+  }
+
+  return defaultMsg;
+};
+
+// Helper to format clean, human-readable filter descriptions (e.g. Created time before: 2026-09-17)
+const formatFilterDescription = (filter) => {
+  if (!filter) return '';
+
+  const rawProp = filter.property || '';
+  const propMap = {
+    'contact_owner': 'Contact owner',
+    'lead_status': 'Lead status',
+    'tag': 'Tags',
+    'tags': 'Tags',
+    'mailing_city': 'City',
+    'city': 'City',
+    'mailing_state': 'State',
+    'state': 'State',
+    'mailing_country': 'Country',
+    'country': 'Country',
+    'lead_source': 'Lead source',
+    'description': 'Description',
+    'created_by': 'Created by',
+    'modified_by': 'Modified by',
+    'created_time': 'Created time',
+    'modified_time': 'Modified time',
+    'untouched_records': 'Untouched records'
+  };
+
+  const propName = propMap[rawProp] || rawProp.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  if (rawProp === 'untouched_records') {
+    const fType = filter.filterType || filter.value;
+    if (fType === '15_days') return 'Untouched records: 15 Days';
+    if (fType === '30_days') return 'Untouched records: 30 Days';
+    if (fType === 'custom') {
+      if (filter.fromDate && filter.toDate) return `Untouched records: ${filter.fromDate} to ${filter.toDate}`;
+      return `Untouched records: Custom`;
+    }
+    return `Untouched records: ${fType || ''}`;
+  }
+
+  // Date Filters
+  if (rawProp === 'created_time' || rawProp === 'createdTime' || rawProp === 'modified_time' || rawProp === 'modifiedTime') {
+    const op = String(filter.dateOperator || 'on').toLowerCase().trim();
+    if (op === 'before') {
+      return `${propName} before: ${filter.value || filter.toDate || ''}`;
+    }
+    if (op === 'after') {
+      return `${propName} after: ${filter.value || filter.fromDate || ''}`;
+    }
+    if (op === 'between' || op === 'custom') {
+      if (filter.fromDate && filter.toDate) {
+        return `${propName} between: ${filter.fromDate} and ${filter.toDate}`;
+      }
+      return `${propName} between: ${filter.value || ''}`;
+    }
+    if (op === 'in_the_last' || op === 'in_last') {
+      const count = filter.count || 1;
+      const period = filter.period || 'days';
+      return `${propName} in the last: ${count} ${period}`;
+    }
+    if (op === 'on') {
+      return `${propName} on: ${filter.value || ''}`;
+    }
+    return `${propName} ${op}: ${filter.value || ''}`;
+  }
+
+  // Text / Choice Filters with operator (is, is not / isn't)
+  const opStr = String(filter.operator || 'is').toLowerCase().trim();
+  const isNot = opStr.includes('not') || opStr.includes("isn't") || opStr.includes('isnt') || opStr === 'is_not';
+  const opLabel = isNot ? 'is not' : 'is';
+
+  return `${propName} ${opLabel}: ${filter.value || ''}`;
+};
+
+// Top-level Standalone EditableLeadField component to keep DOM input alive across parent state updates (prevents cursor jumping)
+const StandaloneEditableLeadField = React.memo(({ label, value, fieldName, type = 'text', isEditing, editValue, setEditValue, startEditing, saveEdit, cancelEdit }) => {
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+  const isSavingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isEditing) {
+      isSavingRef.current = false;
+      const handleClickOutside = (event) => {
+        if (containerRef.current && !containerRef.current.contains(event.target)) {
+          cancelEdit();
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isEditing, cancelEdit]);
+
+  React.useEffect(() => {
+    if (isEditing && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    const val = inputRef.current ? inputRef.current.value : editValue;
+    saveEdit(val);
+  };
+
+  return (
+    <div ref={containerRef} data-editable-field>
+      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+        {label}
+      </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {isEditing ? (
+          <>
+            <input
+              ref={inputRef}
+              type={type}
+              defaultValue={editValue || ''}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+                if (e.key === 'Escape') cancelEdit();
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                border: '1px solid var(--green-600)',
+                borderRadius: 'var(--r)',
+                fontSize: '12px',
+                background: 'var(--surface)',
+                color: 'var(--text)'
+              }}
+            />
+            <button
+              onClick={handleSave}
+              style={{
+                padding: '4px 8px',
+                background: 'var(--green-600)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                fontSize: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Save"
+            ><Check size={14} style={{ color: 'white' }} /></button>
+            <button
+              onClick={cancelEdit}
+              style={{
+                padding: '4px 8px',
+                background: 'var(--gray-200)',
+                color: 'var(--text)',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              color: value ? 'var(--text)' : 'var(--text-3)',
+              fontStyle: value ? 'normal' : 'italic',
+              minHeight: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px',
+              borderRadius: 'var(--r)',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease'
+            }}
+            onClick={() => startEditing(fieldName, value)}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-100)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+          >
+            <span>{value || 'Not specified'}</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+              onMouseEnter={(e) => { e.target.style.opacity = '1'; }}
+              onMouseLeave={(e) => { e.target.style.opacity = '0'; }}
+            >
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// Helper to normalize user parameter for backend API
+const getApiUserName = (u) => {
+  const name = u?.name || u?.username || u?.phone_number || 'Operation';
+  if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
+    return 'Operation';
+  }
+  return name;
+};
+
+export default function LeadPipeline({ onPageChange }) {
+  const { user } = useAuth();
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(100);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [apiStatusSummary, setApiStatusSummary] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Predefined states initialized early for top-level memoization access
+  const [predefinedLeadStatuses, setPredefinedLeadStatuses] = useState(() => {
+    const defaultStatuses = ['New', 'Yet to Contact', 'Attempted to Contact', 'Contacted', 'Starter', 'Growth', 'Enterprise', 'Follow-up 1', 'Follow-up 2', 'In Discussion', 'Interested', 'Junk', 'Demo Scheduled'];
+    const saved = localStorage.getItem('predefinedLeadStatuses');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return Array.from(new Set([...defaultStatuses, ...parsed]));
+      } catch (e) { }
+    }
+    return defaultStatuses;
+  });
+
+  const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
+    const defaultAccountTypes = ['Customer', 'Prospect', 'Partner', 'Reseller', 'Vendor', 'Investor', 'Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Enterprise Client'];
+    const saved = localStorage.getItem('predefinedAccountTypes');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return Array.from(new Set([...defaultAccountTypes, ...parsed]));
+      } catch (e) { }
+    }
+    return defaultAccountTypes;
+  });
+
+  const [predefinedTags, setPredefinedTags] = useState(() => {
+    const saved = localStorage.getItem('predefinedTags');
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+  });
+
+  const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
+    const saved = localStorage.getItem('predefinedLeadSources');
+    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
+  });
+
+  const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
+    const saved = localStorage.getItem('predefinedIndustries');
+    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
+  });
+
+  const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
+    const apiDefaults = ['Akhil Kumar M', 'Alisha', 'Amith', 'Aymen', 'Bhagwati', 'Chaturya', 'Fathima', 'Harshitha', 'Lipsa', 'Mustaqeem', 'Operation', 'Partner_test', 'Pragya', 'Priyanshu', 'Rohini', 'Rohith S', 'Sat', 'Shurti', 'Shyamli', 'Testing operation acc', 'Testing sales acc', 'Vijay K B'];
+    const saved = localStorage.getItem('predefinedContactOwners');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { }
+    }
+    return apiDefaults;
+  });
+
+  // Save to localStorage when predefined values change
+  useEffect(() => {
+    localStorage.setItem('predefinedLeadStatuses', JSON.stringify(predefinedLeadStatuses));
+  }, [predefinedLeadStatuses]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedAccountTypes', JSON.stringify(predefinedAccountTypes));
+  }, [predefinedAccountTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedTags', JSON.stringify(predefinedTags));
+  }, [predefinedTags]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedLeadSources', JSON.stringify(predefinedLeadSources));
+  }, [predefinedLeadSources]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedIndustries', JSON.stringify(predefinedIndustries));
+  }, [predefinedIndustries]);
+
+  useEffect(() => {
+    localStorage.setItem('predefinedContactOwners', JSON.stringify(predefinedContactOwners));
+  }, [predefinedContactOwners]);
+
+  // Fetch dropdown options dynamically from backend API on mount (GET - Available to All Roles)
+  useEffect(() => {
+    let active = true;
+
+    const fetchAllDropdownOptions = async () => {
+      const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+
+      const categories = [
+        { name: 'lead_status', setter: setPredefinedLeadStatuses },
+        { name: 'industry', setter: setPredefinedIndustries },
+        { name: 'lead_source', setter: setPredefinedLeadSources },
+        { name: 'contact_owner', setter: setPredefinedContactOwners },
+        { name: 'tags', setter: setPredefinedTags },
+        { name: 'account_type', setter: setPredefinedAccountTypes }
+      ];
+
+      for (const cat of categories) {
+        try {
+          const res = await fetch(`${apiUrl}?category=${encodeURIComponent(cat.name)}`);
+          if (res.ok) {
+            const result = await res.json();
+            if (active && result && result.status && Array.isArray(result.data) && result.data.length > 0) {
+              cat.setter(result.data);
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching dropdown options for ${cat.name}:`, err);
+        }
+      }
+    };
+
+    fetchAllDropdownOptions();
+
+    return () => { active = false; };
+  }, []);
+
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isConverting, setIsConverting] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [customStatus, setCustomStatus] = useState('');
+  const [showCustomStatusInput, setShowCustomStatusInput] = useState(false);
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const [customOwner, setCustomOwner] = useState('');
+  const [showCustomOwnerInput, setShowCustomOwnerInput] = useState(false);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [tagsDropdownOpen, setTagsDropdownOpen] = useState(false);
+  const [customTags, setCustomTags] = useState('');
+  const [showCustomTagsInput, setShowCustomTagsInput] = useState(false);
+  const [leadSourceDropdownOpen, setLeadSourceDropdownOpen] = useState(false);
+  const [customLeadSource, setCustomLeadSource] = useState('');
+  const [showCustomLeadSourceInput, setShowCustomLeadSourceInput] = useState(false);
+  const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
+  const [customIndustry, setCustomIndustry] = useState('');
+  const [showCustomIndustryInput, setShowCustomIndustryInput] = useState(false);
+
+  // ── Edit dialog state ─────────────────────────────────────────────────────────
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editDialogField, setEditDialogField] = useState('');
+  const [editDialogValue, setEditDialogValue] = useState('');
+  const [editDialogRowId, setEditDialogRowId] = useState(null);
+  const [editDialogDropdownOpen, setEditDialogDropdownOpen] = useState(false);
+  const [showEditDialogCustomInput, setShowEditDialogCustomInput] = useState(false);
+  const [editDialogCustomValue, setEditDialogCustomValue] = useState('');
+
+  // ── Single Execution Guards & Loading States ─────────────────────────────
+  const pendingFieldUpdatesRef = useRef(new Set());
+  const isCreatingLeadRef = useRef(false);
+  const [isCreatingLead, setIsCreatingLead] = useState(false);
+  const isAddingNoteRef = useRef(false);
+  const updatingNoteIdRef = useRef(null);
+  const [updatingNoteId, setUpdatingNoteId] = useState(null);
+  const isAddingTaskRef = useRef(false);
+  const isUpdatingTaskRef = useRef(false);
+  const deletingActivityIdRef = useRef(null);
+  const [deletingActivityId, setDeletingActivityId] = useState(null);
+  const updatingActivityCreatedByRef = useRef(new Set());
+  const deletingLeadIdRef = useRef(null);
+  const [deletingLeadId, setDeletingLeadId] = useState(null);
+  const isImportingCSVRef = useRef(false);
+  const [isImportingCSV, setIsImportingCSV] = useState(false);
+  const isBulkUpdatingRef = useRef(false);
+  const isConvertingRef = useRef(false);
+  const isBulkDeletingRef = useRef(false);
+  const isSavingEditDialogRef = useRef(false);
+  const [isSavingEditDialog, setIsSavingEditDialog] = useState(false);
+
+  // Close filter property dropdowns when clicking anywhere outside
+  useEffect(() => {
+    const handleClickOutsidePropertyDropdown = (event) => {
+      const clickedContainer = event.target.closest('.filter-property-dropdown-container');
+      const clickedIndex = clickedContainer && clickedContainer.dataset.leadsIndex !== undefined
+        ? parseInt(clickedContainer.dataset.leadsIndex, 10)
+        : -1;
+
+      setSelectedProperties(prevProps => {
+        if (prevProps.some((p, i) => p && p.dropdownOpen && i !== clickedIndex)) {
+          return prevProps.map((p, i) => i === clickedIndex ? p : { ...p, dropdownOpen: false });
+        }
+        return prevProps;
+      });
+    };
+
+    document.addEventListener('mousedown', handleClickOutsidePropertyDropdown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsidePropertyDropdown);
+    };
+  }, []);
+
+  // ── Get predefined options for field ───────────────────────────────────────────
+  const getFieldOptions = (fieldName) => {
+    const optionMap = {
+      'leadStatus': Object.keys(statusConfig),
+      'industry': predefinedIndustries,
+      'contactOwner': getContactOwnerOptions(),
+      'leadSource': predefinedLeadSources,
+      'tags': predefinedTags
+    };
+    return optionMap[fieldName] || null;
+  };
+
+  const isFieldWithDropdown = (fieldName) => {
+    return getFieldOptions(fieldName) !== null;
+  };
+
+  // ── Edit dialog handlers ─────────────────────────────────────────────────────
+  const openEditDialog = (rowId, fieldName, currentValue) => {
+    setEditDialogRowId(rowId);
+    setEditDialogField(fieldName);
+    setEditDialogValue(currentValue);
+    setEditDialogDropdownOpen(false);
+    setShowEditDialogCustomInput(false);
+    setEditDialogCustomValue('');
+    setShowEditDialog(true);
+  };
+
+  const closeEditDialog = () => {
+    setShowEditDialog(false);
+    setEditDialogField('');
+    setEditDialogValue('');
+    setEditDialogRowId(null);
+    setEditDialogDropdownOpen(false);
+    setShowEditDialogCustomInput(false);
+    setEditDialogCustomValue('');
+  };
+
+  const handleEditDialogSave = async () => {
+    if (isSavingEditDialogRef.current || isSavingEditDialog) return;
+    const valueToSave = showEditDialogCustomInput ? editDialogCustomValue : editDialogValue;
+    if (!valueToSave.trim() || !editDialogRowId || !editDialogField) {
+      toast.error('Please enter a value');
+      return;
+    }
+
+    isSavingEditDialogRef.current = true;
+    setIsSavingEditDialog(true);
+
+    try {
+      await handleFieldUpdate(editDialogRowId, editDialogField, valueToSave.trim());
+
+      // Update predefined options if custom value was added
+      if (showEditDialogCustomInput && valueToSave.trim()) {
+        if (editDialogField === 'industry') {
+          setPredefinedIndustries([...predefinedIndustries, valueToSave.trim()]);
+          saveCustomDropdownOption('industry', valueToSave.trim());
+        } else if (editDialogField === 'contactOwner') {
+          setPredefinedContactOwners([...predefinedContactOwners, valueToSave.trim()]);
+          saveCustomDropdownOption('contact_owner', valueToSave.trim());
+        } else if (editDialogField === 'leadSource') {
+          setPredefinedLeadSources([...predefinedLeadSources, valueToSave.trim()]);
+          saveCustomDropdownOption('lead_source', valueToSave.trim());
+        } else if (editDialogField === 'tags') {
+          setPredefinedTags([...predefinedTags, valueToSave.trim()]);
+          saveCustomDropdownOption('tags', valueToSave.trim());
+        }
+      }
+
+      closeEditDialog();
+    } finally {
+      isSavingEditDialogRef.current = false;
+      setIsSavingEditDialog(false);
+    }
+  };
+
+  const handleEditDialogOptionSelect = (value) => {
+    setEditDialogValue(value);
+    setEditDialogDropdownOpen(false);
+  };
+
+  const handleEditDialogCustomInput = () => {
+    setEditDialogCustomValue(editDialogValue);
+    setShowEditDialogCustomInput(true);
+    setEditDialogDropdownOpen(false);
+  };
+
+  // ── Close all dropdowns when one is opened ─────────────────────────────────
+  const closeAllDropdowns = () => {
+    setStatusDropdownOpen(false);
+    setOwnerDropdownOpen(false);
+    setTagsDropdownOpen(false);
+    setLeadSourceDropdownOpen(false);
+    setIndustryDropdownOpen(false);
+  };
+
+  // ── Close dropdowns when clicking outside ─────────────────────────────────
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('[data-dropdown]')) {
+        closeAllDropdowns();
+      }
+      if (!event.target.closest('[data-editable-field]') && editingField) {
+        cancelEdit();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingField]);
+
+  // ── Tab state for modal right panel ──────────────────────────────────────
+  const [activeModalTab, setActiveModalTab] = useState('timeline');
+  const [showCreateDealModal, setShowCreateDealModal] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTaskField, setEditTaskField] = useState(null);
+  const [timelineData, setTimelineData] = useState([]); // Timeline data
+  const [timelineLoading, setTimelineLoading] = useState(false); // Timeline loading state
+  const [taskName, setTaskName] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskDueTime, setTaskDueTime] = useState('23:59');
+  const [taskOwner, setTaskOwner] = useState('');
+  const [taskStatus, setTaskStatus] = useState('');
+  const [noteInput, setNoteInput] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editNoteInput, setEditNoteInput] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [addingNote, setAddingNote] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
+
+  const [contactOwnerFilter, setContactOwnerFilter] = useState(() => {
+    try { return sessionStorage.getItem('lead_contactOwnerFilter') || ''; } catch (e) { return ''; }
+  });
+  const [contactOwnerFilterOperator, setContactOwnerFilterOperator] = useState('is');
+  const [isFilterApplied, setIsFilterApplied] = useState(() => {
+    try { return sessionStorage.getItem('lead_isFilterApplied') === 'true'; } catch (e) { return false; }
+  });
+  const [currentFilterCriteria, setCurrentFilterCriteria] = useState(() => {
+    try { return sessionStorage.getItem('lead_currentFilterCriteria') || ''; } catch (e) { return ''; }
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // what user types — does NOT trigger API
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [showRemainingSummary, setShowRemainingSummary] = useState(false);
+
+  // Fetch status summary metrics directly from backend API
+  useEffect(() => {
+    const fetchStatusSummary = async () => {
+      try {
+        const currentUserName = getApiUserName(user);
+        const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL || 'https://api.sat2farm.com/business/leads/status-summary';
+        const url = `${summaryApiUrl}?user=${encodeURIComponent(currentUserName)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setApiStatusSummary(data);
+        }
+      } catch (err) {
+        console.error('Error fetching lead status summary:', err);
+      }
+    };
+
+    fetchStatusSummary();
+  }, [user, refreshKey]);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [isLast50Mode, setIsLast50Mode] = useState(false);
+  const [newThisWeekFilter, setNewThisWeekFilter] = useState(false);
+  const [filterSidebarOpen, setFilterSidebarOpen] = useState(false);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const [filtersSuccess, setFiltersSuccess] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('lead_selectedProperties');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  }); // Array of {property, value, operator} objects
+  const [currentProperty, setCurrentProperty] = useState('');
+
+  // Save filter state to sessionStorage
+  useEffect(() => {
+    try {
+      if (isFilterApplied) {
+        sessionStorage.setItem('lead_selectedProperties', JSON.stringify(selectedProperties));
+        sessionStorage.setItem('lead_isFilterApplied', 'true');
+        sessionStorage.setItem('lead_currentFilterCriteria', currentFilterCriteria);
+        sessionStorage.setItem('lead_contactOwnerFilter', contactOwnerFilter);
+      } else {
+        sessionStorage.removeItem('lead_selectedProperties');
+        sessionStorage.removeItem('lead_isFilterApplied');
+        sessionStorage.removeItem('lead_currentFilterCriteria');
+        sessionStorage.removeItem('lead_contactOwnerFilter');
+      }
+    } catch (e) { }
+  }, [selectedProperties, isFilterApplied, currentFilterCriteria, contactOwnerFilter]);
+  const [showMoreDropdown, setShowMoreDropdown] = useState(false);
+  const [showUpdateFieldsModal, setShowUpdateFieldsModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedFieldToUpdate, setSelectedFieldToUpdate] = useState('');
+  const [updateFieldValue, setUpdateFieldValue] = useState('');
+  const [updateNewFieldValue, setUpdateNewFieldValue] = useState('');
+  const [convertAccountName, setConvertAccountName] = useState('');
+  const [convertWebsite, setConvertWebsite] = useState('');
+  const [convertAccountType, setConvertAccountType] = useState('');
+
+  // Helper to construct query parameter keys with _is or _is_not suffixes
+  const getFilterQueryParamKey = (property, operator = 'is') => {
+    const fieldMap = {
+      'contact_owner': 'owner',
+      'owner': 'owner',
+      'lead_status': 'status',
+      'status': 'status',
+      'tag': 'tags',
+      'tags': 'tags',
+      'lead_source': 'lead_source',
+      'mailing_city': 'city',
+      'city': 'city',
+      'mailing_state': 'state',
+      'state': 'state',
+      'mailing_country': 'country',
+      'country': 'country',
+      'description': 'description',
+      'created_by': 'created_by',
+      'modified_by': 'modified_by'
+    };
+    const baseKey = fieldMap[property] || property;
+    const opLower = String(operator || '').toLowerCase().trim();
+    const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+    const suffix = isNot ? '_is_not' : '_is';
+    return `${baseKey}${suffix}`;
+  };
+
+  // Fetch leads from API (standardized user, offset, limit and filter integration with graceful fallback)
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        setLoading(true);
+        const currentUserName = getApiUserName(user);
+
+        let url;
+        const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
+        const fetchLimit = limit;
+        const fetchOffset = offset;
+
+        const hasActiveFilter = (typeof isFilterApplied !== 'undefined' && isFilterApplied) ||
+          (typeof filterStatus !== 'undefined' && filterStatus !== 'all') ||
+          isSearching ||
+          (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) ||
+          (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter !== '') ||
+          (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0);
+
+        let response;
+        const searchApiUrl = import.meta.env.VITE_LEADS_SEARCH_API_URL;
+
+        let untouchedProp = null;
+        if (isFilterApplied && typeof selectedProperties !== 'undefined') {
+          untouchedProp = selectedProperties.find(p => p.property === 'untouched_records');
+        }
+
+        // 1. If untouched_records filter is active, call dedicated untouched leads endpoint
+        if (untouchedProp) {
+          try {
+            const untouchedBaseUrl = import.meta.env.VITE_UNTOUCHED_LEADS_API_URL || 'https://api.sat2farm.com/business/leads/untouched';
+            const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
+            const params = new URLSearchParams({
+              user: currentUserName,
+              filter_type: fType
+            });
+            if (fType === 'custom') {
+              if (untouchedProp.fromDate) params.append('from_date', untouchedProp.fromDate);
+              if (untouchedProp.toDate) params.append('to_date', untouchedProp.toDate);
+            }
+            url = `${untouchedBaseUrl}?${params.toString()}`;
+            console.log('Untouched leads API URL:', url);
+            response = await fetch(url);
+          } catch (untouchedErr) {
+            console.warn('Untouched leads API fetch failed, falling back:', untouchedErr);
+          }
+        }
+
+        // 2. If searching, call dedicated search endpoint: /business/leads/search?user=...&query=...&limit=...&offset=...
+        if ((!response || !response.ok) && isSearching && searchApiUrl) {
+          try {
+            const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&query=${encodeURIComponent(searchTerm.trim())}&limit=${fetchLimit}&offset=${fetchOffset}`;
+            console.log('Lead search URL:', searchUrl);
+            response = await fetch(searchUrl);
+          } catch (searchErr) {
+            console.warn('Dedicated search API failed, falling back to filter/leads API:', searchErr);
+          }
+        }
+
+        // 2. If not searching or dedicated search failed, call filter API if filters active
+        if ((!response || !response.ok) && hasActiveFilter && import.meta.env.VITE_FILTER_LEADS_API_URL) {
+          try {
+            const params = new URLSearchParams({
+              user: currentUserName,
+              offset: fetchOffset.toString(),
+              limit: fetchLimit.toString()
+            });
+
+            if (isSearching) {
+              params.append('query', searchTerm.trim());
+            }
+
+            if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
+              params.append('status_is', filterStatus);
+            }
+            if (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter) {
+              const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
+              const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+              const ownerKey = isNot ? 'owner_is_not' : 'owner_is';
+              params.append(ownerKey, contactOwnerFilter);
+            }
+            if (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) {
+              params.append('date_type', 'in_last');
+              params.append('last_count', '7');
+              params.append('last_unit', 'days');
+            }
+            if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
+              selectedProperties.forEach(p => {
+                if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+                  const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
+                  params.append('date_field', dateField);
+                  const op = p.dateOperator || 'on';
+                  params.append('date_type', op);
+
+                  const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
+                  const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
+                  const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
+
+                  if (op === 'between' || op === 'custom') {
+                    if (formattedFrom && formattedTo) {
+                      params.append('from', formattedFrom);
+                      params.append('to', formattedTo);
+                    } else if (formattedDate) {
+                      params.append('date', formattedDate);
+                    }
+                  } else if (formattedDate) {
+                    params.append('date', formattedDate);
+                  }
+                } else if (p.property && p.value) {
+                  const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+                  params.append(paramKey, p.value);
+                }
+              });
+            }
+            url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?${params.toString()}`;
+            response = await fetch(url);
+          } catch (filterErr) {
+            console.warn('Filter API fetch failed, falling back to main leads API:', filterErr);
+          }
+        }
+
+        // 3. Fallback to main leads URL
+        if (!response || !response.ok) {
+          url = `${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${fetchOffset}&limit=${fetchLimit}`;
+          response = await fetch(url);
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+
+
+        // Handle paginated API response structure
+        let leadsArray = data;
+        let totalCount = 0;
+
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          // API returns paginated response object with metadata
+
+          leadsArray = data.data || data.results || data.leads || data.items || data.records || data.rows || [];
+
+          // Fallback: find the first array property in the response
+          if (!Array.isArray(leadsArray) || leadsArray.length === 0) {
+            for (const key in data) {
+              if (Array.isArray(data[key]) && data[key].length > 0) {
+
+                leadsArray = data[key];
+                break;
+              }
+            }
+          }
+
+          totalCount = data.total || data.count || data.total_count || 0;
+          setTotalLeads(totalCount);
+          if (isLast50Mode && totalCount > 0) {
+            const calculatedOffset = Math.max(totalCount - 50, 0);
+            if (offset !== calculatedOffset) {
+              setOffset(calculatedOffset);
+            }
+          }
+        } else if (Array.isArray(data)) {
+          totalCount = data.length;
+          setTotalLeads(totalCount);
+        }
+
+        // Validate that data is an array before mapping
+        if (!Array.isArray(leadsArray)) {
+          console.error('API response is not an array:', data);
+          setLeads([]);
+          setError('Invalid data format received from server');
+          return;
+        }
+
+        // Transform API data to match component structure
+        const transformedLeads = leadsArray.map(lead => ({
+          id: lead.id,
+          contactName: lead.full_name || 'Unknown',
+          phoneNumber: lead.phone || '',
+          alternateNumber: lead.alternate_number || '',
+          email: lead.email || '',
+          companyName: lead.company_name || '',
+          contactOwner: lead.owner || 'Unassigned',
+          city: lead.city || '',
+          state: lead.state || '',
+          country: lead.country || 'IN',
+          leadStatus: lead.status || 'New',
+          tags: lead.tags || '',
+          leadSource: lead.lead_source || '',
+          description: lead.description || '',
+          createdTime: lead.created_time || new Date().toISOString(),
+          industry: lead.industry || '',
+          createdBy: lead.created_by || 'System',
+          modifiedBy: lead.modified_by || 'System',
+          lastActivity: lead.last_activity || new Date().toISOString()
+        }));
+
+        setLeads(transformedLeads);
+        setError(null);
+
+        // Show clean toast popup when filter finishes fetching
+        if (hasActiveFilter && !isSearching) {
+          const filterCount = totalCount !== undefined ? totalCount : transformedLeads.length;
+          toast.success(`Filter applied (${filterCount.toLocaleString()} records found)`, { id: 'filter-applied-toast' });
+        }
+      } catch (err) {
+        console.error('Error fetching leads:', err);
+        setError('Failed to load leads. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeads();
+  }, [offset, limit, user, isFilterApplied, filterStatus, searchTerm, newThisWeekFilter, contactOwnerFilter, refreshKey]);
+
+  const [allLeadsData, setAllLeadsData] = useState([]);
+
+  const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
+  const [filterFetchProgress, setFilterFetchProgress] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    const transformLead = (lead) => ({
+      id: lead.id,
+      contactName: lead.full_name || lead.contact_name || lead.name || '',
+      phoneNumber: lead.phone || lead.phone_number || '',
+      alternateNumber: lead.alternate_number || '',
+      email: lead.email || '',
+      companyName: lead.company_name || lead.company || '',
+      contactOwner: lead.owner || lead.contact_owner || lead.owner_name || '',
+      city: lead.city || lead.mailing_city || '',
+      state: lead.state || lead.mailing_state || '',
+      country: lead.country || lead.mailing_country || 'IN',
+      leadStatus: lead.status || lead.lead_status || '',
+      tags: lead.tags || lead.tag || '',
+      leadSource: lead.lead_source || lead.source || '',
+      description: lead.description || '',
+      createdTime: lead.created_time || lead.created_at || '',
+      industry: lead.industry || '',
+      createdBy: lead.created_by || lead.createdBy || lead.created_user || lead.creator || lead.created_by_name || '',
+      modifiedBy: lead.modified_by || lead.modifiedBy || lead.modified_user || lead.modifier || lead.modified_by_name || '',
+      lastActivity: lead.last_activity || lead.updated_at || '',
+      _raw: lead
+    });
+
+    const fetchAllLeadsForFilters = async () => {
+      if (active) {
+        setIsFetchingFilterOptions(false);
+        setFilterFetchProgress(100);
+      }
+    };
+
+    fetchAllLeadsForFilters();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Memoized unique values map with rich pre-filled defaults
+  const uniqueValuesMap = useMemo(() => {
+    const propertyMap = {
+      'contact_owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
+      'lead_status': ['leadStatus', 'status', 'lead_status'],
+      'tag': ['tags', 'tag'],
+      'mailing_country': ['country', 'mailing_country'],
+      'mailing_state': ['state', 'mailing_state'],
+      'mailing_city': ['city', 'mailing_city'],
+      'mailing_street': ['companyName', 'company_name', 'street'],
+      'created_by': ['createdBy', 'created_by', 'created_user', 'creator', 'created_by_name'],
+      'modified_by': ['modifiedBy', 'modified_by', 'modified_user', 'modifier', 'modified_by_name'],
+      'lead_source': ['leadSource', 'lead_source', 'source'],
+      'pipeline_stage': ['leadStatus', 'status'],
+      'contact_name': ['contactName', 'contact_name', 'full_name', 'name'],
+      'industry': ['industry'],
+      'account_type': ['accountType', 'account_type']
+    };
+
+    const defaultsMap = {
+      'lead_status': predefinedLeadStatuses,
+      'status': predefinedLeadStatuses,
+      'pipeline_stage': predefinedLeadStatuses,
+      'contact_owner': predefinedContactOwners,
+      'owner': predefinedContactOwners,
+      'tag': predefinedTags,
+      'tags': predefinedTags,
+      'lead_source': predefinedLeadSources,
+      'industry': predefinedIndustries,
+      'account_type': predefinedAccountTypes,
+      'mailing_country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore'],
+      'country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore']
+    };
+
+    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type'];
+
+    const sourceData = (allLeadsData && allLeadsData.length > 0) ? allLeadsData : leads;
+    const sets = {};
+    for (const key of Object.keys(propertyMap)) {
+      sets[key] = new Set(defaultsMap[key] || []);
+    }
+
+    for (let i = 0; i < sourceData.length; i++) {
+      const item = sourceData[i];
+      const raw = item._raw || {};
+
+      for (const [property, possibleFields] of Object.entries(propertyMap)) {
+        if (apiDropdownProps.includes(property) && defaultsMap[property] && defaultsMap[property].length > 0) {
+          continue;
+        }
+
+        const set = sets[property];
+        if (property === 'tag' || property === 'tags') {
+          const tagStr = item.tags || raw.tags || raw.tag || '';
+          if (tagStr && typeof tagStr === 'string') {
+            const parts = tagStr.split(',');
+            for (let j = 0; j < parts.length; j++) {
+              const t = parts[j].trim();
+              if (t) set.add(t);
+            }
+          }
+          continue;
+        }
+
+        for (let f = 0; f < possibleFields.length; f++) {
+          const field = possibleFields[f];
+          const val = item[field] || raw[field];
+          if (val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined') {
+            set.add(String(val).trim());
+          }
+        }
+      }
+    }
+
+    const result = {};
+    for (const [property, set] of Object.entries(sets)) {
+      result[property] = Array.from(set).sort((a, b) => a.localeCompare(b));
+    }
+    return result;
+  }, [allLeadsData, leads, predefinedLeadStatuses, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes]);
+
+  // Get unique values for a property — reads from memoized cache
+  const getUniqueValues = (property) => uniqueValuesMap[property] || [];
+
+  const getModifiedByOptions = () => {
+    return predefinedContactOwners || [];
+  };
+
+  const getCreatedByOptions = () => {
+    return predefinedContactOwners || [];
+  };
+
+  const getContactOwnerOptions = () => {
+    return predefinedContactOwners || [];
+  };
+
+  const getUniqueContactOwners = () => {
+    return getUniqueValues('contact_owner');
+  };
+
+  // Get unique tags from leads data
+  const getUniqueTags = () => {
+    const allTags = leads.flatMap(lead => {
+      if (lead.tags && lead.tags.trim()) {
+        return lead.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+      return [];
+    });
+    return [...new Set(allTags)].sort();
+  };
+
+  // Get icon for timeline field
+  const getTimelineIcon = (field) => {
+    const iconMap = {
+      'contactName': User,
+      'phoneNumber': Phone,
+      'email': Mail,
+      'companyName': Building,
+      'alternateNumber': Phone,
+      'city': MapPin,
+      'state': Map,
+      'country': Globe,
+      'leadStatus': Activity,
+      'industry': Briefcase,
+      'contactOwner': UserCheck,
+      'leadSource': TrendingUp,
+      'tags': Tag,
+      'notes': MessageSquare,
+      'description': FileText
+    };
+    const IconComponent = iconMap[field] || FileEdit;
+    return IconComponent;
+  };
+
+  // Add note using API
+  const handleAddNote = async () => {
+    if (isAddingNoteRef.current || addingNote) return;
+
+    if (!noteInput.trim()) {
+      toast.error('Please enter a note');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No lead selected');
+      return;
+    }
+
+    isAddingNoteRef.current = true;
+    setAddingNote(true);
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lead_id: String(selectedUser.id),
+          activity_type: 'note',
+          message: noteInput,
+          user: currentUserName
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding note:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+
+      if (result.success || result.message) {
+        toast.success('Note added successfully');
+        setNoteInput('');
+        // Refresh timeline to show the new note
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new note
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to add note');
+      }
+    } catch (err) {
+      console.error('Error adding note:', err);
+      toast.error('Failed to add note');
+    } finally {
+      isAddingNoteRef.current = false;
+      setAddingNote(false);
+    }
+  };
+
+  // Update note using API
+  const handleUpdateNote = async (noteId, updatedMessage) => {
+    if (updatingNoteIdRef.current === noteId || updatingNoteId === noteId) return;
+
+    if (!updatedMessage || !updatedMessage.trim()) {
+      toast.error('Please enter a note');
+      return;
+    }
+
+    updatingNoteIdRef.current = noteId;
+    setUpdatingNoteId(noteId);
+    const currentUserName = getApiUserName(user);
+    const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    try {
+      const payload = {
+        id: String(noteId),
+        activity_type: 'note',
+        message: updatedMessage.trim(),
+        user: currentUserName
+      };
+
+      const response = await fetch(activityApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating note:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message || result.id) {
+        toast.success('Note updated successfully');
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
+      } else {
+        toast.error('Failed to update note');
+      }
+    } catch (err) {
+      console.error('Error updating note:', err);
+      toast.error('Failed to update note');
+    } finally {
+      updatingNoteIdRef.current = null;
+      setUpdatingNoteId(null);
+    }
+  };
+
+  // Helper to format date strings for input
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return dateStr.slice(0, 10);
+    }
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
+
+  const formatTimeForInput = (dateStr, timeStr) => {
+    if (timeStr && /^\d{2}:\d{2}/.test(timeStr)) {
+      return timeStr.slice(0, 5);
+    }
+    if (dateStr && dateStr.includes('T')) {
+      const t = dateStr.split('T')[1];
+      if (t) return t.slice(0, 5);
+    }
+    if (dateStr && dateStr.includes(' ')) {
+      const parts = dateStr.split(' ');
+      if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
+        return parts[1].slice(0, 5);
+      }
+    }
+    return '23:59';
+  };
+
+  // Add task using API
+  const handleAddTask = async () => {
+    if (isAddingTaskRef.current || addingTask) return;
+
+    if ((!editTaskField || editTaskField === 'task_name') && (!taskName || !taskName.trim())) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'due_date') && (!taskDueDate || !taskDueDate.trim())) {
+      toast.error('Please select due date');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'status') && (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task Stage' || taskStatus === 'Choose a Task status')) {
+      toast.error('Please select status');
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error('No lead selected');
+      return;
+    }
+
+    isAddingTaskRef.current = true;
+    setAddingTask(true);
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lead_id: String(selectedUser.id),
+          activity_type: 'task',
+          task_name: taskName,
+          due_date: taskDueDate ? formatDateForInput(taskDueDate) : '',
+          due_time: taskDueTime ? taskDueTime.slice(0, 5) : '23:59',
+          status: taskStatus,
+          task_owner: currentUserName,
+          user: currentUserName
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error adding task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message) {
+        toast.success('Task created successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskDueTime('23:59');
+        setTaskStatus('');
+        setShowCreateTaskModal(false);
+        // Refresh timeline to show the new task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the new task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to create task');
+      }
+    } catch (err) {
+      console.error('Error adding task:', err);
+      toast.error('Failed to create task');
+    } finally {
+      isAddingTaskRef.current = false;
+      setAddingTask(false);
+    }
+  };
+
+  // Edit task - populate form with task data
+  const handleEditTask = (task, field = null) => {
+    setEditingTask(task);
+    setEditTaskField(field);
+    setTaskName(task.task_name || '');
+    setTaskDueDate(formatDateForInput(task.due_date));
+    setTaskDueTime(formatTimeForInput(task.due_date, task.due_time));
+    setTaskStatus(task.status || '');
+    setTaskOwner(task.task_owner || task.created_by || '');
+    setShowEditTaskModal(true);
+  };
+
+  // Update task using API
+  const handleUpdateTask = async () => {
+    if (isUpdatingTaskRef.current || addingTask) return;
+
+    if (!taskName || !taskName.trim()) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if (!taskDueDate || !taskDueDate.trim()) {
+      toast.error('Please select due date');
+      return;
+    }
+
+    if (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task Stage' || taskStatus === 'Choose a Task status') {
+      toast.error('Please select status');
+      return;
+    }
+
+    if (!editingTask) {
+      toast.error('No task selected');
+      return;
+    }
+
+    isUpdatingTaskRef.current = true;
+    setAddingTask(true);
+    const currentUserName = getApiUserName(user);
+    const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: String(editingTask.id),
+          activity_type: 'task',
+          task_name: taskName,
+          due_date: taskDueDate ? formatDateForInput(taskDueDate) : '',
+          due_time: taskDueTime ? taskDueTime.slice(0, 5) : '23:59',
+          status: taskStatus,
+          task_owner: editingTask.task_owner || editingTask.created_by || currentUserName,
+          user: currentUserName
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating task:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message) {
+        if (taskOwner && taskOwner !== editingTask.created_by) {
+          handleUpdateActivityCreatedBy(editingTask.id, taskOwner);
+        }
+
+        toast.success('Task updated successfully');
+        setTaskName('');
+        setTaskDueDate('');
+        setTaskDueTime('23:59');
+        setTaskStatus('');
+        setEditingTask(null);
+        setShowEditTaskModal(false);
+        // Refresh timeline to show the updated task
+        fetchTimeline(selectedUser.id);
+        // Refresh activities to show the updated task
+        fetchActivities(selectedUser.id);
+      } else {
+        toast.error('Failed to update task');
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
+      toast.error('Failed to update task');
+    } finally {
+      isUpdatingTaskRef.current = false;
+      setAddingTask(false);
+    }
+  };
+
+  // ── Fetch timeline data for a lead ─────────────────────────────────────────
+  const fetchTimeline = async (leadId) => {
+    if (!leadId) return;
+    setTimelineLoading(true);
+    try {
+      const timelineApiUrl = import.meta.env.VITE_LEAD_TIMELINE_API_URL;
+      const url = `${timelineApiUrl}?lead_id=${encodeURIComponent(leadId)}`;
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      const stored = localStorage.getItem('sat2farm_user');
+      if (stored) {
+        try {
+          const { jwt, token } = JSON.parse(stored);
+          const actualToken = jwt || token;
+          if (actualToken) {
+            headers['Authorization'] = `Bearer ${actualToken}`;
+          }
+        } catch (e) { }
+      }
+
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      const items = Array.isArray(data) ? data : (data.timeline || data.data || data.results || data.items || []);
+      setTimelineData(items);
+    } catch (error) {
+      console.error('Error fetching timeline:', error);
+      toast.error('Failed to fetch timeline');
+      setTimelineData([]);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  // Fetch activities from API
+  const fetchActivities = async (leadId) => {
+    if (!leadId) return;
+    try {
+      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL || 'https://api.sat2farm.com/business/leads/activity';
+      const currentUserName = getApiUserName(user);
+      const url = `${activityApiUrl}?lead_id=${encodeURIComponent(leadId)}&user=${encodeURIComponent(currentUserName)}`;
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      const stored = localStorage.getItem('sat2farm_user');
+      if (stored) {
+        try {
+          const { jwt, token } = JSON.parse(stored);
+          const actualToken = jwt || token;
+          if (actualToken) {
+            headers['Authorization'] = `Bearer ${actualToken}`;
+          }
+        } catch (e) { }
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        console.error('Error fetching activities:', response.status);
+        return;
+      }
+
+      const result = await response.json();
+      const activityList = Array.isArray(result) ? result : (result.activities || result.data || []);
+      setActivities(activityList);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  };
+
+  const handleDeleteActivity = async (activityId) => {
+    if (deletingActivityIdRef.current === activityId || deletingActivityId === activityId) return;
+    if (!window.confirm('Are you sure you want to delete this activity?')) return;
+
+    deletingActivityIdRef.current = activityId;
+    setDeletingActivityId(activityId);
+
+    try {
+      const currentUserName = getApiUserName(user);
+      const url = `${import.meta.env.VITE_LEAD_ACTIVITY_API_URL}?id=${activityId}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(url, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (result.success || result.message || response.ok) {
+        toast.success('Activity deleted successfully');
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting activity:', err);
+      toast.error('Failed to delete activity');
+    } finally {
+      deletingActivityIdRef.current = null;
+      setDeletingActivityId(null);
+    }
+  };
+
+  const handleUpdateActivityCreatedBy = async (activityId, newCreatedBy) => {
+    if (updatingActivityCreatedByRef.current.has(activityId)) return;
+    updatingActivityCreatedByRef.current.add(activityId);
+
+    try {
+      const currentUserName = getApiUserName(user);
+      const apiUrl = import.meta.env.VITE_UPDATE_ACTIVITY_CREATED_BY_API_URL;
+      const url = `${apiUrl}?id=${activityId}&created_by=${encodeURIComponent(newCreatedBy)}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(url, {
+        method: 'PUT'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (result.success || result.message || response.ok) {
+        toast.success('Activity author updated successfully');
+        if (selectedUser) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating activity created_by:', err);
+      toast.error('Failed to update activity author');
+    } finally {
+      updatingActivityCreatedByRef.current.delete(activityId);
+    }
+  };
+
+  const [statusConfig, setStatusConfig] = useState(() => {
+    const saved = localStorage.getItem('statusConfig');
+    return saved ? JSON.parse(saved) : {
+      'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
+      'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
+      'Contacted': { color: '#8b5cf6', label: 'Contacted' },
+      'Starter': { color: '#14b8a6', label: 'Starter' },
+      'Growth': { color: '#0ea5e9', label: 'Growth' },
+      'Enterprise': { color: '#6366f1', label: 'Enterprise' },
+      'Follow-up 1': { color: '#10b981', label: 'Follow-up 1' },
+      'Follow-up 2': { color: '#06b6d4', label: 'Follow-up 2' },
+      'In Discussion': { color: '#8b5cf6', label: 'In Discussion' },
+      'Interested': { color: '#10b981', label: 'Interested' },
+      'Junk': { color: '#ef4444', label: 'Junk' }
+    };
+  });
+
+  // Save to localStorage when statusConfig changes
+  useEffect(() => {
+    localStorage.setItem('statusConfig', JSON.stringify(statusConfig));
+  }, [statusConfig]);
+
+  const getLeadsByStatus = (status) => {
+    return leads.filter(lead => lead.leadStatus === status);
+  };
+
+  const STATUS_KEY_MAP = {
+    'yet_to_contact': 'Yet to Contact',
+    'attempted_to_contact': 'Attempted to Contact',
+    'contacted': 'Contacted',
+    'starter': 'Starter',
+    'growth': 'Growth',
+    'enterprise': 'Enterprise',
+    'follow_up_1': 'Follow-up 1',
+    'follow_up_2': 'Follow-up 2',
+    'in_discussion': 'In Discussion',
+    'interested': 'Interested',
+    'junk': 'Junk'
+  };
+
+  const getStatusSummary = () => {
+    if (apiStatusSummary && typeof apiStatusSummary === 'object' && !Array.isArray(apiStatusSummary)) {
+      const items = [];
+      Object.entries(apiStatusSummary).forEach(([key, count]) => {
+        if (typeof count === 'number') {
+          let status = STATUS_KEY_MAP[key.toLowerCase()];
+          if (!status) {
+            const cleanKey = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            const match = Object.keys(statusConfig).find(s => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === cleanKey);
+            if (match) {
+              status = match;
+            } else {
+              status = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            }
+          }
+
+          const label = statusConfig[status]?.label || status;
+          const color = statusConfig[status]?.color || '#6b7280';
+
+          items.push({
+            status,
+            count,
+            color,
+            label
+          });
+        }
+      });
+      return items;
+    }
+
+    const counts = {};
+    leads.forEach(lead => {
+      const status = lead.leadStatus || 'Unknown';
+      counts[status] = (counts[status] || 0) + 1;
+    });
+
+    const allowedStatuses = Object.keys(statusConfig);
+
+    const orderedStatuses = allowedStatuses.filter(status => counts[status] > 0);
+
+    return orderedStatuses.map(status => ({
+      status,
+      count: counts[status] || 0,
+      color: statusConfig[status]?.color || '#6b7280',
+      label: statusConfig[status]?.label || status
+    }));
+  };
+
+  const handleStatusSummaryClick = (status) => {
+    setFilterStatus(prev => (prev === status ? 'all' : status));
+    setOffset(0);
+  };
+
+  const getTotalValue = (status) => {
+    return leads
+      .filter(lead => lead.leadStatus === status)
+      .reduce((sum, lead) => sum + (lead.value || 0), 0);
+  };
+
+  const downloadCSV = async () => {
+    try {
+      // Show loading state
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = 'Downloading...';
+      button.disabled = true;
+
+      const currentUser = getApiUserName(user);
+      const response = await fetch(`${import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL}?user=${encodeURIComponent(currentUser)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+
+      // Create download link
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `leads_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Reset button state
+      button.textContent = originalText;
+      button.disabled = false;
+
+    } catch (err) {
+      console.error('Error downloading CSV:', err);
+      alert(`Failed to download CSV: ${err.message || 'Unknown error'}`);
+
+      // Reset button state on error
+      const button = event.target;
+      button.textContent = 'Download CSV';
+      button.disabled = false;
+    }
+  };
+
+  const isSearching = typeof searchTerm !== 'undefined' && searchTerm.trim() !== '';
+
+  const filteredLeads = leads.filter(lead => {
+    // 1. Search term matching across fields if client-side filtering needed
+    let matchesSearch = true;
+    if (isSearching) {
+      const q = searchTerm.trim().toLowerCase();
+      const nameMatch = (lead.contactName || '').toLowerCase().includes(q);
+      const phoneMatch = (lead.phoneNumber || '').includes(q) || (lead.alternateNumber || '').includes(q);
+      const emailMatch = (lead.email || '').toLowerCase().includes(q);
+      const companyMatch = (lead.companyName || '').toLowerCase().includes(q);
+      const ownerMatch = (lead.contactOwner || '').toLowerCase().includes(q);
+      const cityMatch = (lead.city || '').toLowerCase().includes(q);
+      const stateMatch = (lead.state || '').toLowerCase().includes(q);
+      const countryMatch = (lead.country || '').toLowerCase().includes(q);
+      const statusMatch = (lead.leadStatus || '').toLowerCase().includes(q);
+      const tagsMatch = (lead.tags || '').toLowerCase().includes(q);
+      const sourceMatch = (lead.leadSource || '').toLowerCase().includes(q);
+      const descMatch = (lead.description || '').toLowerCase().includes(q);
+
+      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || ownerMatch || cityMatch || stateMatch || countryMatch || statusMatch || tagsMatch || sourceMatch || descMatch;
+    }
+
+    const matchesStatus = filterStatus === 'all' || lead.leadStatus === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const displayedLeads = filteredLeads;
+  const effectiveTotalLeads = isSearching
+    ? (totalLeads === 0 ? 0 : (totalLeads || filteredLeads.length))
+    : (totalLeads || leads.length);
+
+  const statusSummary = getStatusSummary();
+
+  // Pagination - using server-side pagination
+  const totalPages = Math.ceil(effectiveTotalLeads / limit);
+  const currentPage = Math.floor(offset / limit) + 1;
+
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  const formatDate = (dateString) => {
+    return formatDateSafe(dateString);
+  };
+
+  const handleFieldUpdate = async (leadId, fieldName, newValue) => {
+    const updateKey = `${leadId}_${fieldName}`;
+    if (pendingFieldUpdatesRef.current.has(updateKey)) {
+      return;
+    }
+    pendingFieldUpdatesRef.current.add(updateKey);
+
+    toast.loading('Updating...', { id: 'field-update' });
+
+    try {
+      let url;
+      let successMessage;
+
+      const currentUserName = getApiUserName(user);
+      const targetLead = leads.find(l => String(l.id) === String(leadId)) ||
+        (selectedUser && String(selectedUser.id) === String(leadId) ? selectedUser :
+          (selectedLead && String(selectedLead.id) === String(leadId) ? selectedLead : {}));
+      const raw = targetLead._raw || {};
+
+      if (fieldName === 'city') {
+        url = `${import.meta.env.VITE_UPDATE_CITY_API_URL}?id=${leadId}&city=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `City updated to ${newValue} successfully!`;
+      } else if (fieldName === 'state') {
+        url = `${import.meta.env.VITE_UPDATE_STATE_API_URL}?id=${leadId}&state=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `State updated to ${newValue} successfully!`;
+      } else if (fieldName === 'country') {
+        url = `${import.meta.env.VITE_UPDATE_COUNTRY_API_URL}?id=${leadId}&country=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Country updated to ${newValue} successfully!`;
+      } else if (['contactName', 'phoneNumber', 'alternateNumber', 'email', 'companyName', 'description'].includes(fieldName)) {
+        const updateLeadApi = import.meta.env.VITE_UPDATE_LEAD_API_URL;
+
+        const fullName = fieldName === 'contactName' ? newValue : (targetLead.contactName || raw.full_name || raw.contact_name || raw.name || '');
+        const phone = fieldName === 'phoneNumber' ? newValue : (targetLead.phoneNumber || raw.phone || raw.phone_number || '');
+        const altPhone = fieldName === 'alternateNumber' ? newValue : (targetLead.alternateNumber || raw.alternate_number || '');
+        const email = fieldName === 'email' ? newValue : (targetLead.email || raw.email || '');
+        const companyName = fieldName === 'companyName' ? newValue : (targetLead.companyName || raw.company_name || raw.company || '');
+        const city = targetLead.city || raw.city || raw.mailing_city || '';
+        const state = targetLead.state || raw.state || raw.mailing_state || '';
+        const country = targetLead.country || raw.country || raw.mailing_country || '';
+        const description = fieldName === 'description' ? newValue : (targetLead.description || raw.description || '');
+
+        const params = new URLSearchParams({
+          id: String(leadId),
+          full_name: fullName,
+          phone: phone,
+          alternate_number: altPhone,
+          email: email,
+          company_name: companyName,
+          city: city,
+          state: state,
+          country: country,
+          description: description,
+          user: currentUserName
+        });
+
+        url = `${updateLeadApi}?${params.toString()}`;
+        successMessage = `${fieldName} updated successfully!`;
+      } else if (fieldName === 'leadStatus') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&new_status=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Lead status updated to ${newValue} successfully!`;
+      } else if (fieldName === 'industry') {
+        url = `${import.meta.env.VITE_UPDATE_INDUSTRY_API_URL}?id=${leadId}&industry=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Industry updated to ${newValue} successfully!`;
+      } else if (fieldName === 'contactOwner') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_OWNER_API_URL}?id=${leadId}&owner=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Contact owner updated to ${newValue} successfully!`;
+      } else if (fieldName === 'leadSource') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_SOURCE_API_URL}?id=${leadId}&lead_source=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Lead source updated to ${newValue} successfully!`;
+      } else if (fieldName === 'tags') {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_TAGS_API_URL}?id=${leadId}&tags=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Tags updated to ${newValue} successfully!`;
+      } else {
+        url = `${import.meta.env.VITE_UPDATE_LEAD_STATUS_API_URL}?id=${leadId}&${fieldName}=${encodeURIComponent(newValue)}&user=${encodeURIComponent(currentUserName)}`;
+        successMessage = `Lead ${fieldName} updated to ${newValue} successfully!`;
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      const stored = localStorage.getItem('sat2farm_user');
+      if (stored) {
+        try {
+          const { jwt, token } = JSON.parse(stored);
+          const actualToken = jwt || token;
+          if (actualToken) {
+            headers['Authorization'] = `Bearer ${actualToken}`;
+          }
+        } catch (e) { }
+      }
+
+      let response = await fetch(url, {
+        method: 'PUT',
+        headers
+      });
+
+      if (response.status === 405) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        const cleanMsg = extractErrorMessage(errorText, `Failed to update ${fieldName}`);
+        throw new Error(cleanMsg);
+      }
+
+      const result = await response.json();
+
+      const isSuccess = result.success || response.ok ||
+        result.message === 'updated' ||
+        (result.message && (result.message.toLowerCase().includes('updated') || result.message.toLowerCase().includes('success')));
+
+      if (isSuccess) {
+        const nowIso = new Date().toISOString();
+        // Update local state
+        setLeads(prevLeads =>
+          prevLeads.map(lead =>
+            String(lead.id) === String(leadId) ? { ...lead, [fieldName]: newValue, modifiedBy: currentUserName, lastActivity: nowIso } : lead
+          )
+        );
+
+        if (selectedUser && String(selectedUser.id) === String(leadId)) {
+          setSelectedUser(prev => ({ ...prev, [fieldName]: newValue, modifiedBy: currentUserName, lastActivity: nowIso }));
+          fetchTimeline(leadId);
+        }
+
+        if (selectedLead && String(selectedLead.id) === String(leadId)) {
+          setSelectedLead(prev => ({ ...prev, [fieldName]: newValue, modifiedBy: currentUserName, lastActivity: nowIso }));
+        }
+
+        const fieldMessages = {
+          'contactName': 'Contact name updated',
+          'phoneNumber': 'Phone number updated',
+          'email': 'Email updated',
+          'companyName': 'Company name updated',
+          'alternateNumber': 'Alternate phone number updated',
+          'city': 'City updated',
+          'state': 'State updated',
+          'country': 'Country updated',
+          'leadStatus': 'Lead status updated',
+          'industry': 'Industry updated',
+          'contactOwner': 'Contact owner updated',
+          'leadSource': 'Lead source updated',
+          'tags': 'Tags updated',
+          'description': 'Description updated'
+        };
+        toast.success(fieldMessages[fieldName] || successMessage, { id: 'field-update' });
+      } else {
+        console.error('API returned failure:', result);
+        const cleanMsg = extractErrorMessage(result, `Failed to update ${fieldName}`);
+        toast.error(cleanMsg, { id: 'field-update' });
+      }
+    } catch (err) {
+      console.error('Network error updating lead field:', err);
+      toast.error(extractErrorMessage(err, 'Failed to update field'), { id: 'field-update' });
+    } finally {
+      pendingFieldUpdatesRef.current.delete(updateKey);
+    }
+  };
+
+  const handleStatusUpdate = async (leadId, newStatus) => handleFieldUpdate(leadId, 'leadStatus', newStatus);
+  const handleOwnerUpdate = async (leadId, newOwner) => handleFieldUpdate(leadId, 'contactOwner', newOwner);
+  const handleTagsUpdate = async (leadId, newTags) => handleFieldUpdate(leadId, 'tags', newTags);
+  const handleLeadSourceUpdate = async (leadId, newLeadSource) => handleFieldUpdate(leadId, 'leadSource', newLeadSource);
+  const handleCityUpdate = async (leadId, newCity) => handleFieldUpdate(leadId, 'city', newCity);
+  const handleStateUpdate = async (leadId, newState) => handleFieldUpdate(leadId, 'state', newState);
+  const handleCountryUpdate = async (leadId, newCountry) => handleFieldUpdate(leadId, 'country', newCountry);
+  const handleIndustryUpdate = async (leadId, newIndustry) => handleFieldUpdate(leadId, 'industry', newIndustry);
+  const handleLeadInfoStatusUpdate = async (leadId, newStatus) => handleFieldUpdate(leadId, 'leadStatus', newStatus);
+  const handleAlternateNumberUpdate = async (leadId, newAlternateNumber) => handleFieldUpdate(leadId, 'alternateNumber', newAlternateNumber);
+
+  const startEditing = (fieldName, currentValue) => {
+    closeAllDropdowns();
+    setEditingField(fieldName);
+    setEditValue(currentValue || '');
+  };
+
+  const saveEdit = (val) => {
+    const valueToSave = val !== undefined ? val : editValue;
+    if (editingField && selectedUser && String(valueToSave).trim() !== '') {
+      handleFieldUpdate(selectedUser.id, editingField, String(valueToSave).trim());
+      setEditingField(null);
+      setEditValue('');
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  const handleDeleteLead = async (leadId) => {
+    if (deletingLeadIdRef.current === leadId || deletingLeadId === leadId) return;
+
+    // Confirm deletion
+    const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action cannot be undone.');
+    if (!confirmDelete) {
+      return;
+    }
+
+    deletingLeadIdRef.current = leadId;
+    setDeletingLeadId(leadId);
+
+    try {
+      const currentUserName = getApiUserName(user);
+      const url = `${import.meta.env.VITE_DELETE_LEAD_API_URL}?id=${leadId}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success || result.message === 'deleted' || response.ok) {
+
+        // Remove lead from local state
+        setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
+
+        // Close modals if they contain the deleted lead
+        if (selectedLead && selectedLead.id === leadId) {
+          setSelectedLead(null);
+        }
+        if (selectedUser && selectedUser.id === leadId) {
+          setSelectedUser(null);
+        }
+
+        alert('Lead deleted successfully!');
+      } else {
+        console.error('API returned failure:', result);
+        alert(`Failed to delete lead: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Network error deleting lead:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      deletingLeadIdRef.current = null;
+      setDeletingLeadId(null);
+    }
+  };
+
+  const handleContactOwnerFilter = async (owner, operator) => {
+
+    setLoading(true);
+
+    try {
+      let url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?`;
+
+      if (operator === 'is') {
+        url += `owner_is=${encodeURIComponent(owner)}`;
+      } else if (operator === 'is_not') {
+        url += `owner_is_not=${encodeURIComponent(owner)}`;
+      }
+
+
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+
+
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+
+
+      if (result.data && Array.isArray(result.data)) {
+
+
+        // Transform the filtered leads data
+        const transformedLeads = result.data.map(lead => ({
+          id: lead.id,
+          contactName: lead.full_name || 'Unknown',
+          phoneNumber: lead.phone || '',
+          alternateNumber: lead.alternate_number || '',
+          email: lead.email || '',
+          companyName: lead.company_name || '',
+          contactOwner: lead.owner || 'Unassigned',
+          city: lead.city || '',
+          state: lead.state || '',
+          country: lead.country || 'IN',
+          leadStatus: lead.status || 'New',
+          tags: lead.tags || '',
+          leadSource: lead.lead_source || '',
+          description: lead.description || '',
+          createdTime: lead.created_time || new Date().toISOString(),
+          industry: lead.industry || '',
+          createdBy: lead.created_by || 'System',
+          modifiedBy: lead.modified_by || 'System',
+          lastActivity: lead.last_activity || new Date().toISOString()
+        }));
+
+        setLeads(transformedLeads);
+        if (result && result.total !== undefined) {
+          setTotalLeads(result.total);
+        } else {
+          setTotalLeads(transformedLeads.length);
+        }
+        setOffset(0);
+        setError(null);
+
+        // Update filter state
+        setContactOwnerFilter(owner);
+        setContactOwnerFilterOperator(operator);
+        setIsFilterApplied(true);
+        setCurrentFilterCriteria(`Contact Owner ${operator === 'is_not' ? 'is not' : 'is'}: ${owner}`);
+
+        alert(`Leads filtered by contact owner ${operator} "${owner}" successfully! Found ${result.total || transformedLeads.length} records.`);
+      } else {
+        console.error('API returned unexpected format:', result);
+        alert(`Failed to filter leads: Unexpected response format`);
+      }
+    } catch (err) {
+      console.error('Network error filtering leads:', err);
+      alert(`Network error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFilteredCSVDownload = async () => {
+    try {
+      toast.loading('Downloading CSV...');
+      const currentUser = getApiUserName(user);
+
+      const params = new URLSearchParams({
+        user: currentUser
+      });
+
+      if (filterStatus && filterStatus !== 'all') {
+        params.append('status_is', filterStatus);
+      }
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('query', searchTerm.trim());
+      }
+      if (contactOwnerFilter) {
+        const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
+        const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+        const ownerKey = isNot ? 'owner_is_not' : 'owner_is';
+        params.append(ownerKey, contactOwnerFilter);
+      }
+      if (newThisWeekFilter) {
+        params.append('date_type', 'in_last');
+        params.append('last_count', '7');
+        params.append('last_unit', 'days');
+      }
+      if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
+        selectedProperties.forEach(p => {
+          if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+            const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
+            params.append('date_field', dateField);
+            const op = p.dateOperator || 'on';
+            params.append('date_type', op);
+
+            const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
+            const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
+            const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
+
+            if (op === 'between' || op === 'custom') {
+              if (formattedFrom && formattedTo) {
+                params.append('from', formattedFrom);
+                params.append('to', formattedTo);
+              } else if (formattedDate) {
+                params.append('date', formattedDate);
+              }
+            } else if (formattedDate) {
+              params.append('date', formattedDate);
+            }
+          } else if (p.property && p.value) {
+            const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+            params.append(paramKey, p.value);
+          }
+        });
+      }
+
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_LEADS_CSV_URL;
+      const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
+
+
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'No data available to download';
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed && parsed.message) {
+            errorMessage = parsed.message.toLowerCase().includes('no data')
+              ? 'No data available to download'
+              : parsed.message;
+          }
+        } catch (e) {
+          if (errorText && !errorText.startsWith('<') && !errorText.includes('HTTP error')) {
+            errorMessage = errorText;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const downloadBlobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadBlobUrl;
+      a.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadBlobUrl);
+      document.body.removeChild(a);
+      toast.dismiss();
+      toast.success('CSV downloaded successfully');
+    } catch (err) {
+      console.error('Network error downloading filtered CSV:', err);
+      toast.dismiss();
+      toast.error(err.message || 'No data available to download');
+    }
+  };
+
+  const handleContactNameUpdate = async (leadId, newContactName) => handleFieldUpdate(leadId, 'contactName', newContactName);
+
+  const handleCreateLead = async (leadData) => {
+    if (isCreatingLeadRef.current || isCreatingLead) return;
+    isCreatingLeadRef.current = true;
+    setIsCreatingLead(true);
+
+    toast.loading('Adding lead...', { id: 'create-lead' });
+
+    try {
+      const url = `${import.meta.env.VITE_CREATE_LEAD_API_URL}`;
+
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(leadData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        toast.dismiss('create-lead');
+        const cleanMsg = extractErrorMessage(errorText, 'Failed to create lead');
+        throw new Error(cleanMsg);
+      }
+
+      const result = await response.json();
+
+
+      if (result.success || result.message || response.ok) {
+        // Refresh the leads list
+        fetchLeads();
+        setShowAddModal(false);
+        toast.dismiss('create-lead');
+        toast.success('Lead created successfully!');
+      } else {
+        console.error('API returned failure:', result);
+        toast.dismiss('create-lead');
+        const cleanMsg = extractErrorMessage(result, 'Failed to create lead');
+        toast.error(cleanMsg);
+      }
+    } catch (err) {
+      console.error('Network error creating lead:', err);
+      toast.dismiss('create-lead');
+      const cleanMsg = extractErrorMessage(err, 'Failed to create lead');
+      toast.error(cleanMsg);
+    } finally {
+      isCreatingLeadRef.current = false;
+      setIsCreatingLead(false);
+    }
+  };
+
+  const handleCombinedFilters = (filters) => {
+    if (isApplyingFilters) return;
+    setIsApplyingFilters(true);
+    setFiltersSuccess(false);
+
+    // Update filter state so useEffect handles the single fetch call cleanly without status_is_not=junk
+    setSelectedProperties(filters);
+    setIsFilterApplied(true);
+    setOffset(0);
+    setRefreshKey(prev => prev + 1);
+
+    const filterDescriptions = (filters || []).map(filter => formatFilterDescription(filter)).filter(Boolean);
+    setCurrentFilterCriteria(filterDescriptions.join(', '));
+
+    setFiltersSuccess(true);
+    setTimeout(() => {
+      setFiltersSuccess(false);
+      setFilterSidebarOpen(false);
+      setIsApplyingFilters(false);
+    }, 300);
+  };
+
+
+
+  // Editable field component (delegates to top-level StandaloneEditableLeadField to prevent cursor jumping)
+  const EditableField = ({ label, value, fieldName, type = 'text' }) => (
+    <StandaloneEditableLeadField
+      key={fieldName}
+      label={label}
+      value={value}
+      fieldName={fieldName}
+      type={type}
+      isEditing={editingField === fieldName}
+      editValue={editValue}
+      setEditValue={setEditValue}
+      startEditing={startEditing}
+      saveEdit={saveEdit}
+      cancelEdit={cancelEdit}
+    />
+  );
+
+  const handleCSVImport = async (file) => {
+    if (isImportingCSVRef.current || isImportingCSV) return;
+    isImportingCSVRef.current = true;
+    setIsImportingCSV(true);
+
+    toast.dismiss();
+    const toastId = 'csv-import-toast';
+    toast.loading('Uploading CSV...', { id: toastId });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('csv_file', file);
+      formData.append('user', getApiUserName(user));
+      formData.append('contact_owner', getApiUserName(user));
+
+
+      const currentUserName = getApiUserName(user);
+      const response = await fetch(`${import.meta.env.VITE_UPLOAD_CSV_API_URL}?user=${encodeURIComponent(currentUserName)}`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        const cleanMsg = extractErrorMessage(errorText, 'Failed to upload CSV');
+        throw new Error(cleanMsg);
+      }
+
+      const result = await response.json();
+
+
+      if (result.message === 'CSV processed' || result.success || result.total_added !== undefined) {
+
+        // Refresh leads data to show newly imported leads
+        await fetchLeads();
+        toast.success(`Successfully imported ${result.total_added || result.imported_count || result.count || 'unknown number of'} leads!`, { id: toastId, duration: 4000 });
+      } else {
+        console.error('API returned failure:', result);
+        const cleanMsg = extractErrorMessage(result, 'Failed to import CSV');
+        toast.error(cleanMsg, { id: toastId, duration: 6000 });
+      }
+    } catch (err) {
+      console.error('Error uploading CSV:', err);
+      const cleanMsg = extractErrorMessage(err, 'Error uploading CSV');
+      toast.error(cleanMsg, { id: toastId, duration: 6000 });
+    } finally {
+      isImportingCSVRef.current = false;
+      setIsImportingCSV(false);
+    }
+  };
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      const currentUserName = getApiUserName(user);
+      const response = await fetch(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodeURIComponent(currentUserName)}&offset=${offset}&limit=${limit}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      let leadsList = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        leadsList = data.data || data.results || data.leads || data.items || data.records || [];
+        if (data.total !== undefined) {
+          setTotalLeads(data.total);
+        }
+      } else if (Array.isArray(data)) {
+        leadsList = data;
+        setTotalLeads(data.length);
+      }
+
+      // Transform API data to match component structure
+      const transformedLeads = leadsList.map(lead => ({
+        id: lead.id,
+        contactName: lead.full_name || 'Unknown',
+        phoneNumber: lead.phone || '',
+        alternateNumber: lead.alternate_number || '',
+        email: lead.email || '',
+        companyName: lead.company_name || '',
+        contactOwner: lead.owner || 'Unassigned',
+        city: lead.city || '',
+        state: lead.state || '',
+        country: lead.country || 'IN',
+        leadStatus: lead.status || 'New',
+        tags: lead.tags || '',
+        leadSource: lead.lead_source || '',
+        description: lead.description || '',
+        createdTime: lead.created_time || new Date().toISOString(),
+        industry: lead.industry || '',
+        createdBy: lead.created_by || 'System',
+        modifiedBy: lead.modified_by || 'System',
+        lastActivity: lead.last_activity || new Date().toISOString()
+      }));
+
+      setLeads(transformedLeads);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching leads:', err);
+      setError('Failed to load leads. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  return (
+    <div className="main-full">
+      <div style={{ padding: '16px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '4px',
+          paddingBottom: '4px',
+          borderBottom: '1px solid var(--border)'
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              margin: '0 0 4px 0',
+              background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              Lead Pipeline
+            </h1>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+              Manage and track sales leads through the pipeline
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => {
+                // Show pop up message informing user about mandatory CSV columns
+                toast('Please ensure your CSV file includes the mandatory columns: Name, Country, Email, and Phone.', {
+                  id: 'csv-mandatory-columns-toast',
+                  icon: 'ℹ️',
+                  duration: 6000,
+                  style: {
+                    background: '#1e293b',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '500'
+                  }
+                });
+
+                // Create file input element
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.csv,.xlsx,.xls';
+                fileInput.onchange = (e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    // Handle CSV import
+                    handleCSVImport(file);
+                  }
+                };
+                fileInput.click();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                background: 'var(--green-600)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Upload size={16} />
+              Import CSV
+            </button>
+          </div>
+        </div>
+
+
+        {/* Search and Filter */}
+        <div style={{
+          display: 'flex',
+          gap: '16px',
+          marginBottom: '16px',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
+            <button
+              onClick={() => setFilterSidebarOpen(!filterSidebarOpen)}
+              style={{
+                padding: '10px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r)',
+                background: filterSidebarOpen ? 'var(--blue-600)' : 'var(--surface)',
+                color: filterSidebarOpen ? 'white' : 'var(--text)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Filters"
+            >
+              <Filter size={16} />
+            </button>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <Search size={16} style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#64748b',
+                pointerEvents: 'none'
+              }} />
+              <input
+                id="search-leads"
+                name="search-leads"
+                type="text"
+                placeholder="Search leads..."
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  // If user clears the input, also clear the actual search
+                  if (!e.target.value.trim()) {
+                    setSearchTerm('');
+                    setOffset(0);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchTerm(searchInput.trim());
+                    setOffset(0);
+                  }
+                }}
+                style={{
+                  width: '220px',
+                  height: '36px',
+                  padding: '8px 12px 8px 36px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r)',
+                  fontSize: '14px',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <button
+              onClick={() => {
+                setSearchTerm(searchInput.trim());
+                setOffset(0);
+              }}
+              style={{
+                padding: '0 14px',
+                height: '36px',
+                background: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--r)',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+              title="Search"
+            >
+              <Search size={14} /> Search
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-sm"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              padding: '5px 10px',
+              background: 'var(--green-600)',
+              color: '#fff',
+              border: '1px solid var(--green-600)',
+              borderRadius: 'var(--r)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--green-700)';
+              e.currentTarget.style.borderColor = 'var(--green-700)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--green-600)';
+              e.currentTarget.style.borderColor = 'var(--green-600)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Lead
+          </button>
+
+          <button
+            onClick={handleFilteredCSVDownload}
+            className="btn btn-sm"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              padding: '5px 10px',
+              background: 'var(--green-600)',
+              color: '#fff',
+              border: '1px solid var(--green-600)',
+              borderRadius: 'var(--r)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--green-700)';
+              e.currentTarget.style.borderColor = 'var(--green-700)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--green-600)';
+              e.currentTarget.style.borderColor = 'var(--green-600)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download CSV
+          </button>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={newThisWeekFilter}
+              onChange={(e) => {
+                setNewThisWeekFilter(e.target.checked);
+                setOffset(0);
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+            <span style={{ color: 'var(--text)', fontSize: '14px' }}>New This Week</span>
+          </label>
+        </div>
+
+        {/* More Dropdown Button - Shows when items are selected */}
+        {selectedRows.length > 0 && (
+          <div style={{ marginBottom: '16px', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>{selectedRows.length} item(s) selected</span>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowMoreDropdown(!showMoreDropdown)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                >
+                  More <ChevronDown size={16} />
+                </button>
+                {showMoreDropdown && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, minWidth: '160px' }}>
+                    {selectedRows.length === 1 && (
+                      <button
+                        onClick={() => {
+                          setShowMoreDropdown(false);
+                          setShowConvertModal(true);
+                          setConvertAccountName('');
+                          setConvertWebsite('');
+                          setConvertAccountType('');
+                        }}
+                        style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-100)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        Convert
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowMoreDropdown(false);
+                        setShowUpdateFieldsModal(true);
+                        setSelectedFieldToUpdate('');
+                        setUpdateFieldValue('');
+                      }}
+                      style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: 'var(--text)', borderBottom: '1px solid var(--border-soft)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-100)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      Update Fields
+                    </button>
+                    {user?.role === 'operation' && (
+                      <button
+                        onClick={() => {
+                          setShowMoreDropdown(false);
+                          setShowDeleteConfirmModal(true);
+                        }}
+                        style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--red-50)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Search Results Banner */}
+        {isSearching && !loading && (
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: 'var(--r)',
+            padding: '10px 16px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Search size={15} style={{ color: '#16a34a' }} />
+              <span style={{ color: '#15803d', fontSize: '14px', fontWeight: '500' }}>
+                Search results for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+              </span>
+              <span style={{ color: '#4ade80', fontSize: '13px' }}>
+                — {effectiveTotalLeads.toLocaleString()} {effectiveTotalLeads === 1 ? 'record' : 'records'} found
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSearchInput('');
+                setOffset(0);
+              }}
+              style={{ background: 'none', border: '1px solid #16a34a', borderRadius: 'var(--r)', padding: '3px 8px', color: '#16a34a', cursor: 'pointer', fontSize: '12px' }}
+            >
+              ✕ Clear
+            </button>
+          </div>
+        )}
+
+        {/* Filter Status Indicator */}
+        {isFilterApplied && !isSearching && (
+          <div style={{
+            background: 'var(--blue-50)',
+            border: '1px solid var(--blue-200)',
+            borderRadius: 'var(--r)',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Filter size={16} style={{ color: 'var(--blue-600)' }} />
+              <span style={{ color: 'var(--blue-600)', fontSize: '14px', fontWeight: '500' }}>
+                Filtered Results: {currentFilterCriteria}
+              </span>
+              <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>
+                ({loading ? '...' : (effectiveTotalLeads || 0).toLocaleString()} records found)
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setIsFilterApplied(false);
+                setCurrentFilterCriteria('');
+                setContactOwnerFilter('');
+                setContactOwnerFilterOperator('is');
+                // Clear filter sidebar selections
+                setSelectedProperties([]);
+                setCurrentProperty('');
+                setFilterStatus('all');
+                setNewThisWeekFilter(false);
+                setSearchTerm('');
+                setOffset(0);
+              }}
+              style={{
+                background: 'none',
+                border: '1px solid var(--blue-600)',
+                borderRadius: 'var(--r)',
+                padding: '4px 8px',
+                color: 'var(--blue-600)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <X size={12} />
+              Clear Filter
+            </button>
+          </div>
+        )}
+
+        {/* Lead Table */}
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 200px)',
+          overflowX: 'auto',
+          maxWidth: '100%',
+          flex: 1
+        }}>
+          <div style={{
+            overflowX: 'auto',
+            maxWidth: '100%',
+            flex: 1,
+            position: 'relative'
+          }}>
+            {loading && <div className="satyukt-top-loader-bar" />}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'separate',
+              borderSpacing: '0',
+              fontSize: '13px',
+              height: '100%'
+            }}>
+              <thead>
+                <tr style={{
+                  background: 'var(--gray-100)',
+                  borderBottom: '2px solid var(--border)'
+                }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11, width: '150px', maxWidth: '150px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.length === filteredLeads.length && filteredLeads.length > 0 && filteredLeads.every(lead => selectedRows.includes(lead.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRows(filteredLeads.map(lead => lead.id));
+                          } else {
+                            setSelectedRows(selectedRows.filter(id => !filteredLeads.find(lead => lead.id === id)));
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>Contact Name</span>
+                    </div>
+                  </th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Phone Number</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Alternate Number</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px' }}>Email</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px' }}>Company Name</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Contact Owner</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>City</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>State</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>Country</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Lead Status</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px' }}>Tags</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px' }}>Lead Source</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '200px', maxWidth: '200px' }}>Description</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Created Time</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Industry</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Created By</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Modified By</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Modified Time</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px' }}>Last Activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="19" style={{ padding: '0', background: '#fafafa' }}>
+                      <SatyuktLoader
+                        message={
+                          searchTerm
+                            ? `Searching leads for "${searchTerm}"...`
+                            : isFilterApplied
+                              ? `Filtering leads by applied criteria...`
+                              : `Loading leads from Satyukt CRM...`
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan="19" style={{
+                      textAlign: 'center',
+                      padding: '40px',
+                      color: 'var(--red-600)',
+                      fontSize: '14px'
+                    }}>
+                      {error}
+                    </td>
+                  </tr>
+                ) : filteredLeads.length === 0 ? (
+                  <tr>
+                    <td colSpan="19" style={{ padding: '0', background: '#ffffff' }}>
+                      <SatyuktEmptyState
+                        title="No leads to display"
+                        subtitle="Leads from Satyukt CRM will appear here."
+                        onRefresh={() => {
+                          setSearchTerm('');
+                          setSearchInput('');
+                          setIsFilterApplied(false);
+                          setCurrentFilterCriteria('');
+                          setSelectedProperties([]);
+                          setCurrentProperty('');
+                          setContactOwnerFilter('');
+                          setOffset(0);
+                          setRefreshKey(prev => prev + 1);
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  displayedLeads.map(lead => (
+                    <tr
+                      key={lead.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-soft)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--gray-50)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.includes(lead.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRows([...selectedRows, lead.id]);
+                              } else {
+                                setSelectedRows(selectedRows.filter(id => id !== lead.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <button
+                            onClick={() => {
+                              setSelectedUser(lead);
+                              setShowUserModal(true);
+                              fetchTimeline(lead.id);
+                              fetchActivities(lead.id);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--blue-600)',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              padding: '0',
+                              textAlign: 'left',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {lead.contactName}
+                          </button>
+                          <button onClick={() => openEditDialog(lead.id, 'contactName', lead.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto' }} title="Edit contact name">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.phoneNumber}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'phoneNumber', lead.phoneNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit phone number">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.alternateNumber}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'alternateNumber', lead.alternateNumber)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit alternate number">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '180px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'email', lead.email)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit email">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.companyName}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'companyName', lead.companyName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit company name">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.contactOwner}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'contactOwner', lead.contactOwner)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit contact owner">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.city}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'city', lead.city)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit city">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.state}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'state', lead.state)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit state">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.country}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'country', lead.country)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit country">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '4px 8px',
+                            borderRadius: 'var(--r)',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            background: `${statusConfig[lead.leadStatus]?.color || '#6b7280'}15`,
+                            color: statusConfig[lead.leadStatus]?.color || '#6b7280'
+                          }}>
+                            {lead.leadStatus}
+                          </span>
+                          <button onClick={() => openEditDialog(lead.id, 'leadStatus', lead.leadStatus)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit lead status">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lead.tags}
+                          </span>
+                          <button onClick={() => openEditDialog(lead.id, 'tags', lead.tags)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit tags">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '130px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.leadSource}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'leadSource', lead.leadSource)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit lead source">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', width: '200px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <div style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }} title={lead.description}>
+                            {lead.description}
+                          </div>
+                          <button onClick={() => openEditDialog(lead.id, 'description', lead.description)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Edit description">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {formatDateSafe(lead.createdTime)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.industry}</span>
+                          <button onClick={() => openEditDialog(lead.id, 'industry', lead.industry)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit industry">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.createdBy}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.modifiedBy}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {formatDateSafe(lead.lastActivity)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '120px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {formatDateSafe(lead.modifiedTime || lead.lastActivity)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && !error && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1px 10px',
+              borderTop: '1px solid #e5e7eb',
+              background: '#fff',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
+                <span>Records per page</span>
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  <select
+                    id="leads-per-page"
+                    name="leads-per-page"
+                    value={isLast50Mode && itemsPerPage === 50 ? 'last50' : itemsPerPage}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'last50') {
+                        setIsLast50Mode(true);
+                        setItemsPerPage(50);
+                        setLimit(50);
+                        const targetOffset = Math.max((totalLeads || 0) - 50, 0);
+                        setOffset(targetOffset);
+                      } else {
+                        setIsLast50Mode(false);
+                        const newItemsPerPage = Number(val);
+                        setItemsPerPage(newItemsPerPage);
+                        setLimit(newItemsPerPage);
+                        setOffset(0);
+                      }
+                    }}
+                    style={{
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      padding: '6px 32px 6px 14px',
+                      borderRadius: '20px',
+                      border: '1px solid #d1d5db',
+                      background: '#fff',
+                      fontSize: '13px',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      minWidth: '56px',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value="last50">Last 50</option>
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      color: '#9ca3af'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOffset((prev) => Math.max(prev - limit, 0));
+                  }}
+                  disabled={offset === 0 || leads.length === 0}
+                  aria-label="Previous page"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    padding: 0,
+                    background: 'none',
+                    border: 'none',
+                    color: offset === 0 || leads.length === 0 ? '#d1d5db' : '#6b7280',
+                    cursor: offset === 0 || leads.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+
+                <span style={{
+                  fontSize: '13px',
+                  color: '#374151',
+                  minWidth: '56px',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {filteredLeads.length === 0
+                    ? '0 to 0'
+                    : `${offset + 1} to ${Math.min(offset + limit, effectiveTotalLeads)} of ${effectiveTotalLeads}`}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOffset((prev) => prev + limit);
+                  }}
+                  disabled={offset + limit >= effectiveTotalLeads || leads.length === 0}
+                  aria-label="Next page"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    padding: 0,
+                    background: 'none',
+                    border: 'none',
+                    color: offset + limit >= effectiveTotalLeads || leads.length === 0 ? '#d1d5db' : '#6b7280',
+                    cursor: offset + limit >= effectiveTotalLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Status summary — horizontal footer bar */}
+        {!loading && !error && (
+          <div style={{
+            marginTop: '0',
+            padding: '8px 16px',
+            background: '#fff',
+            borderTop: '1px solid #e5e7eb',
+            flexShrink: 0
+          }}>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '20px 28px',
+              fontSize: '13px',
+              color: '#4b5563',
+              lineHeight: 1.4
+            }}>
+              <span style={{ color: '#4b5563', whiteSpace: 'nowrap' }}>
+                {isSearching ? '' : (
+                  <>
+                    Total Leads{' '}
+                    <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                    <strong style={{ color: '#111827', fontWeight: 600 }}>{effectiveTotalLeads}</strong>
+                  </>
+                )}
+              </span>
+
+              {(() => {
+                const contactedItem = statusSummary.find(item => item.status.toLowerCase() === 'contacted');
+                const primaryStatuses = contactedItem ? [contactedItem] : statusSummary.slice(0, 1);
+                const remainingStatuses = contactedItem
+                  ? statusSummary.filter(item => item.status.toLowerCase() !== 'contacted')
+                  : statusSummary.slice(1);
+
+                const hasActiveRemainingFilter = remainingStatuses.some(item => filterStatus === item.status);
+                const isRemainingExpanded = showRemainingSummary || hasActiveRemainingFilter;
+
+                const renderItem = ({ status, count, label }) => {
+                  const isActive = filterStatus === status;
+                  const itemContent = (
+                    <>
+                      {label}{' '}
+                      <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
+                      <strong style={{ color: '#111827', fontWeight: 600 }}>{count}</strong>
+                    </>
+                  );
+
+                  if (isActive) {
+                    return (
+                      <span
+                        key={status}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleStatusSummaryClick(status)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            border: 'none',
+                            background: '#dcfce7',
+                            color: '#374151',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontFamily: 'inherit',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {itemContent}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterStatus('all');
+                            setOffset(0);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            color: '#2563eb',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontFamily: 'inherit'
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => handleStatusSummaryClick(status)}
+                      title={`Filter by ${label}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: '#4b5563',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {itemContent}
+                    </button>
+                  );
+                };
+
+                return (
+                  <>
+                    {primaryStatuses.map(renderItem)}
+
+                    {remainingStatuses.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRemainingSummary(prev => !prev)}
+                        title={isRemainingExpanded ? "Hide details" : "Show remaining summary"}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 10px',
+                          borderRadius: '16px',
+                          border: '1px solid #d1d5db',
+                          background: isRemainingExpanded ? '#f3f4f6' : '#ffffff',
+                          color: '#374151',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <span>{isRemainingExpanded ? 'Hide Details' : `+ ${remainingStatuses.length} More`}</span>
+                        {isRemainingExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+
+                    {isRemainingExpanded && remainingStatuses.map(renderItem)}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Filter Sidebar */}
+        {filterSidebarOpen && (
+          <>
+            <style>{`@keyframes satyuktSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                zIndex: 999
+              }}
+              onClick={() => setFilterSidebarOpen(false)}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '320px',
+              background: 'var(--surface)',
+              borderRight: '1px solid var(--border)',
+              zIndex: 1000,
+              overflowY: 'auto'
+            }}>
+              <div style={{
+                padding: '20px',
+                borderBottom: '1px solid var(--border)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '16px', fontWeight: '600' }}>Filters</h3>
+                  <button
+                    onClick={() => setFilterSidebarOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '20px' }}>
+                {isFetchingFilterOptions && (
+                  <div style={{
+                    padding: '20px 16px',
+                    borderRadius: '10px',
+                    background: 'var(--gray-50, #f9fafb)',
+                    border: '1px solid var(--border)',
+                    marginTop: '4px'
+                  }}>
+                    <style>{`@keyframes filterSpin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{
+                        width: '16px', height: '16px', flexShrink: 0,
+                        border: '2px solid #3b82f6',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'filterSpin 0.7s linear infinite'
+                      }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', flex: 1 }}>
+                        Loading filters...
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#3b82f6',
+                        minWidth: '36px',
+                        textAlign: 'right'
+                      }}>
+                        {filterFetchProgress}%
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '5px',
+                      background: 'var(--border, #e5e7eb)',
+                      borderRadius: '99px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${filterFetchProgress}%`,
+                        background: 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                        borderRadius: '99px',
+                        transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
+                {!isFetchingFilterOptions && (
+                  <>
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Property</label>
+                      <select
+                        value={currentProperty}
+                        onChange={(e) => {
+                          const property = e.target.value;
+                          if (property && !selectedProperties.find(p => p.property === property)) {
+                            const newProperty = {
+                              property,
+                              value: property === 'untouched_records' ? '15_days' : '',
+                              filterType: property === 'untouched_records' ? '15_days' : '',
+                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                            };
+                            if (property === 'created_time' || property === 'modified_time') {
+                              newProperty.dateOperator = 'on';
+                            }
+                            setSelectedProperties([...selectedProperties, newProperty]);
+                          }
+                          setCurrentProperty('');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          fontSize: '13px',
+                          background: 'var(--surface)',
+                          color: 'var(--text)'
+                        }}
+                      >
+                        <option value="">Choose Property</option>
+                        <option value="contact_owner">Contact Owner</option>
+                        <option value="created_time">Created Time</option>
+                        <option value="lead_status">Lead Status</option>
+                        <option value="tag">Tag</option>
+                        <option value="mailing_country">Mailing Country</option>
+                        <option value="mailing_state">Mailing State</option>
+                        <option value="created_by">Created By</option>
+                        <option value="lead_source">Lead Source</option>
+                        <option value="mailing_city">Mailing City</option>
+                        <option value="modified_by">Modified By</option>
+                        <option value="modified_time">Modified Time</option>
+                        <option value="untouched_records">Untouched Records</option>
+                      </select>
+                    </div>
+
+
+                    {/* Selected Properties */}
+                    {selectedProperties.map((prop, index) => (
+                      <div key={index} style={{ marginBottom: '24px', position: 'relative' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '8px'
+                        }}>
+                          <label style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>
+                            {prop.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </label>
+                          <button
+                            onClick={() => {
+                              setSelectedProperties(selectedProperties.filter((_, i) => i !== index));
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-3)',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              borderRadius: 'var(--r)'
+                            }}
+                            title="Remove filter"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        {/* Contact Name special case with is/isn't and search */}
+                        {prop.property === 'contact_name' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
+                                value={prop.searchTerm || prop.value || ''}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].searchTerm = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                placeholder="Search contact name..."
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)',
+                                  minWidth: '80px'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            {prop.value && (
+                              <div style={{
+                                marginTop: '8px',
+                                fontSize: '12px',
+                                color: 'var(--text-3)',
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '4px'
+                              }}>
+                                <span style={{
+                                  background: 'var(--blue-600)15',
+                                  color: 'var(--blue-600)',
+                                  padding: '2px 6px',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '11px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value}
+                                  <button
+                                    onClick={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].value = '';
+                                      updated[index].searchTerm = '';
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--blue-600)',
+                                      cursor: 'pointer',
+                                      padding: '0',
+                                      fontSize: '12px',
+                                      lineHeight: '1',
+                                      borderRadius: '50%',
+                                      width: '14px',
+                                      height: '14px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title={`Remove ${prop.value}`}
+                                  ><X size={12} /></button>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Contact Owner special case with searchable dropdown and is/isn't */}
+                        {prop.property === 'contact_owner' && (
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search contact owners..."
+                                  value={prop.searchTerm || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && prop.searchTerm && prop.searchTerm.trim()) {
+                                      e.preventDefault();
+                                      const typedVal = prop.searchTerm.trim();
+                                      const updated = [...selectedProperties];
+                                      const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                      if (!currentValues.includes(typedVal)) {
+                                        currentValues.push(typedVal);
+                                      }
+                                      updated[index].value = currentValues.join(',');
+                                      updated[index].dropdownOpen = false;
+                                      updated[index].searchTerm = '';
+                                      setSelectedProperties(updated);
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getUniqueValues(prop.property)
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      ><X size={12} /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lead Status special case with Is/Is Not and multiple selection */}
+                        {prop.property === 'lead_status' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search lead status..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {[
+                                        'Yet to Contact',
+                                        'Attempted to Contact',
+                                        'Contacted',
+                                        'Starter',
+                                        'Growth',
+                                        'Enterprise',
+                                        'Follow-up 1',
+                                        'Follow-up 2',
+                                        'In Discussion',
+                                        'Interested',
+                                        'Junk'
+                                      ].filter(status => !prop.searchTerm || status.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(status => (
+                                          <div
+                                            key={status}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(status)) {
+                                                const indexToRemove = currentValues.indexOf(status);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(status);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(status) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(status) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{status}</span>
+                                              {prop.value && prop.value.includes(status) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((status, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {status}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(status);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${status}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tag special case with Is/Is Not and multiple selection */}
+                        {prop.property === 'tag' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search tags..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {[
+                                        'Sat2Farm Recurring',
+                                        'Sat2Farm Non Recurring',
+                                        'Sat2Farm Exclusivity',
+                                        'Sat4Agri',
+                                        'Sat4Risk',
+                                        'Project',
+                                        'WhiteLabelling',
+                                        'API Client',
+                                        'Positive response'
+                                      ].filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(tag => (
+                                          <div
+                                            key={tag}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(tag)) {
+                                                const indexToRemove = currentValues.indexOf(tag);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(tag);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(tag) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(tag) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{tag}</span>
+                                              {prop.value && prop.value.includes(tag) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((tag, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {tag}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(tag);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${tag}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mailing Country special case with Is/Is Not/Contains and multiple selection */}
+                        {prop.property === 'mailing_country' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search countries..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(country => (
+                                          <div
+                                            key={country}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(country)) {
+                                                const indexToRemove = currentValues.indexOf(country);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(country);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{country}</span>
+                                              {prop.value && prop.value.includes(country) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((country, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {country}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(country);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${country}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mailing State special case with Is/Is Not/Contains and multiple selection */}
+                        {prop.property === 'mailing_state' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search states..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(state => (
+                                          <div
+                                            key={state}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(state)) {
+                                                const indexToRemove = currentValues.indexOf(state);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(state);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{state}</span>
+                                              {prop.value && prop.value.includes(state) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((state, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {state}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(state);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${state}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mailing City special case with Is/Is Not/Contains and multiple selection */}
+                        {prop.property === 'mailing_city' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search cities..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(city => (
+                                          <div
+                                            key={city}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(city)) {
+                                                const indexToRemove = currentValues.indexOf(city);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(city);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{city}</span>
+                                              {prop.value && prop.value.split(',').includes(city) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').filter(Boolean).map((city, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {city}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(city);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${city}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'created_by' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Created By</option>
+                                  {getCreatedByOptions().map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'modified_by' && (
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ minWidth: '80px' }}>
+                              <select
+                                value={prop.operator || 'is'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].operator = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="is">is</option>
+                                <option value="isn't">isn't</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Search users..."
+                                  value={prop.searchTerm || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].searchTerm = e.target.value;
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onFocus={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  onClick={() => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].dropdownOpen = true;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                                {prop.dropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: 'var(--surface)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    zIndex: 10,
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    marginTop: '4px'
+                                  }}>
+                                    {getModifiedByOptions()
+                                      .filter(owner => !prop.searchTerm || owner.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      .map(owner => (
+                                        <div
+                                          key={owner}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                            if (currentValues.includes(owner)) {
+                                              const indexToRemove = currentValues.indexOf(owner);
+                                              currentValues.splice(indexToRemove, 1);
+                                            } else {
+                                              currentValues.push(owner);
+                                            }
+
+                                            updated[index].value = currentValues.join(',');
+                                            updated[index].dropdownOpen = true;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: 'var(--text)',
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'var(--gray-100)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = prop.value && prop.value.includes(owner) ? 'var(--blue-600)15' : 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>{owner}</span>
+                                            {prop.value && prop.value.includes(owner) && (
+                                              <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                              {prop.value && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  fontSize: '12px',
+                                  color: 'var(--text-3)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: '4px'
+                                }}>
+                                  {prop.value.split(',').map((owner, i) => (
+                                    <span key={i} style={{
+                                      background: 'var(--blue-600)15',
+                                      color: 'var(--blue-600)',
+                                      padding: '2px 6px',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '11px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {owner}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...selectedProperties];
+                                          const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                          const indexToRemove = currentValues.indexOf(owner);
+                                          if (indexToRemove > -1) {
+                                            currentValues.splice(indexToRemove, 1);
+                                            updated[index].value = currentValues.join(',');
+                                            setSelectedProperties(updated);
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: 'var(--blue-600)',
+                                          cursor: 'pointer',
+                                          padding: '0',
+                                          fontSize: '12px',
+                                          lineHeight: '1',
+                                          borderRadius: '50%',
+                                          width: '14px',
+                                          height: '14px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                        title={`Remove ${owner}`}
+                                      ><X size={12} /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'lead_source' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Lead Sources</option>
+                                  {getUniqueValues(prop.property).map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'description' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  placeholder="Enter description..."
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Created Time special case with advanced date filtering */}
+                        {prop.property === 'created_time' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                              <select
+                                value={prop.dateOperator || 'on'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].dateOperator = e.target.value;
+                                  updated[index].value = ''; // Reset values when operator changes
+                                  updated[index].fromDate = '';
+                                  updated[index].toDate = '';
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="on">On</option>
+                                <option value="before">Before</option>
+                                <option value="after">After</option>
+                                <option value="between">Between</option>
+                                <option value="custom">Custom</option>
+                              </select>
+                            </div>
+
+                            {/* On, Before, After - Single Date Picker */}
+                            {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                              <input
+                                type="date"
+                                value={prop.value || ''}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].value = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                            )}
+
+                            {/* Between / Custom - From Date and To Date */}
+                            {(prop.dateOperator === 'between' || prop.dateOperator === 'custom') && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+
+                          </div>
+                        )}
+
+                        {/* Modified Time special case with advanced date filtering */}
+                        {prop.property === 'modified_time' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                              <select
+                                value={prop.dateOperator || 'on'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].dateOperator = e.target.value;
+                                  updated[index].value = ''; // Reset values when operator changes
+                                  updated[index].fromDate = '';
+                                  updated[index].toDate = '';
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="on">On</option>
+                                <option value="before">Before</option>
+                                <option value="after">After</option>
+                                <option value="between">Between</option>
+                                <option value="custom">Custom</option>
+                              </select>
+                            </div>
+
+                            {/* On, Before, After - Single Date Picker */}
+                            {['on', 'before', 'after'].includes(prop.dateOperator) && (
+                              <input
+                                type="date"
+                                value={prop.value || ''}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  updated[index].value = e.target.value;
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              />
+                            )}
+
+                            {/* Between - From Date and To Date */}
+                            {prop.dateOperator === 'between' && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Untouched Records special case with 15_days / 30_days / Custom options */}
+                        {prop.property === 'untouched_records' && (
+                          <div>
+                            <div style={{ marginBottom: '8px' }}>
+                              <select
+                                value={prop.filterType || prop.value || '15_days'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  const val = e.target.value;
+                                  updated[index].filterType = val;
+                                  updated[index].value = val;
+                                  if (val !== 'custom') {
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                  }
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="15_days">15 Days</option>
+                                <option value="30_days">30 Days</option>
+                                <option value="custom">Custom Date Range</option>
+                              </select>
+                            </div>
+
+                            {(prop.filterType === 'custom' || prop.value === 'custom') && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Activities special case with Is/Is Not dropdown */}
+                        {prop.property === 'activities' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">Select...</option>
+                                  <option value="has_activities">Has Activities</option>
+                                  <option value="no_activities">No Activities</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Other properties with text input */}
+                        {['description', 'mailing_street', 'notes', 'pipelines', 'pipeline_stage'].includes(prop.property) && (
+                          <input
+                            type="text"
+                            value={prop.value}
+                            onChange={(e) => {
+                              const updated = [...selectedProperties];
+                              updated[index].value = e.target.value;
+                              setSelectedProperties(updated);
+                            }}
+                            placeholder={`Enter ${prop.property.replace('_', ' ')}...`}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '13px',
+                              background: 'var(--surface)',
+                              color: 'var(--text)'
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setFilterStatus('all');
+                          setNewThisWeekFilter(false);
+                          setSearchTerm('');
+                          setSelectedProperties([]);
+                          setCurrentProperty('');
+                          setIsFilterApplied(false);
+                          setOffset(0);
+                          setCurrentFilterCriteria('');
+                          setContactOwnerFilter('');
+                          setContactOwnerFilterOperator('is');
+                          // Refetch all leads to show unfiltered results
+                          fetchLeads();
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Clear Filters
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Collect all active filters
+                          const activeFilters = [];
+
+                          // Add contact owner filter if configured
+                          const contactOwnerProp = selectedProperties.find(prop => prop.property === 'contact_owner');
+                          if (contactOwnerProp && contactOwnerProp.value) {
+                            const selectedOwners = contactOwnerProp.value.split(',');
+                            if (selectedOwners.length > 0) {
+                              // Send all selected owners as comma-separated values
+                              const ownersString = selectedOwners.join(',');
+                              activeFilters.push({
+                                property: 'contact_owner',
+                                value: ownersString,
+                                operator: contactOwnerProp.operator
+                              });
+                            }
+                          }
+
+                          // Add lead status filter if configured
+                          const leadStatusProp = selectedProperties.find(prop => prop.property === 'lead_status');
+                          if (leadStatusProp && leadStatusProp.value) {
+                            const selectedStatuses = leadStatusProp.value.split(',');
+                            if (selectedStatuses.length > 0) {
+                              // Send all selected statuses as comma-separated values
+                              const statusesString = selectedStatuses.join(',');
+                              activeFilters.push({
+                                property: 'lead_status',
+                                value: statusesString,
+                                operator: leadStatusProp.operator
+                              });
+                            }
+                          }
+
+                          // Add tag filter if configured
+                          const tagProp = selectedProperties.find(prop => prop.property === 'tag');
+                          if (tagProp && tagProp.value) {
+                            const selectedTags = tagProp.value.split(',');
+                            if (selectedTags.length > 0) {
+                              // Send all selected tags as comma-separated values
+                              const tagsString = selectedTags.join(',');
+                              activeFilters.push({
+                                property: 'tag',
+                                value: tagsString,
+                                operator: tagProp.operator
+                              });
+                            }
+                          }
+
+                          // Add mailing state filter if configured
+                          const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
+                          if (mailingStateProp && mailingStateProp.value) {
+                            const selectedStates = mailingStateProp.value.split(',');
+                            if (selectedStates.length > 0) {
+                              // Send all selected states as comma-separated values
+                              const statesString = selectedStates.join(',');
+                              activeFilters.push({
+                                property: 'mailing_state',
+                                value: statesString,
+                                operator: mailingStateProp.operator
+                              });
+                            }
+                          }
+
+                          // Add mailing country filter if configured
+                          const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
+                          if (mailingCountryProp && mailingCountryProp.value) {
+                            const selectedCountries = mailingCountryProp.value.split(',');
+                            if (selectedCountries.length > 0) {
+                              // Send all selected countries as comma-separated values
+                              const countriesString = selectedCountries.join(',');
+                              activeFilters.push({
+                                property: 'mailing_country',
+                                value: countriesString,
+                                operator: mailingCountryProp.operator
+                              });
+                            }
+                          }
+
+                          // Add created_by filter if configured
+                          const createdByProp = selectedProperties.find(prop => prop.property === 'created_by');
+                          if (createdByProp && createdByProp.value) {
+                            activeFilters.push({
+                              property: 'created_by',
+                              value: createdByProp.value,
+                              operator: createdByProp.operator || 'is'
+                            });
+                          }
+
+                          // Add modified_by filter if configured
+                          const modifiedByProp = selectedProperties.find(prop => prop.property === 'modified_by');
+                          if (modifiedByProp && modifiedByProp.value) {
+                            activeFilters.push({
+                              property: 'modified_by',
+                              value: modifiedByProp.value,
+                              operator: modifiedByProp.operator || 'is'
+                            });
+                          }
+
+                          // Add city filter if configured
+                          const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
+                          if (cityProp && cityProp.value) {
+                            activeFilters.push({
+                              property: 'mailing_city',
+                              value: cityProp.value,
+                              operator: cityProp.operator || 'is'
+                            });
+                          }
+
+                          // Add lead_source filter if configured
+                          const leadSourceProp = selectedProperties.find(prop => prop.property === 'lead_source');
+                          if (leadSourceProp && leadSourceProp.value) {
+                            activeFilters.push({
+                              property: 'lead_source',
+                              value: leadSourceProp.value,
+                              operator: leadSourceProp.operator || 'is'
+                            });
+                          }
+
+                          // Add description filter if configured
+                          const descriptionProp = selectedProperties.find(prop => prop.property === 'description');
+                          if (descriptionProp && descriptionProp.value) {
+                            activeFilters.push({
+                              property: 'description',
+                              value: descriptionProp.value,
+                              operator: descriptionProp.operator || 'is'
+                            });
+                          }
+
+                          // Add created_time filter if configured
+                          const createdTimeProp = selectedProperties.find(prop => prop.property === 'created_time');
+                          if (createdTimeProp) {
+                            if ((createdTimeProp.dateOperator === 'on' || createdTimeProp.dateOperator === 'before' || createdTimeProp.dateOperator === 'after') && createdTimeProp.value) {
+                              activeFilters.push({
+                                property: 'created_time',
+                                value: createdTimeProp.value,
+                                dateOperator: createdTimeProp.dateOperator
+                              });
+                            } else if ((createdTimeProp.dateOperator === 'between' || createdTimeProp.dateOperator === 'custom') && (createdTimeProp.fromDate && createdTimeProp.toDate || createdTimeProp.value)) {
+                              activeFilters.push({
+                                property: 'created_time',
+                                fromDate: createdTimeProp.fromDate,
+                                toDate: createdTimeProp.toDate,
+                                value: createdTimeProp.value,
+                                dateOperator: createdTimeProp.dateOperator
+                              });
+                            }
+                          }
+
+                          // Add modified_time filter if configured
+                          const modifiedTimeProp = selectedProperties.find(prop => prop.property === 'modified_time');
+                          if (modifiedTimeProp) {
+                            if ((modifiedTimeProp.dateOperator === 'on' || modifiedTimeProp.dateOperator === 'before' || modifiedTimeProp.dateOperator === 'after') && modifiedTimeProp.value) {
+                              activeFilters.push({
+                                property: 'modified_time',
+                                value: modifiedTimeProp.value,
+                                dateOperator: modifiedTimeProp.dateOperator
+                              });
+                            } else if ((modifiedTimeProp.dateOperator === 'between' || modifiedTimeProp.dateOperator === 'custom') && (modifiedTimeProp.fromDate && modifiedTimeProp.toDate || modifiedTimeProp.value)) {
+                              activeFilters.push({
+                                property: 'modified_time',
+                                fromDate: modifiedTimeProp.fromDate,
+                                toDate: modifiedTimeProp.toDate,
+                                value: modifiedTimeProp.value,
+                                dateOperator: modifiedTimeProp.dateOperator
+                              });
+                            }
+                          }
+
+                          // Add untouched_records filter if configured
+                          const untouchedProp = selectedProperties.find(prop => prop.property === 'untouched_records');
+                          if (untouchedProp) {
+                            const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
+                            activeFilters.push({
+                              property: 'untouched_records',
+                              filterType: fType,
+                              value: fType,
+                              fromDate: untouchedProp.fromDate || '',
+                              toDate: untouchedProp.toDate || ''
+                            });
+                          }
+
+                          // Apply all filters together in single API call
+                          if (activeFilters.length > 0) {
+                            handleCombinedFilters(activeFilters);
+                          } else {
+                            setFilterSidebarOpen(false);
+                          }
+                        }}
+                        disabled={isApplyingFilters || filtersSuccess}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          border: filtersSuccess ? '1px solid #10b981' : '1px solid var(--blue-600)',
+                          borderRadius: 'var(--r)',
+                          background: filtersSuccess ? '#10b981' : isApplyingFilters ? '#2563eb' : 'var(--blue-600)',
+                          color: 'white',
+                          cursor: (isApplyingFilters || filtersSuccess) ? 'not-allowed' : 'pointer',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          opacity: isApplyingFilters ? 0.85 : 1,
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {filtersSuccess ? (
+                          <>
+                            <Check size={14} /> Applied!
+                          </>
+                        ) : isApplyingFilters ? (
+                          <>
+                            <div style={{
+                              width: '13px',
+                              height: '13px',
+                              border: '2px solid rgba(255,255,255,0.4)',
+                              borderTopColor: '#ffffff',
+                              borderRadius: '50%',
+                              animation: 'satyuktSpin 0.7s linear infinite'
+                            }} />
+                            Applying...
+                          </>
+                        ) : (
+                          'Apply Filters'
+                        )}
+                      </button>
+                    </div>
+                  </>)}
+              </div>
+            </div>
+
+            {/* Overlay for sidebar */}
+            <div
+              onClick={() => setFilterSidebarOpen(false)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '320px',
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.3)',
+                zIndex: 999
+              }}
+            />
+          </>
+        )}
+
+        {/* User Information Modal */}
+        {showUserModal && selectedUser && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              position: 'relative',
+              background: 'var(--surface)',
+              borderRadius: '0',
+              width: '85%',
+              height: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '24px 24px 16px',
+                borderBottom: '1px solid var(--border)'
+              }}>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '20px',
+                  fontWeight: '700',
+                  color: 'var(--text)',
+                  fontFamily: 'var(--font-display)'
+                }}>
+                  Lead Information
+                </h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => {
+                      setShowConvertModal(true);
+                      setConvertAccountName('');
+                      setConvertWebsite('');
+                      setConvertAccountType('');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--green-600)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 'var(--r)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Convert
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUserModal(false);
+                      setSelectedUser(null);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-3)',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal body: two-column layout */}
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+                {/* ── Left panel: all editable sections ── */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Contact Information Section */}
+                  <div style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Contact Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <EditableField
+                        label="Contact Name"
+                        value={selectedUser.contactName}
+                        fieldName="contactName"
+                      />
+                      <EditableField
+                        label="Email"
+                        value={selectedUser.email}
+                        fieldName="email"
+                        type="email"
+                      />
+                      <EditableField
+                        label="Phone"
+                        value={selectedUser.phoneNumber}
+                        fieldName="phoneNumber"
+                        type="tel"
+                      />
+                      <EditableField
+                        label="Alternate Phone"
+                        value={selectedUser.alternateNumber}
+                        fieldName="alternateNumber"
+                        type="tel"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Company Information Section */}
+                  <div style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Company Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <EditableField
+                        label="Company Name"
+                        value={selectedUser.companyName}
+                        fieldName="companyName"
+                      />
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry Type</label>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text)',
+                              transition: 'background-color 0.2s ease'
+                            }}
+                            onClick={() => {
+                              closeAllDropdowns();
+                              setIndustryDropdownOpen(!industryDropdownOpen);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'var(--surface)';
+                            }}
+                          >
+                            <span>{selectedUser.industry || 'Select industry'}</span>
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
+                          </div>
+
+                          {industryDropdownOpen && (
+                            <div data-dropdown style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              zIndex: 10,
+                              marginTop: '4px',
+                              maxHeight: '200px',
+                              overflowY: 'auto'
+                            }}>
+                              {predefinedIndustries.map(industry => (
+                                <button
+                                  key={industry}
+                                  onClick={() => {
+                                    handleFieldUpdate(selectedUser.id, 'industry', industry);
+                                    setIndustryDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: 'var(--text)',
+                                    borderBottom: '1px solid var(--border-soft)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--gray-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  {industry}
+                                </button>
+                              ))}
+
+                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                <button
+                                  onClick={() => {
+                                    setShowCustomIndustryInput(true);
+                                    setIndustryDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'var(--green-600)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--green-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  + Custom
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showCustomIndustryInput && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: 'var(--green-50)',
+                              border: '1px solid var(--green-200)',
+                              borderRadius: 'var(--r)'
+                            }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={customIndustry}
+                                  onChange={(e) => setCustomIndustry(e.target.value)}
+                                  placeholder="Enter custom industry..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: '1px solid var(--green-300)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '12px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (customIndustry.trim()) {
+                                      handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim());
+                                      setPredefinedIndustries([...predefinedIndustries, customIndustry.trim()]);
+                                      saveCustomDropdownOption('industry', customIndustry.trim());
+                                      setCustomIndustry('');
+                                      setShowCustomIndustryInput(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--green-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCustomIndustry('');
+                                    setShowCustomIndustryInput(false);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--gray-200)',
+                                    color: 'var(--text)',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Information Section */}
+                  <div style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Location Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                      <EditableField
+                        label="City Name"
+                        value={selectedUser.city}
+                        fieldName="city"
+                      />
+                      <EditableField
+                        label="State Name"
+                        value={selectedUser.state}
+                        fieldName="state"
+                      />
+                      <EditableField
+                        label="Country Name"
+                        value={selectedUser.country}
+                        fieldName="country"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Lead Management Section */}
+                  <div style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Lead Management
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text)',
+                              transition: 'background-color 0.2s ease'
+                            }}
+                            onClick={() => {
+                              closeAllDropdowns();
+                              setStatusDropdownOpen(!statusDropdownOpen);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'var(--surface)';
+                            }}
+                          >
+                            <span>{selectedUser.leadStatus}</span>
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
+                          </div>
+
+                          {statusDropdownOpen && (
+                            <div data-dropdown style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              zIndex: 10,
+                              marginTop: '4px'
+                            }}>
+                              {Object.keys(statusConfig).map(status => (
+                                <button
+                                  key={status}
+                                  onClick={() => {
+                                    handleFieldUpdate(selectedUser.id, 'leadStatus', status);
+                                    setStatusDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: 'var(--text)',
+                                    borderBottom: '1px solid var(--border-soft)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = statusConfig[status].color + '15';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  {statusConfig[status].label}
+                                </button>
+                              ))}
+
+                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                <button
+                                  onClick={() => {
+                                    setShowCustomStatusInput(true);
+                                    setStatusDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    borderBottom: '1px solid var(--border-soft)',
+                                    fontWeight: '500',
+                                    color: 'var(--green-600)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--green-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  + Custom Status
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showCustomStatusInput && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: 'var(--green-50)',
+                              border: '1px solid var(--green-200)',
+                              borderRadius: 'var(--r)'
+                            }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={customStatus}
+                                  onChange={(e) => setCustomStatus(e.target.value)}
+                                  placeholder="Enter custom status..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: '1px solid var(--green-300)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '12px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (customStatus.trim()) {
+                                      handleFieldUpdate(selectedUser.id, 'leadStatus', customStatus.trim());
+                                      setStatusConfig({ ...statusConfig, [customStatus.trim()]: { color: '#6b7280', label: customStatus.trim() } });
+                                      setCustomStatus('');
+                                      setShowCustomStatusInput(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--green-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCustomStatus('');
+                                    setShowCustomStatusInput(false);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--gray-200)',
+                                    color: 'var(--text)',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Owner</label>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text)',
+                              transition: 'background-color 0.2s ease'
+                            }}
+                            onClick={() => {
+                              closeAllDropdowns();
+                              setOwnerDropdownOpen(!ownerDropdownOpen);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'var(--surface)';
+                            }}
+                          >
+                            <span>{selectedUser.contactOwner}</span>
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
+                          </div>
+
+                          {ownerDropdownOpen && (
+                            <div data-dropdown style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              zIndex: 10,
+                              marginTop: '4px',
+                              maxHeight: '200px',
+                              overflowY: 'auto'
+                            }}>
+                              {getContactOwnerOptions().map(owner => (
+                                <button
+                                  key={owner}
+                                  onClick={() => {
+                                    handleFieldUpdate(selectedUser.id, 'contactOwner', owner);
+                                    setOwnerDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: 'var(--text)',
+                                    borderBottom: '1px solid var(--border-soft)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--gray-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  {owner}
+                                </button>
+                              ))}
+
+                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                <button
+                                  onClick={() => {
+                                    setShowCustomOwnerInput(true);
+                                    setOwnerDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'var(--green-600)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--green-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  + Custom Owner
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showCustomOwnerInput && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: 'var(--green-50)',
+                              border: '1px solid var(--green-200)',
+                              borderRadius: 'var(--r)'
+                            }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={customOwner}
+                                  onChange={(e) => setCustomOwner(e.target.value)}
+                                  placeholder="Enter custom owner..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: '1px solid var(--green-300)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '12px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (customOwner.trim()) {
+                                      handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim());
+                                      setPredefinedContactOwners([...predefinedContactOwners, customOwner.trim()]);
+                                      saveCustomDropdownOption('contact_owner', customOwner.trim());
+                                      setCustomOwner('');
+                                      setShowCustomOwnerInput(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--green-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCustomOwner('');
+                                    setShowCustomOwnerInput(false);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--gray-200)',
+                                    color: 'var(--text)',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Source</label>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text)',
+                              transition: 'background-color 0.2s ease'
+                            }}
+                            onClick={() => {
+                              closeAllDropdowns();
+                              setLeadSourceDropdownOpen(!leadSourceDropdownOpen);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'var(--surface)';
+                            }}
+                          >
+                            <span>{selectedUser.leadSource || 'Select lead source'}</span>
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
+                          </div>
+
+                          {leadSourceDropdownOpen && (
+                            <div data-dropdown style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              zIndex: 10,
+                              marginTop: '4px',
+                              maxHeight: '200px',
+                              overflowY: 'auto'
+                            }}>
+                              {predefinedLeadSources.map(source => (
+                                <button
+                                  key={source}
+                                  onClick={() => {
+                                    handleFieldUpdate(selectedUser.id, 'leadSource', source);
+                                    setLeadSourceDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: 'var(--text)',
+                                    borderBottom: '1px solid var(--border-soft)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--gray-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  {source}
+                                </button>
+                              ))}
+
+                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                <button
+                                  onClick={() => {
+                                    setShowCustomLeadSourceInput(true);
+                                    setLeadSourceDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'var(--green-600)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--green-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  + Custom
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showCustomLeadSourceInput && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: 'var(--green-50)',
+                              border: '1px solid var(--green-200)',
+                              borderRadius: 'var(--r)'
+                            }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={customLeadSource}
+                                  onChange={(e) => setCustomLeadSource(e.target.value)}
+                                  placeholder="Enter custom lead source..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: '1px solid var(--green-300)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '12px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (customLeadSource.trim()) {
+                                      handleFieldUpdate(selectedUser.id, 'leadSource', customLeadSource.trim());
+                                      setPredefinedLeadSources([...predefinedLeadSources, customLeadSource.trim()]);
+                                      saveCustomDropdownOption('lead_source', customLeadSource.trim());
+                                      setCustomLeadSource('');
+                                      setShowCustomLeadSourceInput(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--green-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCustomLeadSource('');
+                                    setShowCustomLeadSourceInput(false);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--gray-200)',
+                                    color: 'var(--text)',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text)',
+                              transition: 'background-color 0.2s ease'
+                            }}
+                            onClick={() => {
+                              closeAllDropdowns();
+                              setTagsDropdownOpen(!tagsDropdownOpen);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'var(--surface)';
+                            }}
+                          >
+                            <span>{selectedUser.tags || 'Select tag'}</span>
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
+                          </div>
+
+                          {tagsDropdownOpen && (
+                            <div data-dropdown style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              zIndex: 10,
+                              marginTop: '4px',
+                              maxHeight: '200px',
+                              overflowY: 'auto'
+                            }}>
+                              {predefinedTags.map(tag => (
+                                <button
+                                  key={tag}
+                                  onClick={() => {
+                                    handleFieldUpdate(selectedUser.id, 'tags', tag);
+                                    setTagsDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: 'var(--text)',
+                                    borderBottom: '1px solid var(--border-soft)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--gray-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  {tag}
+                                </button>
+                              ))}
+
+                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                                <button
+                                  onClick={() => {
+                                    setShowCustomTagsInput(true);
+                                    setTagsDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    background: 'none',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'var(--green-600)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--green-100)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'none';
+                                  }}
+                                >
+                                  + Custom Tag
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showCustomTagsInput && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: 'var(--green-50)',
+                              border: '1px solid var(--green-200)',
+                              borderRadius: 'var(--r)'
+                            }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={customTags}
+                                  onChange={(e) => setCustomTags(e.target.value)}
+                                  placeholder="Enter custom tag..."
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: '1px solid var(--green-300)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '12px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (customTags.trim()) {
+                                      handleFieldUpdate(selectedUser.id, 'tags', customTags.trim());
+                                      setPredefinedTags([...predefinedTags, customTags.trim()]);
+                                      saveCustomDropdownOption('tags', customTags.trim());
+                                      setCustomTags('');
+                                      setShowCustomTagsInput(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--green-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCustomTags('');
+                                    setShowCustomTagsInput(false);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'var(--gray-200)',
+                                    color: 'var(--text)',
+                                    border: 'none',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Information Section */}
+                  <div style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      Additional Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+
+                      <EditableField
+                        label="Description"
+                        value={selectedUser.description}
+                        fieldName="description"
+                      />
+                    </div>
+                  </div>
+
+                  {/* System Information Section */}
+                  <div style={{
+                    marginBottom: '0',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r)'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 16px 0',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      borderBottom: '1px solid var(--border-soft)',
+                      paddingBottom: '8px'
+                    }}>
+                      System Information
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
+                        <div style={{ color: 'var(--text)' }}>
+                          {new Date(selectedUser.createdTime).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                        <div style={{ color: 'var(--text)' }}>
+                          {new Date(selectedUser.lastActivity).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
+                        <div style={{ color: 'var(--text)' }}>
+                          {new Date(selectedUser.lastActivity).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
+                        <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser.createdBy}</div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified By</label>
+                        <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedUser.modifiedBy}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>{/* end left panel */}
+
+                {/* ── Right panel: tabs (Timeline / Notes / Activities / Pipelines) ── */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  {/* Tabs */}
+                  <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 20px', flexShrink: 0 }}>
+                    {[
+                      { id: 'timeline', label: 'Timeline' },
+                      { id: 'notes', label: 'Notes' },
+                      { id: 'activities', label: 'Activities' },
+
+                    ].map(tab => (
+                      <button key={tab.id} onClick={() => setActiveModalTab(tab.id)}
+                        style={{ padding: '14px 16px', border: 'none', borderBottom: activeModalTab === tab.id ? '2px solid var(--green-600)' : '2px solid transparent', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '13px', color: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--text-3)', fontWeight: activeModalTab === tab.id ? '600' : '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {tab.label}
+                        {tab.count && (
+                          <span style={{ backgroundColor: activeModalTab === tab.id ? 'var(--green-600)' : 'var(--gray-200)', color: activeModalTab === tab.id ? '#fff' : 'var(--text-3)', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '600' }}>{tab.count}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tab Content */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+
+                    {activeModalTab === 'timeline' && (
+                      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '600', fontSize: '16px' }}>
+                            {selectedUser?.contactName?.charAt(0) || 'L'}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text)' }}>{selectedUser?.contactName || 'Lead'}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>Created on {new Date(selectedUser?.createdTime || Date.now()).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                        </div>
+                        {timelineLoading ? (
+                          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Loading timeline...</div>
+                        ) : timelineData.length > 0 ? (
+                          <div style={{ paddingLeft: '32px', borderLeft: '2px solid var(--border)', marginLeft: '20px' }}>
+                            {timelineData.map((item, index) => {
+                              const IconComponent = getTimelineIcon(item.field);
+                              return (
+                                <div key={item.id} style={{ paddingBottom: index < timelineData.length - 1 ? '20px' : '0' }}>
+                                  <div style={{ marginLeft: '-36px', marginBottom: '12px' }}>
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--green-100)', border: '2px solid var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <IconComponent size={16} style={{ color: 'var(--green-600)' }} />
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{new Date(item.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                  <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '4px' }}>
+                                    <span>
+                                      {(() => {
+                                        const field = item?.field ? String(item.field).trim().toLowerCase() : '';
+                                        const act = item?.activity_type ? String(item.activity_type).trim().toLowerCase() : '';
+
+                                        if (act === 'lead_created') return 'Lead created';
+                                        if (act === 'note_added' || field === 'note') return 'Note added';
+                                        if (act === 'note_updated') return 'Note updated';
+                                        if (act === 'task_created' || field === 'task') return 'Task created';
+                                        if (act === 'task_updated') return 'Task updated';
+                                        if (act === 'deal_created') return 'Deal created';
+                                        if (act === 'deal_deleted') return 'Deal deleted';
+
+                                        const map = {
+                                          deal_stage: 'Deal Stage',
+                                          stage: 'Deal Stage',
+                                          deal_name: 'Deal Name',
+                                          deal_amount: 'Deal Amount',
+                                          amount: 'Deal Amount',
+                                          deal_probability: 'Deal Probability',
+                                          probability: 'Deal Probability',
+                                          deal_type: 'Deal Type',
+                                          deal_owner: 'Deal Owner',
+                                          deal_close_date: 'Closing Date',
+                                          close_date: 'Closing Date',
+                                          contact_name: 'Contact Name',
+                                          full_name: 'Contact Name',
+                                          company_name: 'Company Name',
+                                          account_name: 'Account Name',
+                                          account_number: 'Account Number',
+                                          phone_number: 'Phone Number',
+                                          alternate_number: 'Alternate Number',
+                                          contact_owner: 'Contact Owner',
+                                          owner: 'Contact Owner',
+                                          lead_source: 'Lead Source',
+                                          lead_status: 'Lead Status',
+                                          status: 'Status',
+                                          account_type: 'Account Type',
+                                          city: 'City',
+                                          state: 'State',
+                                          country: 'Country',
+                                          tags: 'Tags',
+                                          description: 'Description'
+                                        };
+
+                                        let label = map[field];
+                                        if (!label) {
+                                          if (field) {
+                                            label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                          } else if (act) {
+                                            label = act.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                          } else {
+                                            label = 'Field';
+                                          }
+                                        }
+                                        return `${label} updated`;
+                                      })()} by <span style={{ fontWeight: 'bold' }}>{item.changed_by || 'Operation'}</span>
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>
+                                    {(() => {
+                                      const hasOld = item.old_value !== null && item.old_value !== undefined && String(item.old_value).trim() !== '';
+                                      const hasNew = item.new_value !== null && item.new_value !== undefined && String(item.new_value).trim() !== '';
+
+                                      if (item.activity_type === 'deal_deleted') {
+                                        return <span>&lsquo;{item.old_value || item.new_value}&rsquo;</span>;
+                                      }
+                                      if (item.field === 'note' || item.field === 'task') {
+                                        return <span>&lsquo;{item.new_value || item.old_value}&rsquo;</span>;
+                                      }
+                                      if (hasOld && hasNew && String(item.old_value).trim() !== String(item.new_value).trim()) {
+                                        return <span>From &lsquo;<strong>{item.old_value}</strong>&rsquo; to &lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                      }
+                                      if (hasNew) {
+                                        return <span>&lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
+                                      }
+                                      if (hasOld) {
+                                        return <span>&lsquo;<strong>{item.old_value}</strong>&rsquo;</span>;
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>No timeline data available</div>
+                        )}
+                      </div>
+                    )}
+
+                    {activeModalTab === 'notes' && (
+                      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '20px' }}>
+                        <div style={{ marginBottom: '16px' }}>
+                          <textarea placeholder="Add a note..." rows={3}
+                            value={noteInput}
+                            onChange={(e) => setNoteInput(e.target.value)}
+                            style={{ width: '100%', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', resize: 'vertical', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }} />
+                          <button onClick={handleAddNote} disabled={addingNote} style={{ marginTop: '8px', backgroundColor: addingNote ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: addingNote ? 'not-allowed' : 'pointer' }}>{addingNote ? 'Adding...' : 'Add Note'}</button>
+                        </div>
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                          {activities.filter(activity => activity.activity_type === 'note' || (activity.message && !activity.task_name)).length > 0 ? (
+                            activities.filter(activity => activity.activity_type === 'note' || (activity.message && !activity.task_name)).map((activity) => (
+                              <div key={activity.id} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ flex: 1, marginRight: '16px' }}>
+                                  <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px', fontWeight: 'bold' }}>
+                                    {activity.created_by || 'Operation'}</div>
+                                  <div style={{ fontSize: '10px', color: 'var(--text-3)', marginBottom: '4px' }}>
+                                    {activity.created_time ? new Date(activity.created_time).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                                  </div>
+                                  {editingNoteId === activity.id ? (
+                                    <div style={{ marginTop: '8px' }}>
+                                      <textarea
+                                        value={editNoteInput}
+                                        onChange={(e) => setEditNoteInput(e.target.value)}
+                                        rows={2}
+                                        style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '14px', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
+                                      />
+                                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                                        <button
+                                          onClick={async () => {
+                                            await handleUpdateNote(activity.id, editNoteInput);
+                                            setEditingNoteId(null);
+                                          }}
+                                          style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                        >Save</button>
+                                        <button
+                                          onClick={() => setEditingNoteId(null)}
+                                          style={{ backgroundColor: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                        >Cancel</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: '15px', color: 'var(--text-3)', fontWeight: '500' }}>{activity.message}</div>
+                                  )}
+                                </div>
+                                {editingNoteId !== activity.id && (
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button
+                                      onClick={() => { setEditingNoteId(activity.id); setEditNoteInput(activity.message || ''); }}
+                                      style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}
+                                    >Edit</button>
+                                    <button
+                                      onClick={() => handleDeleteActivity(activity.id)}
+                                      style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>No notes yet</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeModalTab === 'activities' && (
+                      <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+                          <h3 style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '600', margin: 0 }}>Activities</h3>
+                          <button onClick={() => setShowCreateTaskModal(true)}
+                            style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Plus size={14} /> Task
+                          </button>
+                        </div>
+                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                          <table style={{ width: '100%', minWidth: '500px', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
+                                {['Task Name', 'Due Date', 'Status', 'Task Owner', 'Actions'].map(h => (
+                                  <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).map((activity) => (
+                                <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '8px 10px', color: 'var(--text)', fontWeight: '500' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{activity.task_name}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'task_name')} title="Edit Task Name" />
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 10px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{activity.due_date ? `${new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${activity.due_time ? ' ' + activity.due_time : ''}` : '-'}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'due_date')} title="Edit Due Date" />
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{
+                                        backgroundColor: activity.status === 'Completed' ? '#d1fae5' : '#fef3c7',
+                                        color: activity.status === 'Completed' ? '#047857' : '#b45309',
+                                        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                      }}>{activity.status}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'status')} title="Edit Status" />
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 10px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_owner || activity.created_by || '-'}</td>
+                                  <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                      <button onClick={() => handleDeleteActivity(activity.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Delete</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                              {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).length === 0 && (
+                                <tr>
+                                  <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No tasks yet</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+
+
+                  </div>
+                </div>{/* end right panel */}
+              </div>{/* end two-column layout */}
+            </div>
+          </div>
+        )}
+
+        {/* ── Create Task Modal ── */}
+        {showCreateTaskModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+            <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Create Task</h3>
+                <button onClick={() => setShowCreateTaskModal(false)} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Task Type <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={taskName}
+                    onChange={(e) => setTaskName(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  >
+                    <option value="">Select task type</option>
+                    <option value="mail">Mail</option>
+                    <option value="call">Call</option>
+                    <option value="meet">Meet</option>
+                    <option value="follow-up">Follow Up</option>
+                    <option value="proposal sent">Proposal Sent</option>
+                  </select>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Due Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Calendar size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                      <input
+                        type="date"
+                        value={taskDueDate}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                        onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
+                        style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Due Time <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Clock size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                      <input
+                        type="time"
+                        value={taskDueTime}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                        onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
+                        style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Status <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={taskStatus}
+                    onChange={(e) => setTaskStatus(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                  >
+                    <option value="">Choose a Task Stage</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
+                  <input type="text" value={getApiUserName(user)} readOnly style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--gray-100)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
+                </div>
+              </div>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
+                <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={handleAddTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Saving...' : 'Save'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Edit Task Modal ── */}
+        {showEditTaskModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
+            <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>{editTaskField === 'task_name' ? 'Edit Task Name' : editTaskField === 'due_date' ? 'Edit Due Date' : editTaskField === 'status' ? 'Edit Status' : 'Edit Task'}</h3>
+                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {(!editTaskField || editTaskField === 'task_name') && (
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Task Type <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Select task type</option>
+                      <option value="mail">Mail</option>
+                      <option value="call">Call</option>
+                      <option value="meet">Meet</option>
+                      <option value="follow-up">Follow Up</option>
+                      <option value="proposal sent">Proposal Sent</option>
+                    </select>
+                  </div>
+                )}
+                {(!editTaskField || editTaskField === 'due_date') && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Due Date <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Calendar size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                        <input
+                          type="date"
+                          value={taskDueDate}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
+                          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Due Time <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Clock size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                        <input
+                          type="time"
+                          value={taskDueTime}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
+                          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {(!editTaskField || editTaskField === 'status') && (
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Status <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => setTaskStatus(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Choose a Task Stage</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
+                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={handleUpdateTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Updating...' : 'Update'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Details Modal */}
+        {selectedLead && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              padding: '24px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Lead Details</h2>
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.contactName}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Email</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.email}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.phoneNumber}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Alternate Number</label>
+                    <input
+                      type="text"
+                      value={selectedLead.alternateNumber || ''}
+                      onChange={(e) => {
+                        const newAlternateNumber = e.target.value;
+                        // Update local state immediately for better UX
+                        setSelectedLead(prev => ({ ...prev, alternateNumber: newAlternateNumber }));
+                      }}
+                      onBlur={(e) => {
+                        const newAlternateNumber = e.target.value;
+                        if (newAlternateNumber !== selectedLead.alternateNumber) {
+                          handleAlternateNumberUpdate(selectedLead.id, newAlternateNumber);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.target.blur();
+                        }
+                      }}
+                      placeholder="Enter alternate phone number"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        color: 'var(--text)',
+                        fontSize: '12px',
+                        fontWeight: '500'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Company Name</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.companyName}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Owner</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.contactOwner}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>City</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.city}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>State</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.state}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Country</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.country}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
+                    <select
+                      value={selectedLead.leadStatus}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        handleLeadInfoStatusUpdate(selectedLead.id, newStatus);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        color: 'var(--text)',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="New">New</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Qualified">Qualified</option>
+                      <option value="Proposal">Proposal</option>
+                      <option value="Negotiation">Negotiation</option>
+                      <option value="Closed Won">Closed Won</option>
+                      <option value="Closed Lost">Closed Lost</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Source</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.leadSource}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.industry}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.tags}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                  <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.description}</div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>
+                      {new Date(selectedLead.createdTime).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.createdBy}</div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified By</label>
+                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>{selectedLead.modifiedBy}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                  <div style={{ color: 'var(--text)', fontWeight: '500' }}>
+                    {new Date(selectedLead.lastActivity).toLocaleString('en-IN')}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
+                  <div style={{ color: 'var(--text)', fontWeight: '500' }}>
+                    {new Date(selectedLead.lastActivity).toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'var(--blue-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Edit Lead
+                </button>
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Lead Modal */}
+        {showAddModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              padding: '24px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Add New Lead</h2>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Required Fields Info Notice */}
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: 'var(--r)',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: '#15803d',
+                fontSize: '13px'
+              }}>
+                <AlertCircle size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                <span>
+                  <strong>Note:</strong> Contact Name, Phone Number, Email, and Country are required fields.
+                </span>
+              </div>
+
+              <form id="addLeadForm" style={{ display: 'grid', gap: '16px' }}>
+                {/* Contact Information */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Contact Information</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="text"
+                        name="fullName"
+                        placeholder="Enter contact name"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        placeholder="Enter phone number"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Alternate Number</label>
+                      <input
+                        type="tel"
+                        name="alternateNumber"
+                        placeholder="Enter alternate number"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Email <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Enter email address"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Information */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Company Information</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Company Name</label>
+                      <input
+                        type="text"
+                        name="companyName"
+                        placeholder="Enter company name"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Contact Owner</label>
+                      <input
+                        type="text"
+                        name="contactOwner"
+                        defaultValue={getApiUserName(user)}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px',
+                          cursor: 'not-allowed'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location Information */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Location Information</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>City</label>
+                      <input
+                        type="text"
+                        name="city"
+                        placeholder="Enter city"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>State</label>
+                      <input
+                        type="text"
+                        name="state"
+                        placeholder="Enter state"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Country <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="text"
+                        name="country"
+                        placeholder="Enter country"
+                        defaultValue="IN"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lead Details */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Lead Details</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
+                      <select
+                        name="leadStatus"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Qualified">Qualified</option>
+                        <option value="Proposal">Proposal</option>
+                        <option value="Negotiation">Negotiation</option>
+                        <option value="Closed Won">Closed Won</option>
+                        <option value="Closed Lost">Closed Lost</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry</label>
+                      <select
+                        name="industry"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Select Industry</option>
+                        <option value="Farmer">Farmer</option>
+                        <option value="FPO">FPO</option>
+                        <option value="NGO">NGO</option>
+                        <option value="Government">Government</option>
+                        <option value="Enterprise">Enterprise</option>
+                        <option value="Agri Input">Agri Input</option>
+                        <option value="Agri Output">Agri Output</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tags</label>
+                      <select
+                        name="tags"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Select a tag</option>
+                        {getUniqueTags().map(tag => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Source</label>
+                      <select
+                        name="leadSource"
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text)',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Select Source</option>
+                        <option value="FB Campaign">FB Campaign</option>
+                        <option value="Website Inbound">Website Inbound</option>
+                        <option value="Sales Inbound">Sales Inbound</option>
+                        <option value="Mail Inbound">Mail Inbound</option>
+                        <option value="External Referral">External Referral</option>
+                        <option value="Cold Call">Cold Call</option>
+                        <option value="Event">Event</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Additional Information</h3>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Description</label>
+                    <textarea
+                      name="description"
+                      placeholder="Enter description"
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r)',
+                        color: 'var(--text)',
+                        fontSize: '14px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* System Fields (Read-only) */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>System Information</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
+                      <input
+                        type="text"
+                        name="createdBy"
+                        value={getApiUserName(user)}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text-3)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified By</label>
+                      <input
+                        type="text"
+                        name="modifiedBy"
+                        value={getApiUserName(user)}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text-3)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Modified Time</label>
+                      <input
+                        type="text"
+                        name="lastActivity"
+                        value={new Date().toISOString()}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text-3)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Last Activity</label>
+                      <input
+                        type="text"
+                        name="lastActivity"
+                        value={new Date().toISOString()}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'var(--gray-100)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r)',
+                          color: 'var(--text-3)',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button
+                  onClick={() => {
+                    if (isCreatingLeadRef.current || isCreatingLead) return;
+
+                    // Collect form data
+                    const form = document.querySelector('#addLeadForm');
+                    if (!form) {
+                      alert('Form not found');
+                      return;
+                    }
+
+                    const formData = new FormData(form);
+                    const leadData = {
+                      full_name: formData.get('fullName') || '',
+                      phone: formData.get('phone') || '',
+                      alternate_number: formData.get('alternateNumber') || '',
+                      email: formData.get('email') || '',
+                      company_name: formData.get('companyName') || '',
+                      owner: formData.get('contactOwner') || 'Unassigned',
+                      city: formData.get('city') || '',
+                      state: formData.get('state') || '',
+                      country: formData.get('country') || 'IN',
+                      status: formData.get('leadStatus') || 'New',
+                      tags: formData.get('tags') || '',
+                      lead_source: formData.get('leadSource') || '',
+                      description: formData.get('description') || '',
+                      industry: formData.get('industry') || '',
+                      created_by: getApiUserName(user),
+                      modified_by: getApiUserName(user),
+                      last_activity: formData.get('lastActivity') || new Date().toISOString()
+                    };
+
+                    // Required fields validation
+                    const missingFields = [];
+                    if (!leadData.full_name.trim()) missingFields.push('Contact Name');
+                    if (!leadData.phone.trim()) missingFields.push('Phone Number');
+                    if (!leadData.email.trim()) missingFields.push('Email');
+                    if (!leadData.country.trim()) missingFields.push('Country');
+
+                    if (missingFields.length > 0) {
+                      toast.error(`Required fields missing: ${missingFields.join(', ')}`);
+                      alert(`Please fill in required fields: ${missingFields.join(', ')}`);
+                      return;
+                    }
+
+                    // Call API to create lead
+                    handleCreateLead(leadData);
+                  }}
+                  disabled={isCreatingLead}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: 'var(--green-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: isCreatingLead ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    opacity: isCreatingLead ? 0.5 : 1
+                  }}
+                >
+                  {isCreatingLead ? 'Adding Lead...' : 'Add Lead'}
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#1e293b',
+                    color: '#e2e8f0',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Update Fields Modal */}
+        {showUpdateFieldsModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+            <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+              {/* Modal header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Update Fields</h2>
+                <button onClick={() => setShowUpdateFieldsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Field selector */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Select Field to Update</label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={selectedFieldToUpdate}
+                      onChange={(e) => { setSelectedFieldToUpdate(e.target.value); setUpdateFieldValue(''); }}
+                      style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                    >
+                      <option value="">Choose a field...</option>
+                      <option value="tags">Tags</option>
+                      <option value="industry">Industry</option>
+                      <option value="state">State</option>
+                      <option value="country">Country</option>
+                      <option value="leadStatus">Lead Status</option>
+                      <option value="contactOwner">Contact Owner</option>
+                    </select>
+                    <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                  </div>
+                </div>
+
+                {/* Current value and new value */}
+                {selectedFieldToUpdate && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Current value */}
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change From</label>
+                      <div style={{ position: 'relative' }}>
+                        {selectedFieldToUpdate === 'leadStatus' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.leadStatus))].filter(Boolean).sort().map(status => (
+                              <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'contactOwner' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.contactOwner))].filter(Boolean).sort().map(owner => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'state' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.state))].filter(Boolean).sort().map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'country' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.country))].filter(Boolean).sort().map(country => (
+                              <option key={country} value={country}>{country}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'industry' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.industry))].filter(Boolean).sort().map(industry => (
+                              <option key={industry} value={industry}>{industry}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'tags' ? (
+                          <select
+                            value={updateFieldValue}
+                            onChange={(e) => setUpdateFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">All selected</option>
+                            {[...new Set(leads.filter(l => selectedRows.includes(l.id)).map(l => l.tags))].filter(Boolean).sort().map(tag => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                      </div>
+                    </div>
+
+                    {/* New value */}
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change To</label>
+                      <div style={{ position: 'relative' }}>
+                        {selectedFieldToUpdate === 'leadStatus' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select new status...</option>
+                            {[...new Set([
+                              ...predefinedLeadStatuses,
+                              ...Object.keys(statusConfig)
+                            ])].filter(Boolean).filter(status => status !== updateFieldValue).sort().map(status => (
+                              <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'contactOwner' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">Select owner...</option>
+                            {[...new Set([
+                              ...predefinedContactOwners,
+                              ...leads.map(l => l.contactOwner)
+                            ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'state' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select state...'}</option>
+                            {[...new Set([
+                              ...getUniqueValues('mailing_state'),
+                              ...leads.map(l => l.state)
+                            ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'country' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select country...'}</option>
+                            {[...new Set([
+                              ...getUniqueValues('mailing_country'),
+                              ...leads.map(l => l.country)
+                            ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
+                              <option key={country} value={country}>{country}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'industry' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select industry...'}</option>
+                            {[...new Set([
+                              ...getUniqueValues('industry'),
+                              ...predefinedIndustries,
+                              ...leads.map(l => l.industry)
+                            ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
+                              <option key={industry} value={industry}>{industry}</option>
+                            ))}
+                          </select>
+                        ) : selectedFieldToUpdate === 'tags' ? (
+                          <select
+                            value={updateNewFieldValue}
+                            onChange={(e) => setUpdateNewFieldValue(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
+                          >
+                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select tags...'}</option>
+                            {[...new Set([
+                              ...getUniqueValues('tag'),
+                              ...predefinedTags,
+                              ...leads.map(l => l.tags)
+                            ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                <button
+                  onClick={() => setShowUpdateFieldsModal(false)}
+                  style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!selectedFieldToUpdate || !updateNewFieldValue) {
+                      toast.error('Please select a field and enter a new value');
+                      return;
+                    }
+                    const fieldMap = {
+                      tags: 'tags',
+                      industry: 'industry',
+                      state: 'state',
+                      country: 'country',
+                      leadStatus: 'status',
+                      contactOwner: 'owner'
+                    };
+                    const field = fieldMap[selectedFieldToUpdate];
+                    const currentUserName = getApiUserName(user);
+
+                    setIsUpdating(true);
+                    try {
+                      const valueParam = updateFieldValue ? updateFieldValue : 'all';
+                      const url = import.meta.env.VITE_BULK_UPDATE_LEADS_API_URL;
+
+                      const response = await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          ids: selectedRows,
+                          field: field,
+                          value: valueParam,
+                          update_value: updateNewFieldValue,
+                          user: currentUserName
+                        })
+                      });
+
+                      if (!response.ok) {
+                        const errorText = await response.text();
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to update fields');
+                        throw new Error(cleanMsg);
+                      }
+
+                      const data = await response.json();
+
+                      setLeads(prev => prev.map(lead => {
+                        if (!selectedRows.includes(lead.id)) return lead;
+                        // If "Change From" is empty, update all selected items
+                        if (!updateFieldValue) {
+                          return { ...lead, [field]: updateNewFieldValue };
+                        }
+                        // Only update items that match the "Change From" value
+                        if (lead[field] === updateFieldValue) {
+                          return { ...lead, [field]: updateNewFieldValue };
+                        }
+                        return lead;
+                      }));
+
+                      const updatedCount = leads.filter(lead =>
+                        selectedRows.includes(lead.id) && (!updateFieldValue || lead[field] === updateFieldValue)
+                      ).length;
+
+                      toast.success(`Updated ${selectedFieldToUpdate} for ${updatedCount} item(s)`);
+                      setShowUpdateFieldsModal(false);
+                      setSelectedRows([]);
+                      setUpdateFieldValue('');
+                      setUpdateNewFieldValue('');
+                    } catch (error) {
+                      console.error('Error updating fields:', error);
+                      toast.error(extractErrorMessage(error, 'Failed to update fields. Please try again.'));
+                    } finally {
+                      isBulkUpdatingRef.current = false;
+                      setIsUpdating(false);
+                    }
+                  }}
+                  disabled={!selectedFieldToUpdate || !updateNewFieldValue || isUpdating}
+                  style={{ padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: (!selectedFieldToUpdate || !updateNewFieldValue || isUpdating) ? 0.5 : 1 }}
+                >
+                  {isUpdating ? 'Updating...' : 'Update'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Convert Modal */}
+        {showConvertModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+            <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+              {/* Modal header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Convert Lead</h2>
+                <button onClick={() => setShowConvertModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Account Name *</label>
+                  <input
+                    type="text"
+                    value={convertAccountName}
+                    onChange={(e) => setConvertAccountName(e.target.value)}
+                    placeholder="Enter account name"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Website</label>
+                  <input
+                    type="text"
+                    value={convertWebsite}
+                    onChange={(e) => setConvertWebsite(e.target.value)}
+                    placeholder="Enter website"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Account Type</label>
+                  <select
+                    value={convertAccountType}
+                    onChange={(e) => setConvertAccountType(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
+                  >
+                    <option value="">Select account type</option>
+                    <option value="Sat2Farm Recurring">Sat2Farm Recurring</option>
+                    <option value="Sat2Farm Non Recurring">Sat2Farm Non Recurring</option>
+                    <option value="Sat2Farm Exclusivity">Sat2Farm Exclusivity</option>
+                    <option value="Sat4Agri">Sat4Agri</option>
+                    <option value="Sat4Risk">Sat4Risk</option>
+                    <option value="Project">Project</option>
+                    <option value="WhiteLabelling">WhiteLabelling</option>
+                    <option value="API Client">API Client</option>
+                    <option value="Positive response">Positive response</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                <button
+                  onClick={() => setShowConvertModal(false)}
+                  style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (isConverting) return;
+                    if (!convertAccountName) {
+                      toast.error('Please enter account name');
+                      return;
+                    }
+                    const currentUserName = getApiUserName(user);
+                    const leadId = selectedRows.length === 1 ? selectedRows[0] : (selectedLead?.id || selectedUser?.id);
+                    if (!leadId) {
+                      toast.error('No lead selected');
+                      return;
+                    }
+
+                    setIsConverting(true);
+
+                    // Close both modals immediately so user returns to previous page view
+                    setShowConvertModal(false);
+                    setShowUserModal(false);
+                    setSelectedUser(null);
+                    setSelectedLead(null);
+
+                    toast.loading('Converting lead to account...', { id: 'convert-lead-toast' });
+
+                    try {
+                      const apiUrl = import.meta.env.VITE_LEAD_MOVE_TO_ACCOUNT_API_URL;
+                      if (!apiUrl) {
+                        toast.dismiss('convert-lead-toast');
+                        toast.error('Move to account API URL not configured');
+                        setIsConverting(false);
+                        return;
+                      }
+                      const response = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          id: String(leadId),
+                          account_name: convertAccountName || '',
+                          website: convertWebsite || '',
+                          description: '',
+                          account_type: convertAccountType || '',
+                          deal_present: 'No',
+                          user: currentUserName
+                        })
+                      });
+                      if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Error moving to account:', errorText);
+                        toast.dismiss('convert-lead-toast');
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to convert lead');
+                        throw new Error(cleanMsg);
+                      }
+                      const result = await response.json();
+
+
+                      toast.dismiss('convert-lead-toast');
+
+                      if (result.success || result.message) {
+                        toast.success('Lead converted successfully!');
+                        setConvertAccountName('');
+                        setConvertWebsite('');
+                        setConvertAccountType('');
+                        setSelectedRows([]);
+                        fetchLeads();
+                      } else {
+                        const cleanMsg = extractErrorMessage(result, 'Failed to convert lead');
+                        toast.error(cleanMsg);
+                      }
+                    } catch (err) {
+                      console.error('Error moving to account:', err);
+                      toast.dismiss('convert-lead-toast');
+                      toast.error(extractErrorMessage(err, 'Failed to convert lead'));
+                    } finally {
+                      isConvertingRef.current = false;
+                      setIsConverting(false);
+                    }
+                  }}
+                  disabled={isConverting || !convertAccountName}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'var(--green-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--r)',
+                    cursor: isConverting || !convertAccountName ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    opacity: isConverting || !convertAccountName ? 0.5 : 1
+                  }}
+                >
+                  {isConverting ? 'Converting...' : 'Convert'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirmModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+            <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '12px', width: '400px', maxWidth: '90%', boxShadow: '0 20px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+              {/* Modal header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Confirm Delete</h2>
+                <button onClick={() => setShowDeleteConfirmModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div style={{ padding: '24px' }}>
+                <p style={{ margin: 0, color: 'var(--text)', fontSize: '14px' }}>
+                  Are you sure you want to delete {selectedRows.length} item(s)? This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '20px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                <button
+                  onClick={() => setShowDeleteConfirmModal(false)}
+                  style={{ padding: '10px 20px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                >
+                  No
+                </button>
+                <button
+                  onClick={async () => {
+                    const currentUserName = getApiUserName(user);
+
+                    setIsDeleting(true);
+                    try {
+                      const url = import.meta.env.VITE_BULK_DELETE_LEADS_API_URL;
+
+                      const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          ids: selectedRows,
+                          user: currentUserName,
+                          confirm: 'yes'
+                        })
+                      });
+
+                      if (!response.ok) {
+                        const errorText = await response.text();
+                        const cleanMsg = extractErrorMessage(errorText, 'Failed to delete items');
+                        throw new Error(cleanMsg);
+                      }
+
+                      const data = await response.json();
+
+                      // Delete selected items from local state
+                      setLeads(prev => prev.filter(lead => !selectedRows.includes(lead.id)));
+                      setSelectedRows([]);
+                      setShowDeleteConfirmModal(false);
+                      toast.success(`Deleted ${selectedRows.length} item(s)`);
+                    } catch (error) {
+                      console.error('Error deleting items:', error);
+                      toast.error(extractErrorMessage(error, 'Failed to delete items. Please try again.'));
+                    } finally {
+                      isBulkDeletingRef.current = false;
+                      setIsDeleting(false);
+                    }
+                  }}
+                  disabled={isDeleting}
+                  style={{ padding: '10px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', opacity: isDeleting ? 0.5 : 1 }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Dialog */}
+        {showEditDialog && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              minWidth: '400px',
+              maxWidth: '500px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+            }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+                Edit {editDialogField.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()}
+              </h3>
+
+              {showEditDialogCustomInput ? (
+                <div style={{ marginBottom: '16px' }}>
+                  <input
+                    type="text"
+                    value={editDialogCustomValue}
+                    onChange={(e) => setEditDialogCustomValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleEditDialogSave(); if (e.key === 'Escape') closeEditDialog(); }}
+                    placeholder={`Enter custom ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                    autoFocus
+                  />
+                </div>
+              ) : isFieldWithDropdown(editDialogField) ? (
+                <div style={{ position: 'relative', marginBottom: '16px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: 'white',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: editDialogValue ? '#111827' : '#6b7280'
+                    }}
+                    onClick={() => setEditDialogDropdownOpen(!editDialogDropdownOpen)}
+                  >
+                    <span>{editDialogValue || `Select ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}</span>
+                    <ChevronDown size={16} style={{ transition: 'transform 0.2s ease', transform: editDialogDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                  </div>
+                  {editDialogDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'white',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 10,
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
+                      {getFieldOptions(editDialogField).map(option => (
+                        <button
+                          key={option}
+                          onClick={() => handleEditDialogOptionSelect(option)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'none',
+                            border: 'none',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            color: '#111827',
+                            borderBottom: '1px solid #e5e7eb'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                        >
+                          {editDialogField === 'leadStatus' ? statusConfig[option]?.label || option : option}
+                        </button>
+                      ))}
+                      {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                        <button
+                          onClick={handleEditDialogCustomInput}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'none',
+                            border: 'none',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#10b981'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#ecfdf5'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                        >
+                          + Custom
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={editDialogValue}
+                  onChange={(e) => setEditDialogValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleEditDialogSave(); if (e.key === 'Escape') closeEditDialog(); }}
+                  placeholder={`Enter ${editDialogField.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}...`}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    marginBottom: '16px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={closeEditDialog}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditDialogSave}
+                  disabled={isSavingEditDialog}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: isSavingEditDialog ? 'not-allowed' : 'pointer',
+                    opacity: isSavingEditDialog ? 0.5 : 1
+                  }}
+                >
+                  {isSavingEditDialog ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
