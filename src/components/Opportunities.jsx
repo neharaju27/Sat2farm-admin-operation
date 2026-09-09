@@ -4966,14 +4966,6 @@ export default function Opportunities({ onPageChange }) {
                       Filters
                     </button>
                     <button
-                      onClick={handleDealsCSVDownload}
-                      disabled={isDownloadingCSV}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: isDownloadingCSV ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', opacity: isDownloadingCSV ? 0.6 : 1 }}
-                    >
-                      <Upload size={16} style={{ transform: 'rotate(180deg)' }} />
-                      Download CSV
-                    </button>
-                    <button
                       onClick={() => setPipelineViewMode(pipelineViewMode === 'kanban' ? 'list' : 'kanban')}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: pipelineViewMode === 'kanban' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
                     >
