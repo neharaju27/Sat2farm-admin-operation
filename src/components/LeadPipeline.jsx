@@ -98,6 +98,19 @@ const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', yea
   }
 };
 
+const formatDateToDDMMYYYY = (dateStr) => {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  if (!str) return '';
+  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) return str;
+  const parts = str.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(parts[2])}-${pad(parts[1])}-${parts[0]}`;
+  }
+  return str;
+};
+
 // Helper to extract clean, user-friendly error messages from API responses or error objects
 const extractErrorMessage = (error, defaultMsg = 'An error occurred') => {
   if (!error) return defaultMsg;
@@ -165,13 +178,26 @@ const formatFilterDescription = (filter) => {
     'description': 'Description',
     'created_by': 'Created by',
     'modified_by': 'Modified by',
-    'created_time': 'Created time'
+    'created_time': 'Created time',
+    'modified_time': 'Modified time',
+    'untouched_records': 'Untouched records'
   };
 
   const propName = propMap[rawProp] || rawProp.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+  if (rawProp === 'untouched_records') {
+    const fType = filter.filterType || filter.value;
+    if (fType === '15_days') return 'Untouched records: 15 Days';
+    if (fType === '30_days') return 'Untouched records: 30 Days';
+    if (fType === 'custom') {
+      if (filter.fromDate && filter.toDate) return `Untouched records: ${filter.fromDate} to ${filter.toDate}`;
+      return `Untouched records: Custom`;
+    }
+    return `Untouched records: ${fType || ''}`;
+  }
+
   // Date Filters
-  if (rawProp === 'created_time' || rawProp === 'createdTime') {
+  if (rawProp === 'created_time' || rawProp === 'createdTime' || rawProp === 'modified_time' || rawProp === 'modifiedTime') {
     const op = String(filter.dateOperator || 'on').toLowerCase().trim();
     if (op === 'before') {
       return `${propName} before: ${filter.value || filter.toDate || ''}`;
@@ -661,12 +687,13 @@ export default function LeadPipeline({ onPageChange }) {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [editTaskField, setEditTaskField] = useState(null);
   const [timelineData, setTimelineData] = useState([]); // Timeline data
   const [timelineLoading, setTimelineLoading] = useState(false); // Timeline loading state
   const [taskName, setTaskName] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskOwner, setTaskOwner] = useState('');
-  const [taskStatus, setTaskStatus] = useState('Pending');
+  const [taskStatus, setTaskStatus] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editNoteInput, setEditNoteInput] = useState('');
@@ -801,8 +828,34 @@ export default function LeadPipeline({ onPageChange }) {
         let response;
         const searchApiUrl = import.meta.env.VITE_LEADS_SEARCH_API_URL;
 
-        // 1. If searching, call dedicated search endpoint: /business/leads/search?user=...&query=...&limit=...&offset=...
-        if (isSearching && searchApiUrl) {
+        let untouchedProp = null;
+        if (isFilterApplied && typeof selectedProperties !== 'undefined') {
+          untouchedProp = selectedProperties.find(p => p.property === 'untouched_records');
+        }
+
+        // 1. If untouched_records filter is active, call dedicated untouched leads endpoint
+        if (untouchedProp) {
+          try {
+            const untouchedBaseUrl = import.meta.env.VITE_UNTOUCHED_LEADS_API_URL || 'https://api.sat2farm.com/business/leads/untouched';
+            const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
+            const params = new URLSearchParams({
+              user: currentUserName,
+              filter_type: fType
+            });
+            if (fType === 'custom') {
+              if (untouchedProp.fromDate) params.append('from_date', untouchedProp.fromDate);
+              if (untouchedProp.toDate) params.append('to_date', untouchedProp.toDate);
+            }
+            url = `${untouchedBaseUrl}?${params.toString()}`;
+            console.log('Untouched leads API URL:', url);
+            response = await fetch(url);
+          } catch (untouchedErr) {
+            console.warn('Untouched leads API fetch failed, falling back:', untouchedErr);
+          }
+        }
+
+        // 2. If searching, call dedicated search endpoint: /business/leads/search?user=...&query=...&limit=...&offset=...
+        if ((!response || !response.ok) && isSearching && searchApiUrl) {
           try {
             const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&query=${encodeURIComponent(searchTerm.trim())}&limit=${fetchLimit}&offset=${fetchOffset}`;
             console.log('Lead search URL:', searchUrl);
@@ -841,30 +894,25 @@ export default function LeadPipeline({ onPageChange }) {
             }
             if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
-                if (p.property === 'created_time' || p.property === 'createdTime') {
-                  if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-                    params.append('date_type', p.dateOperator);
-                    if (p.fromDate && p.toDate) {
-                      params.append('from', p.fromDate);
-                      params.append('to', p.toDate);
-                    } else if (p.value || p.date) {
-                      params.append('date', p.value || p.date);
+                if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+                  const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
+                  params.append('date_field', dateField);
+                  const op = p.dateOperator || 'on';
+                  params.append('date_type', op);
+
+                  const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
+                  const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
+                  const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
+
+                  if (op === 'between' || op === 'custom') {
+                    if (formattedFrom && formattedTo) {
+                      params.append('from', formattedFrom);
+                      params.append('to', formattedTo);
+                    } else if (formattedDate) {
+                      params.append('date', formattedDate);
                     }
-                  } else if (p.dateOperator === 'on' && (p.value || p.date)) {
-                    params.append('date_type', 'on');
-                    params.append('date', p.value || p.date);
-                  } else if (p.dateOperator === 'before' && (p.value || p.date)) {
-                    params.append('date_type', 'before');
-                    params.append('date', p.value || p.date);
-                  } else if (p.dateOperator === 'after' && (p.value || p.date)) {
-                    params.append('date_type', 'after');
-                    params.append('date', p.value || p.date);
-                  } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
-                    const unitMap = { day: 'days', week: 'weeks', month: 'months' };
-                    const count = p.count ? parseInt(p.count) : 1;
-                    params.append('date_type', 'in_last');
-                    params.append('last_count', count.toString());
-                    params.append('last_unit', unitMap[p.period] || 'days');
+                  } else if (formattedDate) {
+                    params.append('date', formattedDate);
                   }
                 } else if (p.property && p.value) {
                   const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
@@ -1272,12 +1320,52 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
+  // Helper to format date strings for datetime-local input
+  const formatDateTimeForInput = (dateStr, timeStr) => {
+    if (!dateStr) return '';
+    let fullStr = dateStr;
+    if (timeStr && !dateStr.includes('T') && !dateStr.includes(' ')) {
+      fullStr = `${dateStr}T${timeStr}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(fullStr)) {
+      return fullStr.slice(0, 16);
+    }
+    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}/.test(fullStr)) {
+      return fullStr.replace(' ', 'T').slice(0, 16);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fullStr)) {
+      return timeStr ? `${fullStr}T${timeStr.slice(0, 5)}` : `${fullStr}T09:00`;
+    }
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
+
   // Add task using API
   const handleAddTask = async () => {
     if (isAddingTaskRef.current || addingTask) return;
 
-    if (!taskName.trim()) {
-      toast.error('Please enter task name');
+    if ((!editTaskField || editTaskField === 'task_name') && (!taskName || !taskName.trim())) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'due_date') && (!taskDueDate || !taskDueDate.trim())) {
+      toast.error('Please select due date and time');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'status') && (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task Stage' || taskStatus === 'Choose a Task status')) {
+      toast.error('Please select status');
       return;
     }
 
@@ -1301,8 +1389,9 @@ export default function LeadPipeline({ onPageChange }) {
           lead_id: String(selectedUser.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate,
-          status: taskStatus || 'In Progress',
+          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
+          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          status: taskStatus,
           task_owner: currentUserName,
           user: currentUserName
         })
@@ -1321,7 +1410,7 @@ export default function LeadPipeline({ onPageChange }) {
         toast.success('Task created successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('Pending');
+        setTaskStatus('');
         setShowCreateTaskModal(false);
         // Refresh timeline to show the new task
         fetchTimeline(selectedUser.id);
@@ -1340,11 +1429,12 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   // Edit task - populate form with task data
-  const handleEditTask = (task) => {
+  const handleEditTask = (task, field = null) => {
     setEditingTask(task);
+    setEditTaskField(field);
     setTaskName(task.task_name || '');
-    setTaskDueDate(task.due_date || '');
-    setTaskStatus(task.status || 'Pending');
+    setTaskDueDate(formatDateTimeForInput(task.due_date, task.due_time));
+    setTaskStatus(task.status || '');
     setTaskOwner(task.task_owner || task.created_by || '');
     setShowEditTaskModal(true);
   };
@@ -1353,8 +1443,18 @@ export default function LeadPipeline({ onPageChange }) {
   const handleUpdateTask = async () => {
     if (isUpdatingTaskRef.current || addingTask) return;
 
-    if (!taskName.trim()) {
-      toast.error('Please enter task name');
+    if (!taskName || !taskName.trim()) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if (!taskDueDate || !taskDueDate.trim()) {
+      toast.error('Please select due date and time');
+      return;
+    }
+
+    if (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task Stage' || taskStatus === 'Choose a Task status') {
+      toast.error('Please select status');
       return;
     }
 
@@ -1375,12 +1475,13 @@ export default function LeadPipeline({ onPageChange }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: editingTask.id,
+          id: String(editingTask.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate,
-          status: taskStatus || 'In Progress',
-          task_owner: taskOwner || currentUserName,
+          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
+          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          status: taskStatus,
+          task_owner: editingTask.task_owner || editingTask.created_by || currentUserName,
           user: currentUserName
         })
       });
@@ -1401,7 +1502,7 @@ export default function LeadPipeline({ onPageChange }) {
         toast.success('Task updated successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('Pending');
+        setTaskStatus('');
         setEditingTask(null);
         setShowEditTaskModal(false);
         // Refresh timeline to show the updated task
@@ -2133,30 +2234,25 @@ export default function LeadPipeline({ onPageChange }) {
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
-          if (p.property === 'created_time' || p.property === 'createdTime') {
-            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-              params.append('date_type', p.dateOperator);
-              if (p.fromDate && p.toDate) {
-                params.append('from', p.fromDate);
-                params.append('to', p.toDate);
-              } else if (p.value || p.date) {
-                params.append('date', p.value || p.date);
+          if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+            const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
+            params.append('date_field', dateField);
+            const op = p.dateOperator || 'on';
+            params.append('date_type', op);
+
+            const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
+            const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
+            const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
+
+            if (op === 'between' || op === 'custom') {
+              if (formattedFrom && formattedTo) {
+                params.append('from', formattedFrom);
+                params.append('to', formattedTo);
+              } else if (formattedDate) {
+                params.append('date', formattedDate);
               }
-            } else if (p.dateOperator === 'on' && (p.value || p.date)) {
-              params.append('date_type', 'on');
-              params.append('date', p.value || p.date);
-            } else if (p.dateOperator === 'before' && (p.value || p.date)) {
-              params.append('date_type', 'before');
-              params.append('date', p.value || p.date);
-            } else if (p.dateOperator === 'after' && (p.value || p.date)) {
-              params.append('date_type', 'after');
-              params.append('date', p.value || p.date);
-            } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
-              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
-              const count = p.count ? parseInt(p.count) : 1;
-              params.append('date_type', 'in_last');
-              params.append('last_count', count.toString());
-              params.append('last_unit', unitMap[p.period] || 'days');
+            } else if (formattedDate) {
+              params.append('date', formattedDate);
             }
           } else if (p.property && p.value) {
             const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
@@ -3545,10 +3641,11 @@ export default function LeadPipeline({ onPageChange }) {
                           if (property && !selectedProperties.find(p => p.property === property)) {
                             const newProperty = {
                               property,
-                              value: '',
+                              value: property === 'untouched_records' ? '15_days' : '',
+                              filterType: property === 'untouched_records' ? '15_days' : '',
                               operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
                             };
-                            if (property === 'created_time') {
+                            if (property === 'created_time' || property === 'modified_time') {
                               newProperty.dateOperator = 'on';
                             }
                             setSelectedProperties([...selectedProperties, newProperty]);
@@ -3576,6 +3673,8 @@ export default function LeadPipeline({ onPageChange }) {
                         <option value="lead_source">Lead Source</option>
                         <option value="mailing_city">Mailing City</option>
                         <option value="modified_by">Modified By</option>
+                        <option value="modified_time">Modified Time</option>
+                        <option value="untouched_records">Untouched Records</option>
                       </select>
                     </div>
 
@@ -5315,29 +5414,86 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
-                        {/* Untouched Records special case with Yes/No dropdown */}
+                        {/* Untouched Records special case with 15_days / 30_days / Custom options */}
                         {prop.property === 'untouched_records' && (
-                          <select
-                            value={prop.value || ''}
-                            onChange={(e) => {
-                              const updated = [...selectedProperties];
-                              updated[index].value = e.target.value;
-                              setSelectedProperties(updated);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--r)',
-                              fontSize: '13px',
-                              background: 'var(--surface)',
-                              color: 'var(--text)'
-                            }}
-                          >
-                            <option value="">Select...</option>
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
+                          <div>
+                            <div style={{ marginBottom: '8px' }}>
+                              <select
+                                value={prop.filterType || prop.value || '15_days'}
+                                onChange={(e) => {
+                                  const updated = [...selectedProperties];
+                                  const val = e.target.value;
+                                  updated[index].filterType = val;
+                                  updated[index].value = val;
+                                  if (val !== 'custom') {
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                  }
+                                  setSelectedProperties(updated);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '13px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text)'
+                                }}
+                              >
+                                <option value="15_days">15 Days</option>
+                                <option value="30_days">30 Days</option>
+                                <option value="custom">Custom Date Range</option>
+                              </select>
+                            </div>
+
+                            {(prop.filterType === 'custom' || prop.value === 'custom') && (
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.fromDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].fromDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To Date</label>
+                                  <input
+                                    type="date"
+                                    value={prop.toDate || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].toDate = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
 
                         {/* Activities special case with Is/Is Not dropdown */}
@@ -5596,6 +5752,39 @@ export default function LeadPipeline({ onPageChange }) {
                                 dateOperator: createdTimeProp.dateOperator
                               });
                             }
+                          }
+
+                          // Add modified_time filter if configured
+                          const modifiedTimeProp = selectedProperties.find(prop => prop.property === 'modified_time');
+                          if (modifiedTimeProp) {
+                            if ((modifiedTimeProp.dateOperator === 'on' || modifiedTimeProp.dateOperator === 'before' || modifiedTimeProp.dateOperator === 'after') && modifiedTimeProp.value) {
+                              activeFilters.push({
+                                property: 'modified_time',
+                                value: modifiedTimeProp.value,
+                                dateOperator: modifiedTimeProp.dateOperator
+                              });
+                            } else if ((modifiedTimeProp.dateOperator === 'between' || modifiedTimeProp.dateOperator === 'custom') && (modifiedTimeProp.fromDate && modifiedTimeProp.toDate || modifiedTimeProp.value)) {
+                              activeFilters.push({
+                                property: 'modified_time',
+                                fromDate: modifiedTimeProp.fromDate,
+                                toDate: modifiedTimeProp.toDate,
+                                value: modifiedTimeProp.value,
+                                dateOperator: modifiedTimeProp.dateOperator
+                              });
+                            }
+                          }
+
+                          // Add untouched_records filter if configured
+                          const untouchedProp = selectedProperties.find(prop => prop.property === 'untouched_records');
+                          if (untouchedProp) {
+                            const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
+                            activeFilters.push({
+                              property: 'untouched_records',
+                              filterType: fType,
+                              value: fType,
+                              fromDate: untouchedProp.fromDate || '',
+                              toDate: untouchedProp.toDate || ''
+                            });
                           }
 
                           // Apply all filters together in single API call
@@ -7072,19 +7261,31 @@ export default function LeadPipeline({ onPageChange }) {
                             <tbody>
                               {activities.filter(activity => activity.activity_type === 'task' && activity.task_name).map((activity) => (
                                 <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                  <td style={{ padding: '8px 10px', color: 'var(--text)', fontWeight: '500' }}>{activity.task_name}</td>
-                                  <td style={{ padding: '8px 10px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                                  <td style={{ padding: '8px 10px', color: 'var(--text)', fontWeight: '500' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{activity.task_name}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'task_name')} title="Edit Task Name" />
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 10px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span>{activity.due_date ? `${new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${activity.due_time ? ' ' + activity.due_time : ''}` : '-'}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'due_date')} title="Edit Due Date" />
+                                    </div>
+                                  </td>
                                   <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                                    <span style={{
-                                      backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
-                                      color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
-                                      padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
-                                    }}>{activity.status}</span>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{
+                                        backgroundColor: activity.status === 'Completed' ? '#d1fae5' : '#fef3c7',
+                                        color: activity.status === 'Completed' ? '#047857' : '#b45309',
+                                        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                      }}>{activity.status}</span>
+                                      <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'status')} title="Edit Status" />
+                                    </div>
                                   </td>
                                   <td style={{ padding: '8px 10px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_owner || activity.created_by || '-'}</td>
                                   <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                                     <div style={{ display: 'flex', gap: '6px' }}>
-                                      <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
                                       <button onClick={() => handleDeleteActivity(activity.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Delete</button>
                                     </div>
                                   </td>
@@ -7122,7 +7323,9 @@ export default function LeadPipeline({ onPageChange }) {
               </div>
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Task Type <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select
                     value={taskName}
                     onChange={(e) => setTaskName(e.target.value)}
@@ -7134,25 +7337,27 @@ export default function LeadPipeline({ onPageChange }) {
                     <option value="meet">Meet</option>
                     <option value="follow-up">Follow Up</option>
                     <option value="proposal sent">Proposal Sent</option>
-
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
-                  <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
+                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Status <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select
                     value={taskStatus}
                     onChange={(e) => setTaskStatus(e.target.value)}
                     style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
                   >
-                    <option>Choose a Task Stage</option>
+                    <option value="">Choose a Task Stage</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Completed">Completed</option>
-                    <option value="Due For">Due For</option>
-                  </select>
+                                      </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
@@ -7160,7 +7365,7 @@ export default function LeadPipeline({ onPageChange }) {
                 </div>
               </div>
               <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
-                <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                 <button onClick={handleAddTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Saving...' : 'Save'}</button>
               </div>
             </div>
@@ -7172,52 +7377,58 @@ export default function LeadPipeline({ onPageChange }) {
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
             <div style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--r-lg)', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>Edit Task</h3>
-                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>{editTaskField === 'task_name' ? 'Edit Task Name' : editTaskField === 'due_date' ? 'Edit Due Date' : editTaskField === 'status' ? 'Edit Status' : 'Edit Task'}</h3>
+                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--gray-100)', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '8px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center' }}>
                   <X size={18} />
                 </button>
               </div>
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
-                  <select
-                    value={taskName}
-                    onChange={(e) => setTaskName(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-                  >
-                    <option value="">Select task type</option>
-                    <option value="mail">Mail</option>
-                    <option value="call">Call</option>
-                    <option value="meet">Meet</option>
-                    <option value="follow-up">Follow Up</option>
-                    <option value="proposal sent">Proposal Sent</option>
-
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
-                  <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
-                  <select
-                    value={taskStatus}
-                    onChange={(e) => setTaskStatus(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Due For">Due For</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner / Created By</label>
-                  <input type="text" value={taskOwner} onChange={(e) => setTaskOwner(e.target.value)} placeholder="Enter Task Owner..." style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
-                </div>
+                {(!editTaskField || editTaskField === 'task_name') && (
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Task Type <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Select task type</option>
+                      <option value="mail">Mail</option>
+                      <option value="call">Call</option>
+                      <option value="meet">Meet</option>
+                      <option value="follow-up">Follow Up</option>
+                      <option value="proposal sent">Proposal Sent</option>
+                    </select>
+                  </div>
+                )}
+                {(!editTaskField || editTaskField === 'due_date') && (
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                  </div>
+                )}
+                {(!editTaskField || editTaskField === 'status') && (
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Status <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => setTaskStatus(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+                    >
+                      <option value="">Choose a Task Stage</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                                          </select>
+                  </div>
+                )}
               </div>
               <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--gray-50)', borderBottomLeftRadius: 'var(--r-lg)', borderBottomRightRadius: 'var(--r-lg)' }}>
-                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                 <button onClick={handleUpdateTask} disabled={addingTask} style={{ backgroundColor: addingTask ? 'var(--gray-400)' : 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Updating...' : 'Update'}</button>
               </div>
             </div>

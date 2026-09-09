@@ -1109,6 +1109,32 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`last_count=${count}`);
             urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
           }
+        } else if (filter.property === 'modified_time' || filter.property === 'modifiedTime') {
+          const val = filter.value || filter.date;
+          if (filter.dateOperator === 'on' && val) {
+            urlParams.push(`modified_time_on=${encodeURIComponent(val)}`);
+            urlParams.push(`date_type=on`);
+            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'after' && val) {
+            urlParams.push(`modified_time_after=${encodeURIComponent(val)}`);
+            urlParams.push(`date_type=after`);
+            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'before' && val) {
+            urlParams.push(`modified_time_before=${encodeURIComponent(val)}`);
+            urlParams.push(`date_type=before`);
+            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && filter.fromDate && filter.toDate) {
+            urlParams.push(`modified_time_between=${encodeURIComponent(filter.fromDate)},${encodeURIComponent(filter.toDate)}`);
+            urlParams.push(`date_type=${filter.dateOperator}`);
+            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
+            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+          } else if (filter.dateOperator === 'in_the_last') {
+            const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+            const count = filter.count ? parseInt(filter.count) : 1;
+            urlParams.push(`date_type=in_last`);
+            urlParams.push(`last_count=${count}`);
+            urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
+          }
         } else if (filter.property && filter.value) {
           const paramName = getFilterQueryParamKey(filter.property, filter.operator);
           urlParams.push(`${paramName}=${encodeURIComponent(filter.value)}`);
@@ -1233,6 +1259,7 @@ export default function Opportunities({ onPageChange }) {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [editTaskField, setEditTaskField] = useState(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editNoteInput, setEditNoteInput] = useState('');
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'kanban'
@@ -1283,7 +1310,7 @@ export default function Opportunities({ onPageChange }) {
   const [customDealType, setCustomDealType] = useState('');
   const [customDealStage, setCustomDealStage] = useState('');
   const [customDealOwner, setCustomDealOwner] = useState('');
-  const [taskStatus, setTaskStatus] = useState('Pending');
+  const [taskStatus, setTaskStatus] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [activities, setActivities] = useState([]);
   const [addingNote, setAddingNote] = useState(false);
@@ -1402,6 +1429,36 @@ export default function Opportunities({ onPageChange }) {
                   params.append('date', val);
                 } else if (p.dateOperator === 'after' && val) {
                   params.append('created_time_after', val);
+                  params.append('date_type', 'after');
+                  params.append('date', val);
+                } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+                  const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+                  const count = p.count ? parseInt(p.count) : 1;
+                  params.append('date_type', 'in_last');
+                  params.append('last_count', count.toString());
+                  params.append('last_unit', unitMap[p.period] || 'days');
+                }
+              } else if (p.property === 'modified_time' || p.property === 'modifiedTime') {
+                const val = p.value || p.date;
+                if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+                  if (p.fromDate && p.toDate) {
+                    params.append('modified_time_between', `${p.fromDate},${p.toDate}`);
+                    params.append('from', p.fromDate);
+                    params.append('to', p.toDate);
+                  } else if (val) {
+                    params.append('date', val);
+                  }
+                  params.append('date_type', p.dateOperator);
+                } else if (p.dateOperator === 'on' && val) {
+                  params.append('modified_time_on', val);
+                  params.append('date_type', 'on');
+                  params.append('date', val);
+                } else if (p.dateOperator === 'before' && val) {
+                  params.append('modified_time_before', val);
+                  params.append('date_type', 'before');
+                  params.append('date', val);
+                } else if (p.dateOperator === 'after' && val) {
+                  params.append('modified_time_after', val);
                   params.append('date_type', 'after');
                   params.append('date', val);
                 } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
@@ -2568,10 +2625,50 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
+  // Helper to format date strings for datetime-local input
+  const formatDateTimeForInput = (dateStr, timeStr) => {
+    if (!dateStr) return '';
+    let fullStr = dateStr;
+    if (timeStr && !dateStr.includes('T') && !dateStr.includes(' ')) {
+      fullStr = `${dateStr}T${timeStr}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(fullStr)) {
+      return fullStr.slice(0, 16);
+    }
+    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}/.test(fullStr)) {
+      return fullStr.replace(' ', 'T').slice(0, 16);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fullStr)) {
+      return timeStr ? `${fullStr}T${timeStr.slice(0, 5)}` : `${fullStr}T09:00`;
+    }
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
+
   // Add task using API
   const handleAddTask = async () => {
-    if (!taskName.trim()) {
-      toast.error('Please enter task name');
+    if ((!editTaskField || editTaskField === 'task_name') && (!taskName || !taskName.trim())) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'due_date') && (!taskDueDate || !taskDueDate.trim())) {
+      toast.error('Please select due date and time');
+      return;
+    }
+
+    if ((!editTaskField || editTaskField === 'status') && (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task status' || taskStatus === 'Choose a Task Stage')) {
+      toast.error('Please select status');
       return;
     }
 
@@ -2584,8 +2681,6 @@ export default function Opportunities({ onPageChange }) {
     const currentUserName = getApiUserName(user);
     const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
 
-    const validStatus = (taskStatus === 'Completed' || taskStatus === 'In Progress' || taskStatus === 'Due For') ? taskStatus : 'In Progress';
-
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -2596,8 +2691,9 @@ export default function Opportunities({ onPageChange }) {
           lead_id: String(selectedUser.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate,
-          status: validStatus,
+          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
+          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          status: taskStatus,
           task_owner: taskOwner || currentUserName,
           user: currentUserName
         })
@@ -2615,7 +2711,7 @@ export default function Opportunities({ onPageChange }) {
         toast.success('Task created successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('In Progress');
+        setTaskStatus('');
         setShowCreateTaskModal(false);
         fetchTimeline(selectedUser.id);
         fetchActivities(selectedUser.id);
@@ -2631,18 +2727,29 @@ export default function Opportunities({ onPageChange }) {
   };
 
   // Edit task - populate form with task data
-  const handleEditTask = (task) => {
+  const handleEditTask = (task, field = null) => {
     setEditingTask(task);
-    setTaskName(task.task_name);
-    setTaskDueDate(task.due_date);
-    setTaskStatus(task.status || 'In Progress');
+    setEditTaskField(field);
+    setTaskName(task.task_name || '');
+    setTaskDueDate(formatDateTimeForInput(task.due_date, task.due_time));
+    setTaskStatus(task.status || '');
     setShowEditTaskModal(true);
   };
 
   // Update task using API
   const handleUpdateTask = async () => {
-    if (!taskName.trim()) {
-      toast.error('Please enter task name');
+    if (!taskName || !taskName.trim()) {
+      toast.error('Please select task type');
+      return;
+    }
+
+    if (!taskDueDate || !taskDueDate.trim()) {
+      toast.error('Please select due date and time');
+      return;
+    }
+
+    if (!taskStatus || !taskStatus.trim() || taskStatus === 'Choose a Task status' || taskStatus === 'Choose a Task Stage') {
+      toast.error('Please select status');
       return;
     }
 
@@ -2655,8 +2762,6 @@ export default function Opportunities({ onPageChange }) {
     const currentUserName = getApiUserName(user);
     const url = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
 
-    const validStatus = (taskStatus === 'Completed' || taskStatus === 'In Progress' || taskStatus === 'Due For') ? taskStatus : 'In Progress';
-
     try {
       const response = await fetch(url, {
         method: 'PUT',
@@ -2664,12 +2769,13 @@ export default function Opportunities({ onPageChange }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: editingTask.id,
+          id: String(editingTask.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate,
-          status: validStatus,
-          task_owner: taskOwner || currentUserName,
+          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
+          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          status: taskStatus,
+          task_owner: editingTask.task_owner || editingTask.created_by || currentUserName,
           user: currentUserName
         })
       });
@@ -2686,7 +2792,7 @@ export default function Opportunities({ onPageChange }) {
         toast.success('Task updated successfully');
         setTaskName('');
         setTaskDueDate('');
-        setTaskStatus('In Progress');
+        setTaskStatus('');
         setShowEditTaskModal(false);
         setEditingTask(null);
         if (selectedUser) {
@@ -3624,6 +3730,36 @@ export default function Opportunities({ onPageChange }) {
               params.append('last_count', count.toString());
               params.append('last_unit', unitMap[p.period] || 'days');
             }
+          } else if (p.property === 'modified_time' || p.property === 'modifiedTime') {
+            const val = p.value || p.date;
+            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
+              if (p.fromDate && p.toDate) {
+                params.append('modified_time_between', `${p.fromDate},${p.toDate}`);
+                params.append('from', p.fromDate);
+                params.append('to', p.toDate);
+              } else if (val) {
+                params.append('date', val);
+              }
+              params.append('date_type', p.dateOperator);
+            } else if (p.dateOperator === 'on' && val) {
+              params.append('modified_time_on', val);
+              params.append('date_type', 'on');
+              params.append('date', val);
+            } else if (p.dateOperator === 'before' && val) {
+              params.append('modified_time_before', val);
+              params.append('date_type', 'before');
+              params.append('date', val);
+            } else if (p.dateOperator === 'after' && val) {
+              params.append('modified_time_after', val);
+              params.append('date_type', 'after');
+              params.append('date', val);
+            } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const count = p.count ? parseInt(p.count) : 1;
+              params.append('date_type', 'in_last');
+              params.append('last_count', count.toString());
+              params.append('last_unit', unitMap[p.period] || 'days');
+            }
           } else if (p.property && p.value) {
             const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
             params.append(paramKey, p.value);
@@ -3675,6 +3811,148 @@ export default function Opportunities({ onPageChange }) {
       console.error('Network error downloading filtered CSV:', err);
       toast.dismiss();
       toast.error(err.message || 'No data available to download');
+    } finally {
+      setIsDownloadingCSV(false);
+    }
+  };
+
+  // Download Deals CSV handler using https://api.sat2farm.com/deals/deals/download
+  const handleDealsCSVDownload = async () => {
+    try {
+      setIsDownloadingCSV(true);
+      toast.loading('Downloading Deals CSV...');
+      const currentUser = getApiUserName(user);
+
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_DEALS_CSV_URL || 'https://api.sat2farm.com/deals/deals/download';
+      const params = new URLSearchParams({
+        user: currentUser
+      });
+
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('query', searchTerm.trim());
+      }
+
+      const dateFieldMap = {
+        closing_date: 'deal_close_date',
+        created_time: 'created_time',
+        modified_time: 'modified_time'
+      };
+
+      if (salesFiltersApplied && selectedSalesProperties && selectedSalesProperties.length > 0) {
+        selectedSalesProperties.forEach(filter => {
+          if (filter.property === 'deal_owner' && filter.value) {
+            const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'deal_owner_is_not' : 'deal_owner_is';
+            filter.value.split(',').filter(v => v.trim()).forEach(value => {
+              params.append(param, value.trim());
+            });
+          } else if (filter.property === 'deal_name' && (filter.value || filter.searchTerm)) {
+            const operator = filter.operator || 'contains';
+            params.append('deal_name_operator', operator);
+            params.append('deal_name', filter.value || filter.searchTerm);
+          } else if (filter.property === 'amount' && (filter.value || filter.operator === 'between')) {
+            if (filter.operator === 'between') {
+              params.append('amount_operator', 'between');
+              params.append('from_amount', filter.value || '0');
+              params.append('to_amount', filter.value2 || '');
+            } else {
+              const operator = filter.operator || 'equals';
+              params.append('amount_operator', operator);
+              params.append('amount', filter.value);
+            }
+          } else if (filter.property === 'deal_type' && filter.value) {
+            const param = filter.operator === 'is not' ? 'deal_type_is_not' : 'deal_type_is';
+            filter.value.split(',').filter(v => v.trim()).forEach(value => {
+              params.append(param, value.trim());
+            });
+          } else if (filter.property === 'deal_stage' && filter.value) {
+            const param = filter.operator === 'is not' ? 'deal_stage_is_not' : 'deal_stage_is';
+            filter.value.split(',').filter(v => v.trim()).forEach(value => {
+              params.append(param, value.trim());
+            });
+          } else if (filter.property === 'created_by' && filter.value) {
+            const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'created_by_is_not' : 'created_by_is';
+            filter.value.split(',').filter(v => v.trim()).forEach(value => {
+              params.append(param, value.trim());
+            });
+          } else if (filter.property === 'modified_by' && filter.value) {
+            const param = (filter.operator === "isn't" || filter.operator === 'is not') ? 'modified_by_is_not' : 'modified_by_is';
+            filter.value.split(',').filter(v => v.trim()).forEach(value => {
+              params.append(param, value.trim());
+            });
+          } else if (['closing_date', 'created_time', 'modified_time'].includes(filter.property)) {
+            const dateField = dateFieldMap[filter.property];
+            if (filter.dateOperator === 'on' && filter.value) {
+              params.append('date_field', dateField);
+              params.append('date_type', 'on');
+              params.append('date', filter.value);
+            } else if (filter.dateOperator === 'before' && filter.value) {
+              params.append('date_field', dateField);
+              params.append('date_type', 'before');
+              params.append('date', filter.value);
+            } else if (filter.dateOperator === 'after' && filter.value) {
+              params.append('date_field', dateField);
+              params.append('date_type', 'after');
+              params.append('date', filter.value);
+            } else if (filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
+              params.append('date_field', dateField);
+              params.append('date_type', 'between');
+              params.append('from', filter.fromDate);
+              params.append('to', filter.toDate);
+            } else if (filter.dateOperator === 'in_the_last' && filter.period) {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const countMap = { day: 1, week: 7, month: 30 };
+              const count = filter.count ? parseInt(filter.count) : countMap[filter.period] || 1;
+              params.append('date_field', dateField);
+              params.append('date_type', 'in_last');
+              params.append('last_count', count.toString());
+              params.append('last_unit', unitMap[filter.period] || 'days');
+            }
+          }
+        });
+      }
+
+      const downloadUrl = `${downloadApiUrl}?${params.toString()}`;
+
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'No deals data available to download';
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed && parsed.message) {
+            errorMessage = parsed.message.toLowerCase().includes('no data')
+              ? 'No deals data available to download'
+              : parsed.message;
+          }
+        } catch (e) {
+          if (errorText && !errorText.startsWith('<') && !errorText.includes('HTTP error')) {
+            errorMessage = errorText;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const downloadBlobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadBlobUrl;
+      a.download = `deals_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadBlobUrl);
+      document.body.removeChild(a);
+      toast.dismiss();
+      toast.success('Deals CSV downloaded successfully');
+    } catch (err) {
+      console.error('Network error downloading deals CSV:', err);
+      toast.dismiss();
+      toast.error(err.message || 'No deals data available to download');
     } finally {
       setIsDownloadingCSV(false);
     }
@@ -3928,12 +4206,12 @@ export default function Opportunities({ onPageChange }) {
             </button>
 
             {viewMode === 'table' && (
-            <button
-              onClick={handleCSVImport}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
-            >
-              <Upload size={16} /> Import CSV
-            </button>
+              <button
+                onClick={handleCSVImport}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                <Upload size={16} /> Import CSV
+              </button>
             )}
           </div>
         </div>
@@ -4677,6 +4955,14 @@ export default function Opportunities({ onPageChange }) {
                     >
                       <Filter size={16} />
                       Filters
+                    </button>
+                    <button
+                      onClick={handleDealsCSVDownload}
+                      disabled={isDownloadingCSV}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: isDownloadingCSV ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '500', opacity: isDownloadingCSV ? 0.6 : 1 }}
+                    >
+                      <Upload size={16} style={{ transform: 'rotate(180deg)' }} />
+                      Download CSV
                     </button>
                     <button
                       onClick={() => setPipelineViewMode(pipelineViewMode === 'kanban' ? 'list' : 'kanban')}
@@ -7868,21 +8154,31 @@ export default function Opportunities({ onPageChange }) {
                               <tbody>
                                 {activities.filter(activity => activity.activity_type === 'task' || activity.task_name).map((activity) => (
                                   <tr key={activity.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_name}</td>
-                                    <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{activity.due_date ? new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>{activity.task_name}</span>
+                                        <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'task_name')} title="Edit Task Name" />
+                                      </div>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>{activity.due_date ? `${new Date(activity.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${activity.due_time ? ' ' + activity.due_time : ''}` : '-'}</span>
+                                        <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'due_date')} title="Edit Due Date" />
+                                      </div>
+                                    </td>
                                     <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
-                                      <span style={{
-                                        backgroundColor: activity.status === 'Completed' ? '#d1fae5' : activity.status === 'In Progress' ? '#fef3c7' : activity.status === 'Due For' ? '#fee2e2' : '#dbeafe',
-                                        color: activity.status === 'Completed' ? '#047857' : activity.status === 'In Progress' ? '#b45309' : activity.status === 'Due For' ? '#dc2626' : '#1d4ed8',
-                                        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
-                                      }}>{activity.status || 'In Progress'}</span>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{
+                                          backgroundColor: activity.status === 'Completed' ? '#d1fae5' : '#fef3c7',
+                                          color: activity.status === 'Completed' ? '#047857' : '#b45309',
+                                          padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500'
+                                        }}>{activity.status || 'In Progress'}</span>
+                                        <FileEdit size={14} style={{ cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }} onClick={() => handleEditTask(activity, 'status')} title="Edit Status" />
+                                      </div>
                                     </td>
                                     <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{activity.task_owner || activity.created_by || '-'}</td>
                                     <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
-                                      <div style={{ display: 'flex', gap: '6px' }}>
-                                        <button onClick={() => handleEditTask(activity)} style={{ backgroundColor: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
-                                        <button onClick={() => handleDeleteActivity(activity.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Delete</button>
-                                      </div>
+                                      <button onClick={() => handleDeleteActivity(activity.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '500', cursor: 'pointer' }}>Delete</button>
                                     </td>
                                   </tr>
                                 ))}
@@ -9687,7 +9983,9 @@ export default function Opportunities({ onPageChange }) {
                 </div>
                 <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Task Type</label>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
+                      Task Type <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <select
                       value={taskName}
                       onChange={(e) => setTaskName(e.target.value)}
@@ -9702,21 +10000,24 @@ export default function Opportunities({ onPageChange }) {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Due Date</label>
-                    <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
+                      Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Status</label>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
+                      Status <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <select
                       value={taskStatus}
                       onChange={(e) => setTaskStatus(e.target.value)}
                       style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
                     >
-                      <option value="">Choose a Task status</option>
+                      <option value="">Choose a Task Stage</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Completed">Completed</option>
-                      <option value="Due For">Due For</option>
-                    </select>
+                                          </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Task Owner</label>
@@ -9724,7 +10025,7 @@ export default function Opportunities({ onPageChange }) {
                   </div>
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
-                  <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={() => { setShowCreateTaskModal(false); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '8px 16px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
                   <button onClick={handleAddTask} disabled={addingTask} style={{ background: 'var(--green-600)', color: '#fff', border: 'none', borderRadius: 'var(--r)', padding: '8px 20px', fontSize: '13px', fontWeight: '500', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Saving...' : 'Save'}</button>
                 </div>
               </div>
@@ -9736,52 +10037,58 @@ export default function Opportunities({ onPageChange }) {
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }}>
               <div style={{ backgroundColor: '#fff', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>Edit Task</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>{editTaskField === 'task_name' ? 'Edit Task Name' : editTaskField === 'due_date' ? 'Edit Due Date' : editTaskField === 'status' ? 'Edit Status' : 'Edit Task'}</h3>
                   <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                     <X size={18} />
                   </button>
                 </div>
                 <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Type</label>
-                    <select
-                      value={taskName}
-                      onChange={(e) => setTaskName(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
-                    >
-                      <option value="">Select task type</option>
-                      <option value="mail">Mail</option>
-                      <option value="call">Call</option>
-                      <option value="meet">Meet</option>
-                      <option value="follow-up">Follow Up</option>
-                      <option value="payment follow-up">Payment Follow Up</option>
-
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Due Date</label>
-                    <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Status</label>
-                    <select
-                      value={taskStatus}
-                      onChange={(e) => setTaskStatus(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
-                    >
-
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Due For">Due For</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
-                    <input type="text" value={getApiUserName(user)} readOnly style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} />
-                  </div>
+                  {(!editTaskField || editTaskField === 'task_name') && (
+                    <div>
+                      <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Task Type <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        value={taskName}
+                        onChange={(e) => setTaskName(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
+                      >
+                        <option value="">Select task type</option>
+                        <option value="mail">Mail</option>
+                        <option value="call">Call</option>
+                        <option value="meet">Meet</option>
+                        <option value="follow-up">Follow Up</option>
+                        <option value="payment follow-up">Payment Follow Up</option>
+                      </select>
+                    </div>
+                  )}
+                  {(!editTaskField || editTaskField === 'due_date') && (
+                    <div>
+                      <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b' }} />
+                    </div>
+                  )}
+                  {(!editTaskField || editTaskField === 'status') && (
+                    <div>
+                      <label style={{ display: 'block', color: '#334155', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Status <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        value={taskStatus}
+                        onChange={(e) => setTaskStatus(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', cursor: 'pointer' }}
+                      >
+                        <option value="">Choose a Task Stage</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                                              </select>
+                    </div>
+                  )}
                 </div>
                 <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: '#fafbfc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
-                  <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus('Pending'); }} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={() => { setShowEditTaskModal(false); setEditingTask(null); setTaskName(''); setTaskDueDate(''); setTaskStatus(''); }} style={{ backgroundColor: '#fff', color: '#475569', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                   <button onClick={handleUpdateTask} disabled={addingTask} style={{ background: addingTask ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 24px', fontSize: '14px', fontWeight: '600', cursor: addingTask ? 'not-allowed' : 'pointer' }}>{addingTask ? 'Updating...' : 'Update'}</button>
                 </div>
               </div>
@@ -9923,6 +10230,7 @@ export default function Opportunities({ onPageChange }) {
                         <option value="">Choose Property</option>
                         <option value="contact_owner">Contact Owner</option>
                         <option value="created_time">Created Time</option>
+                        <option value="modified_time">Modified Time</option>
                         <option value="tag">Tags</option>
                         <option value="mailing_country">Mailing Country</option>
                         <option value="mailing_state">Mailing State</option>
