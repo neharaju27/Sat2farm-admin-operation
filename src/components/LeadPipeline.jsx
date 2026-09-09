@@ -692,6 +692,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [timelineLoading, setTimelineLoading] = useState(false); // Timeline loading state
   const [taskName, setTaskName] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskDueTime, setTaskDueTime] = useState('23:59');
   const [taskOwner, setTaskOwner] = useState('');
   const [taskStatus, setTaskStatus] = useState('');
   const [noteInput, setNoteInput] = useState('');
@@ -1320,21 +1321,11 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
-  // Helper to format date strings for datetime-local input
-  const formatDateTimeForInput = (dateStr, timeStr) => {
+  // Helper to format date strings for input
+  const formatDateForInput = (dateStr) => {
     if (!dateStr) return '';
-    let fullStr = dateStr;
-    if (timeStr && !dateStr.includes('T') && !dateStr.includes(' ')) {
-      fullStr = `${dateStr}T${timeStr}`;
-    }
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(fullStr)) {
-      return fullStr.slice(0, 16);
-    }
-    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}/.test(fullStr)) {
-      return fullStr.replace(' ', 'T').slice(0, 16);
-    }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(fullStr)) {
-      return timeStr ? `${fullStr}T${timeStr.slice(0, 5)}` : `${fullStr}T09:00`;
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return dateStr.slice(0, 10);
     }
     try {
       const d = new Date(dateStr);
@@ -1342,12 +1333,27 @@ export default function LeadPipeline({ onPageChange }) {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+        return `${year}-${month}-${day}`;
       }
     } catch (e) {}
     return dateStr;
+  };
+
+  const formatTimeForInput = (dateStr, timeStr) => {
+    if (timeStr && /^\d{2}:\d{2}/.test(timeStr)) {
+      return timeStr.slice(0, 5);
+    }
+    if (dateStr && dateStr.includes('T')) {
+      const t = dateStr.split('T')[1];
+      if (t) return t.slice(0, 5);
+    }
+    if (dateStr && dateStr.includes(' ')) {
+      const parts = dateStr.split(' ');
+      if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
+        return parts[1].slice(0, 5);
+      }
+    }
+    return '23:59';
   };
 
   // Add task using API
@@ -1360,7 +1366,7 @@ export default function LeadPipeline({ onPageChange }) {
     }
 
     if ((!editTaskField || editTaskField === 'due_date') && (!taskDueDate || !taskDueDate.trim())) {
-      toast.error('Please select due date and time');
+      toast.error('Please select due date');
       return;
     }
 
@@ -1389,8 +1395,8 @@ export default function LeadPipeline({ onPageChange }) {
           lead_id: String(selectedUser.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
-          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          due_date: taskDueDate ? formatDateForInput(taskDueDate) : '',
+          due_time: taskDueTime ? taskDueTime.slice(0, 5) : '23:59',
           status: taskStatus,
           task_owner: currentUserName,
           user: currentUserName
@@ -1405,11 +1411,11 @@ export default function LeadPipeline({ onPageChange }) {
 
       const result = await response.json();
 
-
       if (result.success || result.message) {
         toast.success('Task created successfully');
         setTaskName('');
         setTaskDueDate('');
+        setTaskDueTime('23:59');
         setTaskStatus('');
         setShowCreateTaskModal(false);
         // Refresh timeline to show the new task
@@ -1433,7 +1439,8 @@ export default function LeadPipeline({ onPageChange }) {
     setEditingTask(task);
     setEditTaskField(field);
     setTaskName(task.task_name || '');
-    setTaskDueDate(formatDateTimeForInput(task.due_date, task.due_time));
+    setTaskDueDate(formatDateForInput(task.due_date));
+    setTaskDueTime(formatTimeForInput(task.due_date, task.due_time));
     setTaskStatus(task.status || '');
     setTaskOwner(task.task_owner || task.created_by || '');
     setShowEditTaskModal(true);
@@ -1449,7 +1456,7 @@ export default function LeadPipeline({ onPageChange }) {
     }
 
     if (!taskDueDate || !taskDueDate.trim()) {
-      toast.error('Please select due date and time');
+      toast.error('Please select due date');
       return;
     }
 
@@ -1478,8 +1485,8 @@ export default function LeadPipeline({ onPageChange }) {
           id: String(editingTask.id),
           activity_type: 'task',
           task_name: taskName,
-          due_date: taskDueDate ? taskDueDate.split('T')[0] : '',
-          due_time: taskDueDate && taskDueDate.includes('T') ? taskDueDate.split('T')[1] : '',
+          due_date: taskDueDate ? formatDateForInput(taskDueDate) : '',
+          due_time: taskDueTime ? taskDueTime.slice(0, 5) : '23:59',
           status: taskStatus,
           task_owner: editingTask.task_owner || editingTask.created_by || currentUserName,
           user: currentUserName
@@ -1502,6 +1509,7 @@ export default function LeadPipeline({ onPageChange }) {
         toast.success('Task updated successfully');
         setTaskName('');
         setTaskDueDate('');
+        setTaskDueTime('23:59');
         setTaskStatus('');
         setEditingTask(null);
         setShowEditTaskModal(false);
@@ -7339,11 +7347,37 @@ export default function LeadPipeline({ onPageChange }) {
                     <option value="proposal sent">Proposal Sent</option>
                   </select>
                 </div>
-                <div>
-                  <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
-                    Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Due Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Calendar size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                      <input
+                        type="date"
+                        value={taskDueDate}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                        onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
+                        style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                      Due Time <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Clock size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                      <input
+                        type="time"
+                        value={taskDueTime}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                        onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
+                        style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
@@ -7357,7 +7391,7 @@ export default function LeadPipeline({ onPageChange }) {
                     <option value="">Choose a Task Stage</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Completed">Completed</option>
-                                      </select>
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Task Owner</label>
@@ -7403,11 +7437,37 @@ export default function LeadPipeline({ onPageChange }) {
                   </div>
                 )}
                 {(!editTaskField || editTaskField === 'due_date') && (
-                  <div>
-                    <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
-                      Due Date & Time <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <input type="datetime-local" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Due Date <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Calendar size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                        <input
+                          type="date"
+                          value={taskDueDate}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
+                          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                        Due Time <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Clock size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                        <input
+                          type="time"
+                          value={taskDueTime}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
+                          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
                 {(!editTaskField || editTaskField === 'status') && (
@@ -7423,7 +7483,7 @@ export default function LeadPipeline({ onPageChange }) {
                       <option value="">Choose a Task Stage</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Completed">Completed</option>
-                                          </select>
+                    </select>
                   </div>
                 )}
               </div>
@@ -8932,4 +8992,3 @@ export default function LeadPipeline({ onPageChange }) {
     </div>
   );
 }
-
