@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+	<name>terrace_garden_sample.kml</name>
+	<coordinates>
+        77.57541541010141, 13.034537695978585
+	</coordinates>
+</Document>
+</kml>
