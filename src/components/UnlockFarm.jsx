@@ -110,6 +110,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [irrigation, setIrrigation] = useState('');
   const [cropsList, setCropsList] = useState([]);
   const [loadingCrops, setLoadingCrops] = useState(false);
+  const [varietiesList, setVarietiesList] = useState([]);
 
   // State for farmer selection
   const [farmerSearchQuery, setFarmerSearchQuery] = useState('');
@@ -297,6 +298,31 @@ export default function UnlockFarm({ user, onPageChange }) {
     } finally {
       setLoadingCrops(false);
     }
+  };
+
+  // Crop-to-variety mapping
+  const cropVarietyMapping = {
+    'Paddymedium': ['Mahaveer', 'Amrut', 'Shakthi', 'IR-64', 'CO-47', 'ADT-36', 'Tulsi', 'Roshi', 'Annada', 'Maibee', 'Govind', 'Dimroo', 'Saket-4', 'RNR-15048', 'Narender-80', 'ASP 18', 'Rasi', 'IR-20', 'IR-36', 'CO-43', 'CO-46', 'Lalat', 'Banglami', 'Rangadoria', 'CSR-10', 'Kasturi', 'KNM-1638', 'Panth-4', 'BPT-5204', 'ASP-25 FL', 'SD20A (Soberana)', 'Signia', 'Fedearroz 50', 'Others'],
+    'Paddy-Basmati': ['Rities', '1509', '1692', '1718', '1121', 'PB-7', '1847', '1885'],
+   
+    'Date_Palm': ['Barhi', 'Deglet Nour', 'Medjool', 'Khuneji'],
+    'Lettuce': ['Iceberg', 'Romaine'],
+    'Panicum': ['Siambaza'],
+    'Bamboo': ['Bambusa tulda']
+  };
+
+  const handleCropTypeChange = (selectedCrop) => {
+    setCropType(selectedCrop);
+    setVariety(''); // Reset variety when crop changes
+
+    console.log('Selected crop:', selectedCrop);
+
+    // Get varieties for the selected crop
+    const varieties = cropVarietyMapping[selectedCrop] || [];
+
+    console.log('Varieties found:', varieties);
+
+    setVarietiesList(varieties);
   };
 
   const fetchFarmerApiKey = async (farmer) => {
@@ -2758,7 +2784,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                         <label>Crop Type</label>
                         <select
                           value={cropType}
-                          onChange={(e) => setCropType(e.target.value)}
+                          onChange={(e) => handleCropTypeChange(e.target.value)}
                           disabled={loadingCrops}
                         >
                           <option value="">
@@ -2774,12 +2800,26 @@ export default function UnlockFarm({ user, onPageChange }) {
 
                       <div className="form-group">
                         <label>Variety</label>
-                        <input
-                          type="text"
-                          value={variety}
-                          onChange={(e) => setVariety(e.target.value)}
-                          placeholder="Enter variety"
-                        />
+                        {varietiesList.length > 0 ? (
+                          <select
+                            value={variety}
+                            onChange={(e) => setVariety(e.target.value)}
+                          >
+                            <option value="">Select variety</option>
+                            {varietiesList.map((varietyItem) => (
+                              <option key={varietyItem} value={varietyItem}>
+                                {varietyItem}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={variety}
+                            onChange={(e) => setVariety(e.target.value)}
+                            placeholder="Enter variety"
+                          />
+                        )}
                       </div>
 
                       <div className="form-group">

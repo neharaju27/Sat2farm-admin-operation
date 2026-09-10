@@ -19,6 +19,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
   const [saving, setSaving] = useState(false);
   const [cropsList, setCropsList] = useState([]);
   const [loadingCrops, setLoadingCrops] = useState(false);
+  const [varietiesList, setVarietiesList] = useState([]);
   
 
   useEffect(() => {
@@ -371,8 +372,35 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
     }
   };
 
+  // Crop-to-variety mapping
+  const cropVarietyMapping = {
+    'Paddymedium': ['Mahaveer', 'Amrut', 'Shakthi', 'IR-64', 'CO-47', 'ADT-36', 'Tulsi', 'Roshi', 'Annada', 'Maibee', 'Govind', 'Dimroo', 'Saket-4', 'RNR-15048', 'Narender-80', 'ASP 18', 'Rasi', 'IR-20', 'IR-36', 'CO-43', 'CO-46', 'Lalat', 'Banglami', 'Rangadoria', 'CSR-10', 'Kasturi', 'KNM-1638', 'Panth-4', 'BPT-5204', 'ASP-25 FL', 'SD20A (Soberana)', 'Signia', 'Fedearroz 50', 'Others'],
+    'Paddy-Basmati': ['Rities', '1509', '1692', '1718', '1121', 'PB-7', '1847', '1885'],
+    'Date_Palm': ['Barhi', 'Deglet Nour', 'Medjool', 'Khuneji'],
+    'Lettuce': ['Iceberg', 'Romaine'],
+    'Panicum': ['Siambaza'],
+    'Bamboo': ['Bambusa tulda']
+  };
+
+  const handleCropTypeChange = (selectedCrop) => {
+    setEditForm({
+      ...editForm,
+      crop_type: selectedCrop,
+      crop_variety: '' // Reset variety when crop changes
+    });
+
+    // Get varieties for the selected crop
+    const varieties = cropVarietyMapping[selectedCrop] || [];
+    setVarietiesList(varieties);
+  };
+
   const handleEditFarm = () => {
     setShowEditModal(true);
+    // Populate varieties for the current crop type
+    if (editForm.crop_type) {
+      const varieties = cropVarietyMapping[editForm.crop_type] || [];
+      setVarietiesList(varieties);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -588,7 +616,7 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                 </label>
                 <select
                   value={editForm.crop_type}
-                  onChange={(e) => setEditForm({...editForm, crop_type: e.target.value})}
+                  onChange={(e) => handleCropTypeChange(e.target.value)}
                   disabled={loadingCrops}
                   style={{
                     width: '100%',
@@ -614,19 +642,41 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                 <label style={{display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
                   Crop Variety
                 </label>
-                <input
-                  type="text"
-                  value={editForm.crop_variety}
-                  onChange={(e) => setEditForm({...editForm, crop_variety: e.target.value})}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                  placeholder="Enter crop variety"
-                />
+                {varietiesList.length > 0 ? (
+                  <select
+                    value={editForm.crop_variety}
+                    onChange={(e) => setEditForm({...editForm, crop_variety: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      backgroundColor: '#fff'
+                    }}
+                  >
+                    <option value="">Select variety</option>
+                    {varietiesList.map((varietyItem) => (
+                      <option key={varietyItem} value={varietyItem}>
+                        {varietyItem}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={editForm.crop_variety}
+                    onChange={(e) => setEditForm({...editForm, crop_variety: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Enter crop variety"
+                  />
+                )}
               </div>
               <div style={{marginBottom: '16px'}}>
                 <label style={{display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
