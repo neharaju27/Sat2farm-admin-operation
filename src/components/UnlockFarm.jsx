@@ -302,8 +302,10 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   // Crop-to-variety mapping
   const cropVarietyMapping = {
-    'Paddymedium': ['Mahaveer', 'Amrut', 'Shakthi', 'IR-64', 'CO-47', 'ADT-36', 'Tulsi', 'Roshi', 'Annada', 'Maibee', 'Govind', 'Dimroo', 'Saket-4', 'RNR-15048', 'Narender-80', 'ASP 18', 'Rasi', 'IR-20', 'IR-36', 'CO-43', 'CO-46', 'Lalat', 'Banglami', 'Rangadoria', 'CSR-10', 'Kasturi', 'KNM-1638', 'Panth-4', 'BPT-5204', 'ASP-25 FL', 'SD20A (Soberana)', 'Signia', 'Fedearroz 50', 'Others'],
+    'Paddymedium': ['Mahaveer', 'Amrut', 'Shakthi', 'IR-64', 'CO-47', 'ADT-36', 'Tulsi', 'Roshi', 'Annada', 'Maibee', 'Govind', 'Dimroo', 'Saket-4', 'Narender-80', 'ASP 25L', 'Rasi', 'IR-20', 'IR-36', 'CO-43', 'CO-46', 'Lalat', 'Banglami', 'Rangadoria', 'CSR-10', 'Kasturi', 'KNM-1638', 'Panth-4', 'BPT-5204', 'ASP-25 L','SD20A','signia','Fedearroz 50'],
     'Paddy-Basmati': ['Rities', '1509', '1692', '1718', '1121', 'PB-7', '1847', '1885'],
+    'Paddylong':['BPT-5204'],
+    'Paddyshort':['Rasi','IR 20', 'IR 36', 'CO 43', 'CO 46', 'Lalat','I.R 64', 'Banglami', 'Rangadoria', 'CSR-10', 'Kasturi', 'Panth-4','RNR 15048','ASP 18','Others' ],
    
     'Date_Palm': ['Barhi', 'Deglet Nour', 'Medjool', 'Khuneji'],
     'Lettuce': ['Iceberg', 'Romaine'],
