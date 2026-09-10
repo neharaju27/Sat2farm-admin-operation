@@ -39,7 +39,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isSalesUser) {
       // Sales users can only access sales pages and unlock-farm
-      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'prospect-stats'];
+      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing'];
       if (allowedSalesPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -186,19 +186,21 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     Green Team
                   </div>
                 )}
-                {/* Prospect Stats - For Operations and Sales Users */}
-                <div
-                  className={`sb-item ${currentPage === 'prospect-stats' ? 'active' : ''}`}
-                  onClick={() => handleNavigationClick('prospect-stats')}
-                >
-                  <svg className="ic" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
-                  </svg>
-                  Prospect Stats
-                </div>
+                {/* Prospect Stats - Only for Operations Users */}
+                {isOperationsUser && (
+                  <div
+                    className={`sb-item ${currentPage === 'prospect-stats' ? 'active' : ''}`}
+                    onClick={() => handleNavigationClick('prospect-stats')}
+                  >
+                    <svg className="ic" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                      <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                    </svg>
+                    Prospect Stats
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -348,19 +350,6 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               Pricing
-              <span className="sb-dot"></span>
-            </div>
-            <div
-              className={`sb-item ${currentPage === 'prospect-stats' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('prospect-stats')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
-              </svg>
-              Prospect Stats
               <span className="sb-dot"></span>
             </div>
           </>

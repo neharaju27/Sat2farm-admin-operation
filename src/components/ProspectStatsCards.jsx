@@ -34,6 +34,28 @@ const palette = {
 };
 
 export default function ProspectStatsCards({ user }) {
+  // Role-based access control - only operation role can access this page
+  const userRole = user?.role?.toLowerCase() || user?.userType?.toLowerCase() || '';
+  if (userRole !== 'operation') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: palette.canvas,
+        color: palette.ink
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>Access Denied</h2>
+        <p style={{ fontSize: '14px', color: palette.inkSoft }}>
+          This page is only accessible to users with Operation role.
+        </p>
+      </div>
+    );
+  }
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -68,6 +90,16 @@ export default function ProspectStatsCards({ user }) {
   const [ownerSummarySearchTerm, setOwnerSummarySearchTerm] = useState('');
   const [selectedDealHistory, setSelectedDealHistory] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  
+  // Date filter states
+  const [dateType, setDateType] = useState('on');
+  const [showDateTypeDropdown, setShowDateTypeDropdown] = useState(false);
+  const [dateValue, setDateValue] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [lastCount, setLastCount] = useState(7);
+  const [lastUnit, setLastUnit] = useState('days');
+  const [showLastUnitDropdown, setShowLastUnitDropdown] = useState(false);
 
   const displayName = user?.name || user?.fullName || user?.first_name || "Operation User";
 
@@ -146,6 +178,21 @@ export default function ProspectStatsCards({ user }) {
       let apiUrl = `${prospectStatsUrl}?month=${apiMonth}`;
       if (selectedOwner) {
         apiUrl += `&owner=${selectedOwner.toLowerCase()}`;
+      }
+      
+      // Add date filter parameters only when they have valid values
+      if (dateType === 'on' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=on&date=${dateValue}`;
+      } else if (dateType === 'before' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=before&date=${dateValue}`;
+      } else if (dateType === 'after' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=after&date=${dateValue}`;
+      } else if (dateType === 'between' && dateFrom && dateTo) {
+        apiUrl += `&date_field=created_time&date_type=between&from=${dateFrom}&to=${dateTo}`;
+      } else if (dateType === 'custom' && dateFrom && dateTo) {
+        apiUrl += `&date_field=created_time&date_type=custom&from=${dateFrom}&to=${dateTo}`;
+      } else if (dateType === 'in_last' && lastCount) {
+        apiUrl += `&date_field=created_time&date_type=in_last&last_count=${lastCount}&last_unit=${lastUnit}`;
       }
 
       const response = await axios.get(apiUrl);
@@ -240,7 +287,26 @@ export default function ProspectStatsCards({ user }) {
     try {
       const apiMonth = convertMonthToApiFormat(selectedMonth);
       const ownerSummaryUrl = import.meta.env.VITE_OWNER_SUMMARY_API_URL;
-      const apiUrl = `${ownerSummaryUrl}?month=${apiMonth}`;
+      let apiUrl = `${ownerSummaryUrl}?month=${apiMonth}`;
+      
+      if (selectedOwner) {
+        apiUrl += `&owner=${selectedOwner.toLowerCase()}`;
+      }
+      
+      // Add date filter parameters only when they have valid values
+      if (dateType === 'on' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=on&date=${dateValue}`;
+      } else if (dateType === 'before' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=before&date=${dateValue}`;
+      } else if (dateType === 'after' && dateValue) {
+        apiUrl += `&date_field=created_time&date_type=after&date=${dateValue}`;
+      } else if (dateType === 'between' && dateFrom && dateTo) {
+        apiUrl += `&date_field=created_time&date_type=between&from=${dateFrom}&to=${dateTo}`;
+      } else if (dateType === 'custom' && dateFrom && dateTo) {
+        apiUrl += `&date_field=created_time&date_type=custom&from=${dateFrom}&to=${dateTo}`;
+      } else if (dateType === 'in_last' && lastCount) {
+        apiUrl += `&date_field=created_time&date_type=in_last&last_count=${lastCount}&last_unit=${lastUnit}`;
+      }
       
       const response = await axios.get(apiUrl);
       
@@ -278,6 +344,27 @@ export default function ProspectStatsCards({ user }) {
       fetchProspectData(selectedMonth);
     }
   }, [selectedOwner]);
+
+  // Refetch data when date value changes (for on/before/after) - only when value is complete
+  useEffect(() => {
+    if (selectedMonth && (dateType === 'on' || dateType === 'before' || dateType === 'after') && dateValue) {
+      fetchProspectData(selectedMonth);
+    }
+  }, [dateValue]);
+
+  // Refetch data when date range changes (for between/custom) - only when both values are complete
+  useEffect(() => {
+    if (selectedMonth && (dateType === 'between' || dateType === 'custom') && dateFrom && dateTo) {
+      fetchProspectData(selectedMonth);
+    }
+  }, [dateFrom, dateTo]);
+
+  // Refetch data when in_last parameters change
+  useEffect(() => {
+    if (selectedMonth && dateType === 'in_last' && lastCount) {
+      fetchProspectData(selectedMonth);
+    }
+  }, [lastCount, lastUnit]);
 
   // ---- Prospect Statistics Cards -----------------------------------------
   const prospectCards = [
@@ -546,6 +633,359 @@ export default function ProspectStatsCards({ user }) {
               )}
             </div>
           </div>
+
+          {/* Date Type Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>Choose Date Type:</span>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDateTypeDropdown(!showDateTypeDropdown);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-mono), monospace',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  minWidth: '140px',
+                  justifyContent: 'space-between'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
+              >
+                {dateType}
+                <ChevronDown size={14} />
+              </button>
+              
+              {showDateTypeDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    background: palette.surface,
+                    border: `1px solid ${palette.border}`,
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 1000
+                  }}
+                >
+                  {['on', 'before', 'after', 'between', 'custom', 'in_last'].map((type) => (
+                    <div
+                      key={type}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDateType(type);
+                        setShowDateTypeDropdown(false);
+                        // Manually refetch data after selection
+                        if (selectedMonth && type !== 'on') {
+                          fetchProspectData(selectedMonth);
+                        }
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        borderTop: type !== 'on' ? `1px solid ${palette.border}` : 'none'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      {type}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Conditional Date Inputs */}
+          {dateType === 'on' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={dateValue}
+                onChange={(e) => setDateValue(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+            </div>
+          )}
+
+          {dateType === 'before' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={dateValue}
+                onChange={(e) => setDateValue(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+            </div>
+          )}
+
+          {dateType === 'after' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={dateValue}
+                onChange={(e) => setDateValue(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+            </div>
+          )}
+
+          {dateType === 'between' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+              <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+            </div>
+          )}
+
+          {dateType === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+              <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+            </div>
+          )}
+
+          {dateType === 'in_last' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                value={lastCount}
+                onChange={(e) => setLastCount(e.target.value)}
+                min="1"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.border}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.ink,
+                  fontFamily: 'var(--font-mono), monospace',
+                  width: '70px'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+              />
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowLastUnitDropdown(!showLastUnitDropdown)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: `1px solid ${palette.border}`,
+                    fontSize: '13px',
+                    outline: 'none',
+                    background: palette.surface,
+                    color: palette.ink,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-mono), monospace',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    minWidth: '90px',
+                    justifyContent: 'space-between'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.growth}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
+                >
+                  {lastUnit}
+                  <ChevronDown size={14} />
+                </button>
+                
+                {showLastUnitDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '4px',
+                      background: palette.surface,
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      zIndex: 10
+                    }}
+                  >
+                    {['days', 'weeks', 'months'].map((unit) => (
+                      <div
+                        key={unit}
+                        onClick={() => {
+                          setLastUnit(unit);
+                          setShowLastUnitDropdown(false);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          borderTop: unit !== 'days' ? `1px solid ${palette.border}` : 'none'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        {unit}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Remove Filter Button */}
+          {(dateType !== 'on' || dateValue || dateFrom || dateTo || (dateType === 'in_last' && lastCount)) && (
+            <button
+              onClick={() => {
+                setDateType('on');
+                setDateValue('');
+                setDateFrom('');
+                setDateTo('');
+                setLastCount(7);
+                setLastUnit('days');
+                if (selectedMonth) {
+                  fetchProspectData(selectedMonth);
+                  toast.success('Date filter removed, data refreshed');
+                }
+              }}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: `1px solid ${palette.rust}`,
+                fontSize: '13px',
+                outline: 'none',
+                background: palette.surface,
+                color: palette.rust,
+                cursor: 'pointer',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#FEF2F2';
+                e.currentTarget.style.borderColor = palette.rust;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = palette.surface;
+                e.currentTarget.style.borderColor = palette.rust;
+              }}
+            >
+              <X size={14} />
+              Remove Filter
+            </button>
+          )}
           
           <div
             className="fr-mono"
