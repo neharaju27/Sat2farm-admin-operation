@@ -7,6 +7,7 @@ import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 import AccountMultiSelect from './filter/AccountMultiSelect';
 import satyuktLogo from '../assets/satyukt.webp';
 import axios from 'axios';
+import AccountTaskStatusIcon, { updateAccountTaskCache } from './AccountTaskStatusIcon';
 
 const GREEN_TEAM_POST_ASSIGNMENT_URL = import.meta.env.VITE_GREEN_TEAM_POST_ASSIGNMENT_URL;
 
@@ -59,6 +60,8 @@ const SatyuktEmptyState = ({ title, subtitle, onRefresh }) => (
     )}
   </div>
 );
+
+
 
 // Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
 const parseDateRobust = (dateStr) => {
@@ -644,7 +647,10 @@ export default function Opportunities({ onPageChange }) {
         dealPresent: opp.deal_present || 0,
         website: opp.website || '',
         accountType: opp.account_type || '',
-        modifiedTime: opp.modified_time || ''
+        modifiedTime: opp.modified_time || '',
+        taskStatus: opp.task_status || opp.task_state || opp.latest_task_status || opp.task_name || opp.task || opp.status_task || (opp.task_completed ? 'Completed' : opp.has_pending_task ? 'Pending' : ''),
+        taskName: opp.task_name || opp.task_title || opp.latest_task_name || '',
+        _raw: opp
       }));
 
       setOpportunities(transformedOpportunities);
@@ -2715,6 +2721,11 @@ export default function Opportunities({ onPageChange }) {
 
       if (result.success || result.message || result.id) {
         toast.success('Task created successfully');
+        if (selectedUser?.id && taskStatus) {
+          updateAccountTaskCache(selectedUser.id, taskStatus, taskName);
+          setOpportunities(prev => prev.map(o => o.id === selectedUser.id ? { ...o, taskStatus: taskStatus, taskName: taskName } : o));
+          setSelectedUser(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+        }
         setTaskName('');
         setTaskDueDate('');
         setTaskDueTime('23:59');
@@ -2798,6 +2809,11 @@ export default function Opportunities({ onPageChange }) {
 
       if (result.success || result.message || result.id) {
         toast.success('Task updated successfully');
+        if (selectedUser?.id && taskStatus) {
+          updateAccountTaskCache(selectedUser.id, taskStatus, taskName);
+          setOpportunities(prev => prev.map(o => o.id === selectedUser.id ? { ...o, taskStatus: taskStatus, taskName: taskName } : o));
+          setSelectedUser(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+        }
         setTaskName('');
         setTaskDueDate('');
         setTaskDueTime('23:59');
@@ -2877,10 +2893,17 @@ export default function Opportunities({ onPageChange }) {
       const result = await response.json();
       const activityList = Array.isArray(result) ? result : (result.activities || result.data || []);
       setActivities(activityList);
+
+      const latestTask = activityList.find(a => (a.activity_type === 'task' || a.task_name) && a.status);
+      if (latestTask) {
+        updateAccountTaskCache(leadId, latestTask.status, latestTask.task_name);
+      }
     } catch (err) {
       console.error('Error fetching activities:', err);
     }
   };
+
+
 
   // â”€â”€ Editing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const startEditing = (fieldName, currentValue) => {
@@ -4474,7 +4497,7 @@ export default function Opportunities({ onPageChange }) {
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px', height: '100%' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--gray-100)', zIndex: 11, minWidth: '150px' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--gray-100)', zIndex: 11, minWidth: '175px', width: '175px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <input type="checkbox" checked={selectedRows.length === currentOpportunities.length && currentOpportunities.length > 0 && currentOpportunities.every(opp => selectedRows.includes(opp.id))} onChange={(e) => { if (e.target.checked) setSelectedRows(currentOpportunities.map(o => o.id)); else setSelectedRows(selectedRows.filter(id => !currentOpportunities.find(opp => opp.id === id))); }} style={{ cursor: 'pointer' }} />
                           <span>Contact Name</span>
@@ -4545,12 +4568,19 @@ export default function Opportunities({ onPageChange }) {
                           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
-                              <input type="checkbox" checked={selectedRows.includes(opp.id)} onChange={(e) => { if (e.target.checked) setSelectedRows([...selectedRows, opp.id]); else setSelectedRows(selectedRows.filter(id => id !== opp.id)); }} style={{ cursor: 'pointer' }} />
-                              <button onClick={() => { setSelectedUser(opp); setShowUserModal(true); fetchTimeline(opp.id); fetchActivities(opp.id); fetchDeals(opp.id); }} style={{ background: 'none', border: 'none', color: 'var(--blue-600)', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={opp.contactName}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: 0, backgroundColor: 'var(--surface)', zIndex: 6, minWidth: '175px', width: '175px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                              <input type="checkbox" checked={selectedRows.includes(opp.id)} onChange={(e) => { if (e.target.checked) setSelectedRows([...selectedRows, opp.id]); else setSelectedRows(selectedRows.filter(id => id !== opp.id)); }} style={{ cursor: 'pointer', flexShrink: 0 }} />
+                              <button onClick={() => { setSelectedUser(opp); setShowUserModal(true); fetchTimeline(opp.id); fetchActivities(opp.id); fetchDeals(opp.id); }} style={{ background: 'none', border: 'none', color: 'var(--blue-600)', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', flexShrink: 1 }} title={opp.contactName}>
                                 {opp.contactName}
                               </button>
+                              <AccountTaskStatusIcon
+                                accountId={opp.id}
+                                initialTaskStatus={opp.taskStatus}
+                                initialTaskName={opp.taskName}
+                                user={user}
+                                refreshKey={refreshKey}
+                              />
                               <button onClick={() => openEditDialog(opp.id, 'contactName', opp.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }} title="Edit contact name">
                                 <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                               </button>

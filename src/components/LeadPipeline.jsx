@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronUp, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronUp, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import satyuktLogo from '../assets/satyukt.webp';
+import LeadTaskStatusIcon, { updateLeadTaskCache } from './LeadTaskStatusIcon';
 
 // Satyukt Full Page Loading Component (Matching User Mockup)
 const SatyuktLoader = ({ message, subtitle }) => (
@@ -463,6 +464,7 @@ export default function LeadPipeline({ onPageChange }) {
 
     const fetchAllDropdownOptions = async () => {
       const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+      if (!apiUrl) return;
 
       const categories = [
         { name: 'lead_status', setter: setPredefinedLeadStatuses },
@@ -1003,7 +1005,10 @@ export default function LeadPipeline({ onPageChange }) {
           industry: lead.industry || '',
           createdBy: lead.created_by || 'System',
           modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
+          lastActivity: lead.last_activity || new Date().toISOString(),
+          taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
+          taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
+          _raw: lead
         }));
 
         setLeads(transformedLeads);
@@ -1053,6 +1058,8 @@ export default function LeadPipeline({ onPageChange }) {
       createdBy: lead.created_by || lead.createdBy || lead.created_user || lead.creator || lead.created_by_name || '',
       modifiedBy: lead.modified_by || lead.modifiedBy || lead.modified_user || lead.modifier || lead.modified_by_name || '',
       lastActivity: lead.last_activity || lead.updated_at || '',
+      taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
+      taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
       _raw: lead
     });
 
@@ -1413,6 +1420,15 @@ export default function LeadPipeline({ onPageChange }) {
 
       if (result.success || result.message) {
         toast.success('Task created successfully');
+        if (selectedUser?.id && taskStatus) {
+          updateLeadTaskCache(selectedUser.id, taskStatus, taskName);
+          setLeads(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
+          setAllLeadsData(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
+          setSelectedUser(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+          if (selectedLead?.id === selectedUser.id) {
+            setSelectedLead(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+          }
+        }
         setTaskName('');
         setTaskDueDate('');
         setTaskDueTime('23:59');
@@ -1507,6 +1523,19 @@ export default function LeadPipeline({ onPageChange }) {
         }
 
         toast.success('Task updated successfully');
+        if (selectedUser?.id && taskStatus) {
+          setTaskStatusMap(prev => {
+            const updated = { ...prev, [selectedUser.id]: { status: taskStatus, taskName: taskName } };
+            saveTaskStatusCache('lead_task_status_cache', updated);
+            return updated;
+          });
+          setLeads(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
+          setAllLeadsData(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
+          setSelectedUser(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+          if (selectedLead?.id === selectedUser.id) {
+            setSelectedLead(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
+          }
+        }
         setTaskName('');
         setTaskDueDate('');
         setTaskDueTime('23:59');
@@ -1599,6 +1628,11 @@ export default function LeadPipeline({ onPageChange }) {
       const result = await response.json();
       const activityList = Array.isArray(result) ? result : (result.activities || result.data || []);
       setActivities(activityList);
+
+      const latestTask = activityList.find(a => (a.activity_type === 'task' || a.task_name) && a.status);
+      if (latestTask) {
+        updateLeadTaskCache(leadId, latestTask.status, latestTask.task_name);
+      }
     } catch (err) {
       console.error('Error fetching activities:', err);
     }
@@ -2961,7 +2995,7 @@ export default function LeadPipeline({ onPageChange }) {
                   background: 'var(--gray-100)',
                   borderBottom: '2px solid var(--border)'
                 }}>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11, width: '150px', maxWidth: '150px' }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: 'var(--text)', whiteSpace: 'nowrap', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--gray-100)', zIndex: 11, minWidth: '175px', width: '175px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <input
                         type="checkbox"
@@ -3059,8 +3093,8 @@ export default function LeadPipeline({ onPageChange }) {
                         e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6, width: '150px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                      <td style={{ padding: '8px 12px', color: 'var(--text)', fontWeight: '500', textAlign: 'left', borderRight: '2px solid var(--border)', position: 'sticky', left: '0', backgroundColor: 'var(--surface)', zIndex: 6, minWidth: '175px', width: '175px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
                           <input
                             type="checkbox"
                             checked={selectedRows.includes(lead.id)}
@@ -3071,7 +3105,7 @@ export default function LeadPipeline({ onPageChange }) {
                                 setSelectedRows(selectedRows.filter(id => id !== lead.id));
                               }
                             }}
-                            style={{ cursor: 'pointer' }}
+                            style={{ cursor: 'pointer', flexShrink: 0 }}
                           />
                           <button
                             onClick={() => {
@@ -3092,12 +3126,16 @@ export default function LeadPipeline({ onPageChange }) {
                               textAlign: 'left',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              maxWidth: '120px',
+                              flexShrink: 1
                             }}
+                            title={lead.contactName}
                           >
                             {lead.contactName}
                           </button>
-                          <button onClick={() => openEditDialog(lead.id, 'contactName', lead.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto' }} title="Edit contact name">
+                          <LeadTaskStatusIcon leadId={lead.id} initialTaskStatus={lead.taskStatus} initialTaskName={lead.taskName} user={user} refreshKey={refreshKey} />
+                          <button onClick={() => openEditDialog(lead.id, 'contactName', lead.contactName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }} title="Edit contact name">
                             <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
                           </button>
                         </div>
@@ -8606,15 +8644,9 @@ export default function LeadPipeline({ onPageChange }) {
                     style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)' }}
                   >
                     <option value="">Select account type</option>
-                    <option value="Sat2Farm Recurring">Sat2Farm Recurring</option>
-                    <option value="Sat2Farm Non Recurring">Sat2Farm Non Recurring</option>
-                    <option value="Sat2Farm Exclusivity">Sat2Farm Exclusivity</option>
-                    <option value="Sat4Agri">Sat4Agri</option>
-                    <option value="Sat4Risk">Sat4Risk</option>
-                    <option value="Project">Project</option>
-                    <option value="WhiteLabelling">WhiteLabelling</option>
-                    <option value="API Client">API Client</option>
-                    <option value="Positive response">Positive response</option>
+                    {predefinedAccountTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </div>
               </div>
