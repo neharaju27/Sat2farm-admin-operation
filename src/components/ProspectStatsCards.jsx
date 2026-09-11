@@ -34,27 +34,6 @@ const palette = {
 };
 
 export default function ProspectStatsCards({ user }) {
-  // Role-based access control - only operation role can access this page
-  const userRole = user?.role?.toLowerCase() || user?.userType?.toLowerCase() || '';
-  if (userRole !== 'operation') {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        background: palette.canvas,
-        color: palette.ink
-      }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-        <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>Access Denied</h2>
-        <p style={{ fontSize: '14px', color: palette.inkSoft }}>
-          This page is only accessible to users with Operation role.
-        </p>
-      </div>
-    );
-  }
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,18 +80,67 @@ export default function ProspectStatsCards({ user }) {
   const [lastUnit, setLastUnit] = useState('days');
   const [showLastUnitDropdown, setShowLastUnitDropdown] = useState(false);
 
+  // Validate user prop
+  if (!user) {
+    console.error('ProspectStatsCards: user prop is missing');
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: palette.canvas,
+        color: palette.ink
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>Error</h2>
+        <p style={{ fontSize: '14px', color: palette.inkSoft }}>
+          User information not available. Please try logging in again.
+        </p>
+      </div>
+    );
+  }
+
+  // Role-based access control - only operation role can access this page
+  const userRole = user?.role?.toLowerCase() || user?.userType?.toLowerCase() || '';
+  if (userRole !== 'operation') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: palette.canvas,
+        color: palette.ink
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>Access Denied</h2>
+        <p style={{ fontSize: '14px', color: palette.inkSoft }}>
+          This page is only accessible to users with Operation role.
+        </p>
+      </div>
+    );
+  }
+
+
+
   const displayName = user?.name || user?.fullName || user?.first_name || "Operation User";
 
   const formatNumber = (num) => {
-    return num.toLocaleString();
+    if (num === null || num === undefined || isNaN(num)) return '0';
+    return Number(num).toLocaleString();
   };
 
   const formatCurrency = (num) => {
-    if (num >= 100000) {
-      const lakhs = (num / 100000).toFixed(1);
+    if (num === null || num === undefined || isNaN(num)) return '₹0';
+    const numValue = Number(num);
+    if (numValue >= 100000) {
+      const lakhs = (numValue / 100000).toFixed(1);
       return `₹${lakhs} L`;
     }
-    return '₹' + num.toLocaleString('en-IN', {
+    return '₹' + numValue.toLocaleString('en-IN', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     });
@@ -131,8 +159,6 @@ export default function ProspectStatsCards({ user }) {
 
   const handleMonthSelect = (month) => {
     setSelectedMonth(month);
-    // Trigger data refresh for the selected month
-    fetchProspectData(month);
   };
 
   // Convert month label (e.g., "Sep 26") to API format (e.g., "2026-09")
@@ -158,6 +184,10 @@ export default function ProspectStatsCards({ user }) {
   const fetchDropdownOptions = async () => {
     try {
       const dropdownOptionsUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+      if (!dropdownOptionsUrl) {
+        console.warn('VITE_DROPDOWN_OPTIONS_API_URL not defined');
+        return;
+      }
       const response = await axios.get(`${dropdownOptionsUrl}?category=contact_owner`);
       
       if (response.data && response.data.status === true) {
@@ -169,19 +199,28 @@ export default function ProspectStatsCards({ user }) {
     }
   };
 
-  const fetchProspectData = async (month = selectedMonth) => {
+  const fetchProspectData = async (month = selectedMonth, options = {}) => {
+    const { skipDateFilter = false } = options;
     try {
       setLoading(true);
       const apiMonth = convertMonthToApiFormat(month);
       const prospectStatsUrl = import.meta.env.VITE_PROSPECT_STATS_API_URL;
+      
+      if (!prospectStatsUrl) {
+        console.error('VITE_PROSPECT_STATS_API_URL not defined');
+        toast.error('API configuration error');
+        setLoading(false);
+        return;
+      }
       
       let apiUrl = `${prospectStatsUrl}?month=${apiMonth}`;
       if (selectedOwner) {
         apiUrl += `&owner=${selectedOwner.toLowerCase()}`;
       }
       
-      // Add date filter parameters only when they have valid values
-      if (dateType === 'on' && dateValue) {
+      // Add date filter parameters only when they have valid values.
+      // Remove Filter can explicitly skip the current filter state.
+      if (!skipDateFilter && dateType === 'on' && dateValue) {
         apiUrl += `&date_field=created_time&date_type=on&date=${dateValue}`;
       } else if (dateType === 'before' && dateValue) {
         apiUrl += `&date_field=created_time&date_type=before&date=${dateValue}`;
@@ -217,13 +256,13 @@ export default function ProspectStatsCards({ user }) {
         }
 
         // Extract metrics from API response based on user requirements
-        const totalProspects = data.accounts?.total_accounts || 0;
-        const totalDeals = data.total_other?.total_deals || 0;
-        const totalDealAmount = data.total_other?.total_amount || 0;
-        const paidAmount = data.paid?.amount || 0;
-        const invoicedAmount = data.paid_invoiced?.amount || 0;
-        const closedLostAmount = data.closed_lost?.amount || 0;
-        const pendingAmount = invoicedAmount - paidAmount;
+        const totalProspects = Number(data.accounts?.total_accounts) || 0;
+        const totalDeals = Number(data.total_other?.total_deals) || 0;
+        const totalDealAmount = Number(data.total_other?.total_amount) || 0;
+        const paidAmount = Number(data.paid?.amount) || 0;
+        const invoicedAmount = Number(data.paid_invoiced?.amount) || 0;
+        const closedLostAmount = Number(data.closed_lost?.amount) || 0;
+        const pendingAmount = Math.max(0, invoicedAmount - paidAmount);
 
         setMetrics({
           totalProspects,
@@ -287,6 +326,13 @@ export default function ProspectStatsCards({ user }) {
     try {
       const apiMonth = convertMonthToApiFormat(selectedMonth);
       const ownerSummaryUrl = import.meta.env.VITE_OWNER_SUMMARY_API_URL;
+      
+      if (!ownerSummaryUrl) {
+        console.error('VITE_OWNER_SUMMARY_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+      
       let apiUrl = `${ownerSummaryUrl}?month=${apiMonth}`;
       
       if (selectedOwner) {
@@ -324,11 +370,11 @@ export default function ProspectStatsCards({ user }) {
 
   useEffect(() => {
     // Fetch dropdown options on mount
-    fetchDropdownOptions();
-    
+    fetchDropdownOptions().catch(err => console.error('Dropdown options fetch failed:', err));
+
     // Fetch initial prospect data with a default month to get available months
     // We'll use a temporary default, then switch to the last available month
-    fetchProspectData('2026-09'); // Temporary default to get available months
+    fetchProspectData('2026-09').catch(err => console.error('Initial prospect data fetch failed:', err));
   }, []);
 
   // Fetch data when selected month changes
@@ -338,9 +384,9 @@ export default function ProspectStatsCards({ user }) {
     }
   }, [selectedMonth]);
 
-  // Refetch data when owner changes
+  // Refetch data whenever owner changes, including "All Owners"
   useEffect(() => {
-    if (selectedOwner && selectedMonth) {
+    if (selectedMonth) {
       fetchProspectData(selectedMonth);
     }
   }, [selectedOwner]);
@@ -350,14 +396,14 @@ export default function ProspectStatsCards({ user }) {
     if (selectedMonth && (dateType === 'on' || dateType === 'before' || dateType === 'after') && dateValue) {
       fetchProspectData(selectedMonth);
     }
-  }, [dateValue]);
+  }, [dateValue, dateType]);
 
   // Refetch data when date range changes (for between/custom) - only when both values are complete
   useEffect(() => {
     if (selectedMonth && (dateType === 'between' || dateType === 'custom') && dateFrom && dateTo) {
       fetchProspectData(selectedMonth);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, dateType]);
 
   // Refetch data when in_last parameters change
   useEffect(() => {
@@ -421,8 +467,8 @@ export default function ProspectStatsCards({ user }) {
       value: metrics.invoicedAmount,
       icon: FileText,
       accent: palette.amberDeep,
-      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 
-        ? `${((metrics.invoicedAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total` 
+      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 && !isNaN(metrics.invoicedAmount)
+        ? `${((metrics.invoicedAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total`
         : 'Total invoiced value',
       isCurrency: true,
       onClick: () => {
@@ -439,8 +485,8 @@ export default function ProspectStatsCards({ user }) {
       value: metrics.paidAmount,
       icon: IndianRupee,
       accent: palette.teal,
-      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 
-        ? `${((metrics.paidAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total` 
+      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 && !isNaN(metrics.paidAmount)
+        ? `${((metrics.paidAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total`
         : 'Amount collected',
       isCurrency: true,
       onClick: () => {
@@ -457,8 +503,8 @@ export default function ProspectStatsCards({ user }) {
       value: metrics.closedLostAmount,
       icon: X,
       accent: palette.rust,
-      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 
-        ? `${((metrics.closedLostAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total` 
+      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 && !isNaN(metrics.closedLostAmount)
+        ? `${((metrics.closedLostAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total`
         : 'Lost deal value',
       isCurrency: true,
       onClick: () => {
@@ -688,9 +734,17 @@ export default function ProspectStatsCards({ user }) {
                         e.stopPropagation();
                         setDateType(type);
                         setShowDateTypeDropdown(false);
-                        // Manually refetch data after selection
-                        if (selectedMonth && type !== 'on') {
-                          fetchProspectData(selectedMonth);
+
+                        // Clear incompatible date values when changing filter type.
+                        if (type === 'on' || type === 'before' || type === 'after') {
+                          setDateFrom('');
+                          setDateTo('');
+                        } else if (type === 'between' || type === 'custom') {
+                          setDateValue('');
+                        } else if (type === 'in_last') {
+                          setDateValue('');
+                          setDateFrom('');
+                          setDateTo('');
                         }
                       }}
                       style={{
@@ -947,16 +1001,25 @@ export default function ProspectStatsCards({ user }) {
           {/* Remove Filter Button */}
           {(dateType !== 'on' || dateValue || dateFrom || dateTo || (dateType === 'in_last' && lastCount)) && (
             <button
-              onClick={() => {
+              onClick={async () => {
+                // Reset all date-filter state.
                 setDateType('on');
                 setDateValue('');
                 setDateFrom('');
                 setDateTo('');
                 setLastCount(7);
                 setLastUnit('days');
+
+                // Immediately refresh using an explicit "no date filter"
+                // request instead of waiting for React state to update.
                 if (selectedMonth) {
-                  fetchProspectData(selectedMonth);
-                  toast.success('Date filter removed, data refreshed');
+                  try {
+                    await fetchProspectData(selectedMonth, { skipDateFilter: true });
+                    toast.success('Date filter removed, data refreshed');
+                  } catch (error) {
+                    console.error('Error refreshing after removing date filter:', error);
+                    toast.error('Failed to refresh data');
+                  }
                 }
               }}
               style={{
@@ -1170,7 +1233,7 @@ export default function ProspectStatsCards({ user }) {
                   >
                     {typeof card.value === 'string' ? card.value : (card.isCurrency ? formatCurrency(card.value) : formatNumber(card.value))}
                   </div>
-                  {(card.key === 'invoicedAmount' || card.key === 'paidAmount' || card.key === 'closedLostAmount') && metrics.totalDealAmount && metrics.totalDealAmount > 0 && typeof card.value === 'number' && (
+                  {(card.key === 'invoicedAmount' || card.key === 'paidAmount' || card.key === 'closedLostAmount') && metrics.totalDealAmount && metrics.totalDealAmount > 0 && typeof card.value === 'number' && !isNaN(card.value) && (
                     <div
                       style={{
                         fontSize: '12px',
@@ -1180,7 +1243,7 @@ export default function ProspectStatsCards({ user }) {
                         opacity: 0.85
                       }}
                     >
-                      {((card.value / metrics.totalDealAmount) * 100).toFixed(1)}% of total
+                      {metrics.totalDealAmount > 0 ? ((card.value / metrics.totalDealAmount) * 100).toFixed(1) : '0'}% of total
                     </div>
                   )}
 
@@ -1290,8 +1353,14 @@ export default function ProspectStatsCards({ user }) {
                   <input
                     type="text"
                     placeholder="Search by name, account, account number, contact, owner, city, type, deals..."
-                    value={accountsSearchTerm}
-                    onChange={(e) => setAccountsSearchTerm(e.target.value)}
+                    value={accountsSearchTerm || ''}
+                    onChange={(e) => {
+                      try {
+                        setAccountsSearchTerm(e.target.value);
+                      } catch (error) {
+                        console.error('Error setting search term:', error);
+                      }
+                    }}
                     style={{
                   width: '100%',
                   padding: '10px 12px 10px 40px',
@@ -1326,65 +1395,77 @@ export default function ProspectStatsCards({ user }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {accountsData && accountsData.length > 0 ? (
+                    {Array.isArray(accountsData) && accountsData.length > 0 ? (
                       accountsData
-                        .filter(account => 
-                          accountsSearchTerm === '' || 
-                          account.full_name?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.account_name?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.account_number?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.email?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.phone?.includes(accountsSearchTerm) ||
-                          account.owner?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.city?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          account.account_type?.toLowerCase().includes(accountsSearchTerm.toLowerCase()) ||
-                          String(account.deal_present).includes(accountsSearchTerm)
-                        )
-                        .map((account, index) => (
-                        <tr key={account.id || index} className="sa-table-row">
-                          <td>
-                            <div className="sa-manager-cell">
-                              <div className="sa-avatar">
-                                {account.full_name?.charAt(0)?.toUpperCase() || 'P'}
-                              </div>
-                              <div>
-                                <div className="sa-manager-name">{account.full_name || 'N/A'}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{account.account_name || 'N/A'}</td>
-                          <td>
-                            <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '13px', color: palette.ink }}>
-                              {account.account_number || 'N/A'}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ fontSize: '13px' }}>
-                              <div style={{ fontWeight: 500 }}>{account.phone || 'N/A'}</div>
-                              <div style={{ fontSize: '11px', color: palette.inkSoft }}>
-                                {account.email || 'No email'}
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                background: '#DCFCE7',
-                                color: '#166534'
-                              }}
-                            >
-                              {account.owner || 'Unassigned'}
-                            </span>
-                          </td>
-                          <td>{account.city || 'N/A'}</td>
-                          <td>{account.account_type || 'N/A'}</td>
+                        .filter(account => {
+                          if (!account) return false;
+                          if (accountsSearchTerm === '' || accountsSearchTerm === null || accountsSearchTerm === undefined) return true;
+                          const searchTerm = String(accountsSearchTerm).toLowerCase().trim();
+                          try {
+                            return (
+                              (String(account.full_name || '').toLowerCase()).includes(searchTerm) ||
+                              (String(account.account_name || '').toLowerCase()).includes(searchTerm) ||
+                              (String(account.account_number || '').toLowerCase()).includes(searchTerm) ||
+                              (String(account.email || '').toLowerCase()).includes(searchTerm) ||
+                              String(account.phone || '').includes(searchTerm) ||
+                              (String(account.owner || '').toLowerCase()).includes(searchTerm) ||
+                              (String(account.city || '').toLowerCase()).includes(searchTerm) ||
+                              (String(account.account_type || '').toLowerCase()).includes(searchTerm) ||
+                              String(account.deal_present || '').includes(searchTerm)
+                            );
+                          } catch (error) {
+                            console.error('Error filtering account:', error, account);
+                            return false;
+                          }
+                        })
+                        .map((account, index) => {
+                          if (!account) return null;
+                          try {
+                            return (
+                              <tr key={account.id || index} className="sa-table-row">
+                                <td>
+                                  <div className="sa-manager-cell">
+                                    <div className="sa-avatar">
+                                      {String(account.full_name || 'P').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <div className="sa-manager-name">{account.full_name || 'N/A'}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>{account.account_name || 'N/A'}</td>
+                                <td>
+                                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '13px', color: palette.ink }}>
+                                    {account.account_number || 'N/A'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ fontSize: '13px' }}>
+                                    <div style={{ fontWeight: 500 }}>{account.phone || 'N/A'}</div>
+                                    <div style={{ fontSize: '11px', color: palette.inkSoft }}>
+                                      {account.email || 'No email'}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '4px 10px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      background: '#DCFCE7',
+                                      color: '#166534'
+                                    }}
+                                  >
+                                    {account.owner || 'Unassigned'}
+                                  </span>
+                                </td>
+                                <td>{account.city || 'N/A'}</td>
+                                <td>{account.account_type || 'N/A'}</td>
                           <td>
                             <span
                               style={{
@@ -1412,8 +1493,13 @@ export default function ProspectStatsCards({ user }) {
                               : 'N/A'
                             }
                           </td>
-                        </tr>
-                      ))
+                              </tr>
+                            );
+                          } catch (error) {
+                            console.error('Error rendering account row:', error, account);
+                            return null;
+                          }
+                        })
                     ) : (
                       <tr>
                         <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
@@ -1706,17 +1792,18 @@ export default function ProspectStatsCards({ user }) {
                             const associatedAccount = accountsData.find(account => account.id === deal.account_id);
                             const contactName = deal.account_name || associatedAccount?.full_name || '';
                             const accountNumber = deal.account_number || associatedAccount?.account_number || '';
-                            
+
                             // Apply search filter
-                            const matchesSearch = dealsSearchTerm === '' || 
-                              deal.deal_name?.toLowerCase().includes(dealsSearchTerm.toLowerCase()) ||
-                              contactName.toLowerCase().includes(dealsSearchTerm.toLowerCase()) ||
-                              String(accountNumber).toLowerCase().includes(dealsSearchTerm.toLowerCase()) ||
-                              deal.deal_stage?.toLowerCase().includes(dealsSearchTerm.toLowerCase()) ||
-                              deal.deal_owner?.toLowerCase().includes(dealsSearchTerm.toLowerCase()) ||
-                              String(deal.deal_amount).includes(dealsSearchTerm);
-                            
-                            return matchesSearch;
+                            if (dealsSearchTerm === '') return true;
+                            const searchTerm = dealsSearchTerm.toLowerCase().trim();
+                            return (
+                              (deal.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                              contactName.toLowerCase().includes(searchTerm) ||
+                              String(accountNumber).toLowerCase().includes(searchTerm) ||
+                              (deal.deal_stage?.toLowerCase() || '').includes(searchTerm) ||
+                              (deal.deal_owner?.toLowerCase() || '').includes(searchTerm) ||
+                              String(deal.deal_amount || '').includes(searchTerm)
+                            );
                           })
                         .map((deal, index) => {
                           // Find the associated account to get the contact name (full_name)
@@ -1958,10 +2045,11 @@ export default function ProspectStatsCards({ user }) {
                   <tbody>
                     {ownerSummaryData && ownerSummaryData.length > 0 ? (
                       ownerSummaryData
-                        .filter(owner => 
-                          ownerSummarySearchTerm === '' || 
-                          owner.owner?.toLowerCase().includes(ownerSummarySearchTerm.toLowerCase())
-                        )
+                        .filter(owner => {
+                          if (ownerSummarySearchTerm === '') return true;
+                          const searchTerm = ownerSummarySearchTerm.toLowerCase().trim();
+                          return (owner.owner?.toLowerCase() || '').includes(searchTerm);
+                        })
                         .map((owner, index) => (
                         <tr key={owner.owner || index} className="sa-table-row">
                           <td>
