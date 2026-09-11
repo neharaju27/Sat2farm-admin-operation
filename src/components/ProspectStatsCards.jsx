@@ -44,6 +44,7 @@ export default function ProspectStatsCards({ user }) {
   const [selectedOwner, setSelectedOwner] = useState('');
   const [ownerOptions, setOwnerOptions] = useState([]);
   const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
+  const ownerDropdownRef = useRef(null);
   const [metrics, setMetrics] = useState({
     totalProspects: 0,
     totalDeals: 0,
@@ -63,6 +64,7 @@ export default function ProspectStatsCards({ user }) {
   const [showDealsTable, setShowDealsTable] = useState(false);
   const [showOwnerSummaryTable, setShowOwnerSummaryTable] = useState(false);
   const [ownerSummaryData, setOwnerSummaryData] = useState(null);
+  const [ownerSummaryLoading, setOwnerSummaryLoading] = useState(false);
   const [dealsFilterType, setDealsFilterType] = useState('all'); // 'all', 'invoiced', 'paid', 'closed_lost'
   const [accountsSearchTerm, setAccountsSearchTerm] = useState('');
   const [dealsSearchTerm, setDealsSearchTerm] = useState('');
@@ -73,12 +75,14 @@ export default function ProspectStatsCards({ user }) {
   // Date filter states
   const [dateType, setDateType] = useState('on');
   const [showDateTypeDropdown, setShowDateTypeDropdown] = useState(false);
+  const dateTypeRef = useRef(null);
   const [dateValue, setDateValue] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [lastCount, setLastCount] = useState(7);
   const [lastUnit, setLastUnit] = useState('days');
   const [showLastUnitDropdown, setShowLastUnitDropdown] = useState(false);
+  const lastUnitRef = useRef(null);
 
   // Validate user prop
   if (!user) {
@@ -199,63 +203,124 @@ export default function ProspectStatsCards({ user }) {
     }
   };
 
+  // ============================================================
+  // BUILD DATE FILTER QUERY
+  // ============================================================
+  const buildDateFilterQuery = ({
+    skipDateFilter = false,
+    filterState = {}
+  } = {}) => {
+    if (skipDateFilter) return '';
+
+    const type = filterState.dateType ?? dateType;
+    const value = filterState.dateValue ?? dateValue;
+    const from = filterState.dateFrom ?? dateFrom;
+    const to = filterState.dateTo ?? dateTo;
+    const count = filterState.lastCount ?? lastCount;
+    const unit = filterState.lastUnit ?? lastUnit;
+
+    if ((type === 'on' || type === 'before' || type === 'after') && value) {
+      return `&date_field=created_time&date_type=${type}&date=${encodeURIComponent(value)}`;
+    }
+
+    if (type === 'between' && from && to) {
+      return `&date_field=created_time&date_type=${type}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    }
+
+    if (type === 'in_last' && count) {
+      return `&date_field=created_time&date_type=in_last&last_count=${encodeURIComponent(count)}&last_unit=${encodeURIComponent(unit)}`;
+    }
+
+    return '';
+  };
+
+  // ============================================================
+  // FETCH PROSPECT DATA
+  // ============================================================
   const fetchProspectData = async (month = selectedMonth, options = {}) => {
-    const { skipDateFilter = false } = options;
+    const {
+      skipDateFilter = false,
+      owner: ownerOverride,
+      forceRefresh = false,
+      filterState = {}
+    } = options;
+
     try {
       setLoading(true);
+
       const apiMonth = convertMonthToApiFormat(month);
       const prospectStatsUrl = import.meta.env.VITE_PROSPECT_STATS_API_URL;
-      
+
       if (!prospectStatsUrl) {
         console.error('VITE_PROSPECT_STATS_API_URL not defined');
         toast.error('API configuration error');
-        setLoading(false);
         return;
       }
-      
-      let apiUrl = `${prospectStatsUrl}?month=${apiMonth}`;
-      if (selectedOwner) {
-        apiUrl += `&owner=${selectedOwner.toLowerCase()}`;
-      }
-      
-      // Add date filter parameters only when they have valid values.
-      // Remove Filter can explicitly skip the current filter state.
-      if (!skipDateFilter && dateType === 'on' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=on&date=${dateValue}`;
-      } else if (dateType === 'before' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=before&date=${dateValue}`;
-      } else if (dateType === 'after' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=after&date=${dateValue}`;
-      } else if (dateType === 'between' && dateFrom && dateTo) {
-        apiUrl += `&date_field=created_time&date_type=between&from=${dateFrom}&to=${dateTo}`;
-      } else if (dateType === 'custom' && dateFrom && dateTo) {
-        apiUrl += `&date_field=created_time&date_type=custom&from=${dateFrom}&to=${dateTo}`;
-      } else if (dateType === 'in_last' && lastCount) {
-        apiUrl += `&date_field=created_time&date_type=in_last&last_count=${lastCount}&last_unit=${lastUnit}`;
+
+      const ownerToUse = ownerOverride !== undefined
+        ? ownerOverride
+        : (filterState.selectedOwner ?? selectedOwner);
+
+      let apiUrl = `${prospectStatsUrl}?month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse) {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
       }
 
-      const response = await axios.get(apiUrl);
+      apiUrl += buildDateFilterQuery({
+        skipDateFilter,
+        filterState
+      });
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH PROSPECT DATA:', {
+        apiUrl,
+        month,
+        ownerToUse,
+        skipDateFilter,
+        forceRefresh,
+        dateType: filterState.dateType ?? dateType,
+        dateValue: filterState.dateValue ?? dateValue,
+        dateFrom: filterState.dateFrom ?? dateFrom,
+        dateTo: filterState.dateTo ?? dateTo,
+        lastCount: filterState.lastCount ?? lastCount,
+        lastUnit: filterState.lastUnit ?? lastUnit
+      });
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      console.log('PROSPECT RESPONSE:', {
+        status: response.status,
+        dataStatus: response.data?.status
+      });
 
       if (response.data && response.data.status === 'success') {
         const data = response.data;
-        
-        // Update available months from API response
+
+        // Update available months from API response.
         if (data.filters && data.filters.available_months) {
           const monthLabels = extractMonthLabels(data.filters.available_months);
           setAvailableMonths(monthLabels);
-          
-          // Set the last month as default only on initial load
+
+          // First request only discovers the available months.
+          // The second request is made by the selectedMonth effect.
           if (isInitialLoad.current && monthLabels.length > 0) {
             const lastMonth = monthLabels[monthLabels.length - 1];
-            setSelectedMonth(lastMonth);
             isInitialLoad.current = false;
-            // Don't process data yet - let useEffect handle the real fetch
-            setLoading(false);
+            setSelectedMonth(lastMonth);
             return;
           }
         }
 
-        // Extract metrics from API response based on user requirements
         const totalProspects = Number(data.accounts?.total_accounts) || 0;
         const totalDeals = Number(data.total_other?.total_deals) || 0;
         const totalDealAmount = Number(data.total_other?.total_amount) || 0;
@@ -266,96 +331,82 @@ export default function ProspectStatsCards({ user }) {
 
         setMetrics({
           totalProspects,
-          totalDeals: totalDeals,
-          invoicedAmount: invoicedAmount,
+          totalDeals,
+          invoicedAmount,
           paidAmount,
-          totalDealAmount: totalDealAmount > 0 ? totalDealAmount : 0,
-          closedLostAmount: closedLostAmount > 0 ? closedLostAmount : 0,
-          pendingAmount: pendingAmount > 0 ? pendingAmount : 0
+          totalDealAmount,
+          closedLostAmount,
+          pendingAmount
         });
 
-        // Store accounts data for table display
         setAccountsData(data.accounts?.details || []);
-        
-        // Store total_other deals data for table display (for Total Deals and Total Deal Amount cards)
-        const totalOtherDeals = data.total_other?.details || [];
-        setOtherDealsData(totalOtherDeals);
-        
-        // Store paid deals data for table display (for Paid Amount card)
-        const paidDeals = data.paid?.details || [];
-        setPaidData(paidDeals);
-        
-        // Store paid_invoiced deals data for table display (for Invoiced Amount card)
-        const paidInvoicedDeals = data.paid_invoiced?.details || [];
-        setPaidInvoicedData(paidInvoicedDeals);
-        
-        // Store closed lost deals separately for the closed lost card
-        const closedLostDeals = data.closed_lost?.details || [];
-        setClosedLostDealsData(closedLostDeals);
-
+        setOtherDealsData(data.total_other?.details || []);
+        setPaidData(data.paid?.details || []);
+        setPaidInvoicedData(data.paid_invoiced?.details || []);
+        setClosedLostDealsData(data.closed_lost?.details || []);
         setLastUpdated(new Date());
       } else {
         throw new Error('API returned unsuccessful status');
       }
-
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching prospect data:', error);
-      setMetrics({
-        totalProspects: 0,
-        totalDeals: 0,
-        invoicedAmount: 0,
-        paidAmount: 0,
-        totalDealAmount: 0,
-        closedLostAmount: 0,
-        pendingAmount: 0
-      });
-      setLoading(false);
       toast.error('Failed to load prospect data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchProspectData();
-    setRefreshing(false);
-    toast.success('Prospect data refreshed');
-  };
+  // ============================================================
+  // FETCH OWNER SUMMARY
+  // ============================================================
+  const fetchOwnerSummaryData = async (month = selectedMonth, options = {}) => {
+    const {
+      skipDateFilter = false,
+      owner: ownerOverride,
+      forceRefresh = false,
+      filterState = {}
+    } = options;
 
-  const fetchOwnerSummaryData = async () => {
     try {
-      const apiMonth = convertMonthToApiFormat(selectedMonth);
+      setOwnerSummaryLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
       const ownerSummaryUrl = import.meta.env.VITE_OWNER_SUMMARY_API_URL;
-      
+
       if (!ownerSummaryUrl) {
         console.error('VITE_OWNER_SUMMARY_API_URL not defined');
         toast.error('API configuration error');
         return;
       }
-      
-      let apiUrl = `${ownerSummaryUrl}?month=${apiMonth}`;
-      
-      if (selectedOwner) {
-        apiUrl += `&owner=${selectedOwner.toLowerCase()}`;
+
+      const ownerToUse = ownerOverride !== undefined
+        ? ownerOverride
+        : (filterState.selectedOwner ?? selectedOwner);
+
+      let apiUrl = `${ownerSummaryUrl}?month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse) {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
       }
-      
-      // Add date filter parameters only when they have valid values
-      if (dateType === 'on' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=on&date=${dateValue}`;
-      } else if (dateType === 'before' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=before&date=${dateValue}`;
-      } else if (dateType === 'after' && dateValue) {
-        apiUrl += `&date_field=created_time&date_type=after&date=${dateValue}`;
-      } else if (dateType === 'between' && dateFrom && dateTo) {
-        apiUrl += `&date_field=created_time&date_type=between&from=${dateFrom}&to=${dateTo}`;
-      } else if (dateType === 'custom' && dateFrom && dateTo) {
-        apiUrl += `&date_field=created_time&date_type=custom&from=${dateFrom}&to=${dateTo}`;
-      } else if (dateType === 'in_last' && lastCount) {
-        apiUrl += `&date_field=created_time&date_type=in_last&last_count=${lastCount}&last_unit=${lastUnit}`;
+
+      apiUrl += buildDateFilterQuery({
+        skipDateFilter,
+        filterState
+      });
+
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
       }
-      
-      const response = await axios.get(apiUrl);
-      
+
+      console.log('FETCH OWNER SUMMARY:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
       if (response.data && response.data.status === 'success') {
         setOwnerSummaryData(response.data.owner_summary || []);
       } else {
@@ -365,52 +416,205 @@ export default function ProspectStatsCards({ user }) {
       console.error('Error fetching owner summary data:', error);
       toast.error('Failed to load owner summary data');
       setOwnerSummaryData([]);
+    } finally {
+      setOwnerSummaryLoading(false);
     }
   };
 
+  // ============================================================
+  // INITIAL LOAD + FILTER/MONTH/OWNER REFRESH
+  // ============================================================
   useEffect(() => {
-    // Fetch dropdown options on mount
-    fetchDropdownOptions().catch(err => console.error('Dropdown options fetch failed:', err));
+    fetchDropdownOptions().catch(err =>
+      console.error('Dropdown options fetch failed:', err)
+    );
 
-    // Fetch initial prospect data with a default month to get available months
-    // We'll use a temporary default, then switch to the last available month
-    fetchProspectData('2026-09').catch(err => console.error('Initial prospect data fetch failed:', err));
+    // First call gets the available months.
+    fetchProspectData('2026-09').catch(err =>
+      console.error('Initial prospect data fetch failed:', err)
+    );
   }, []);
 
-  // Fetch data when selected month changes
+  // Close dropdowns when clicking outside them
   useEffect(() => {
-    if (selectedMonth) {
-      fetchProspectData(selectedMonth);
-    }
-  }, [selectedMonth]);
+    const handleClickOutside = (event) => {
+      const target = event.target;
 
-  // Refetch data whenever owner changes, including "All Owners"
-  useEffect(() => {
-    if (selectedMonth) {
-      fetchProspectData(selectedMonth);
-    }
-  }, [selectedOwner]);
+      if (ownerDropdownRef.current && !ownerDropdownRef.current.contains(target)) {
+        setShowOwnerDropdown(false);
+      }
 
-  // Refetch data when date value changes (for on/before/after) - only when value is complete
-  useEffect(() => {
-    if (selectedMonth && (dateType === 'on' || dateType === 'before' || dateType === 'after') && dateValue) {
-      fetchProspectData(selectedMonth);
-    }
-  }, [dateValue, dateType]);
+      if (dateTypeRef.current && !dateTypeRef.current.contains(target)) {
+        setShowDateTypeDropdown(false);
+      }
 
-  // Refetch data when date range changes (for between/custom) - only when both values are complete
-  useEffect(() => {
-    if (selectedMonth && (dateType === 'between' || dateType === 'custom') && dateFrom && dateTo) {
-      fetchProspectData(selectedMonth);
-    }
-  }, [dateFrom, dateTo, dateType]);
+      if (lastUnitRef.current && !lastUnitRef.current.contains(target)) {
+        setShowLastUnitDropdown(false);
+      }
+    };
 
-  // Refetch data when in_last parameters change
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Once the API gives us the default month, or whenever the month
+  // or owner changes, fetch fresh data using the current filter state.
   useEffect(() => {
-    if (selectedMonth && dateType === 'in_last' && lastCount) {
-      fetchProspectData(selectedMonth);
+    if (!selectedMonth || isInitialLoad.current) return;
+
+    fetchProspectData(selectedMonth, {
+      forceRefresh: true
+    });
+
+    if (showOwnerSummaryTable) {
+      fetchOwnerSummaryData(selectedMonth, {
+        forceRefresh: true
+      });
     }
-  }, [lastCount, lastUnit]);
+  }, [selectedMonth, selectedOwner]);
+
+  // ============================================================
+  // APPLY FILTER
+  // ============================================================
+  const handleApplyFilter = async () => {
+    if (!selectedMonth || refreshing) return;
+
+    setRefreshing(true);
+    setLoading(true);
+
+    try {
+      const currentFilterState = {
+        dateType,
+        dateValue,
+        dateFrom,
+        dateTo,
+        lastCount,
+        lastUnit,
+        selectedOwner
+      };
+
+      await fetchProspectData(selectedMonth, {
+        filterState: currentFilterState,
+        forceRefresh: true
+      });
+
+      if (showOwnerSummaryTable) {
+        await fetchOwnerSummaryData(selectedMonth, {
+          filterState: currentFilterState,
+          forceRefresh: true
+        });
+      }
+
+      toast.success('Filter applied and data refreshed');
+    } catch (error) {
+      console.error('Error applying filter:', error);
+      toast.error('Failed to apply filter');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // ============================================================
+  // REMOVE FILTER
+  // ============================================================
+  const handleRemoveFilter = async () => {
+    if (!selectedMonth || refreshing) return;
+
+    setDateType('on');
+    setDateValue('');
+    setDateFrom('');
+    setDateTo('');
+    setLastCount(7);
+    setLastUnit('days');
+
+    setRefreshing(true);
+    setLoading(true);
+
+    try {
+      // Explicitly skip the old date filter so React's asynchronous
+      // state updates cannot cause the old filter to be sent again.
+      await fetchProspectData(selectedMonth, {
+        skipDateFilter: true,
+        forceRefresh: true,
+        filterState: {
+          dateType: 'on',
+          dateValue: '',
+          dateFrom: '',
+          dateTo: '',
+          lastCount: 7,
+          lastUnit: 'days',
+          selectedOwner
+        }
+      });
+
+      if (showOwnerSummaryTable) {
+        await fetchOwnerSummaryData(selectedMonth, {
+          skipDateFilter: true,
+          forceRefresh: true,
+          filterState: {
+            dateType: 'on',
+            dateValue: '',
+            dateFrom: '',
+            dateTo: '',
+            lastCount: 7,
+            lastUnit: 'days',
+            selectedOwner
+          }
+        });
+      }
+
+      toast.success('Filter removed and data refreshed');
+    } catch (error) {
+      console.error('Error removing filter:', error);
+      toast.error('Failed to refresh data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // ============================================================
+  // MANUAL REFRESH
+  // ============================================================
+  const handleRefresh = async () => {
+    if (!selectedMonth || refreshing) return;
+
+    setRefreshing(true);
+    setLoading(true);
+
+    try {
+      const currentFilterState = {
+        dateType,
+        dateValue,
+        dateFrom,
+        dateTo,
+        lastCount,
+        lastUnit,
+        selectedOwner
+      };
+
+      await fetchProspectData(selectedMonth, {
+        filterState: currentFilterState,
+        forceRefresh: true
+      });
+
+      if (showOwnerSummaryTable) {
+        await fetchOwnerSummaryData(selectedMonth, {
+          filterState: currentFilterState,
+          forceRefresh: true
+        });
+      }
+
+      toast.success('Prospect data refreshed');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      toast.error('Failed to refresh data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   // ---- Prospect Statistics Cards -----------------------------------------
   const prospectCards = [
@@ -597,7 +801,7 @@ export default function ProspectStatsCards({ user }) {
           {/* Owner Filter Dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>Owner:</span>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }} ref={ownerDropdownRef}>
               <button
                 onClick={() => setShowOwnerDropdown(!showOwnerDropdown)}
                 style={{
@@ -683,7 +887,7 @@ export default function ProspectStatsCards({ user }) {
           {/* Date Type Dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>Choose Date Type:</span>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }} ref={dateTypeRef}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -727,7 +931,7 @@ export default function ProspectStatsCards({ user }) {
                     zIndex: 1000
                   }}
                 >
-                  {['on', 'before', 'after', 'between', 'custom', 'in_last'].map((type) => (
+                  {['on', 'before', 'after', 'between', 'in_last'].map((type) => (
                     <div
                       key={type}
                       onClick={(e) => {
@@ -739,7 +943,7 @@ export default function ProspectStatsCards({ user }) {
                         if (type === 'on' || type === 'before' || type === 'after') {
                           setDateFrom('');
                           setDateTo('');
-                        } else if (type === 'between' || type === 'custom') {
+                        } else if (type === 'between') {
                           setDateValue('');
                         } else if (type === 'in_last') {
                           setDateValue('');
@@ -871,45 +1075,7 @@ export default function ProspectStatsCards({ user }) {
             </div>
           )}
 
-          {dateType === 'custom' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-              <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-            </div>
-          )}
+          {/* 'custom' date type removed */}
 
           {dateType === 'in_last' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -932,7 +1098,7 @@ export default function ProspectStatsCards({ user }) {
                 onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
                 onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
               />
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }} ref={lastUnitRef}>
                 <button
                   onClick={() => setShowLastUnitDropdown(!showLastUnitDropdown)}
                   style={{
@@ -998,58 +1164,63 @@ export default function ProspectStatsCards({ user }) {
             </div>
           )}
 
-          {/* Remove Filter Button */}
-          {(dateType !== 'on' || dateValue || dateFrom || dateTo || (dateType === 'in_last' && lastCount)) && (
-            <button
-              onClick={async () => {
-                // Reset all date-filter state.
-                setDateType('on');
-                setDateValue('');
-                setDateFrom('');
-                setDateTo('');
-                setLastCount(7);
-                setLastUnit('days');
+          {/* Apply / Remove Filter Buttons */}
+          {(dateValue || dateFrom || dateTo || (dateType === 'in_last' && lastCount)) && (
+            <>
+              <button
+                onClick={handleApplyFilter}
+                disabled={refreshing}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.growth}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.growth,
+                  color: '#ffffff',
+                  cursor: refreshing ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: refreshing ? 0.7 : 1
+                }}
+              >
+                <RefreshCw size={14} className={refreshing ? 'fr-spin' : ''} />
+                Apply Filter
+              </button>
 
-                // Immediately refresh using an explicit "no date filter"
-                // request instead of waiting for React state to update.
-                if (selectedMonth) {
-                  try {
-                    await fetchProspectData(selectedMonth, { skipDateFilter: true });
-                    toast.success('Date filter removed, data refreshed');
-                  } catch (error) {
-                    console.error('Error refreshing after removing date filter:', error);
-                    toast.error('Failed to refresh data');
-                  }
-                }
-              }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: `1px solid ${palette.rust}`,
-                fontSize: '13px',
-                outline: 'none',
-                background: palette.surface,
-                color: palette.rust,
-                cursor: 'pointer',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#FEF2F2';
-                e.currentTarget.style.borderColor = palette.rust;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = palette.surface;
-                e.currentTarget.style.borderColor = palette.rust;
-              }}
-            >
-              <X size={14} />
-              Remove Filter
-            </button>
+              <button
+                onClick={handleRemoveFilter}
+                disabled={refreshing}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: `1px solid ${palette.rust}`,
+                  fontSize: '13px',
+                  outline: 'none',
+                  background: palette.surface,
+                  color: palette.rust,
+                  cursor: refreshing ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: refreshing ? 0.7 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!refreshing) e.currentTarget.style.background = '#FEF2F2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = palette.surface;
+                }}
+              >
+                <X size={14} />
+                Remove Filter
+              </button>
+            </>
           )}
-          
+
           <div
             className="fr-mono"
             style={{
