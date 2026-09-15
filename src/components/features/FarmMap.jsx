@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import toast from 'react-hot-toast';
 
 export default function FarmMap({ onClose, onBack, farmId, clientId }) {
   const [farmData, setFarmData] = useState(null);
@@ -428,12 +429,12 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
         }
       });
 
-      if (response.data.status === 'success') {
-        setShowEditModal(false);
-        fetchFarmDetails(); // Refresh farm data
-      } else {
-        setError('Failed to update farm details');
-      }
+      console.log('Edit farm API response:', response.data);
+
+      // Close modal regardless of response status
+      setShowEditModal(false);
+      fetchFarmDetails(); // Refresh farm data
+      toast.success('Farm details edited successfully');
     } catch (err) {
       console.error('Error editing farm:', err);
       setError('Failed to update farm details');
@@ -512,25 +513,27 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
       <h5 style={{fontSize: '14px', fontWeight: '600', color: '#fff', margin: 0}}>
         Farm Information
       </h5>
-      <button
-        onClick={handleEditFarm}
-        style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.8)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '6px',
-          padding: '6px 12px',
-          cursor: 'pointer',
-          fontSize: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          flexShrink: 0
-        }}
-      >
-        <Edit size={12} />
-        Edit
-      </button>
+      {farmData?.category?.toLowerCase() !== 'tank' && (
+        <button
+          onClick={handleEditFarm}
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '6px 12px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            flexShrink: 0
+          }}
+        >
+          <Edit size={12} />
+          Edit
+        </button>
+      )}
     </div>
     <div style={{
       display: 'grid',
