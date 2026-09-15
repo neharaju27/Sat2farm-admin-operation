@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock } from 'lucide-react';
 import sat2farmLogo from '../assets/satyukt.webp';
 
@@ -7,6 +7,8 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [salesOpen, setSalesOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
   const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
+  const [todayTasks, setTodayTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   
   // Check user role with more flexible matching
   const userRole = user?.role?.toLowerCase().trim();
@@ -17,6 +19,130 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isPartnerUser = userRole === 'partner';
   const isMarketingUser = userRole === 'marketing';
   const isTechDepartmentUser = userRole?.includes('tech') || userRole === 'tech department' || userRole === 'tech-department' || userRole === 'tech';
+
+  // Helper to normalize user parameter for backend API
+  const getApiUserName = (u) => {
+    const name = u?.name || u?.username || u?.phone_number || 'Operation';
+    if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
+      return 'Operation';
+    }
+    return name;
+  };
+
+  // Robust Date Parser to handle YYYY-MM-DD, DD-MM-YYYY, ISO strings, etc.
+  const parseDateRobust = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+    const str = String(dateStr).trim();
+    if (!str || str === 'Invalid Date' || str === 'undefined' || str === 'null') return null;
+
+    // Try DD-MM-YYYY HH:mm:ss or DD-MM-YYYY HH:mm or DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+    if (dmyMatch) {
+      const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
+      const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Try YYYY-MM-DD HH:mm:ss or YYYY-MM-DD HH:mm
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+    if (ymdMatch) {
+      const [, year, month, day, hours = '0', minutes = '0', seconds = '0'] = ymdMatch;
+      const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Try standard JS Date parsing
+    let d = new Date(str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str);
+    if (!isNaN(d.getTime())) return d;
+
+    d = new Date(str);
+    if (!isNaN(d.getTime())) return d;
+
+    return null;
+  };
+
+  // Check if task is overdue
+  const isTaskOverdue = (task) => {
+    const taskDate = parseDateRobust(task.due_date);
+    if (!taskDate) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    // Task is overdue if due date is before today and status is still "in progress"
+    const statusLower = (task.status || 'Pending').toLowerCase();
+    const isInProgress = statusLower === 'in progress';
+    
+    return taskDate < today && isInProgress;
+  };
+
+  // Fetch today's tasks for sales users
+  useEffect(() => {
+    if (!isSalesUser) return;
+
+    const fetchTodayTasks = async () => {
+      try {
+        setLoadingTasks(true);
+        const calendarApiUrl = import.meta.env.VITE_CALENDAR_API_URL;
+        const currentUserName = getApiUserName(user);
+        
+        const apiUrl = `${calendarApiUrl}?role=sales&user=${encodeURIComponent(currentUserName)}`;
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const today = new Date();
+          const todaysTasks = result.data
+            .filter(activity => {
+              const taskDate = parseDateRobust(activity.due_date);
+              return taskDate && taskDate.toDateString() === today.toDateString() && 
+                     (activity.activity_type === 'task' || activity.task_name);
+            })
+            .sort((a, b) => {
+              const dateA = parseDateRobust(a.due_date);
+              const dateB = parseDateRobust(b.due_date);
+              if (!dateA && !dateB) return 0;
+              if (!dateA) return 1;
+              if (!dateB) return -1;
+              return dateA - dateB;
+            });
+          
+          // Also count overdue tasks (tasks due before today that are still in progress)
+          const overdueTasks = result.data
+            .filter(activity => {
+              const taskDate = parseDateRobust(activity.due_date);
+              if (!taskDate) return false;
+              taskDate.setHours(0, 0, 0, 0);
+              const statusLower = (activity.status || 'Pending').toLowerCase();
+              const isInProgress = statusLower === 'in progress';
+              return taskDate < today && isInProgress && 
+                     (activity.activity_type === 'task' || activity.task_name);
+            });
+          
+          // Combine today's tasks and overdue tasks for the badge count
+          setTodayTasks([...todaysTasks, ...overdueTasks]);
+          
+          setTodayTasks(todaysTasks);
+        } else {
+          setTodayTasks([]);
+        }
+      } catch (error) {
+        console.error('Error fetching today\'s tasks:', error);
+        setTodayTasks([]);
+      } finally {
+        setLoadingTasks(false);
+      }
+    };
+
+    fetchTodayTasks();
+  }, [isSalesUser, user]);
   
   // Page activity states
   const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
@@ -25,13 +151,14 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isManagerActive = currentPage === 'unlock-farm' || currentPage === 'register';
   const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'register';
   const isMarketingActive = currentPage === 'marketing-dashboard';
+  const isSatyuktCrmActive = currentPage === 'lead-pipeline' || currentPage === 'opportunities' || currentPage === 'green-team' || currentPage === 'prospect-stats' || currentPage === 'task-calendar';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -39,7 +166,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isSalesUser) {
       // Sales users can only access sales pages and unlock-farm
-      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing'];
+      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar'];
       if (allowedSalesPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -201,6 +328,45 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     Prospect Stats
                   </div>
                 )}
+                {/* Task Calendar - For Operations and Sales Users */}
+                <div
+                  className={`sb-item ${currentPage === 'task-calendar' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('task-calendar')}
+                  style={{ position: 'relative' }}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <path d="M5 2v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <path d="M11 2v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <circle cx="5" cy="9" r="1" fill="currentColor"/>
+                    <circle cx="8" cy="9" r="1" fill="currentColor"/>
+                    <circle cx="11" cy="9" r="1" fill="currentColor"/>
+                  </svg>
+                  Task Calendar
+                  {isSalesUser && todayTasks.length > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: '#ef4444',
+                      color: 'white',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      minWidth: '18px',
+                      height: '18px',
+                      borderRadius: '9px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 6px',
+                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                    }}>
+                      {todayTasks.length}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </>
