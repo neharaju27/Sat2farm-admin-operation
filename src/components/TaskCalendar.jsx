@@ -574,9 +574,9 @@ export default function TaskCalendar() {
               }}
             >
               <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="in progress">In Progress</option>
-              <option value="overdue">Overdue</option>
+              <option value="completed" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Completed</option>
+              <option value="in progress" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>In Progress</option>
+              <option value="overdue" style={{ backgroundColor: '#fee2e2', color: '#B5432B' }}>Overdue</option>
             </select>
           </div>
 
@@ -1283,8 +1283,8 @@ export default function TaskCalendar() {
                       transition: 'border-color 0.2s'
                     }}
                   >
-                    <option value="In Progress">⏳ In Progress</option>
-                    <option value="Completed">✅ Completed</option>
+                    <option value="In Progress" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>⏳ In Progress</option>
+                    <option value="Completed" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>✅ Completed</option>
                   </select>
                 ) : (
                   <div 
@@ -1305,7 +1305,9 @@ export default function TaskCalendar() {
                       borderRadius: '12px',
                       fontSize: '11px',
                       fontWeight: '600',
-                      ...getStatusColor(getEffectiveStatus(selectedTask)),
+                      backgroundColor: getStatusColor(getEffectiveStatus(selectedTask)).bg,
+                      color: getStatusColor(getEffectiveStatus(selectedTask)).text,
+                      border: `1px solid ${getStatusColor(getEffectiveStatus(selectedTask)).border}`,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
