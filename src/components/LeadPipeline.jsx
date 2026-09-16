@@ -3562,7 +3562,7 @@ export default function LeadPipeline({ onPageChange }) {
                 right: 0,
                 bottom: 0,
                 background: 'rgba(0, 0, 0, 0.25)',
-                zIndex: 999
+                zIndex: 990
               }}
               onClick={() => setFilterSidebarOpen(false)}
             />
@@ -3572,9 +3572,10 @@ export default function LeadPipeline({ onPageChange }) {
               left: 0,
               bottom: 0,
               width: '320px',
+              maxWidth: '100vw',
               background: 'var(--surface)',
               borderRight: '1px solid var(--border)',
-              zIndex: 1000,
+              zIndex: 995,
               overflowY: 'auto'
             }}>
               <div style={{

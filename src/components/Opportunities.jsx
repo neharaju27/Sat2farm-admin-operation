@@ -5019,7 +5019,7 @@ export default function Opportunities({ onPageChange }) {
                     right: 0,
                     bottom: 0,
                     background: 'rgba(0, 0, 0, 0.5)',
-                    zIndex: 999
+                    zIndex: 990
                   }} onClick={() => setSalesFilterSidebarOpen(false)} />
                   <div style={{
                     position: 'absolute',
@@ -5027,9 +5027,10 @@ export default function Opportunities({ onPageChange }) {
                     left: 0,
                     bottom: 0,
                     width: '320px',
+                    maxWidth: '100vw',
                     background: 'white',
                     borderRight: '1px solid var(--border)',
-                    zIndex: 1000,
+                    zIndex: 995,
                     overflowY: 'auto',
                     boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)'
                   }}>
@@ -10192,7 +10193,7 @@ export default function Opportunities({ onPageChange }) {
                 right: 0,
                 bottom: 0,
                 background: 'rgba(0, 0, 0, 0.25)',
-                zIndex: 999
+                zIndex: 990
               }}
               onClick={() => setFilterSidebarOpen(false)}
             />
@@ -10202,9 +10203,10 @@ export default function Opportunities({ onPageChange }) {
               left: 0,
               bottom: 0,
               width: '320px',
+              maxWidth: '100vw',
               background: 'var(--surface)',
               borderRight: '1px solid var(--border)',
-              zIndex: 1000,
+              zIndex: 995,
               overflowY: 'auto'
             }}>
               <div style={{

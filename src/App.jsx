@@ -25,7 +25,6 @@ import SalesDashboard from "./components/SalesDashboard";
 import AllSalesData from "./components/AllSalesData";
 import Pricing from "./components/Pricing";
 import ProspectStatsCards from "./components/ProspectStatsCards";
-import TaskCalendar from "./components/TaskCalendar";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -70,6 +69,12 @@ function App() {
     logout();
   };
 
+  // Reset redirect status when logged in user changes
+  const userIdentity = user ? (user.phone_number || user.phoneNumber || user.username || user.name || JSON.stringify(user)) : null;
+  useEffect(() => {
+    setHasRedirected(false);
+  }, [userIdentity]);
+
   // Single unified effect for role-based redirect and page restore
   useEffect(() => {
     if (!user) {
@@ -80,30 +85,26 @@ function App() {
     if (hasRedirected) return;
 
     const savedPage = localStorage.getItem('currentPage');
+    let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
+
+    // Allowed pages per role
+    const allowedPartnerPages = ['super-admin-dashboard', 'unlock-farm', 'register'];
+    const allowedManagerPages = ['unlock-farm', 'register', 'manager-monthly-report'];
+    const allowedClientPages = ['client-monthly-report', 'unlock-farm', 'register'];
+    const allowedTechPages = ['green-team'];
 
     // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
-      // Check if user is manager and saved page is lead-pipeline
-      let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
-
-      // Partner users always go to super-admin-dashboard
-      if (role === 'partner') {
+      if (role === 'partner' && !allowedPartnerPages.includes(savedPage)) {
         setCurrentPage('super-admin-dashboard');
         localStorage.setItem('currentPage', 'super-admin-dashboard');
-        setHasRedirected(true);
-        return;
-      } else if (role.includes('tech')) {
-        // Tech Department users always go to green-team
+      } else if (role.includes('tech') && !allowedTechPages.includes(savedPage)) {
         setCurrentPage('green-team');
         localStorage.setItem('currentPage', 'green-team');
-        setHasRedirected(true);
-        return;
-      } else if (role === 'manager' && savedPage === 'lead-pipeline') {
-        // Manager trying to access lead-pipeline - redirect to unlock-farm instead
+      } else if (role === 'manager' && !allowedManagerPages.includes(savedPage)) {
         setCurrentPage('unlock-farm');
         localStorage.setItem('currentPage', 'unlock-farm');
-      } else if (role === 'client' && savedPage !== 'client-monthly-report' && savedPage !== 'unlock-farm' && savedPage !== 'register') {
-        // Client trying to access other pages - redirect to client-monthly-report instead
+      } else if (role === 'client' && !allowedClientPages.includes(savedPage)) {
         setCurrentPage('client-monthly-report');
         localStorage.setItem('currentPage', 'client-monthly-report');
       } else {
@@ -115,8 +116,6 @@ function App() {
     }
 
     // Fresh login — redirect based on role
-    let role = (user.role || user.user_role || user.type || 'user').toLowerCase().trim();
-
     if (role === 'partner') {
       setCurrentPage('super-admin-dashboard');
       localStorage.setItem('currentPage', 'super-admin-dashboard');
@@ -243,8 +242,6 @@ function App() {
           return <Pricing user={userDisplay} onPageChange={handlePageChange} />;
         case 'prospect-stats':
           return <ProspectStatsCards user={userDisplay} />;
-        case 'task-calendar':
-          return <TaskCalendar user={userDisplay} />;
         default:
           return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }
@@ -297,7 +294,7 @@ function App() {
             inset: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(2px)',
-            zIndex: 999,
+            zIndex: 99998,
             transition: 'opacity 0.3s ease'
           }}
         />
@@ -311,7 +308,7 @@ function App() {
             position: 'absolute',
             top: shouldShowBanner() ? '50px' : '10px',
             left: '10px',
-            zIndex: 998,
+            zIndex: 99997,
             width: '32px',
             height: '32px',
             display: 'flex',
@@ -337,7 +334,7 @@ function App() {
           left: 0,
           height: '100vh',
           width: '256px',
-          zIndex: 1000,
+          zIndex: 99999,
           borderRight: '1px solid #334155',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
           transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
