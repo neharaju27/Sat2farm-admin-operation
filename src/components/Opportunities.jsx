@@ -4221,14 +4221,14 @@ export default function Opportunities({ onPageChange }) {
       <div style={{ padding: '8px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>
-          <div>
+        <div className="responsive-header-container" style={{ marginBottom: '4px', paddingBottom: '4px' }}>
+          <div className="responsive-header-title">
             <h1 style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 8px 0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               Opportunities
             </h1>
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>Manage and track sales opportunities through the pipeline</p>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="responsive-toolbar">
             <button
               onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
@@ -4715,7 +4715,7 @@ export default function Opportunities({ onPageChange }) {
               </div>
 
               {/* Summary Section */}
-              <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', background: '#fff', display: 'flex', gap: '24px', fontSize: '13px', color: '#4b5563', flexShrink: 0 }}>
+              <div className="responsive-stats-bar" style={{ fontSize: '13px', color: '#4b5563' }}>
                 <span style={{ whiteSpace: 'nowrap' }}>
                   Total{' '}
                   <span style={{ color: '#9ca3af', margin: '0 4px' }}>•</span>{' '}
@@ -4855,7 +4855,7 @@ export default function Opportunities({ onPageChange }) {
 
               {/* Pagination */}
               {!loading && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1px 10px', borderTop: '1px solid #e5e7eb', background: '#fff', flexShrink: 0 }}>
+                <div className="responsive-pagination-bar">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
                     <span>Records per page</span>
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -4906,8 +4906,8 @@ export default function Opportunities({ onPageChange }) {
           {viewMode === 'kanban' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Kanban Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', borderBottom: '1px solid var(--border)', background: 'white', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="responsive-header-container" style={{ padding: '8px 20px', background: 'white', flexShrink: 0 }}>
+                <div className="responsive-header-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'var(--text)' }}>Sales Pipeline</h2>
                   {salesFiltersApplied && !isSearching && (
                     <span style={{ padding: '4px 12px', background: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
@@ -4915,9 +4915,9 @@ export default function Opportunities({ onPageChange }) {
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ position: 'relative' }}>
+                <div className="responsive-toolbar">
+                  <div className="responsive-search-wrapper">
+                    <div className="responsive-search-box">
                       <Search size={16} style={{
                         position: 'absolute',
                         left: '12px',
@@ -4928,6 +4928,7 @@ export default function Opportunities({ onPageChange }) {
                       <input
                         type="text"
                         placeholder="Search deals..."
+                        className="responsive-search-input"
                         value={dealsSearchInput}
                         onChange={(e) => {
                           const target = e.target;
@@ -4954,7 +4955,7 @@ export default function Opportunities({ onPageChange }) {
                           }
                         }}
                         style={{
-                          width: '240px',
+                          width: '100%',
                           padding: '8px 12px 8px 36px',
                           border: '1px solid #d1d5db',
                           borderRadius: 'var(--r)',
@@ -4980,14 +4981,15 @@ export default function Opportunities({ onPageChange }) {
                         borderRadius: 'var(--r)',
                         cursor: 'pointer',
                         fontSize: '14px',
-                        fontWeight: '500'
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       <Search size={15} />
                       Search
                     </button>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => setSalesFilterSidebarOpen(!salesFilterSidebarOpen)}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: salesFilterSidebarOpen ? '#3b82f6' : 'white', color: salesFilterSidebarOpen ? 'white' : '#374151', border: '1px solid #d1d5db', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}

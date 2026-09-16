@@ -1455,3 +1455,85 @@ button:active {
     gap: 12px;
   }
 }
+
+/* ── Responsive Layout & UX Fixes for Opportunities and Lead Pipeline ── */
+.responsive-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.responsive-header-title {
+  padding-left: 0;
+  transition: padding 0.2s ease;
+}
+
+@media (max-width: 1024px) {
+  .responsive-header-title {
+    padding-left: 44px; /* Clearance for floating mobile hamburger button */
+  }
+}
+
+.responsive-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.responsive-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.responsive-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.responsive-search-input {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.responsive-stats-bar {
+  display: flex;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.responsive-pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 6px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .responsive-pagination-bar {
+    justify-content: center;
+  }
+}
+

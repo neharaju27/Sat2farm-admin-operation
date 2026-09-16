@@ -2560,15 +2560,8 @@ export default function LeadPipeline({ onPageChange }) {
     <div className="main-full">
       <div style={{ padding: '16px', background: '#f8f7f4', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '4px',
-          paddingBottom: '4px',
-          borderBottom: '1px solid var(--border)'
-        }}>
-          <div>
+        <div className="responsive-header-container" style={{ marginBottom: '4px', paddingBottom: '4px' }}>
+          <div className="responsive-header-title">
             <h1 style={{
               fontSize: '28px',
               fontWeight: '700',
@@ -2584,7 +2577,7 @@ export default function LeadPipeline({ onPageChange }) {
               Manage and track sales leads through the pipeline
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="responsive-toolbar">
             <button
               onClick={() => {
                 // Show pop up message informing user about mandatory CSV columns
@@ -2636,15 +2629,8 @@ export default function LeadPipeline({ onPageChange }) {
 
 
         {/* Search and Filter */}
-        <div style={{
-          display: 'flex',
-          gap: '16px',
-          marginBottom: '16px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
+        <div className="responsive-toolbar" style={{ marginBottom: '16px' }}>
+          <div className="responsive-search-wrapper">
             <button
               onClick={() => setFilterSidebarOpen(!filterSidebarOpen)}
               style={{
@@ -2662,7 +2648,7 @@ export default function LeadPipeline({ onPageChange }) {
             >
               <Filter size={16} />
             </button>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div className="responsive-search-box">
               <Search size={16} style={{
                 position: 'absolute',
                 left: '12px',
@@ -2676,6 +2662,7 @@ export default function LeadPipeline({ onPageChange }) {
                 name="search-leads"
                 type="text"
                 placeholder="Search leads..."
+                className="responsive-search-input"
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
@@ -2692,7 +2679,7 @@ export default function LeadPipeline({ onPageChange }) {
                   }
                 }}
                 style={{
-                  width: '220px',
+                  width: '100%',
                   height: '36px',
                   padding: '8px 12px 8px 36px',
                   border: '1px solid var(--border)',
@@ -3292,15 +3279,7 @@ export default function LeadPipeline({ onPageChange }) {
 
           {/* Pagination */}
           {!loading && !error && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1px 10px',
-              borderTop: '1px solid #e5e7eb',
-              background: '#fff',
-              flexShrink: 0
-            }}>
+            <div className="responsive-pagination-bar">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#6b7280' }}>
                 <span>Records per page</span>
                 <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
@@ -3423,13 +3402,7 @@ export default function LeadPipeline({ onPageChange }) {
 
         {/* Status summary — horizontal footer bar */}
         {!loading && !error && (
-          <div style={{
-            marginTop: '0',
-            padding: '8px 16px',
-            background: '#fff',
-            borderTop: '1px solid #e5e7eb',
-            flexShrink: 0
-          }}>
+          <div className="responsive-stats-bar">
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
