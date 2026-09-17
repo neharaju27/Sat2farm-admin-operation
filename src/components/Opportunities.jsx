@@ -264,7 +264,7 @@ const StandaloneEditableDealField = React.memo(({
       {label && (
         <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
           {label}
-          {(required || ['Deal Name', 'Closing Date', 'Deal Stage', 'Stage', 'Deal Type'].includes(label)) && (
+          {(required || ['Deal Name', 'Closing Date', 'Deal Stage', 'Stage', 'Deal Type', 'Probability'].includes(label)) && (
             <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
           )}
         </label>
@@ -2081,7 +2081,7 @@ export default function Opportunities({ onPageChange }) {
       });
 
       let response;
-      const dealsSearchApiUrl = import.meta.env.VITE_DEALS_SEARCH_API_URL || 'https://api.sat2farm.com/deals/search';
+      const dealsSearchApiUrl = import.meta.env.VITE_DEALS_SEARCH_API_URL;
 
       if (searchTerm && searchTerm.trim()) {
         try {
@@ -2564,15 +2564,40 @@ export default function Opportunities({ onPageChange }) {
     const stages = ['Opportunity', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost', 'Invoiced', 'Paid'];
 
     try {
-      const results = await Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50)));
+      const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
+      const currentUser = getApiUserName(user);
+
+      const [results, dealStageAmountRes] = await Promise.all([
+        Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50))),
+        dealStageAmountApiUrl
+          ? axios.get(`${dealStageAmountApiUrl}?user=${encodeURIComponent(currentUser)}`).catch(err => {
+            console.error('Error fetching deal stage amounts:', err);
+            return null;
+          })
+          : Promise.resolve(null)
+      ]);
+
       const dealsByStage = {};
       const totalsByStage = {};
       const valuesByStage = {};
+      const dealStageAmounts = dealStageAmountRes?.data || {};
 
       stages.forEach((stage, index) => {
         dealsByStage[stage] = results[index].deals;
         totalsByStage[stage] = results[index].total;
-        if (results[index].totalValue !== null && results[index].totalValue !== undefined) {
+
+        let apiAmount = dealStageAmounts[stage];
+        if (apiAmount === undefined || apiAmount === null) {
+          const lowerStage = stage.toLowerCase();
+          const matchedKey = Object.keys(dealStageAmounts).find(k => k.toLowerCase() === lowerStage);
+          if (matchedKey) {
+            apiAmount = dealStageAmounts[matchedKey];
+          }
+        }
+
+        if (apiAmount !== undefined && apiAmount !== null) {
+          valuesByStage[stage] = parseFloat(apiAmount) || 0;
+        } else if (results[index].totalValue !== null && results[index].totalValue !== undefined) {
           valuesByStage[stage] = results[index].totalValue;
         }
       });
@@ -2646,7 +2671,7 @@ export default function Opportunities({ onPageChange }) {
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
-    } catch (e) {}
+    } catch (e) { }
     return dateStr;
   };
 
@@ -2875,7 +2900,7 @@ export default function Opportunities({ onPageChange }) {
   const fetchActivities = async (leadId) => {
     if (!leadId) return;
     try {
-      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL || 'https://api.sat2farm.com/business/leads/activity';
+      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
       const currentUserName = getApiUserName(user);
       const url = `${activityApiUrl}?lead_id=${encodeURIComponent(leadId)}&user=${encodeURIComponent(currentUserName)}`;
       const response = await fetch(url, {
@@ -3485,6 +3510,9 @@ export default function Opportunities({ onPageChange }) {
   };
 
   const startDealEditing = (fieldName, currentValue) => {
+    if (user?.role?.toLowerCase().trim() === 'sales' && (fieldName === 'deal_close_date' || fieldName === 'deal_probability')) {
+      return;
+    }
     setEditingDealField(fieldName);
     setEditDealValue(currentValue || '');
   };
@@ -3507,6 +3535,13 @@ export default function Opportunities({ onPageChange }) {
         }
 
         const valueToSave = overrideVal !== undefined ? overrideVal : editDealValue;
+
+        if (['deal_name', 'deal_close_date', 'deal_type', 'deal_stage', 'deal_probability'].includes(editingDealField) && (valueToSave === '' || valueToSave === null || valueToSave === undefined)) {
+          toast.dismiss('deal-update-toast');
+          toast.error('This field is mandatory');
+          setIsUpdatingDeal(false);
+          return;
+        }
 
         const requestBody = {
           deal_id: selectedDeal.deal_id || selectedDeal.id,
@@ -3855,7 +3890,7 @@ export default function Opportunities({ onPageChange }) {
       toast.loading('Downloading Deals CSV...');
       const currentUser = getApiUserName(user);
 
-      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_DEALS_CSV_URL || 'https://api.sat2farm.com/deals/deals/download';
+      const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_DEALS_CSV_URL;
       const params = new URLSearchParams({
         user: currentUser
       });
@@ -7136,38 +7171,42 @@ export default function Opportunities({ onPageChange }) {
                     </div>
 
                     <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', overflowX: 'auto' }}>
-                      <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse' }}>
+                      <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
                         <thead style={{ background: '#f8f9fa', borderBottom: '2px solid #e0e0e0' }}>
                           <tr>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Deal Name</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Contact Name</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Amount</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Stage</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Probability</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Closing Date</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#333' }}>Deal Type</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '180px', borderRight: '1px solid #eaeaea' }}>Deal Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '160px', borderRight: '1px solid #eaeaea' }}>Account Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '150px', borderRight: '1px solid #eaeaea' }}>Account Number</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '160px', borderRight: '1px solid #eaeaea' }}>Contact Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Amount</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Stage</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '110px', borderRight: '1px solid #eaeaea' }}>Probability</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Closing Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Deal Owner</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Deal Type</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '220px', borderRight: '1px solid #eaeaea' }}>Description</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Created By</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Created Time</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Modified By</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px' }}>Modified Time</th>
                           </tr>
                         </thead>
                         <tbody>
                           {isDealsLoading ? (
                             Array.from({ length: 6 }).map((_, idx) => (
                               <tr key={`deal-skeleton-${idx}`} style={{ borderBottom: '1px solid #e0e0e0' }}>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '75%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '60%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '45%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '65%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '40%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '55%', height: '16px' }} /></td>
-                                <td style={{ padding: '12px 16px' }}><div className="skeleton-shimmer" style={{ width: '50%', height: '16px' }} /></td>
+                                {Array.from({ length: 15 }).map((_, cIdx) => (
+                                  <td key={`col-skel-${cIdx}`} style={{ padding: '10px 14px', borderRight: cIdx < 14 ? '1px solid #f0f0f0' : 'none' }}><div className="skeleton-shimmer" style={{ width: '70%', height: '16px' }} /></td>
+                                ))}
                               </tr>
                             ))
                           ) : (
                             Object.values(filteredKanbanDeals).flat()
                               .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
-                              .map((deal) => (
-                                <tr key={deal.deal_id} style={{ borderBottom: '1px solid #e0e0e0', '&:hover': { background: '#f8f9fa' } }}>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#333', cursor: 'pointer', transition: 'color 0.2s ease', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                    title={deal.deal_name}
+                              .map((deal, idx) => (
+                                <tr key={deal.deal_id || deal.id || idx} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#333', cursor: 'pointer', fontWeight: '600', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}
+                                    title={deal.deal_name || '-'}
                                     onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
                                     onMouseLeave={(e) => e.currentTarget.style.color = '#333'}
                                     onClick={(e) => {
@@ -7176,13 +7215,13 @@ export default function Opportunities({ onPageChange }) {
                                         deal_id: deal.deal_id,
                                         deal_name: deal.deal_name,
                                         contact_name: deal.full_name || '',
-                                        amount: `₹${deal.deal_amount}`,
+                                        amount: deal.deal_amount ? `₹${deal.deal_amount}` : '-',
                                         closing_date: deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
                                         description: deal.description || '',
                                         deal_type: deal.deal_type || '',
                                         deal_stage: deal.deal_stage || '',
                                         contact_owner: deal.deal_owner || '',
-                                        probability: `${deal.deal_probability}%`,
+                                        probability: deal.deal_probability !== undefined && deal.deal_probability !== null ? `${deal.deal_probability}%` : '-',
                                         account_name: deal.account_name || '',
                                         account_number: deal.account_number || '',
                                         created_time: deal.created_time || '',
@@ -7190,16 +7229,34 @@ export default function Opportunities({ onPageChange }) {
                                       });
                                       setShowDealInfoModal(true);
                                     }}>
-                                    {deal.deal_name}
+                                    {deal.deal_name || '-'}
                                   </td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.full_name || '-'}</td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666', fontWeight: '600' }}>₹{deal.deal_amount}</td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_stage}</td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_probability}%</td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }} title={deal.account_name || '-'}>{deal.account_name || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.account_number || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }} title={deal.full_name || '-'}>{deal.full_name || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#10b981', fontWeight: '600', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                    {deal.deal_amount ? `₹${deal.deal_amount}` : '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.deal_stage || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                    {deal.deal_probability !== undefined && deal.deal_probability !== null ? `${deal.deal_probability}%` : '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
                                     {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                                   </td>
-                                  <td style={{ padding: '12px 16px', fontSize: '13px', color: '#666' }}>{deal.deal_type || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.deal_owner || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.deal_type || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }} title={deal.description || '-'}>
+                                    {deal.description || '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.created_by || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                    {deal.created_time ? new Date(deal.created_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.modified_by || '-'}</td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap' }}>
+                                    {deal.modified_time ? new Date(deal.modified_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                  </td>
                                 </tr>
                               ))
                           )}
@@ -8356,7 +8413,9 @@ export default function Opportunities({ onPageChange }) {
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Probability</label>
+                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
+                        Probability<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+                      </label>
                       <div style={{ position: 'relative' }}>
                         <input type="number" value={dealProbability} onChange={(e) => setDealProbability(e.target.value)} placeholder="0" min="0" max="100" style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
                         <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', fontSize: '13px', fontWeight: '500' }}>%</span>
@@ -8400,7 +8459,11 @@ export default function Opportunities({ onPageChange }) {
                   <button
                     onClick={async () => {
                       if (isCreatingDeal) return;
-                      if (dealName && dealClosingDate && dealStage && dealType) {
+                      if (!dealName || !dealClosingDate || !dealStage || !dealType || dealProbability === '' || dealProbability === null || dealProbability === undefined) {
+                        toast.error('Please fill in all mandatory fields');
+                        return;
+                      }
+                      if (dealName && dealClosingDate && dealStage && dealType && dealProbability !== '' && dealProbability !== null && dealProbability !== undefined) {
                         setIsCreatingDeal(true);
                         try {
                           toast.loading('Creating deal...');
@@ -8686,7 +8749,23 @@ export default function Opportunities({ onPageChange }) {
                           </div>
                         </div>
                         <EditableDealField label="Amount" value={selectedDeal.amount?.replace('₹', '') || ''} fieldName="deal_amount" type="number" />
-                        <EditableDealField label="Closing Date" required={true} value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
+                        {user?.role?.toLowerCase().trim() === 'sales' ? (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+                              Closing Date<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+                            </label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : '-'}</div>
+                          </div>
+                        ) : (
+                          <EditableDealField label="Closing Date" required={true} value={selectedDeal.closing_date !== '-' ? selectedDeal.closing_date : ''} fieldName="deal_close_date" type="date" />
+                        )}
                         <EditableDealField label="Deal Type" required={true} value={selectedDeal.deal_type || ''} fieldName="deal_type" type="select" options={predefinedDealTypes} />
                         <EditableDealField label="Deal Stage" required={true} value={selectedDeal.deal_stage || ''} fieldName="deal_stage" type="select" options={predefinedDealStages} />
                         {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') ? (
@@ -8704,7 +8783,23 @@ export default function Opportunities({ onPageChange }) {
                             }}>{selectedDeal.contact_owner || '-'}</div>
                           </div>
                         )}
-                        <EditableDealField label="Probability" value={selectedDeal.probability?.replace('%', '') || ''} fieldName="deal_probability" type="number" />
+                        {user?.role?.toLowerCase().trim() === 'sales' ? (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
+                              Probability<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+                            </label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.probability ? selectedDeal.probability : '-'}</div>
+                          </div>
+                        ) : (
+                          <EditableDealField label="Probability" required={true} value={selectedDeal.probability?.replace('%', '') || ''} fieldName="deal_probability" type="number" />
+                        )}
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
                           <div style={{
@@ -10043,7 +10138,7 @@ export default function Opportunities({ onPageChange }) {
                         <input
                           type="date"
                           value={taskDueDate}
-                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
                           onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
                           style={{ width: '100%', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                         />
@@ -10058,7 +10153,7 @@ export default function Opportunities({ onPageChange }) {
                         <input
                           type="time"
                           value={taskDueTime}
-                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
                           onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
                           style={{ width: '100%', padding: '8px 12px 8px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                         />
@@ -10133,7 +10228,7 @@ export default function Opportunities({ onPageChange }) {
                           <input
                             type="date"
                             value={taskDueDate}
-                            onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                            onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
                             onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
                             style={{ width: '100%', padding: '10px 12px 10px 36px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', fontFamily: 'inherit', cursor: 'pointer' }}
                           />
@@ -10148,7 +10243,7 @@ export default function Opportunities({ onPageChange }) {
                           <input
                             type="time"
                             value={taskDueTime}
-                            onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                            onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
                             onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
                             style={{ width: '100%', padding: '10px 12px 10px 36px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#fafbfc', color: '#1e293b', fontFamily: 'inherit', cursor: 'pointer' }}
                           />
