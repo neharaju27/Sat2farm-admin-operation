@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 
@@ -3883,7 +3883,7 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // Download Deals CSV handler using https://api.sat2farm.com/deals/deals/download
+
   const handleDealsCSVDownload = async () => {
     try {
       setIsDownloadingCSV(true);
@@ -3891,6 +3891,12 @@ export default function Opportunities({ onPageChange }) {
       const currentUser = getApiUserName(user);
 
       const downloadApiUrl = import.meta.env.VITE_DOWNLOAD_DEALS_CSV_URL;
+      if (!downloadApiUrl) {
+        toast.dismiss();
+        toast.error('Download Deals CSV API URL not configured');
+        setIsDownloadingCSV(false);
+        return;
+      }
       const params = new URLSearchParams({
         user: currentUser
       });
@@ -5031,6 +5037,30 @@ export default function Opportunities({ onPageChange }) {
                     >
                       <Filter size={16} />
                       Filters
+                    </button>
+                    <button
+                      onClick={handleDealsCSVDownload}
+                      disabled={isDownloadingCSV}
+                      title="Download Deals CSV"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--r)',
+                        cursor: isDownloadingCSV ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
+                        transition: 'all 0.2s ease',
+                        opacity: isDownloadingCSV ? 0.6 : 1
+                      }}
+                    >
+                      <Download size={16} />
+                      {isDownloadingCSV ? 'Downloading...' : 'Download'}
                     </button>
                     <button
                       onClick={() => setPipelineViewMode(pipelineViewMode === 'kanban' ? 'list' : 'kanban')}
