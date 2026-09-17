@@ -25,6 +25,7 @@ import SalesDashboard from "./components/SalesDashboard";
 import AllSalesData from "./components/AllSalesData";
 import Pricing from "./components/Pricing";
 import ProspectStatsCards from "./components/ProspectStatsCards";
+import TaskCalendar from "./components/TaskCalendar";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -242,6 +243,8 @@ function App() {
           return <Pricing user={userDisplay} onPageChange={handlePageChange} />;
         case 'prospect-stats':
           return <ProspectStatsCards user={userDisplay} />;
+        case 'task-calendar':
+          return <TaskCalendar user={userDisplay} onPageChange={handlePageChange} />;
         default:
           return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }
