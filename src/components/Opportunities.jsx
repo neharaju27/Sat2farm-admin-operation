@@ -5136,7 +5136,7 @@ export default function Opportunities({ onPageChange }) {
                             if (property && !selectedSalesProperties.find(p => p.property === property)) {
                               setSelectedSalesProperties([...selectedSalesProperties, {
                                 property,
-                                operator: property === 'deal_name' ? 'contains' : 'is',
+                                operator: property === 'deal_name' ? 'contains' : (property === 'amount' ? 'equals' : 'is'),
                                 value: '',
                                 value2: '',
                                 fromDate: '',
@@ -5559,6 +5559,7 @@ export default function Opportunities({ onPageChange }) {
                                   }}
                                 >
                                   <option>Choose a value</option>
+                                  <option value="equals">equal to</option>
                                   <option value="greater_than">greater than</option>
                                   <option value="less_than">less than</option>
                                   <option value="between">between</option>
