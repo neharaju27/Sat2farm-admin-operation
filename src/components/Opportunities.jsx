@@ -5558,7 +5558,6 @@ export default function Opportunities({ onPageChange }) {
                                     color: 'var(--text)'
                                   }}
                                 >
-                                  <option>Choose a value</option>
                                   <option value="equals">equal to</option>
                                   <option value="greater_than">greater than</option>
                                   <option value="less_than">less than</option>
