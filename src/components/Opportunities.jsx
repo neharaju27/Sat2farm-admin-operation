@@ -515,6 +515,10 @@ export default function Opportunities({ onPageChange }) {
     'Paid'
   ]);
 
+  const [predefinedCountries, setPredefinedCountries] = useState([]);
+  const [predefinedStates, setPredefinedStates] = useState([]);
+  const [predefinedCities, setPredefinedCities] = useState([]);
+
   // Save to localStorage when predefined values change
   useEffect(() => {
     localStorage.setItem('opportunities_predefinedTags', JSON.stringify(predefinedTags));
@@ -543,6 +547,42 @@ export default function Opportunities({ onPageChange }) {
   useEffect(() => {
     localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
   }, [predefinedDealStages]);
+
+  // Fetch location dropdown options (country, state, city) dynamically from API on mount / user change
+  useEffect(() => {
+    let active = true;
+
+    const fetchLocationOptions = async () => {
+      const locationApiUrl = import.meta.env.VITE_LOCATIONS_API_URL;
+      if (!locationApiUrl) return;
+      const currentUserName = getApiUserName(user);
+      const locCategories = [
+        { loc_value: 'country', setter: setPredefinedCountries },
+        { loc_value: 'state', setter: setPredefinedStates },
+        { loc_value: 'city', setter: setPredefinedCities }
+      ];
+
+      for (const cat of locCategories) {
+        try {
+          const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&loc_value=${cat.loc_value}`);
+          if (res.ok) {
+            const result = await res.json();
+            const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
+            if (active && Array.isArray(list) && list.length > 0) {
+              const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
+              cat.setter(cleaned);
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching location options for account ${cat.loc_value}:`, err);
+        }
+      }
+    };
+
+    fetchLocationOptions();
+
+    return () => { active = false; };
+  }, [user]);
 
   // Fetch dropdown options dynamically from backend API on mount
   useEffect(() => {
@@ -982,11 +1022,15 @@ export default function Opportunities({ onPageChange }) {
       'lead_source': predefinedLeadSources,
       'industry': predefinedIndustries,
       'account_type': predefinedAccountTypes,
-      'mailing_country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore'],
-      'country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore']
+      'mailing_country': predefinedCountries,
+      'country': predefinedCountries,
+      'mailing_state': predefinedStates,
+      'state': predefinedStates,
+      'mailing_city': predefinedCities,
+      'city': predefinedCities
     };
 
-    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type'];
+    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type', 'mailing_country', 'country', 'mailing_state', 'state', 'mailing_city', 'city'];
 
     const sourceData = (allAccountsData && allAccountsData.length > 0) ? allAccountsData : opportunities;
     const result = {};
@@ -1022,7 +1066,7 @@ export default function Opportunities({ onPageChange }) {
       result[property] = [...new Set([...defaults, ...extracted])].sort((a, b) => String(a).localeCompare(String(b)));
     }
     return result;
-  }, [allAccountsData, opportunities, predefinedDealStages, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes]);
+  }, [allAccountsData, opportunities, predefinedDealStages, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes, predefinedCountries, predefinedStates, predefinedCities]);
 
   // Get unique values for a property "” reads from memoized cache
   const getUniqueValues = (property) => uniqueValuesMap[property] || [];
@@ -1039,7 +1083,7 @@ export default function Opportunities({ onPageChange }) {
     return predefinedContactOwners || [];
   };
 
-  // Helper to construct query parameter keys with _is or _is_not suffixes
+  // Helper to construct query parameter keys with _is, _is_not, or _contains suffixes
   const getFilterQueryParamKey = (property, operator = 'is') => {
     const fieldMap = {
       'contact_owner': 'owner',
@@ -1062,6 +1106,9 @@ export default function Opportunities({ onPageChange }) {
     };
     const baseKey = fieldMap[property] || property;
     const opLower = String(operator || '').toLowerCase().trim();
+    if (opLower === 'contains' || opLower.includes('contain')) {
+      return `${baseKey}_contains`;
+    }
     const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
     const prefix = isNot ? 'is_not_' : 'is_';
     return `${prefix}${baseKey}`;
@@ -1090,7 +1137,10 @@ export default function Opportunities({ onPageChange }) {
       // Build URL parameters for all filters
       filters.forEach(filter => {
         if (filter.property === 'created_time' || filter.property === 'createdTime') {
+          urlParams.push(`date_field=created_time`);
           const val = filter.value || filter.date;
+          const from = filter.fromDate || filter.value;
+          const to = filter.toDate || filter.value2;
           if (filter.dateOperator === 'on' && val) {
             urlParams.push(`created_time_on=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=on`);
@@ -1103,11 +1153,13 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`created_time_before=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=before`);
             urlParams.push(`date=${encodeURIComponent(val)}`);
-          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && filter.fromDate && filter.toDate) {
-            urlParams.push(`created_time_between=${encodeURIComponent(filter.fromDate)},${encodeURIComponent(filter.toDate)}`);
+          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && from && to) {
+            urlParams.push(`created_time_between=${encodeURIComponent(from)},${encodeURIComponent(to)}`);
             urlParams.push(`date_type=${filter.dateOperator}`);
-            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+            urlParams.push(`from=${encodeURIComponent(from)}`);
+            urlParams.push(`to=${encodeURIComponent(to)}`);
+            urlParams.push(`from_date=${encodeURIComponent(from)}`);
+            urlParams.push(`to_date=${encodeURIComponent(to)}`);
           } else if (filter.dateOperator === 'in_the_last') {
             const unitMap = { day: 'days', week: 'weeks', month: 'months' };
             const count = filter.count ? parseInt(filter.count) : 1;
@@ -1116,7 +1168,10 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
           }
         } else if (filter.property === 'modified_time' || filter.property === 'modifiedTime') {
+          urlParams.push(`date_field=modified_time`);
           const val = filter.value || filter.date;
+          const from = filter.fromDate || filter.value;
+          const to = filter.toDate || filter.value2;
           if (filter.dateOperator === 'on' && val) {
             urlParams.push(`modified_time_on=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=on`);
@@ -1129,11 +1184,13 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`modified_time_before=${encodeURIComponent(val)}`);
             urlParams.push(`date_type=before`);
             urlParams.push(`date=${encodeURIComponent(val)}`);
-          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && filter.fromDate && filter.toDate) {
-            urlParams.push(`modified_time_between=${encodeURIComponent(filter.fromDate)},${encodeURIComponent(filter.toDate)}`);
+          } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && from && to) {
+            urlParams.push(`modified_time_between=${encodeURIComponent(from)},${encodeURIComponent(to)}`);
             urlParams.push(`date_type=${filter.dateOperator}`);
-            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+            urlParams.push(`from=${encodeURIComponent(from)}`);
+            urlParams.push(`to=${encodeURIComponent(to)}`);
+            urlParams.push(`from_date=${encodeURIComponent(from)}`);
+            urlParams.push(`to_date=${encodeURIComponent(to)}`);
           } else if (filter.dateOperator === 'in_the_last') {
             const unitMap = { day: 'days', week: 'weeks', month: 'months' };
             const count = filter.count ? parseInt(filter.count) : 1;
@@ -1199,7 +1256,8 @@ export default function Opportunities({ onPageChange }) {
         }, 500);
         const criteriaText = filters.map(f => {
           const propLabel = f.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-          const operatorText = f.operator === 'is' || f.operator === 'is not' ? f.operator === 'is' ? 'is' : 'isn\'t' : '';
+          const op = f.operator || 'is';
+          const operatorText = op === 'contains' ? 'contains' : (op === 'is not' || op === 'is_not') ? "isn't" : 'is';
           return `${propLabel} ${operatorText} ${f.value}`;
         }).join(', ');
         setCurrentFilterCriteria(criteriaText);
@@ -1663,9 +1721,12 @@ export default function Opportunities({ onPageChange }) {
             const dealDate = parseDateRobust(dateVal);
             return dealDate && filterDate && dealDate > filterDate;
           });
-        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = parseDateRobust(prop.fromDate);
-          const maxDate = parseDateRobust(prop.toDate);
+        } else if (prop.dateOperator === 'between' && (prop.fromDate || prop.value) && (prop.toDate || prop.value2)) {
+          const from = prop.fromDate || prop.value;
+          const to = prop.toDate || prop.value2;
+          const minDate = parseDateRobust(from);
+          const maxDate = parseDateRobust(to);
+          if (maxDate) maxDate.setHours(23, 59, 59, 999);
           filtered = filtered.filter(deal => {
             const dateVal = deal.deal_close_date || deal.dealCloseDate || deal.closing_date || deal.closingDate;
             if (!dateVal) return false;
@@ -1743,9 +1804,12 @@ export default function Opportunities({ onPageChange }) {
             const dealDate = parseDateRobust(dateVal);
             return dealDate && filterDate && dealDate > filterDate;
           });
-        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = parseDateRobust(prop.fromDate);
-          const maxDate = parseDateRobust(prop.toDate);
+        } else if (prop.dateOperator === 'between' && (prop.fromDate || prop.value) && (prop.toDate || prop.value2)) {
+          const from = prop.fromDate || prop.value;
+          const to = prop.toDate || prop.value2;
+          const minDate = parseDateRobust(from);
+          const maxDate = parseDateRobust(to);
+          if (maxDate) maxDate.setHours(23, 59, 59, 999);
           filtered = filtered.filter(deal => {
             const dateVal = deal.created_time || deal.createdTime || deal.created_at || deal.createdAt;
             if (!dateVal) return false;
@@ -1805,9 +1869,12 @@ export default function Opportunities({ onPageChange }) {
             const dealDate = parseDateRobust(dateVal);
             return dealDate && filterDate && dealDate > filterDate;
           });
-        } else if (prop.dateOperator === 'between' && prop.fromDate && prop.toDate) {
-          const minDate = parseDateRobust(prop.fromDate);
-          const maxDate = parseDateRobust(prop.toDate);
+        } else if (prop.dateOperator === 'between' && (prop.fromDate || prop.value) && (prop.toDate || prop.value2)) {
+          const from = prop.fromDate || prop.value;
+          const to = prop.toDate || prop.value2;
+          const minDate = parseDateRobust(from);
+          const maxDate = parseDateRobust(to);
+          if (maxDate) maxDate.setHours(23, 59, 59, 999);
           filtered = filtered.filter(deal => {
             const dateVal = deal.modified_time || deal.modifiedTime || deal.modified_at || deal.modifiedAt;
             if (!dateVal) return false;
@@ -2062,11 +2129,16 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`date_field=${dateField}`);
             urlParams.push(`date_type=after`);
             urlParams.push(`date=${encodeURIComponent(filter.value)}`);
-          } else if (filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
+          } else if (filter.dateOperator === 'between' && (filter.fromDate || filter.value) && (filter.toDate || filter.value2)) {
+            const from = filter.fromDate || filter.value;
+            const to = filter.toDate || filter.value2;
             urlParams.push(`date_field=${dateField}`);
             urlParams.push(`date_type=between`);
-            urlParams.push(`from=${encodeURIComponent(filter.fromDate)}`);
-            urlParams.push(`to=${encodeURIComponent(filter.toDate)}`);
+            urlParams.push(`from=${encodeURIComponent(from)}`);
+            urlParams.push(`to=${encodeURIComponent(to)}`);
+            urlParams.push(`from_date=${encodeURIComponent(from)}`);
+            urlParams.push(`to_date=${encodeURIComponent(to)}`);
+            urlParams.push(`${dateField}_between=${encodeURIComponent(from)},${encodeURIComponent(to)}`);
           } else if (filter.dateOperator === 'in_the_last' && filter.period) {
             const unitMap = { day: 'days', week: 'weeks', month: 'months' };
             const countMap = { day: 1, week: 7, month: 30 };
@@ -3966,11 +4038,16 @@ export default function Opportunities({ onPageChange }) {
               params.append('date_field', dateField);
               params.append('date_type', 'after');
               params.append('date', filter.value);
-            } else if (filter.dateOperator === 'between' && filter.fromDate && filter.toDate) {
+            } else if (filter.dateOperator === 'between' && (filter.fromDate || filter.value) && (filter.toDate || filter.value2)) {
+              const from = filter.fromDate || filter.value;
+              const to = filter.toDate || filter.value2;
               params.append('date_field', dateField);
               params.append('date_type', 'between');
-              params.append('from', filter.fromDate);
-              params.append('to', filter.toDate);
+              params.append('from', from);
+              params.append('to', to);
+              params.append('from_date', from);
+              params.append('to_date', to);
+              params.append(`${dateField}_between`, `${from},${to}`);
             } else if (filter.dateOperator === 'in_the_last' && filter.period) {
               const unitMap = { day: 'days', week: 'weeks', month: 'months' };
               const countMap = { day: 1, week: 7, month: 30 };
@@ -10418,7 +10495,7 @@ export default function Opportunities({ onPageChange }) {
                             const newProperty = {
                               property,
                               value: '',
-                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'mailing_state' || property === 'mailing_country' || property === 'lead_source' || property === 'description') ? 'is' : ''
                             };
 
                             if (property === 'created_time' || property === 'modified_time') {
@@ -10662,6 +10739,9 @@ export default function Opportunities({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -10676,20 +10756,232 @@ export default function Opportunities({ onPageChange }) {
                                 >
                                   <option value="is">Is</option>
                                   <option value="is not">Is Not</option>
+                                  <option value="contains">Contains</option>
                                 </select>
                               </div>
                               <div style={{ flex: 1 }}>
-                                <AccountMultiSelect
-                                  value={prop.value}
-                                  options={getUniqueValues(prop.property)}
-                                  onChange={(newValue) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = newValue;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  placeholder="Search cities..."
-                                  loading={isFetchingFilterOptions}
-                                />
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder={prop.operator === 'contains' ? "Enter or search city..." : "Search cities..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(c => c.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(city => city.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
+                                      {getUniqueValues(prop.property)
+                                        .filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
+                                        .map(city => (
+                                          <div
+                                            key={city}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = city;
+                                              } else {
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(city)) {
+                                                  const indexToRemove = currentValues.indexOf(city);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(city);
+                                                }
+                                                updated[index].value = currentValues.join(',');
+                                              }
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.split(',').includes(city) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(city) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{city}</span>
+                                              {prop.value && prop.value.split(',').includes(city) && (
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      {getUniqueValues(prop.property).filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching cities
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').filter(Boolean).map((city, i) => (
+                                      <span key={i} style={{
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        fontWeight: 500,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {city}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(city);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
+                                            }
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--green-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${city}`}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -11321,6 +11613,9 @@ export default function Opportunities({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -11342,12 +11637,42 @@ export default function Opportunities({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search countries..."
-                                    value={prop.searchTerm || ''}
+                                    placeholder={prop.operator === 'contains' ? "Enter or search country..." : "Search countries..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
                                     onChange={(e) => {
                                       const updated = [...selectedProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
                                       setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(c => c.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
                                     }}
                                     onFocus={() => {
                                       const updated = [...selectedProperties];
@@ -11379,23 +11704,62 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(country => country.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
                                       {getUniqueValues(prop.property)
                                         .filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
                                         .map(country => (
                                           <div
                                             key={country}
                                             onClick={() => {
                                               const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(country)) {
-                                                const indexToRemove = currentValues.indexOf(country);
-                                                currentValues.splice(indexToRemove, 1);
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = country;
                                               } else {
-                                                currentValues.push(country);
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(country)) {
+                                                  const indexToRemove = currentValues.indexOf(country);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(country);
+                                                }
+                                                updated[index].value = currentValues.join(',');
                                               }
-
-                                              updated[index].value = currentValues.join(',');
                                               updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedProperties(updated);
@@ -11406,23 +11770,28 @@ export default function Opportunities({ onPageChange }) {
                                               fontSize: '13px',
                                               color: 'var(--text)',
                                               borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent'
+                                              backgroundColor: prop.value && prop.value.split(',').includes(country) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
                                             }}
                                             onMouseEnter={(e) => {
                                               e.currentTarget.style.background = 'var(--gray-100)';
                                             }}
                                             onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent';
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(country) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
                                             }}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{country}</span>
-                                              {prop.value && prop.value.includes(country) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              {prop.value && prop.value.split(',').includes(country) && (
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
                                               )}
                                             </div>
                                           </div>
                                         ))}
+                                      {getUniqueValues(prop.property).filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching countries
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -11435,13 +11804,14 @@ export default function Opportunities({ onPageChange }) {
                                     flexWrap: 'wrap',
                                     gap: '4px'
                                   }}>
-                                    {prop.value.split(',').map((country, i) => (
+                                    {prop.value.split(',').filter(Boolean).map((country, i) => (
                                       <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
                                         borderRadius: 'var(--r)',
                                         fontSize: '11px',
+                                        fontWeight: 500,
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
@@ -11450,18 +11820,23 @@ export default function Opportunities({ onPageChange }) {
                                         <button
                                           onClick={() => {
                                             const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(country);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(country);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
                                             }
+                                            setSelectedProperties(updated);
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: 'var(--blue-600)',
+                                            color: 'var(--green-600)',
                                             cursor: 'pointer',
                                             padding: '0',
                                             fontSize: '12px',
@@ -11495,6 +11870,9 @@ export default function Opportunities({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -11516,12 +11894,42 @@ export default function Opportunities({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search states..."
-                                    value={prop.searchTerm || ''}
+                                    placeholder={prop.operator === 'contains' ? "Enter or search state..." : "Search states..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
                                     onChange={(e) => {
                                       const updated = [...selectedProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
                                       setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(s => s.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
                                     }}
                                     onFocus={() => {
                                       const updated = [...selectedProperties];
@@ -11553,23 +11961,62 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(state => state.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
                                       {getUniqueValues(prop.property)
                                         .filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
                                         .map(state => (
                                           <div
                                             key={state}
                                             onClick={() => {
                                               const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(state)) {
-                                                const indexToRemove = currentValues.indexOf(state);
-                                                currentValues.splice(indexToRemove, 1);
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = state;
                                               } else {
-                                                currentValues.push(state);
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(state)) {
+                                                  const indexToRemove = currentValues.indexOf(state);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(state);
+                                                }
+                                                updated[index].value = currentValues.join(',');
                                               }
-
-                                              updated[index].value = currentValues.join(',');
                                               updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedProperties(updated);
@@ -11580,23 +12027,28 @@ export default function Opportunities({ onPageChange }) {
                                               fontSize: '13px',
                                               color: 'var(--text)',
                                               borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent'
+                                              backgroundColor: prop.value && prop.value.split(',').includes(state) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
                                             }}
                                             onMouseEnter={(e) => {
                                               e.currentTarget.style.background = 'var(--gray-100)';
                                             }}
                                             onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent';
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(state) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
                                             }}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{state}</span>
-                                              {prop.value && prop.value.includes(state) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              {prop.value && prop.value.split(',').includes(state) && (
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
                                               )}
                                             </div>
                                           </div>
                                         ))}
+                                      {getUniqueValues(prop.property).filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching states
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -11609,13 +12061,14 @@ export default function Opportunities({ onPageChange }) {
                                     flexWrap: 'wrap',
                                     gap: '4px'
                                   }}>
-                                    {prop.value.split(',').map((state, i) => (
+                                    {prop.value.split(',').filter(Boolean).map((state, i) => (
                                       <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
                                         borderRadius: 'var(--r)',
                                         fontSize: '11px',
+                                        fontWeight: 500,
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
@@ -11624,18 +12077,23 @@ export default function Opportunities({ onPageChange }) {
                                         <button
                                           onClick={() => {
                                             const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(state);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(state);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
                                             }
+                                            setSelectedProperties(updated);
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: 'var(--blue-600)',
+                                            color: 'var(--green-600)',
                                             cursor: 'pointer',
                                             padding: '0',
                                             fontSize: '12px',
@@ -11709,7 +12167,7 @@ export default function Opportunities({ onPageChange }) {
                           if (isApplyingAccountsFilters || accountsFiltersSuccess) return;
                           const activeFilters = selectedProperties.filter(prop => {
                             if (!prop.property) return false;
-                            if (prop.property === 'created_time' || prop.property === 'createdTime') {
+                            if (['created_time', 'createdTime', 'modified_time', 'modifiedTime', 'closing_date', 'closingDate'].includes(prop.property)) {
                               return Boolean(prop.value || prop.date || (prop.fromDate && prop.toDate) || prop.dateOperator === 'in_the_last');
                             }
                             return Boolean(prop.value && String(prop.value).trim() !== '');

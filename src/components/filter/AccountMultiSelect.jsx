@@ -142,7 +142,7 @@ const AccountMultiSelect = ({
               No options found
             </div>
           ) : (
-            filteredOptions.map((option) => {
+            filteredOptions.slice(0, 200).map((option) => {
               const isSelected = selectedValues.includes(String(option));
 
               return (

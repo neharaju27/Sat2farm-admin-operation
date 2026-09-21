@@ -223,10 +223,11 @@ const formatFilterDescription = (filter) => {
     return `${propName} ${op}: ${filter.value || ''}`;
   }
 
-  // Text / Choice Filters with operator (is, is not / isn't)
+  // Text / Choice Filters with operator (is, is not / isn't, contains)
   const opStr = String(filter.operator || 'is').toLowerCase().trim();
+  const isContains = opStr.includes('contain');
   const isNot = opStr.includes('not') || opStr.includes("isn't") || opStr.includes('isnt') || opStr === 'is_not';
-  const opLabel = isNot ? 'is not' : 'is';
+  const opLabel = isContains ? 'contains' : isNot ? 'is not' : 'is';
 
   return `${propName} ${opLabel}: ${filter.value || ''}`;
 };
@@ -433,6 +434,10 @@ export default function LeadPipeline({ onPageChange }) {
     return apiDefaults;
   });
 
+  const [predefinedCountries, setPredefinedCountries] = useState([]);
+  const [predefinedStates, setPredefinedStates] = useState([]);
+  const [predefinedCities, setPredefinedCities] = useState([]);
+
   // Save to localStorage when predefined values change
   useEffect(() => {
     localStorage.setItem('predefinedLeadStatuses', JSON.stringify(predefinedLeadStatuses));
@@ -457,6 +462,42 @@ export default function LeadPipeline({ onPageChange }) {
   useEffect(() => {
     localStorage.setItem('predefinedContactOwners', JSON.stringify(predefinedContactOwners));
   }, [predefinedContactOwners]);
+
+  // Fetch location dropdown options (country, state, city) dynamically from API on mount / user change
+  useEffect(() => {
+    let active = true;
+
+    const fetchLocationOptions = async () => {
+      const locationApiUrl = import.meta.env.VITE_LOCATIONS_API_URL;
+      if (!locationApiUrl) return;
+      const currentUserName = getApiUserName(user);
+      const locCategories = [
+        { loc_value: 'country', setter: setPredefinedCountries },
+        { loc_value: 'state', setter: setPredefinedStates },
+        { loc_value: 'city', setter: setPredefinedCities }
+      ];
+
+      for (const cat of locCategories) {
+        try {
+          const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&loc_value=${cat.loc_value}`);
+          if (res.ok) {
+            const result = await res.json();
+            const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
+            if (active && Array.isArray(list) && list.length > 0) {
+              const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
+              cat.setter(cleaned);
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching location options for lead ${cat.loc_value}:`, err);
+        }
+      }
+    };
+
+    fetchLocationOptions();
+
+    return () => { active = false; };
+  }, [user]);
 
   // Fetch dropdown options dynamically from backend API on mount (GET - Available to All Roles)
   useEffect(() => {
@@ -782,7 +823,7 @@ export default function LeadPipeline({ onPageChange }) {
   const [convertWebsite, setConvertWebsite] = useState('');
   const [convertAccountType, setConvertAccountType] = useState('');
 
-  // Helper to construct query parameter keys with _is or _is_not suffixes
+  // Helper to construct query parameter keys with _is, _is_not, or _contains suffixes
   const getFilterQueryParamKey = (property, operator = 'is') => {
     const fieldMap = {
       'contact_owner': 'owner',
@@ -804,6 +845,9 @@ export default function LeadPipeline({ onPageChange }) {
     };
     const baseKey = fieldMap[property] || property;
     const opLower = String(operator || '').toLowerCase().trim();
+    if (opLower === 'contains' || opLower.includes('contain')) {
+      return `${baseKey}_contains`;
+    }
     const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
     const suffix = isNot ? '_is_not' : '_is';
     return `${baseKey}${suffix}`;
@@ -917,9 +961,12 @@ export default function LeadPipeline({ onPageChange }) {
                   } else if (formattedDate) {
                     params.append('date', formattedDate);
                   }
-                } else if (p.property && p.value) {
-                  const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
-                  params.append(paramKey, p.value);
+                } else if (p.property && (p.value || (p.operator === 'contains' && p.searchTerm))) {
+                  const val = p.value || (p.operator === 'contains' ? p.searchTerm.trim() : '');
+                  if (val) {
+                    const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+                    params.append(paramKey, val);
+                  }
                 }
               });
             }
@@ -1107,11 +1154,15 @@ export default function LeadPipeline({ onPageChange }) {
       'lead_source': predefinedLeadSources,
       'industry': predefinedIndustries,
       'account_type': predefinedAccountTypes,
-      'mailing_country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore'],
-      'country': ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'UAE', 'Singapore']
+      'mailing_country': predefinedCountries,
+      'country': predefinedCountries,
+      'mailing_state': predefinedStates,
+      'state': predefinedStates,
+      'mailing_city': predefinedCities,
+      'city': predefinedCities
     };
 
-    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type'];
+    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type', 'mailing_country', 'country', 'mailing_state', 'state', 'mailing_city', 'city'];
 
     const sourceData = (allLeadsData && allLeadsData.length > 0) ? allLeadsData : leads;
     const sets = {};
@@ -1156,7 +1207,7 @@ export default function LeadPipeline({ onPageChange }) {
       result[property] = Array.from(set).sort((a, b) => a.localeCompare(b));
     }
     return result;
-  }, [allLeadsData, leads, predefinedLeadStatuses, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes]);
+  }, [allLeadsData, leads, predefinedLeadStatuses, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes, predefinedCountries, predefinedStates, predefinedCities]);
 
   // Get unique values for a property — reads from memoized cache
   const getUniqueValues = (property) => uniqueValuesMap[property] || [];
@@ -2296,9 +2347,12 @@ export default function LeadPipeline({ onPageChange }) {
             } else if (formattedDate) {
               params.append('date', formattedDate);
             }
-          } else if (p.property && p.value) {
-            const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
-            params.append(paramKey, p.value);
+          } else if (p.property && (p.value || (p.operator === 'contains' && p.searchTerm))) {
+            const val = (p.value || (p.operator === 'contains' ? p.searchTerm : '')).trim();
+            if (val) {
+              const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+              params.append(paramKey, val);
+            }
           }
         });
       }
@@ -4382,6 +4436,9 @@ export default function LeadPipeline({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -4403,12 +4460,42 @@ export default function LeadPipeline({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search countries..."
-                                    value={prop.searchTerm || ''}
+                                    placeholder={prop.operator === 'contains' ? "Enter or search country..." : "Search countries..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
                                     onChange={(e) => {
                                       const updated = [...selectedProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
                                       setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(c => c.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
                                     }}
                                     onFocus={() => {
                                       const updated = [...selectedProperties];
@@ -4440,23 +4527,62 @@ export default function LeadPipeline({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(country => country.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
                                       {getUniqueValues(prop.property)
                                         .filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
                                         .map(country => (
                                           <div
                                             key={country}
                                             onClick={() => {
                                               const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(country)) {
-                                                const indexToRemove = currentValues.indexOf(country);
-                                                currentValues.splice(indexToRemove, 1);
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = country;
                                               } else {
-                                                currentValues.push(country);
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(country)) {
+                                                  const indexToRemove = currentValues.indexOf(country);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(country);
+                                                }
+                                                updated[index].value = currentValues.join(',');
                                               }
-
-                                              updated[index].value = currentValues.join(',');
                                               updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedProperties(updated);
@@ -4467,23 +4593,28 @@ export default function LeadPipeline({ onPageChange }) {
                                               fontSize: '13px',
                                               color: 'var(--text)',
                                               borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent'
+                                              backgroundColor: prop.value && prop.value.split(',').includes(country) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
                                             }}
                                             onMouseEnter={(e) => {
                                               e.currentTarget.style.background = 'var(--gray-100)';
                                             }}
                                             onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.includes(country) ? 'var(--blue-600)15' : 'transparent';
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(country) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
                                             }}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{country}</span>
-                                              {prop.value && prop.value.includes(country) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              {prop.value && prop.value.split(',').includes(country) && (
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
                                               )}
                                             </div>
                                           </div>
                                         ))}
+                                      {getUniqueValues(prop.property).filter(country => !prop.searchTerm || country.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching countries
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -4496,13 +4627,14 @@ export default function LeadPipeline({ onPageChange }) {
                                     flexWrap: 'wrap',
                                     gap: '4px'
                                   }}>
-                                    {prop.value.split(',').map((country, i) => (
+                                    {prop.value.split(',').filter(Boolean).map((country, i) => (
                                       <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
                                         borderRadius: 'var(--r)',
                                         fontSize: '11px',
+                                        fontWeight: 500,
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
@@ -4511,18 +4643,23 @@ export default function LeadPipeline({ onPageChange }) {
                                         <button
                                           onClick={() => {
                                             const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(country);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(country);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
                                             }
+                                            setSelectedProperties(updated);
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: 'var(--blue-600)',
+                                            color: 'var(--green-600)',
                                             cursor: 'pointer',
                                             padding: '0',
                                             fontSize: '12px',
@@ -4555,6 +4692,9 @@ export default function LeadPipeline({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -4576,12 +4716,42 @@ export default function LeadPipeline({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search states..."
-                                    value={prop.searchTerm || ''}
+                                    placeholder={prop.operator === 'contains' ? "Enter or search state..." : "Search states..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
                                     onChange={(e) => {
                                       const updated = [...selectedProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
                                       setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(s => s.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(str => str.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
                                     }}
                                     onFocus={() => {
                                       const updated = [...selectedProperties];
@@ -4613,23 +4783,62 @@ export default function LeadPipeline({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(state => state.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
                                       {getUniqueValues(prop.property)
                                         .filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
                                         .map(state => (
                                           <div
                                             key={state}
                                             onClick={() => {
                                               const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(state)) {
-                                                const indexToRemove = currentValues.indexOf(state);
-                                                currentValues.splice(indexToRemove, 1);
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = state;
                                               } else {
-                                                currentValues.push(state);
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(state)) {
+                                                  const indexToRemove = currentValues.indexOf(state);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(state);
+                                                }
+                                                updated[index].value = currentValues.join(',');
                                               }
-
-                                              updated[index].value = currentValues.join(',');
                                               updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedProperties(updated);
@@ -4640,23 +4849,28 @@ export default function LeadPipeline({ onPageChange }) {
                                               fontSize: '13px',
                                               color: 'var(--text)',
                                               borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent'
+                                              backgroundColor: prop.value && prop.value.split(',').includes(state) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
                                             }}
                                             onMouseEnter={(e) => {
                                               e.currentTarget.style.background = 'var(--gray-100)';
                                             }}
                                             onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.includes(state) ? 'var(--blue-600)15' : 'transparent';
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(state) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
                                             }}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{state}</span>
-                                              {prop.value && prop.value.includes(state) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              {prop.value && prop.value.split(',').includes(state) && (
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
                                               )}
                                             </div>
                                           </div>
                                         ))}
+                                      {getUniqueValues(prop.property).filter(state => !prop.searchTerm || state.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching states
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -4669,13 +4883,14 @@ export default function LeadPipeline({ onPageChange }) {
                                     flexWrap: 'wrap',
                                     gap: '4px'
                                   }}>
-                                    {prop.value.split(',').map((state, i) => (
+                                    {prop.value.split(',').filter(Boolean).map((state, i) => (
                                       <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
                                         borderRadius: 'var(--r)',
                                         fontSize: '11px',
+                                        fontWeight: 500,
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
@@ -4684,18 +4899,23 @@ export default function LeadPipeline({ onPageChange }) {
                                         <button
                                           onClick={() => {
                                             const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(state);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(state);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
                                             }
+                                            setSelectedProperties(updated);
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: 'var(--blue-600)',
+                                            color: 'var(--green-600)',
                                             cursor: 'pointer',
                                             padding: '0',
                                             fontSize: '12px',
@@ -4728,6 +4948,9 @@ export default function LeadPipeline({ onPageChange }) {
                                   onChange={(e) => {
                                     const updated = [...selectedProperties];
                                     updated[index].operator = e.target.value;
+                                    if (e.target.value === 'contains' && prop.searchTerm) {
+                                      updated[index].value = prop.searchTerm.trim();
+                                    }
                                     setSelectedProperties(updated);
                                   }}
                                   style={{
@@ -4749,12 +4972,42 @@ export default function LeadPipeline({ onPageChange }) {
                                 <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
                                   <input
                                     type="text"
-                                    placeholder="Search cities..."
-                                    value={prop.searchTerm || ''}
+                                    placeholder={prop.operator === 'contains' ? "Enter or search city..." : "Search cities..."}
+                                    value={prop.searchTerm !== undefined ? prop.searchTerm : (prop.operator === 'contains' ? (prop.value || '') : '')}
                                     onChange={(e) => {
                                       const updated = [...selectedProperties];
                                       updated[index].searchTerm = e.target.value;
+                                      if (updated[index].operator === 'contains') {
+                                        updated[index].value = e.target.value;
+                                      }
                                       setSelectedProperties(updated);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const customVal = (prop.searchTerm || '').trim();
+                                        if (customVal) {
+                                          const updated = [...selectedProperties];
+                                          if (prop.operator === 'contains') {
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          } else {
+                                            const matched = getUniqueValues(prop.property).find(c => c.toLowerCase() === customVal.toLowerCase());
+                                            if (matched) {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                              if (!currentValues.includes(matched)) {
+                                                currentValues.push(matched);
+                                              }
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }
+                                          }
+                                        }
+                                      }
                                     }}
                                     onFocus={() => {
                                       const updated = [...selectedProperties];
@@ -4786,23 +5039,62 @@ export default function LeadPipeline({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
+                                      {prop.operator === 'contains' && prop.searchTerm && prop.searchTerm.trim() !== '' && !getUniqueValues(prop.property).some(city => city.toLowerCase() === prop.searchTerm.trim().toLowerCase()) && (
+                                        <div
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const customVal = prop.searchTerm.trim();
+                                            updated[index].value = customVal;
+                                            updated[index].dropdownOpen = false;
+                                            updated[index].searchTerm = '';
+                                            setSelectedProperties(updated);
+                                          }}
+                                          style={{
+                                            padding: '9px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            color: '#15803d',
+                                            fontWeight: 500,
+                                            borderBottom: '1px solid var(--border-soft)',
+                                            backgroundColor: '#f0fdf4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#f0fdf4';
+                                          }}
+                                        >
+                                          <Search size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Search for &ldquo;<strong>{prop.searchTerm.trim()}</strong>&rdquo;
+                                          </span>
+                                        </div>
+                                      )}
                                       {getUniqueValues(prop.property)
                                         .filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .slice(0, 200)
                                         .map(city => (
                                           <div
                                             key={city}
                                             onClick={() => {
                                               const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(city)) {
-                                                const indexToRemove = currentValues.indexOf(city);
-                                                currentValues.splice(indexToRemove, 1);
+                                              if (prop.operator === 'contains') {
+                                                updated[index].value = city;
                                               } else {
-                                                currentValues.push(city);
+                                                const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                                if (currentValues.includes(city)) {
+                                                  const indexToRemove = currentValues.indexOf(city);
+                                                  currentValues.splice(indexToRemove, 1);
+                                                } else {
+                                                  currentValues.push(city);
+                                                }
+                                                updated[index].value = currentValues.join(',');
                                               }
-
-                                              updated[index].value = currentValues.join(',');
                                               updated[index].dropdownOpen = false;
                                               updated[index].searchTerm = '';
                                               setSelectedProperties(updated);
@@ -4813,23 +5105,28 @@ export default function LeadPipeline({ onPageChange }) {
                                               fontSize: '13px',
                                               color: 'var(--text)',
                                               borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent'
+                                              backgroundColor: prop.value && prop.value.split(',').includes(city) ? 'rgba(22, 163, 74, 0.12)' : 'transparent'
                                             }}
                                             onMouseEnter={(e) => {
                                               e.currentTarget.style.background = 'var(--gray-100)';
                                             }}
                                             onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(city) ? 'var(--blue-600)15' : 'transparent';
+                                              e.currentTarget.style.background = prop.value && prop.value.split(',').includes(city) ? 'rgba(22, 163, 74, 0.12)' : 'transparent';
                                             }}
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                               <span>{city}</span>
                                               {prop.value && prop.value.split(',').includes(city) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                                <Check size={14} style={{ color: 'var(--green-600)' }} />
                                               )}
                                             </div>
                                           </div>
                                         ))}
+                                      {getUniqueValues(prop.property).filter(city => !prop.searchTerm || city.toLowerCase().includes(prop.searchTerm.toLowerCase())).length === 0 && (
+                                        <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
+                                          No matching cities
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -4844,11 +5141,12 @@ export default function LeadPipeline({ onPageChange }) {
                                   }}>
                                     {prop.value.split(',').filter(Boolean).map((city, i) => (
                                       <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
+                                        background: 'rgba(22, 163, 74, 0.12)',
+                                        color: 'var(--green-600)',
+                                        padding: '2px 8px',
                                         borderRadius: 'var(--r)',
                                         fontSize: '11px',
+                                        fontWeight: 500,
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
@@ -4857,18 +5155,23 @@ export default function LeadPipeline({ onPageChange }) {
                                         <button
                                           onClick={() => {
                                             const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(city);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
+                                            if (prop.operator === 'contains') {
+                                              updated[index].value = '';
+                                              updated[index].searchTerm = '';
+                                            } else {
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                              const indexToRemove = currentValues.indexOf(city);
+                                              if (indexToRemove > -1) {
+                                                currentValues.splice(indexToRemove, 1);
+                                                updated[index].value = currentValues.join(',');
+                                              }
                                             }
+                                            setSelectedProperties(updated);
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: 'var(--blue-600)',
+                                            color: 'var(--green-600)',
                                             cursor: 'pointer',
                                             padding: '0',
                                             fontSize: '12px',
@@ -5384,8 +5687,8 @@ export default function LeadPipeline({ onPageChange }) {
                               />
                             )}
 
-                            {/* Between - From Date and To Date */}
-                            {prop.dateOperator === 'between' && (
+                            {/* Between / Custom - From Date and To Date */}
+                            {(prop.dateOperator === 'between' || prop.dateOperator === 'custom') && (
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <div style={{ flex: 1 }}>
                                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From Date</label>
@@ -5676,30 +5979,26 @@ export default function LeadPipeline({ onPageChange }) {
 
                           // Add mailing state filter if configured
                           const mailingStateProp = selectedProperties.find(prop => prop.property === 'mailing_state');
-                          if (mailingStateProp && mailingStateProp.value) {
-                            const selectedStates = mailingStateProp.value.split(',');
-                            if (selectedStates.length > 0) {
-                              // Send all selected states as comma-separated values
-                              const statesString = selectedStates.join(',');
+                          if (mailingStateProp && (mailingStateProp.value || (mailingStateProp.operator === 'contains' && mailingStateProp.searchTerm))) {
+                            const val = (mailingStateProp.value || (mailingStateProp.operator === 'contains' ? mailingStateProp.searchTerm : '')).trim();
+                            if (val) {
                               activeFilters.push({
                                 property: 'mailing_state',
-                                value: statesString,
-                                operator: mailingStateProp.operator
+                                value: val,
+                                operator: mailingStateProp.operator || 'is'
                               });
                             }
                           }
 
                           // Add mailing country filter if configured
                           const mailingCountryProp = selectedProperties.find(prop => prop.property === 'mailing_country');
-                          if (mailingCountryProp && mailingCountryProp.value) {
-                            const selectedCountries = mailingCountryProp.value.split(',');
-                            if (selectedCountries.length > 0) {
-                              // Send all selected countries as comma-separated values
-                              const countriesString = selectedCountries.join(',');
+                          if (mailingCountryProp && (mailingCountryProp.value || (mailingCountryProp.operator === 'contains' && mailingCountryProp.searchTerm))) {
+                            const val = (mailingCountryProp.value || (mailingCountryProp.operator === 'contains' ? mailingCountryProp.searchTerm : '')).trim();
+                            if (val) {
                               activeFilters.push({
                                 property: 'mailing_country',
-                                value: countriesString,
-                                operator: mailingCountryProp.operator
+                                value: val,
+                                operator: mailingCountryProp.operator || 'is'
                               });
                             }
                           }
@@ -5726,12 +6025,15 @@ export default function LeadPipeline({ onPageChange }) {
 
                           // Add city filter if configured
                           const cityProp = selectedProperties.find(prop => prop.property === 'mailing_city');
-                          if (cityProp && cityProp.value) {
-                            activeFilters.push({
-                              property: 'mailing_city',
-                              value: cityProp.value,
-                              operator: cityProp.operator || 'is'
-                            });
+                          if (cityProp && (cityProp.value || (cityProp.operator === 'contains' && cityProp.searchTerm))) {
+                            const val = (cityProp.value || (cityProp.operator === 'contains' ? cityProp.searchTerm : '')).trim();
+                            if (val) {
+                              activeFilters.push({
+                                property: 'mailing_city',
+                                value: val,
+                                operator: cityProp.operator || 'is'
+                              });
+                            }
                           }
 
                           // Add lead_source filter if configured
