@@ -1467,9 +1467,7 @@ export default function Opportunities({ onPageChange }) {
             params.append('deal_filter', dealFilter);
           }
           if (newThisWeekFilter) {
-            params.append('date_type', 'in_last');
-            params.append('last_count', '7');
-            params.append('last_unit', 'days');
+            params.append('last_week_activity', 'true');
           }
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
@@ -3838,9 +3836,7 @@ export default function Opportunities({ onPageChange }) {
         params.append('query', searchTerm.trim());
       }
       if (newThisWeekFilter) {
-        params.append('date_type', 'in_last');
-        params.append('last_count', '7');
-        params.append('last_unit', 'days');
+        params.append('last_week_activity', 'true');
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
@@ -4279,17 +4275,7 @@ export default function Opportunities({ onPageChange }) {
     }
 
     let isNewThisWeek = true;
-    if (newThisWeekFilter) {
-      if (!opp.createdTime) {
-        isNewThisWeek = false;
-      } else {
-        const createdDate = parseDateRobust(opp.createdTime);
-        const now = new Date();
-        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        sevenDaysAgo.setHours(0, 0, 0, 0);
-        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
-      }
-    }
+    // Server-side filter with last_week_activity=true is applied when fetching accounts
 
     let matchesDealFilter = true;
     if (dealFilter === 'with_deals') {
@@ -4301,7 +4287,7 @@ export default function Opportunities({ onPageChange }) {
     return matchesSearch && isNewThisWeek && matchesDealFilter;
   });
 
-  const isClientPaginated = newThisWeekFilter || (dealFilter && dealFilter !== 'all');
+  const isClientPaginated = false;
 
   const calculatedWithDeals = opportunities.filter(opp => String(opp.dealPresent) === '1' || Number(opp.dealPresent) > 0 || Boolean(opp.hasDeal) || (Array.isArray(opp.deals) && opp.deals.length > 0)).length;
   const calculatedWithoutDeals = Math.max(0, opportunities.length - calculatedWithDeals);
