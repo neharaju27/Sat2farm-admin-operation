@@ -47,6 +47,14 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
         return;
       }
 
+      // Check for specific error response: {"exception": "No pest/disease available for your crop", "status": "error"}
+      if (data && data.exception && data.exception.toLowerCase().includes('no pest/disease available for your crop')) {
+        setError('No pest/disease available for your crop');
+        setPests([]);
+        setDiseases([]);
+        return;
+      }
+
       // Separate pests and diseases
       const pestList = data.filter(item => item.Pest);
       const diseaseList = data.filter(item => item.Disease);
@@ -61,7 +69,13 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
       setDiseases(diseaseList);
     } catch (err) {
       console.error('Error fetching pest/disease data:', err);
-      setError('Data will be available soon');
+
+      // Handle 404 error - show specific message
+      if (err.response && err.response.status === 404) {
+        setError('No pest/disease available for your crop');
+      } else {
+        setError('Data will be available soon');
+      }
     } finally {
       setLoading(false);
     }
