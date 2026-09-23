@@ -1467,7 +1467,9 @@ export default function Opportunities({ onPageChange }) {
             params.append('deal_filter', dealFilter);
           }
           if (newThisWeekFilter) {
-            params.append('last_week_activity', 'true');
+            params.append('date_type', 'in_last');
+            params.append('last_count', '7');
+            params.append('last_unit', 'days');
           }
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
@@ -2306,6 +2308,7 @@ export default function Opportunities({ onPageChange }) {
 
 
   const [greenTeamAssignedDealIds, setGreenTeamAssignedDealIds] = useState([]);
+  const [greenTeamAssignments, setGreenTeamAssignments] = useState([]);
   const [showGreenTeamAssignmentDetails, setShowGreenTeamAssignmentDetails] = useState(false);
   const [greenTeamAssignmentDetails, setGreenTeamAssignmentDetails] = useState(null);
   const [loadingGreenTeamDetails, setLoadingGreenTeamDetails] = useState(false);
@@ -2331,6 +2334,7 @@ export default function Opportunities({ onPageChange }) {
       if (response.data && response.data.assignments && Array.isArray(response.data.assignments)) {
         const assignedDealIds = response.data.assignments.map(assignment => assignment.deal_id?.toString());
         setGreenTeamAssignedDealIds(assignedDealIds);
+        setGreenTeamAssignments(response.data.assignments);
         console.log('Green Team assigned deal IDs:', assignedDealIds);
       }
     } catch (error) {
@@ -2338,10 +2342,28 @@ export default function Opportunities({ onPageChange }) {
     }
   };
 
-  // Helper function to check if a deal is assigned to Green Team
+  // Helper function to check if a deal is assigned to Green Team and get its current stage
   const isDealAssignedToGreenTeam = (deal) => {
     const dealId = deal.deal_id?.toString() || deal.id?.toString();
     return greenTeamAssignedDealIds.includes(dealId);
+  };
+
+  // Helper function to get the current stage for a deal assigned to Green Team
+  const getDealCurrentStage = (deal) => {
+    const dealId = deal.deal_id?.toString() || deal.id?.toString();
+    // Check if we have the assignment details already loaded
+    if (greenTeamAssignmentDetails && greenTeamAssignmentDetails.deal_id?.toString() === dealId) {
+      return greenTeamAssignmentDetails.current_stage || greenTeamAssignmentDetails.stage || 'New Assignment';
+    }
+    // Try to get stage from the assignments data
+    if (greenTeamAssignments && Array.isArray(greenTeamAssignments)) {
+      const assignment = greenTeamAssignments.find(a => a.deal_id?.toString() === dealId);
+      if (assignment) {
+        return assignment.current_stage || assignment.stage || 'New Assignment';
+      }
+    }
+    // Otherwise, return default
+    return 'New Assignment';
   };
 
   // Fetch Green Team assignment details for a specific deal
@@ -2369,7 +2391,8 @@ export default function Opportunities({ onPageChange }) {
             ...assignment,
             contact_name: assignment.contact_name || '-',
             amount: assignment.amount || '-',
-            closing_date: assignment.closing_date || '-'
+            closing_date: assignment.closing_date || '-',
+            current_stage: assignment.current_stage || assignment.stage || 'New Assignment'
           };
           setGreenTeamAssignmentDetails(assignmentWithFallbacks);
           setEditingGreenTeamDetails(assignmentWithFallbacks);
@@ -2383,6 +2406,22 @@ export default function Opportunities({ onPageChange }) {
       toast.error('Failed to fetch assignment details');
     } finally {
       setLoadingGreenTeamDetails(false);
+    }
+  };
+
+  // Helper function to get button text based on current stage
+  const getGreenTeamButtonText = (currentStage) => {
+    switch (currentStage) {
+      case 'New Assignment':
+        return 'Assigned to Green Team';
+      case 'In Progress':
+        return 'In Progress';
+      case 'Review':
+        return 'Review';
+      case 'Completed':
+        return 'Completed';
+      default:
+        return 'Assigned to Green Team';
     }
   };
 
@@ -3836,7 +3875,9 @@ export default function Opportunities({ onPageChange }) {
         params.append('query', searchTerm.trim());
       }
       if (newThisWeekFilter) {
-        params.append('last_week_activity', 'true');
+        params.append('date_type', 'in_last');
+        params.append('last_count', '7');
+        params.append('last_unit', 'days');
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
@@ -4275,7 +4316,17 @@ export default function Opportunities({ onPageChange }) {
     }
 
     let isNewThisWeek = true;
-    // Server-side filter with last_week_activity=true is applied when fetching accounts
+    if (newThisWeekFilter) {
+      if (!opp.createdTime) {
+        isNewThisWeek = false;
+      } else {
+        const createdDate = parseDateRobust(opp.createdTime);
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        isNewThisWeek = createdDate && createdDate >= sevenDaysAgo;
+      }
+    }
 
     let matchesDealFilter = true;
     if (dealFilter === 'with_deals') {
@@ -4287,7 +4338,7 @@ export default function Opportunities({ onPageChange }) {
     return matchesSearch && isNewThisWeek && matchesDealFilter;
   });
 
-  const isClientPaginated = false;
+  const isClientPaginated = newThisWeekFilter || (dealFilter && dealFilter !== 'all');
 
   const calculatedWithDeals = opportunities.filter(opp => String(opp.dealPresent) === '1' || Number(opp.dealPresent) > 0 || Boolean(opp.hasDeal) || (Array.isArray(opp.deals) && opp.deals.length > 0)).length;
   const calculatedWithoutDeals = Math.max(0, opportunities.length - calculatedWithDeals);
@@ -8744,7 +8795,7 @@ export default function Opportunities({ onPageChange }) {
                         ) : (
                           <>
                             <CheckCircle size={16} />
-                            <span>Assigned to Green Team</span>
+                            <span>{getGreenTeamButtonText(getDealCurrentStage(selectedDeal))}</span>
                           </>
                         )}
                       </button>
