@@ -1568,18 +1568,14 @@ export default function LeadPipeline({ onPageChange }) {
 
       const result = await response.json();
 
-      if (result.success || result.message) {
-        if (taskOwner && taskOwner !== editingTask.created_by) {
+      if (result.success || result.message || result.id) {
+        if (taskOwner && editingTask.created_by && taskOwner !== editingTask.created_by) {
           handleUpdateActivityCreatedBy(editingTask.id, taskOwner);
         }
 
         toast.success('Task updated successfully');
         if (selectedUser?.id && taskStatus) {
-          setTaskStatusMap(prev => {
-            const updated = { ...prev, [selectedUser.id]: { status: taskStatus, taskName: taskName } };
-            saveTaskStatusCache('lead_task_status_cache', updated);
-            return updated;
-          });
+          updateLeadTaskCache(selectedUser.id, taskStatus, taskName);
           setLeads(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
           setAllLeadsData(prev => prev.map(l => l.id === selectedUser.id ? { ...l, taskStatus: taskStatus, taskName: taskName } : l));
           setSelectedUser(prev => prev ? { ...prev, taskStatus: taskStatus, taskName: taskName } : prev);
@@ -1594,9 +1590,10 @@ export default function LeadPipeline({ onPageChange }) {
         setEditingTask(null);
         setShowEditTaskModal(false);
         // Refresh timeline to show the updated task
-        fetchTimeline(selectedUser.id);
-        // Refresh activities to show the updated task
-        fetchActivities(selectedUser.id);
+        if (selectedUser?.id) {
+          fetchTimeline(selectedUser.id);
+          fetchActivities(selectedUser.id);
+        }
       } else {
         toast.error('Failed to update task');
       }

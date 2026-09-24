@@ -75,6 +75,33 @@ const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', yea
   }
 };
 
+const formatDateForInput = (dateStr) => {
+  if (!dateStr) return '';
+  const d = parseDateRobust(dateStr);
+  if (!d) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatTimeForInput = (dateStr, timeStr) => {
+  if (timeStr && /^\d{2}:\d{2}/.test(timeStr)) {
+    return timeStr.slice(0, 5);
+  }
+  if (dateStr && dateStr.includes('T')) {
+    const t = dateStr.split('T')[1];
+    if (t) return t.slice(0, 5);
+  }
+  if (dateStr && dateStr.includes(' ')) {
+    const parts = dateStr.split(' ');
+    if (parts[1] && /^\d{2}:\d{2}/.test(parts[1])) {
+      return parts[1].slice(0, 5);
+    }
+  }
+  return '23:59';
+};
+
 export default function TaskCalendar() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -1190,7 +1217,6 @@ export default function TaskCalendar() {
                         setEditedTaskName('');
                       }
                     }}
-                    onBlur={() => setEditingField(null)}
                     autoFocus
                     className="fr-body"
                     style={{
@@ -1268,7 +1294,6 @@ export default function TaskCalendar() {
                         setEditedStatus('');
                       }
                     }}
-                    onBlur={() => setEditingField(null)}
                     autoFocus
                     className="fr-body"
                     style={{
@@ -1381,24 +1406,8 @@ export default function TaskCalendar() {
                   <div 
                     onClick={() => {
                       setEditingField('dueDate');
-                      let dateValue = '';
-                      let timeValue = selectedTask.due_time || '';
-                      
-                      if (selectedTask.due_date) {
-                        if (selectedTask.due_date.includes(' ')) {
-                          const parts = selectedTask.due_date.split(' ');
-                          dateValue = parts[0];
-                          if (parts[1]) {
-                            const timeParts = parts[1].split(':');
-                            timeValue = `${timeParts[0]}:${timeParts[1]}`;
-                          }
-                        } else {
-                          dateValue = selectedTask.due_date;
-                        }
-                      }
-                      
-                      setEditedDueDate(dateValue);
-                      setEditedDueTime(timeValue);
+                      setEditedDueDate(formatDateForInput(selectedTask.due_date));
+                      setEditedDueTime(formatTimeForInput(selectedTask.due_date, selectedTask.due_time));
                     }}
                     className="fr-body" 
                     style={{ 
@@ -1623,33 +1632,59 @@ export default function TaskCalendar() {
                     onClick={async () => {
                       try {
                         const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+                        const finalTaskName = editingField === 'taskName' ? editedTaskName : (selectedTask.task_name || '');
+                        const finalDueDate = editingField === 'dueDate' ? editedDueDate : formatDateForInput(selectedTask.due_date);
+                        const finalDueTime = editingField === 'dueDate' ? (editedDueTime || '23:59') : formatTimeForInput(selectedTask.due_date, selectedTask.due_time);
+                        const finalStatus = editingField === 'status' ? editedStatus : (selectedTask.status || 'In Progress');
+
                         const requestBody = {
-                          id: selectedTask.id,
-                          task_name: editingField === 'taskName' ? editedTaskName : selectedTask.task_name,
-                          due_date: editingField === 'dueDate' ? editedDueDate : selectedTask.due_date,
-                          status: editingField === 'status' ? editedStatus : selectedTask.status,
+                          id: String(selectedTask.id),
+                          activity_type: 'task',
+                          task_name: finalTaskName,
+                          due_date: finalDueDate,
+                          due_time: finalDueTime ? finalDueTime.slice(0, 5) : '23:59',
+                          status: finalStatus,
+                          task_owner: selectedTask.task_owner || selectedTask.created_by || currentUserName,
                           user: currentUserName
                         };
 
-                        // Only include due_time if it has a value and we're editing due date
-                        if (editingField === 'dueDate' && editedDueTime) {
-                          requestBody.due_time = editedDueTime;
-                        }
                         console.log('Updating task with:', requestBody);
                         
+                        const headers = {
+                          'Content-Type': 'application/json',
+                        };
+                        const stored = localStorage.getItem('sat2farm_user');
+                        if (stored) {
+                          try {
+                            const { jwt, token } = JSON.parse(stored);
+                            const actualToken = jwt || token;
+                            if (actualToken) {
+                              headers['Authorization'] = `Bearer ${actualToken}`;
+                            }
+                          } catch (e) { }
+                        }
+
                         const response = await fetch(activityApiUrl, {
                           method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
+                          headers,
                           body: JSON.stringify(requestBody)
                         });
 
                         const result = await response.json();
                         console.log('API response:', result);
 
-                        if (response.ok) {
+                        if (response.ok && (result.success || result.message || result.id || result.status)) {
                           toast.success('Task updated successfully');
+
+                          // Update selectedTask in modal state
+                          setSelectedTask(prev => prev ? {
+                            ...prev,
+                            task_name: finalTaskName,
+                            due_date: finalDueDate ? `${finalDueDate} ${finalDueTime}` : prev.due_date,
+                            due_time: finalDueTime,
+                            status: finalStatus
+                          } : null);
+
                           await fetchAllTasks();
                           setEditingField(null);
                           setEditedTaskName('');
@@ -1658,7 +1693,7 @@ export default function TaskCalendar() {
                           setEditedStatus('');
                         } else {
                           console.error('API error:', result);
-                          toast.error('Failed to update task');
+                          toast.error(result.message || 'Failed to update task');
                         }
                       } catch (error) {
                         console.error('Error updating task:', error);
