@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { normalizeUserRole } from '../utils/roleUtils';
 import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronUp, ChevronRight, X, Check, Clock, AlertCircle, FileText, ChevronLeft, Upload, ChevronDown as ChevronDownIcon, User, Building, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building2, Hash, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import satyuktLogo from '../assets/satyukt.webp';
@@ -374,8 +373,6 @@ const getApiUserName = (u) => {
 
 export default function LeadPipeline({ onPageChange }) {
   const { user } = useAuth();
-  const userRole = normalizeUserRole(user);
-  const isSales = userRole === 'sales';
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -633,10 +630,6 @@ export default function LeadPipeline({ onPageChange }) {
 
   // ── Edit dialog handlers ─────────────────────────────────────────────────────
   const openEditDialog = (rowId, fieldName, currentValue) => {
-    if (isSales && (fieldName === 'leadStatus' || fieldName === 'status' || fieldName === 'lead_status')) {
-      toast.error('Sales users are not allowed to edit lead status');
-      return;
-    }
     setEditDialogRowId(rowId);
     setEditDialogField(fieldName);
     setEditDialogValue(currentValue);
@@ -661,10 +654,6 @@ export default function LeadPipeline({ onPageChange }) {
     const valueToSave = showEditDialogCustomInput ? editDialogCustomValue : editDialogValue;
     if (!valueToSave.trim() || !editDialogRowId || !editDialogField) {
       toast.error('Please enter a value');
-      return;
-    }
-    if (isSales && (editDialogField === 'leadStatus' || editDialogField === 'status' || editDialogField === 'lead_status')) {
-      toast.error('Sales users are not allowed to edit lead status');
       return;
     }
 
@@ -1404,7 +1393,7 @@ export default function LeadPipeline({ onPageChange }) {
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
-    } catch (e) { }
+    } catch (e) {}
     return dateStr;
   };
 
@@ -1967,10 +1956,6 @@ export default function LeadPipeline({ onPageChange }) {
   };
 
   const handleFieldUpdate = async (leadId, fieldName, newValue) => {
-    if (isSales && (fieldName === 'leadStatus' || fieldName === 'status' || fieldName === 'lead_status')) {
-      toast.error('Sales users are not allowed to edit lead status');
-      return;
-    }
     const updateKey = `${leadId}_${fieldName}`;
     if (pendingFieldUpdatesRef.current.has(updateKey)) {
       return;
@@ -2134,13 +2119,7 @@ export default function LeadPipeline({ onPageChange }) {
     }
   };
 
-  const handleStatusUpdate = async (leadId, newStatus) => {
-    if (isSales) {
-      toast.error('Sales users are not allowed to edit lead status');
-      return;
-    }
-    return handleFieldUpdate(leadId, 'leadStatus', newStatus);
-  };
+  const handleStatusUpdate = async (leadId, newStatus) => handleFieldUpdate(leadId, 'leadStatus', newStatus);
   const handleOwnerUpdate = async (leadId, newOwner) => handleFieldUpdate(leadId, 'contactOwner', newOwner);
   const handleTagsUpdate = async (leadId, newTags) => handleFieldUpdate(leadId, 'tags', newTags);
   const handleLeadSourceUpdate = async (leadId, newLeadSource) => handleFieldUpdate(leadId, 'leadSource', newLeadSource);
@@ -2148,13 +2127,7 @@ export default function LeadPipeline({ onPageChange }) {
   const handleStateUpdate = async (leadId, newState) => handleFieldUpdate(leadId, 'state', newState);
   const handleCountryUpdate = async (leadId, newCountry) => handleFieldUpdate(leadId, 'country', newCountry);
   const handleIndustryUpdate = async (leadId, newIndustry) => handleFieldUpdate(leadId, 'industry', newIndustry);
-  const handleLeadInfoStatusUpdate = async (leadId, newStatus) => {
-    if (isSales) {
-      toast.error('Sales users are not allowed to edit lead status');
-      return;
-    }
-    return handleFieldUpdate(leadId, 'leadStatus', newStatus);
-  };
+  const handleLeadInfoStatusUpdate = async (leadId, newStatus) => handleFieldUpdate(leadId, 'leadStatus', newStatus);
   const handleAlternateNumberUpdate = async (leadId, newAlternateNumber) => handleFieldUpdate(leadId, 'alternateNumber', newAlternateNumber);
 
   const startEditing = (fieldName, currentValue) => {
@@ -3282,11 +3255,9 @@ export default function LeadPipeline({ onPageChange }) {
                           }}>
                             {lead.leadStatus}
                           </span>
-                          {!isSales && (
-                            <button onClick={() => openEditDialog(lead.id, 'leadStatus', lead.leadStatus)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit lead status">
-                              <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
-                            </button>
-                          )}
+                          <button onClick={() => openEditDialog(lead.id, 'leadStatus', lead.leadStatus)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }} title="Edit lead status">
+                            <FileEdit size={14} style={{ color: 'var(--text-3)' }} />
+                          </button>
                         </div>
                       </td>
                       <td style={{ padding: '8px 12px', color: 'var(--text)', textAlign: 'left', borderRight: '1px solid var(--border)', width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -6601,33 +6572,30 @@ export default function LeadPipeline({ onPageChange }) {
                               justifyContent: 'space-between',
                               width: '100%',
                               padding: '8px 12px',
-                              background: isSales ? 'var(--gray-50)' : 'var(--surface)',
+                              background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               borderRadius: 'var(--r)',
-                              cursor: isSales ? 'not-allowed' : 'pointer',
+                              cursor: 'pointer',
                               fontSize: '12px',
                               color: 'var(--text)',
-                              transition: 'background-color 0.2s ease',
-                              opacity: isSales ? 0.85 : 1
+                              transition: 'background-color 0.2s ease'
                             }}
                             onClick={() => {
-                              if (isSales) return;
                               closeAllDropdowns();
                               setStatusDropdownOpen(!statusDropdownOpen);
                             }}
                             onMouseEnter={(e) => {
-                              if (!isSales) e.currentTarget.style.background = 'var(--gray-100)';
+                              e.currentTarget.style.background = 'var(--gray-100)';
                             }}
                             onMouseLeave={(e) => {
-                              if (!isSales) e.currentTarget.style.background = 'var(--surface)';
+                              e.currentTarget.style.background = 'var(--surface)';
                             }}
-                            title={isSales ? 'Editing lead status is restricted for sales' : undefined}
                           >
                             <span>{selectedUser.leadStatus}</span>
-                            {!isSales && <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />}
+                            <ChevronDownIcon size={14} style={{ transition: 'transform 0.2s ease' }} />
                           </div>
 
-                          {!isSales && statusDropdownOpen && (
+                          {statusDropdownOpen && (
                             <div data-dropdown style={{
                               position: 'absolute',
                               top: '100%',
@@ -7700,7 +7668,7 @@ export default function LeadPipeline({ onPageChange }) {
                       <input
                         type="date"
                         value={taskDueDate}
-                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
                         onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
                         style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                       />
@@ -7715,7 +7683,7 @@ export default function LeadPipeline({ onPageChange }) {
                       <input
                         type="time"
                         value={taskDueTime}
-                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
                         onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
                         style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                       />
@@ -7790,7 +7758,7 @@ export default function LeadPipeline({ onPageChange }) {
                         <input
                           type="date"
                           value={taskDueDate}
-                          onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
                           onChange={(e) => { setTaskDueDate(e.target.value); e.target.blur(); }}
                           style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                         />
@@ -7805,7 +7773,7 @@ export default function LeadPipeline({ onPageChange }) {
                         <input
                           type="time"
                           value={taskDueTime}
-                          onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                          onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
                           onChange={(e) => { setTaskDueTime(e.target.value); e.target.blur(); }}
                           style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
                         />
@@ -7960,46 +7928,32 @@ export default function LeadPipeline({ onPageChange }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
-                    {isSales ? (
-                      <div style={{
+                    <select
+                      value={selectedLead.leadStatus}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        handleLeadInfoStatusUpdate(selectedLead.id, newStatus);
+                      }}
+                      style={{
+                        width: '100%',
                         padding: '8px 12px',
-                        background: 'var(--gray-50)',
+                        background: 'var(--surface)',
                         border: '1px solid var(--border)',
                         borderRadius: 'var(--r)',
                         color: 'var(--text)',
                         fontSize: '12px',
-                        fontWeight: '500'
-                      }}>
-                        {selectedLead.leadStatus}
-                      </div>
-                    ) : (
-                      <select
-                        value={selectedLead.leadStatus}
-                        onChange={(e) => {
-                          const newStatus = e.target.value;
-                          handleLeadInfoStatusUpdate(selectedLead.id, newStatus);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          color: 'var(--text)',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="New">New</option>
-                        <option value="Contacted">Contacted</option>
-                        <option value="Qualified">Qualified</option>
-                        <option value="Proposal">Proposal</option>
-                        <option value="Negotiation">Negotiation</option>
-                        <option value="Closed Won">Closed Won</option>
-                        <option value="Closed Lost">Closed Lost</option>
-                      </select>
-                    )}
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="New">New</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Qualified">Qualified</option>
+                      <option value="Proposal">Proposal</option>
+                      <option value="Negotiation">Negotiation</option>
+                      <option value="Closed Won">Closed Won</option>
+                      <option value="Closed Lost">Closed Lost</option>
+                    </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Source</label>
@@ -8646,7 +8600,7 @@ export default function LeadPipeline({ onPageChange }) {
                       <option value="industry">Industry</option>
                       <option value="state">State</option>
                       <option value="country">Country</option>
-                      {!isSales && <option value="leadStatus">Lead Status</option>}
+                      <option value="leadStatus">Lead Status</option>
                       <option value="contactOwner">Contact Owner</option>
                     </select>
                     <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
@@ -8841,10 +8795,6 @@ export default function LeadPipeline({ onPageChange }) {
                   onClick={async () => {
                     if (!selectedFieldToUpdate || !updateNewFieldValue) {
                       toast.error('Please select a field and enter a new value');
-                      return;
-                    }
-                    if (isSales && selectedFieldToUpdate === 'leadStatus') {
-                      toast.error('Sales users are not allowed to edit lead status');
                       return;
                     }
                     const fieldMap = {
