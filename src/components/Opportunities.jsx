@@ -619,6 +619,31 @@ export default function Opportunities({ onPageChange }) {
     return () => { active = false; };
   }, []);
 
+  // Save custom dropdown option to backend API (POST)
+  const saveCustomDropdownOption = async (category, optionName) => {
+    const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+    if (!apiUrl || !category || !optionName?.trim()) return;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          category: category,
+          option_name: optionName.trim()
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.warn(`Dropdown option POST returned status ${response.status}:`, errorData?.message || response.statusText);
+      }
+    } catch (err) {
+      console.warn(`Error saving custom dropdown option for ${category}:`, err);
+    }
+  };
+
   // Fetch opportunities from API
 
   const fetchOpportunities = async () => {
@@ -844,14 +869,19 @@ export default function Opportunities({ onPageChange }) {
     if (showEditDialogCustomInput && valueToSave.trim()) {
       if (editDialogField === 'industry') {
         setPredefinedIndustries([...predefinedIndustries, valueToSave.trim()]);
+        saveCustomDropdownOption('industry', valueToSave.trim());
       } else if (editDialogField === 'accountType') {
         setPredefinedAccountTypes([...predefinedAccountTypes, valueToSave.trim()]);
+        saveCustomDropdownOption('account_type', valueToSave.trim());
       } else if (editDialogField === 'contactOwner') {
         setPredefinedContactOwners([...predefinedContactOwners, valueToSave.trim()]);
+        saveCustomDropdownOption('contact_owner', valueToSave.trim());
       } else if (editDialogField === 'leadSource') {
         setPredefinedLeadSources([...predefinedLeadSources, valueToSave.trim()]);
+        saveCustomDropdownOption('lead_source', valueToSave.trim());
       } else if (editDialogField === 'tags') {
         setPredefinedTags([...predefinedTags, valueToSave.trim()]);
+        saveCustomDropdownOption('tags', valueToSave.trim());
       }
     }
 
@@ -1036,18 +1066,13 @@ export default function Opportunities({ onPageChange }) {
     const result = {};
 
     for (const [property, possibleFields] of Object.entries(propertyMap)) {
-      const defaults = defaultsMap[property] || [];
-
-      if (apiDropdownProps.includes(property) && defaults && defaults.length > 0) {
-        result[property] = [...new Set(defaults)].sort((a, b) => String(a).localeCompare(String(b)));
-        continue;
-      }
+      const defaults = (defaultsMap[property] || []).filter(v => v && String(v).trim() && String(v).toLowerCase() !== 'null' && String(v).toLowerCase() !== 'undefined');
 
       if (property === 'tag' || property === 'tags') {
         const allTags = sourceData.flatMap(item => {
           const tagStr = item.tags || (item._raw && (item._raw.tags || item._raw.tag)) || '';
           return (tagStr && typeof tagStr === 'string' && tagStr.trim())
-            ? tagStr.split(',').map(t => t.trim()).filter(Boolean)
+            ? tagStr.split(',').map(t => t.trim()).filter(t => t && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined')
             : [];
         });
         result[property] = [...new Set([...defaults, ...allTags])].sort((a, b) => String(a).localeCompare(String(b)));
@@ -1102,7 +1127,8 @@ export default function Opportunities({ onPageChange }) {
       'description': 'description',
       'created_by': 'created_by',
       'modified_by': 'modified_by',
-      'account_type': 'account_type'
+      'account_type': 'account_type',
+      'industry': 'industry'
     };
     const baseKey = fieldMap[property] || property;
     const opLower = String(operator || '').toLowerCase().trim();
@@ -7950,7 +7976,7 @@ export default function Opportunities({ onPageChange }) {
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <input type="text" value={customAccountType} onChange={(e) => setCustomAccountType(e.target.value)} placeholder="Enter custom account type..."
                                     style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
-                                  <button onClick={() => { if (customAccountType.trim()) { handleFieldUpdate(selectedUser.id, 'accountType', customAccountType.trim()); setPredefinedAccountTypes([...predefinedAccountTypes, customAccountType.trim()]); setCustomAccountType(''); setShowCustomAccountTypeInput(false); } }}
+                                  <button onClick={() => { if (customAccountType.trim()) { handleFieldUpdate(selectedUser.id, 'accountType', customAccountType.trim()); setPredefinedAccountTypes([...predefinedAccountTypes, customAccountType.trim()]); saveCustomDropdownOption('account_type', customAccountType.trim()); setCustomAccountType(''); setShowCustomAccountTypeInput(false); } }}
                                     style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
                                   <button onClick={() => { setCustomAccountType(''); setShowCustomAccountTypeInput(false); }}
                                     style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
@@ -7999,7 +8025,7 @@ export default function Opportunities({ onPageChange }) {
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <input type="text" value={customIndustry} onChange={(e) => setCustomIndustry(e.target.value)} placeholder="Enter custom industry..."
                                     style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
-                                  <button onClick={() => { if (customIndustry.trim()) { handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim()); setPredefinedIndustries([...predefinedIndustries, customIndustry.trim()]); setCustomIndustry(''); setShowCustomIndustryInput(false); } }}
+                                  <button onClick={() => { if (customIndustry.trim()) { handleFieldUpdate(selectedUser.id, 'industry', customIndustry.trim()); setPredefinedIndustries([...predefinedIndustries, customIndustry.trim()]); saveCustomDropdownOption('industry', customIndustry.trim()); setCustomIndustry(''); setShowCustomIndustryInput(false); } }}
                                     style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
                                   <button onClick={() => { setCustomIndustry(''); setShowCustomIndustryInput(false); }}
                                     style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
@@ -8064,7 +8090,7 @@ export default function Opportunities({ onPageChange }) {
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <input type="text" value={customOwner} onChange={(e) => setCustomOwner(e.target.value)} placeholder="Enter custom owner..."
                                     style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
-                                  <button onClick={() => { if (customOwner.trim()) { handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim()); setPredefinedContactOwners([...predefinedContactOwners, customOwner.trim()]); setCustomOwner(''); setShowCustomOwnerInput(false); } }}
+                                  <button onClick={() => { if (customOwner.trim()) { handleFieldUpdate(selectedUser.id, 'contactOwner', customOwner.trim()); setPredefinedContactOwners([...predefinedContactOwners, customOwner.trim()]); saveCustomDropdownOption('contact_owner', customOwner.trim()); setCustomOwner(''); setShowCustomOwnerInput(false); } }}
                                     style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
                                   <button onClick={() => { setCustomOwner(''); setShowCustomOwnerInput(false); }}
                                     style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
@@ -8112,7 +8138,7 @@ export default function Opportunities({ onPageChange }) {
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <input type="text" value={customTags} onChange={(e) => setCustomTags(e.target.value)} placeholder="Enter custom tag..."
                                     style={{ flex: 1, padding: '6px 8px', border: '1px solid var(--green-300)', borderRadius: 'var(--r)', fontSize: '12px', background: 'var(--surface)', color: 'var(--text)' }} autoFocus />
-                                  <button onClick={() => { if (customTags.trim()) { handleFieldUpdate(selectedUser.id, 'tags', customTags.trim()); setPredefinedTags([...predefinedTags, customTags.trim()]); setCustomTags(''); setShowCustomTagsInput(false); } }}
+                                  <button onClick={() => { if (customTags.trim()) { handleFieldUpdate(selectedUser.id, 'tags', customTags.trim()); setPredefinedTags([...predefinedTags, customTags.trim()]); saveCustomDropdownOption('tags', customTags.trim()); setCustomTags(''); setShowCustomTagsInput(false); } }}
                                     style={{ padding: '6px 12px', background: 'var(--green-600)', color: 'white', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer', fontWeight: '500' }}>Apply</button>
                                   <button onClick={() => { setCustomTags(''); setShowCustomTagsInput(false); }}
                                     style={{ padding: '6px 12px', background: 'var(--gray-200)', color: 'var(--text)', border: 'none', borderRadius: 'var(--r)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
@@ -10555,9 +10581,12 @@ export default function Opportunities({ onPageChange }) {
                       >
                         <option value="">Choose Property</option>
                         <option value="contact_owner">Contact Owner</option>
+                        <option value="account_type">Account Type</option>
+                        <option value="industry">Industry</option>
+                        <option value="lead_source">Lead Source</option>
+                        <option value="tag">Tags</option>
                         <option value="created_time">Created Time</option>
                         <option value="modified_time">Modified Time</option>
-                        <option value="tag">Tags</option>
                         <option value="mailing_country">Mailing Country</option>
                         <option value="mailing_state">Mailing State</option>
                         <option value="mailing_city">Mailing City</option>
@@ -11445,28 +11474,280 @@ export default function Opportunities({ onPageChange }) {
                         )}
 
                         {prop.property === 'account_type' && (
-                          <select
-                            value={prop.value}
-                            onChange={(e) => {
-                              const updated = [...selectedProperties];
-                              updated[index].value = e.target.value;
-                              setSelectedProperties(updated);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--r)',
-                              fontSize: '13px',
-                              background: 'var(--surface)',
-                              color: 'var(--text)'
-                            }}
-                          >
-                            <option value="">Select value</option>
-                            {predefinedAccountTypes.map(type => (
-                              <option key={type} value={type}>{type}</option>
-                            ))}
-                          </select>
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Account Types</option>
+                                  {getUniqueValues(prop.property).map(type => (
+                                    <option key={type} value={type}>{type}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'industry' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-accounts-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search industries..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(ind => !prop.searchTerm || ind.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(ind => (
+                                          <div
+                                            key={ind}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(ind)) {
+                                                const indexToRemove = currentValues.indexOf(ind);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(ind);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{ind}</span>
+                                              {prop.value && prop.value.includes(ind) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((ind, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {ind}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(ind);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${ind}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'lead_source' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Lead Sources</option>
+                                  {getUniqueValues(prop.property).map(src => (
+                                    <option key={src} value={src}>{src}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
                         )}
 
                         {prop.property === 'tag' && (
@@ -11535,7 +11816,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {predefinedAccountTypes.filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getUniqueValues(prop.property).filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(tag => (
                                           <div
                                             key={tag}

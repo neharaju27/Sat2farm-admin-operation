@@ -536,6 +536,31 @@ export default function LeadPipeline({ onPageChange }) {
     return () => { active = false; };
   }, []);
 
+  // Save custom dropdown option to backend API (POST)
+  const saveCustomDropdownOption = async (category, optionName) => {
+    const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
+    if (!apiUrl || !category || !optionName?.trim()) return;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          category: category,
+          option_name: optionName.trim()
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.warn(`Dropdown option POST returned status ${response.status}:`, errorData?.message || response.statusText);
+      }
+    } catch (err) {
+      console.warn(`Error saving custom dropdown option for ${category}:`, err);
+    }
+  };
+
   const [selectedLead, setSelectedLead] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -677,6 +702,9 @@ export default function LeadPipeline({ onPageChange }) {
         } else if (editDialogField === 'tags') {
           setPredefinedTags([...predefinedTags, valueToSave.trim()]);
           saveCustomDropdownOption('tags', valueToSave.trim());
+        } else if (editDialogField === 'leadStatus' || editDialogField === 'lead_status') {
+          setPredefinedLeadStatuses([...predefinedLeadStatuses, valueToSave.trim()]);
+          saveCustomDropdownOption('lead_status', valueToSave.trim());
         }
       }
 
@@ -841,7 +869,9 @@ export default function LeadPipeline({ onPageChange }) {
       'country': 'country',
       'description': 'description',
       'created_by': 'created_by',
-      'modified_by': 'modified_by'
+      'modified_by': 'modified_by',
+      'industry': 'industry',
+      'account_type': 'account_type'
     };
     const baseKey = fieldMap[property] || property;
     const opLower = String(operator || '').toLowerCase().trim();
@@ -1167,18 +1197,16 @@ export default function LeadPipeline({ onPageChange }) {
     const sourceData = (allLeadsData && allLeadsData.length > 0) ? allLeadsData : leads;
     const sets = {};
     for (const key of Object.keys(propertyMap)) {
-      sets[key] = new Set(defaultsMap[key] || []);
+      const defaults = (defaultsMap[key] || []).filter(v => v && String(v).trim() && String(v).toLowerCase() !== 'null' && String(v).toLowerCase() !== 'undefined');
+      sets[key] = new Set(defaults);
     }
 
     for (let i = 0; i < sourceData.length; i++) {
       const item = sourceData[i];
+      if (!item) continue;
       const raw = item._raw || {};
 
       for (const [property, possibleFields] of Object.entries(propertyMap)) {
-        if (apiDropdownProps.includes(property) && defaultsMap[property] && defaultsMap[property].length > 0) {
-          continue;
-        }
-
         const set = sets[property];
         if (property === 'tag' || property === 'tags') {
           const tagStr = item.tags || raw.tags || raw.tag || '';
@@ -1186,7 +1214,7 @@ export default function LeadPipeline({ onPageChange }) {
             const parts = tagStr.split(',');
             for (let j = 0; j < parts.length; j++) {
               const t = parts[j].trim();
-              if (t) set.add(t);
+              if (t && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined') set.add(t);
             }
           }
           continue;
@@ -3738,6 +3766,8 @@ export default function LeadPipeline({ onPageChange }) {
                         <option value="created_time">Created Time</option>
                         <option value="lead_status">Lead Status</option>
                         <option value="tag">Tag</option>
+                        <option value="industry">Industry</option>
+                        <option value="account_type">Account Type</option>
                         <option value="mailing_country">Mailing Country</option>
                         <option value="mailing_state">Mailing State</option>
                         <option value="created_by">Created By</option>
@@ -4126,19 +4156,8 @@ export default function LeadPipeline({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {[
-                                        'Yet to Contact',
-                                        'Attempted to Contact',
-                                        'Contacted',
-                                        'Starter',
-                                        'Growth',
-                                        'Enterprise',
-                                        'Follow-up 1',
-                                        'Follow-up 2',
-                                        'In Discussion',
-                                        'Interested',
-                                        'Junk'
-                                      ].filter(status => !prop.searchTerm || status.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getUniqueValues(prop.property)
+                                        .filter(status => !prop.searchTerm || status.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(status => (
                                           <div
                                             key={status}
@@ -4309,17 +4328,8 @@ export default function LeadPipeline({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {[
-                                        'Sat2Farm Recurring',
-                                        'Sat2Farm Non Recurring',
-                                        'Sat2Farm Exclusivity',
-                                        'Sat4Agri',
-                                        'Sat4Risk',
-                                        'Project',
-                                        'WhiteLabelling',
-                                        'API Client',
-                                        'Positive response'
-                                      ].filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {getUniqueValues(prop.property)
+                                        .filter(tag => !prop.searchTerm || tag.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(tag => (
                                           <div
                                             key={tag}
@@ -5474,6 +5484,230 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
+                        {prop.property === 'industry' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ minWidth: '80px' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search industries..."
+                                    value={prop.searchTerm || ''}
+                                    onChange={(e) => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].searchTerm = e.target.value;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    onFocus={() => {
+                                      const updated = [...selectedProperties];
+                                      updated[index].dropdownOpen = true;
+                                      setSelectedProperties(updated);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 12px',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      fontSize: '13px',
+                                      background: 'var(--surface)',
+                                      color: 'var(--text)'
+                                    }}
+                                  />
+                                  {prop.dropdownOpen && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      right: 0,
+                                      background: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: 'var(--r)',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                      zIndex: 10,
+                                      maxHeight: '200px',
+                                      overflowY: 'auto',
+                                      marginTop: '4px'
+                                    }}>
+                                      {getUniqueValues(prop.property)
+                                        .filter(ind => !prop.searchTerm || ind.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                        .map(ind => (
+                                          <div
+                                            key={ind}
+                                            onClick={() => {
+                                              const updated = [...selectedProperties];
+                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+
+                                              if (currentValues.includes(ind)) {
+                                                const indexToRemove = currentValues.indexOf(ind);
+                                                currentValues.splice(indexToRemove, 1);
+                                              } else {
+                                                currentValues.push(ind);
+                                              }
+
+                                              updated[index].value = currentValues.join(',');
+                                              updated[index].dropdownOpen = false;
+                                              updated[index].searchTerm = '';
+                                              setSelectedProperties(updated);
+                                            }}
+                                            style={{
+                                              padding: '8px 12px',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              color: 'var(--text)',
+                                              borderBottom: '1px solid var(--border-soft)',
+                                              backgroundColor: prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = 'var(--gray-100)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent';
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                              <span>{ind}</span>
+                                              {prop.value && prop.value.includes(ind) && (
+                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {prop.value && (
+                                  <div style={{
+                                    marginTop: '8px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-3)',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px'
+                                  }}>
+                                    {prop.value.split(',').map((ind, i) => (
+                                      <span key={i} style={{
+                                        background: 'var(--blue-600)15',
+                                        color: 'var(--blue-600)',
+                                        padding: '2px 6px',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {ind}
+                                        <button
+                                          onClick={() => {
+                                            const updated = [...selectedProperties];
+                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
+                                            const indexToRemove = currentValues.indexOf(ind);
+                                            if (indexToRemove > -1) {
+                                              currentValues.splice(indexToRemove, 1);
+                                              updated[index].value = currentValues.join(',');
+                                              setSelectedProperties(updated);
+                                            }
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--blue-600)',
+                                            cursor: 'pointer',
+                                            padding: '0',
+                                            fontSize: '12px',
+                                            lineHeight: '1',
+                                            borderRadius: '50%',
+                                            width: '14px',
+                                            height: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={`Remove ${ind}`}
+                                        ><X size={12} /></button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {prop.property === 'account_type' && (
+                          <div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <select
+                                  value={prop.operator || 'is'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].operator = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="is">Is</option>
+                                  <option value="is not">Is Not</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <select
+                                  value={prop.value}
+                                  onChange={(e) => {
+                                    const updated = [...selectedProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="">All Account Types</option>
+                                  {getUniqueValues(prop.property).map(value => (
+                                    <option key={value} value={value}>{value}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {prop.property === 'description' && (
                           <div>
                             <div style={{ display: 'flex', gap: '12px' }}>
@@ -6040,6 +6274,26 @@ export default function LeadPipeline({ onPageChange }) {
                               property: 'lead_source',
                               value: leadSourceProp.value,
                               operator: leadSourceProp.operator || 'is'
+                            });
+                          }
+
+                          // Add industry filter if configured
+                          const industryProp = selectedProperties.find(prop => prop.property === 'industry');
+                          if (industryProp && industryProp.value) {
+                            activeFilters.push({
+                              property: 'industry',
+                              value: industryProp.value,
+                              operator: industryProp.operator || 'is'
+                            });
+                          }
+
+                          // Add account_type filter if configured
+                          const accountTypeProp = selectedProperties.find(prop => prop.property === 'account_type');
+                          if (accountTypeProp && accountTypeProp.value) {
+                            activeFilters.push({
+                              property: 'account_type',
+                              value: accountTypeProp.value,
+                              operator: accountTypeProp.operator || 'is'
                             });
                           }
 
@@ -6698,6 +6952,8 @@ export default function LeadPipeline({ onPageChange }) {
                                     if (customStatus.trim()) {
                                       handleFieldUpdate(selectedUser.id, 'leadStatus', customStatus.trim());
                                       setStatusConfig({ ...statusConfig, [customStatus.trim()]: { color: '#6b7280', label: customStatus.trim() } });
+                                      setPredefinedLeadStatuses([...predefinedLeadStatuses, customStatus.trim()]);
+                                      saveCustomDropdownOption('lead_status', customStatus.trim());
                                       setCustomStatus('');
                                       setShowCustomStatusInput(false);
                                     }
@@ -8302,13 +8558,9 @@ export default function LeadPipeline({ onPageChange }) {
                           fontSize: '14px'
                         }}
                       >
-                        <option value="New">New</option>
-                        <option value="Contacted">Contacted</option>
-                        <option value="Qualified">Qualified</option>
-                        <option value="Proposal">Proposal</option>
-                        <option value="Negotiation">Negotiation</option>
-                        <option value="Closed Won">Closed Won</option>
-                        <option value="Closed Lost">Closed Lost</option>
+                        {predefinedLeadStatuses.map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -8326,13 +8578,9 @@ export default function LeadPipeline({ onPageChange }) {
                         }}
                       >
                         <option value="">Select Industry</option>
-                        <option value="Farmer">Farmer</option>
-                        <option value="FPO">FPO</option>
-                        <option value="NGO">NGO</option>
-                        <option value="Government">Government</option>
-                        <option value="Enterprise">Enterprise</option>
-                        <option value="Agri Input">Agri Input</option>
-                        <option value="Agri Output">Agri Output</option>
+                        {predefinedIndustries.map(ind => (
+                          <option key={ind} value={ind}>{ind}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -8352,7 +8600,7 @@ export default function LeadPipeline({ onPageChange }) {
                         }}
                       >
                         <option value="">Select a tag</option>
-                        {getUniqueTags().map(tag => (
+                        {Array.from(new Set([...predefinedTags, ...getUniqueTags()])).filter(Boolean).map(tag => (
                           <option key={tag} value={tag}>{tag}</option>
                         ))}
                       </select>
@@ -8372,13 +8620,9 @@ export default function LeadPipeline({ onPageChange }) {
                         }}
                       >
                         <option value="">Select Source</option>
-                        <option value="FB Campaign">FB Campaign</option>
-                        <option value="Website Inbound">Website Inbound</option>
-                        <option value="Sales Inbound">Sales Inbound</option>
-                        <option value="Mail Inbound">Mail Inbound</option>
-                        <option value="External Referral">External Referral</option>
-                        <option value="Cold Call">Cold Call</option>
-                        <option value="Event">Event</option>
+                        {predefinedLeadSources.map(source => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
