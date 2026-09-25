@@ -470,26 +470,26 @@ export default function Opportunities({ onPageChange }) {
   // Predefined states initialized early for top-level memoization access
   const [predefinedTags, setPredefinedTags] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedTags');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive Response'];
   });
 
   const [predefinedLeadSources, setPredefinedLeadSources] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedLeadSources');
-    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event'];
+    return saved ? JSON.parse(saved) : ['FB Campaign', 'Website Inbound', 'Sales Inbound', 'Mail Inbound', 'External Referral', 'Cold Call', 'Event', 'LinkedIn Campaign'];
   });
 
   const [predefinedIndustries, setPredefinedIndustries] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedIndustries');
-    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output'];
+    return saved ? JSON.parse(saved) : ['Farmer', 'FPO', 'NGO', 'Government', 'Enterprise', 'Agri Input', 'Agri Output', 'Agro Technology', 'growth'];
   });
 
   const [predefinedAccountTypes, setPredefinedAccountTypes] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedAccountTypes');
-    return saved ? JSON.parse(saved) : ['Sat2Farm Recurring', 'Sat2Farm Non Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Positive response'];
+    return saved ? JSON.parse(saved) : ['Sat2Farm Non Recurring', 'Sat2Farm Recurring', 'Sat2Farm Exclusivity', 'Sat4Agri', 'Sat4Risk', 'Project', 'WhiteLabelling', 'API Client', 'Enterprise Client'];
   });
 
   const [predefinedContactOwners, setPredefinedContactOwners] = useState(() => {
-    const apiDefaults = ['Akhil Kumar M', 'Alisha', 'Amith', 'Aymen', 'Bhagwati', 'Chaturya', 'Fathima', 'Harshitha', 'Lipsa', 'Mustaqeem', 'Operation', 'Partner_test', 'Pragya', 'Priyanshu', 'Rohini', 'Rohith S', 'Sat', 'Shurti', 'Shyamli', 'Testing operation acc', 'Testing sales acc', 'Vijay K B'];
+    const apiDefaults = ['Akhil Kumar M', 'Alisha', 'Amith', 'Aymen', 'Chaturya', 'Fathima', 'Harshitha', 'Krishna', 'Lipsa', 'Mustaqeem', 'Operation', 'Pragya', 'Priyanshu', 'Purnima', 'Rohini', 'Rohith S', 'Sat', 'Shurti', 'Shyamli', 'Supriyo', 'Vijay K B'];
     const saved = localStorage.getItem('opportunities_predefinedContactOwners');
     if (saved) {
       try {
@@ -1024,8 +1024,6 @@ export default function Opportunities({ onPageChange }) {
     const propertyMap = {
       'contact_owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
       'owner': ['contactOwner', 'owner', 'contact_owner', 'owner_name'],
-      'lead_status': ['leadStatus', 'status', 'lead_status'],
-      'status': ['leadStatus', 'status', 'lead_status'],
       'tag': ['tags', 'tag'],
       'tags': ['tags', 'tag'],
       'mailing_country': ['country', 'mailing_country'],
@@ -1034,22 +1032,16 @@ export default function Opportunities({ onPageChange }) {
       'mailing_street': ['companyName', 'company_name', 'street'],
       'created_by': ['createdBy', 'created_by', 'created_user', 'creator', 'created_by_name'],
       'modified_by': ['modifiedBy', 'modified_by', 'modified_user', 'modifier', 'modified_by_name'],
-      'lead_source': ['leadSource', 'lead_source', 'source'],
-      'pipeline_stage': ['leadStatus', 'status'],
       'contact_name': ['contactName', 'contact_name', 'full_name', 'name'],
       'industry': ['industry'],
       'account_type': ['accountType', 'account_type']
     };
 
     const defaultsMap = {
-      'lead_status': predefinedDealStages,
-      'status': predefinedDealStages,
-      'pipeline_stage': predefinedDealStages,
       'contact_owner': predefinedContactOwners,
       'owner': predefinedContactOwners,
       'tag': predefinedTags,
       'tags': predefinedTags,
-      'lead_source': predefinedLeadSources,
       'industry': predefinedIndustries,
       'account_type': predefinedAccountTypes,
       'mailing_country': predefinedCountries,
@@ -1060,13 +1052,18 @@ export default function Opportunities({ onPageChange }) {
       'city': predefinedCities
     };
 
-    const apiDropdownProps = ['contact_owner', 'owner', 'lead_status', 'status', 'pipeline_stage', 'tag', 'tags', 'lead_source', 'industry', 'account_type', 'mailing_country', 'country', 'mailing_state', 'state', 'mailing_city', 'city'];
+    const apiDropdownProps = ['contact_owner', 'owner', 'tag', 'tags', 'industry', 'account_type', 'mailing_country', 'country', 'mailing_state', 'state', 'mailing_city', 'city'];
 
     const sourceData = (allAccountsData && allAccountsData.length > 0) ? allAccountsData : opportunities;
     const result = {};
 
     for (const [property, possibleFields] of Object.entries(propertyMap)) {
       const defaults = (defaultsMap[property] || []).filter(v => v && String(v).trim() && String(v).toLowerCase() !== 'null' && String(v).toLowerCase() !== 'undefined');
+
+      if (apiDropdownProps.includes(property) && defaults && defaults.length > 0) {
+        result[property] = [...new Set(defaults)];
+        continue;
+      }
 
       if (property === 'tag' || property === 'tags') {
         const allTags = sourceData.flatMap(item => {
@@ -1075,7 +1072,7 @@ export default function Opportunities({ onPageChange }) {
             ? tagStr.split(',').map(t => t.trim()).filter(t => t && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined')
             : [];
         });
-        result[property] = [...new Set([...defaults, ...allTags])].sort((a, b) => String(a).localeCompare(String(b)));
+        result[property] = [...new Set([...defaults, ...allTags])];
         continue;
       }
 
@@ -1088,7 +1085,7 @@ export default function Opportunities({ onPageChange }) {
         return vals;
       }).filter(val => val && String(val).trim() !== '' && String(val).toLowerCase() !== 'null' && String(val).toLowerCase() !== 'undefined');
 
-      result[property] = [...new Set([...defaults, ...extracted])].sort((a, b) => String(a).localeCompare(String(b)));
+      result[property] = [...new Set([...defaults, ...extracted])];
     }
     return result;
   }, [allAccountsData, opportunities, predefinedDealStages, predefinedContactOwners, predefinedTags, predefinedLeadSources, predefinedIndustries, predefinedAccountTypes, predefinedCountries, predefinedStates, predefinedCities]);
@@ -1113,11 +1110,8 @@ export default function Opportunities({ onPageChange }) {
     const fieldMap = {
       'contact_owner': 'owner',
       'owner': 'owner',
-      'lead_status': 'status',
-      'status': 'status',
       'tag': 'tags',
       'tags': 'tags',
-      'lead_source': 'lead_source',
       'mailing_city': 'city',
       'city': 'city',
       'mailing_state': 'state',
@@ -10558,7 +10552,7 @@ export default function Opportunities({ onPageChange }) {
                             const newProperty = {
                               property,
                               value: '',
-                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'mailing_state' || property === 'mailing_country' || property === 'lead_source' || property === 'description') ? 'is' : ''
+                              operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'mailing_state' || property === 'mailing_country' || property === 'description') ? 'is' : ''
                             };
 
                             if (property === 'created_time' || property === 'modified_time') {
@@ -10583,7 +10577,6 @@ export default function Opportunities({ onPageChange }) {
                         <option value="contact_owner">Contact Owner</option>
                         <option value="account_type">Account Type</option>
                         <option value="industry">Industry</option>
-                        <option value="lead_source">Lead Source</option>
                         <option value="tag">Tags</option>
                         <option value="created_time">Created Time</option>
                         <option value="modified_time">Modified Time</option>
@@ -11697,59 +11690,6 @@ export default function Opportunities({ onPageChange }) {
                           </div>
                         )}
 
-                        {prop.property === 'lead_source' && (
-                          <div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <select
-                                  value={prop.operator || 'is'}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].operator = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="is">Is</option>
-                                  <option value="is not">Is Not</option>
-                                </select>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <select
-                                  value={prop.value}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Lead Sources</option>
-                                  {getUniqueValues(prop.property).map(src => (
-                                    <option key={src} value={src}>{src}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
                         {prop.property === 'tag' && (
                           <div>
                             <div style={{ display: 'flex', gap: '12px' }}>
@@ -12436,7 +12376,7 @@ export default function Opportunities({ onPageChange }) {
                           </div>
                         )}
 
-                        {prop.property !== 'contact_name' && prop.property !== 'contact_owner' && prop.property !== 'lead_status' && prop.property !== 'tag' && prop.property !== 'mailing_country' && prop.property !== 'mailing_state' && prop.property !== 'mailing_city' && prop.property !== 'created_time' && prop.property !== 'modified_time' && prop.property !== 'industry' && prop.property !== 'account_type' && prop.property !== 'created_by' && prop.property !== 'modified_by' && prop.property !== 'lead_source' && prop.property !== 'description' && (
+                        {prop.property !== 'contact_name' && prop.property !== 'contact_owner' && prop.property !== 'tag' && prop.property !== 'mailing_country' && prop.property !== 'mailing_state' && prop.property !== 'mailing_city' && prop.property !== 'created_time' && prop.property !== 'modified_time' && prop.property !== 'industry' && prop.property !== 'account_type' && prop.property !== 'created_by' && prop.property !== 'modified_by' && prop.property !== 'description' && (
                           <input
                             type="text"
                             value={prop.value}
