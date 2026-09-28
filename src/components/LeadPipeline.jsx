@@ -3767,7 +3767,6 @@ export default function LeadPipeline({ onPageChange }) {
                         <option value="lead_status">Lead Status</option>
                         <option value="tag">Tag</option>
                         <option value="industry">Industry</option>
-                        <option value="account_type">Account Type</option>
                         <option value="mailing_country">Mailing Country</option>
                         <option value="mailing_state">Mailing State</option>
                         <option value="created_by">Created By</option>
@@ -5655,59 +5654,6 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
-                        {prop.property === 'account_type' && (
-                          <div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ width: '100px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                <select
-                                  value={prop.operator || 'is'}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].operator = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="is">Is</option>
-                                  <option value="is not">Is Not</option>
-                                </select>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <select
-                                  value={prop.value}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].value = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="">All Account Types</option>
-                                  {getUniqueValues(prop.property).map(value => (
-                                    <option key={value} value={value}>{value}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
                         {prop.property === 'description' && (
                           <div>
                             <div style={{ display: 'flex', gap: '12px' }}>
@@ -6284,16 +6230,6 @@ export default function LeadPipeline({ onPageChange }) {
                               property: 'industry',
                               value: industryProp.value,
                               operator: industryProp.operator || 'is'
-                            });
-                          }
-
-                          // Add account_type filter if configured
-                          const accountTypeProp = selectedProperties.find(prop => prop.property === 'account_type');
-                          if (accountTypeProp && accountTypeProp.value) {
-                            activeFilters.push({
-                              property: 'account_type',
-                              value: accountTypeProp.value,
-                              operator: accountTypeProp.operator || 'is'
                             });
                           }
 
