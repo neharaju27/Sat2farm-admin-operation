@@ -4358,37 +4358,33 @@ export default function Opportunities({ onPageChange }) {
     return matchesSearch && isNewThisWeek && matchesDealFilter;
   });
 
-  const isClientPaginated = newThisWeekFilter || (dealFilter && dealFilter !== 'all');
-
   const calculatedWithDeals = opportunities.filter(opp => String(opp.dealPresent) === '1' || Number(opp.dealPresent) > 0 || Boolean(opp.hasDeal) || (Array.isArray(opp.deals) && opp.deals.length > 0)).length;
   const calculatedWithoutDeals = Math.max(0, opportunities.length - calculatedWithDeals);
 
   const totalRecords = totalOpportunities || opportunities.length || 1;
   const ratioWith = opportunities.length > 0 ? (calculatedWithDeals / opportunities.length) : 0;
 
-  const displayWithDeals = (apiDealTotals.with_deals > 0 && apiDealTotals.with_deals !== totalOpportunities && apiDealTotals.with_deals !== 1742)
+  const displayWithDeals = apiDealTotals.with_deals > 0
     ? apiDealTotals.with_deals
     : Math.round(ratioWith * totalRecords);
 
-  const displayWithoutDeals = (apiDealTotals.without_deals > 0 && apiDealTotals.without_deals !== totalOpportunities && apiDealTotals.without_deals !== 1742)
+  const displayWithoutDeals = apiDealTotals.without_deals > 0
     ? apiDealTotals.without_deals
     : Math.max(0, totalRecords - displayWithDeals);
 
   const totalCount = dealFilter === 'with_deals'
-    ? displayWithDeals
-    : (dealFilter === 'without_deals' ? displayWithoutDeals : (totalOpportunities || filteredOpportunities.length));
+    ? (totalOpportunities || displayWithDeals)
+    : (dealFilter === 'without_deals' ? (totalOpportunities || displayWithoutDeals) : (totalOpportunities || filteredOpportunities.length));
 
   const effectiveTotalCount = isSearching
     ? (totalOpportunities === 0 ? 0 : (totalOpportunities || filteredOpportunities.length))
-    : (isClientPaginated ? filteredOpportunities.length : totalCount);
+    : (totalOpportunities !== undefined && totalOpportunities !== null ? totalOpportunities : totalCount);
 
   const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
   const startRecord = filteredOpportunities.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endRecord = Math.min(currentPage * itemsPerPage, effectiveTotalCount);
 
-  const currentOpportunities = isClientPaginated
-    ? filteredOpportunities.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    : filteredOpportunities;
+  const currentOpportunities = filteredOpportunities;
 
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (

@@ -51,6 +51,56 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Auto-refresh the website after every 24 hours
+  useEffect(() => {
+    const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const lastRefreshKey = 'app_last_refresh_time';
+
+    const checkAndScheduleRefresh = () => {
+      const now = Date.now();
+      const lastRefresh = Number(localStorage.getItem(lastRefreshKey)) || now;
+
+      if (!localStorage.getItem(lastRefreshKey)) {
+        localStorage.setItem(lastRefreshKey, String(now));
+      }
+
+      const elapsed = now - lastRefresh;
+      const remainingTime = Math.max(0, REFRESH_INTERVAL_MS - elapsed);
+
+      if (elapsed >= REFRESH_INTERVAL_MS) {
+        localStorage.setItem(lastRefreshKey, String(now));
+        window.location.reload();
+        return null;
+      }
+
+      return setTimeout(() => {
+        localStorage.setItem(lastRefreshKey, String(Date.now()));
+        window.location.reload();
+      }, remainingTime);
+    };
+
+    let timer = checkAndScheduleRefresh();
+
+    // Check on visibility change (e.g. laptop wakes up from sleep or tab returns to focus)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        const lastRefresh = Number(localStorage.getItem(lastRefreshKey)) || now;
+        if (now - lastRefresh >= REFRESH_INTERVAL_MS) {
+          localStorage.setItem(lastRefreshKey, String(now));
+          window.location.reload();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const [selectedManagerMobile, setSelectedManagerMobile] = useState(null);
   const handlePageChange = (page,mobileNo = null) => {
     setCurrentPage(page);
