@@ -8955,10 +8955,7 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select new status...</option>
-                            {[...new Set([
-                              ...predefinedLeadStatuses,
-                              ...Object.keys(statusConfig)
-                            ])].filter(Boolean).filter(status => status !== updateFieldValue).sort().map(status => (
+                            {[...new Set(predefinedLeadStatuses)].filter(Boolean).filter(status => status !== updateFieldValue).sort().map(status => (
                               <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
                             ))}
                           </select>
@@ -8969,10 +8966,7 @@ export default function LeadPipeline({ onPageChange }) {
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
                             <option value="">Select owner...</option>
-                            {[...new Set([
-                              ...predefinedContactOwners,
-                              ...leads.map(l => l.contactOwner)
-                            ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
+                            {[...new Set(predefinedContactOwners)].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                               <option key={owner} value={owner}>{owner}</option>
                             ))}
                           </select>
@@ -8982,11 +8976,8 @@ export default function LeadPipeline({ onPageChange }) {
                             onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
-                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select state...'}</option>
-                            {[...new Set([
-                              ...getUniqueValues('mailing_state'),
-                              ...leads.map(l => l.state)
-                            ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
+                            <option value="">Select state...</option>
+                            {[...new Set(predefinedStates)].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
                               <option key={state} value={state}>{state}</option>
                             ))}
                           </select>
@@ -8996,11 +8987,8 @@ export default function LeadPipeline({ onPageChange }) {
                             onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
-                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select country...'}</option>
-                            {[...new Set([
-                              ...getUniqueValues('mailing_country'),
-                              ...leads.map(l => l.country)
-                            ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
+                            <option value="">Select country...</option>
+                            {[...new Set(predefinedCountries)].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
                               <option key={country} value={country}>{country}</option>
                             ))}
                           </select>
@@ -9010,12 +8998,8 @@ export default function LeadPipeline({ onPageChange }) {
                             onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
-                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select industry...'}</option>
-                            {[...new Set([
-                              ...getUniqueValues('industry'),
-                              ...predefinedIndustries,
-                              ...leads.map(l => l.industry)
-                            ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
+                            <option value="">Select industry...</option>
+                            {[...new Set(predefinedIndustries)].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
                               <option key={industry} value={industry}>{industry}</option>
                             ))}
                           </select>
@@ -9025,12 +9009,8 @@ export default function LeadPipeline({ onPageChange }) {
                             onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                             style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                           >
-                            <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select tags...'}</option>
-                            {[...new Set([
-                              ...getUniqueValues('tag'),
-                              ...predefinedTags,
-                              ...leads.map(l => l.tags)
-                            ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
+                            <option value="">Select tags...</option>
+                            {[...new Set(predefinedTags)].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
                               <option key={tag} value={tag}>{tag}</option>
                             ))}
                           </select>

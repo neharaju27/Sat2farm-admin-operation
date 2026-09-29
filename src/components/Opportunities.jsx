@@ -7690,12 +7690,8 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select industry...'}</option>
-                              {[...new Set([
-                                ...getUniqueValues('industry'),
-                                ...predefinedIndustries,
-                                ...opportunities.map(o => o.industry)
-                              ])].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
+                              <option value="">Select industry...</option>
+                              {[...new Set(predefinedIndustries)].filter(Boolean).filter(industry => industry !== updateFieldValue).sort().map(industry => (
                                 <option key={industry} value={industry}>{industry}</option>
                               ))}
                             </select>
@@ -7706,10 +7702,7 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select owner...</option>
-                              {[...new Set([
-                                ...getContactOwnerOptions(),
-                                ...opportunities.map(o => o.contactOwner || o.owner)
-                              ])].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
+                              {[...new Set(predefinedContactOwners)].filter(Boolean).filter(owner => owner !== updateFieldValue).sort().map(owner => (
                                 <option key={owner} value={owner}>{owner}</option>
                               ))}
                             </select>
@@ -7719,11 +7712,8 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select state...'}</option>
-                              {[...new Set([
-                                ...getUniqueValues('mailing_state'),
-                                ...opportunities.map(o => o.state)
-                              ])].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
+                              <option value="">Select state...</option>
+                              {[...new Set(predefinedStates)].filter(Boolean).filter(state => state !== updateFieldValue).sort().map(state => (
                                 <option key={state} value={state}>{state}</option>
                               ))}
                             </select>
@@ -7733,11 +7723,8 @@ export default function Opportunities({ onPageChange }) {
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
-                              <option value="">{isFetchingFilterOptions ? `Please wait... (${filterFetchProgress}%)` : 'Select country...'}</option>
-                              {[...new Set([
-                                ...getUniqueValues('mailing_country'),
-                                ...opportunities.map(o => o.country)
-                              ])].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
+                              <option value="">Select country...</option>
+                              {[...new Set(predefinedCountries)].filter(Boolean).filter(country => country !== updateFieldValue).sort().map(country => (
                                 <option key={country} value={country}>{country}</option>
                               ))}
                             </select>
@@ -7748,11 +7735,7 @@ export default function Opportunities({ onPageChange }) {
                               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
                             >
                               <option value="">Select tags...</option>
-                              {[...new Set([
-                                ...getUniqueValues('tag'),
-                                ...predefinedTags,
-                                ...opportunities.map(o => o.tags)
-                              ])].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
+                              {[...new Set(predefinedTags)].filter(Boolean).filter(tag => tag !== updateFieldValue).sort().map(tag => (
                                 <option key={tag} value={tag}>{tag}</option>
                               ))}
                             </select>
