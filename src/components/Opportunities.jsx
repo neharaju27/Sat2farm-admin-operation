@@ -7607,7 +7607,6 @@ export default function Opportunities({ onPageChange }) {
                         <option value="industry">Industry</option>
                         <option value="state">State</option>
                         <option value="country">Country</option>
-                        <option value="leadStatus">Lead Status</option>
                         <option value="contactOwner">Contact Owner</option>
                       </select>
                       <ChevronDown size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
@@ -7621,18 +7620,7 @@ export default function Opportunities({ onPageChange }) {
                       <div>
                         <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change From</label>
                         <div style={{ position: 'relative' }}>
-                          {selectedFieldToUpdate === 'leadStatus' ? (
-                            <select
-                              value={updateFieldValue}
-                              onChange={(e) => setUpdateFieldValue(e.target.value)}
-                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
-                            >
-                              <option value="">All selected</option>
-                              {[...new Set(opportunities.filter(o => selectedRows.includes(o.id)).map(o => o.leadStatus))].filter(Boolean).sort().map(status => (
-                                <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
-                              ))}
-                            </select>
-                          ) : selectedFieldToUpdate === 'industry' ? (
+                          {selectedFieldToUpdate === 'industry' ? (
                             <select
                               value={updateFieldValue}
                               onChange={(e) => setUpdateFieldValue(e.target.value)}
@@ -7696,21 +7684,7 @@ export default function Opportunities({ onPageChange }) {
                       <div>
                         <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>Change To</label>
                         <div style={{ position: 'relative' }}>
-                          {selectedFieldToUpdate === 'leadStatus' ? (
-                            <select
-                              value={updateNewFieldValue}
-                              onChange={(e) => setUpdateNewFieldValue(e.target.value)}
-                              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '14px', background: 'var(--surface)', color: 'var(--text)', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}
-                            >
-                              <option value="">Select new status...</option>
-                              {[...new Set([
-                                ...predefinedLeadStatuses,
-                                ...Object.keys(statusConfig)
-                              ])].filter(Boolean).filter(status => status !== updateFieldValue).sort().map(status => (
-                                <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
-                              ))}
-                            </select>
-                          ) : selectedFieldToUpdate === 'industry' ? (
+                          {selectedFieldToUpdate === 'industry' ? (
                             <select
                               value={updateNewFieldValue}
                               onChange={(e) => setUpdateNewFieldValue(e.target.value)}
