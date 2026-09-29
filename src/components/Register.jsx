@@ -55,21 +55,21 @@ export default function Registration({ user, onPageChange }) {
   useEffect(() => {
     console.log('User prop in Registration component:', user);
     
-    // Fetch client ID for referral code based on logged-in user's mobile number
+    // Fetch client ID for referral code and account ID based on logged-in user's mobile number
     const fetchClientId = async () => {
       const loggedInPhoneNumber = getLoggedInMobileNumber();
-      console.log('=== REFERRAL CODE DEBUG ===');
+      console.log('=== REFERRAL CODE & ACCOUNT ID DEBUG ===');
       console.log('Logged in phone number:', loggedInPhoneNumber);
       console.log('User object:', user);
 
       if (!loggedInPhoneNumber) {
-        console.warn('No logged-in mobile number found for referral code lookup.');
+        console.warn('No logged-in mobile number found for referral code / account ID lookup.');
         return;
       }
 
       try {
         const apiUrl = `${GET_USER_ID_API_URL}?mobile_no=${encodeURIComponent(loggedInPhoneNumber)}`;
-        console.log('Fetching client ID from URL:', apiUrl);
+        console.log('Fetching user details from URL:', apiUrl);
         
         const response = await fetch(apiUrl);
         console.log('Response status:', response.status);
@@ -83,21 +83,31 @@ export default function Registration({ user, onPageChange }) {
         console.log('Full API response data:', JSON.stringify(data, null, 2));
 
         const clientId = data?.user_id || data?.client_id || data?.data?.client_id || data?.clientid || data?.Client_ID;
+        const accountId = data?.account_id ?? data?.acc_id ?? data?.data?.account_id ?? data?.AccountId;
         console.log('Extracted client ID:', clientId);
+        console.log('Extracted account ID:', accountId);
+
+        setFormData(prev => ({
+          ...prev,
+          ...(clientId ? { referal_code: String(clientId) } : {}),
+          ...(accountId !== undefined && accountId !== null && accountId !== '' ? { acc_id: String(accountId) } : {})
+        }));
 
         if (clientId) {
-          setFormData(prev => ({
-            ...prev,
-            referal_code: clientId
-          }));
           console.log('✅ Referral code auto-populated with client ID:', clientId);
         } else {
           console.warn('⚠️ No client_id found in response. Available keys:', Object.keys(data));
         }
+
+        if (accountId !== undefined && accountId !== null && accountId !== '') {
+          console.log('✅ Account ID auto-populated with account ID:', accountId);
+        } else {
+          console.warn('⚠️ No account_id found in response. Available keys:', Object.keys(data));
+        }
       } catch (error) {
-        console.error('❌ Error fetching client ID:', error);
+        console.error('❌ Error fetching user details:', error);
       }
-      console.log('=== END REFERRAL CODE DEBUG ===');
+      console.log('=== END REFERRAL CODE & ACCOUNT ID DEBUG ===');
     };
     
     fetchClientId();
@@ -289,18 +299,17 @@ export default function Registration({ user, onPageChange }) {
         setRegisteredUsers(prev => [...prev, newUser]);
         
         // Reset form
-        setFormData({
+        setFormData(prev => ({
           fName: "",
           lName: "",
           user_email: "",
           pNumber: "",
-          
-          acc_id: "",
-          referal_code: "",
+          acc_id: (currentRole === 'partner' || currentRole === 'manager') ? prev.acc_id : "",
+          referal_code: (currentRole === 'partner' || currentRole === 'client' || currentRole === 'manager' || currentRole === 'sales') ? prev.referal_code : "",
           category: "",
           new_password: "",
           country_code: "+91"
-        });
+        }));
       } else {
         const errorMessage = data.message || 'Registration failed. Please try again.';
         setError(errorMessage);
@@ -540,8 +549,8 @@ export default function Registration({ user, onPageChange }) {
                 </div>
               </div>
 
-              {currentRole === 'client' || currentRole === 'manager' ? (
-                /* Only Referral Code for Client and Manager */
+              {currentRole === 'client' ? (
+                /* Only Referral Code for Client */
                 <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
@@ -589,7 +598,7 @@ export default function Registration({ user, onPageChange }) {
                   </div>
                 </div>
               ) : (
-                /* Account ID and Referral Code for Sales and Partner roles (referral code disabled) */
+                /* Account ID and Referral Code for Sales, Partner, and Manager roles (referral code disabled, account ID auto-fetched and disabled for partner/manager) */
                 <div className="two-col" style={{marginBottom: '24px'}}>
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
@@ -601,7 +610,9 @@ export default function Registration({ user, onPageChange }) {
                       name="acc_id"
                       value={formData.acc_id}
                       onChange={handleChange}
-                      placeholder="Enter account ID"
+                      placeholder={currentRole === 'partner' || currentRole === 'manager' ? "Fetching account ID..." : "Enter account ID"}
+                      disabled={currentRole === 'partner' || currentRole === 'manager'}
+                      style={currentRole === 'partner' || currentRole === 'manager' ? {backgroundColor: '#f3f4f6', cursor: 'not-allowed'} : {}}
                     />
                   </div>
 

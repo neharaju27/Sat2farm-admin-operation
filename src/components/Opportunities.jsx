@@ -734,38 +734,62 @@ export default function Opportunities({ onPageChange }) {
     fetchAllKanbanDeals();
   }, []);
 
+  // Unfiltered deal totals ref
+  const defaultDealTotalsRef = React.useRef({ with_deals: 0, without_deals: 0 });
+
   // Fetch deal totals from API
-  const fetchDealTotals = async () => {
+  const fetchDealTotals = async (force = false) => {
+    if (!force) {
+      try {
+        if (sessionStorage.getItem('opp_isFilterApplied') === 'true') return;
+      } catch (e) { }
+    }
+
     const currentUserName = getApiUserName(user);
     const apiUrl = import.meta.env.VITE_FILTER_ACCOUNTS_API_URL;
 
     if (!apiUrl) return;
 
     try {
-      // Fetch with_deals total
-      const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&account_with_deal=true`);
-      if (withDealsResponse.ok) {
-        const withDealsData = await withDealsResponse.json();
-        const withCount = Array.isArray(withDealsData)
-          ? withDealsData.length
-          : (withDealsData.total !== undefined ? withDealsData.total : (withDealsData.count !== undefined ? withDealsData.count : undefined));
-
-        if (withCount !== undefined) {
-          setApiDealTotals(prev => ({ ...prev, with_deals: withCount }));
+      // 1. Fetch unfiltered counts with a single request
+      const filterRes = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&limit=1`);
+      if (filterRes.ok) {
+        const filterData = await filterRes.json();
+        if (typeof filterData.with_deals_total === 'number' && typeof filterData.without_deals_total === 'number') {
+          defaultDealTotalsRef.current = {
+            with_deals: filterData.with_deals_total,
+            without_deals: filterData.without_deals_total
+          };
+          setApiDealTotals({
+            with_deals: filterData.with_deals_total,
+            without_deals: filterData.without_deals_total
+          });
+          return;
         }
       }
 
-      // Fetch without_deals total
+      // 2. Fallback to separate endpoints
+      const withDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&account_with_deal=true`);
+      let withCount;
+      if (withDealsResponse.ok) {
+        const withDealsData = await withDealsResponse.json();
+        withCount = Array.isArray(withDealsData)
+          ? withDealsData.length
+          : (withDealsData.total !== undefined ? withDealsData.total : (withDealsData.count !== undefined ? withDealsData.count : undefined));
+      }
+
       const withoutDealsResponse = await fetch(`${apiUrl}?user=${encodeURIComponent(currentUserName)}&account_without_deal=true`);
+      let withoutCount;
       if (withoutDealsResponse.ok) {
         const withoutDealsData = await withoutDealsResponse.json();
-        const withoutCount = Array.isArray(withoutDealsData)
+        withoutCount = Array.isArray(withoutDealsData)
           ? withoutDealsData.length
           : (withoutDealsData.total !== undefined ? withoutDealsData.total : (withoutDealsData.count !== undefined ? withoutDealsData.count : undefined));
+      }
 
-        if (withoutCount !== undefined) {
-          setApiDealTotals(prev => ({ ...prev, without_deals: withoutCount }));
-        }
+      if (withCount !== undefined && withoutCount !== undefined) {
+        defaultDealTotalsRef.current = { with_deals: withCount, without_deals: withoutCount };
+        setApiDealTotals({ with_deals: withCount, without_deals: withoutCount });
       }
     } catch (err) {
       console.error('Error fetching deal totals:', err);
@@ -1156,7 +1180,13 @@ export default function Opportunities({ onPageChange }) {
 
       // Build URL parameters for all filters
       filters.forEach(filter => {
-        if (filter.property === 'created_time' || filter.property === 'createdTime') {
+        if (filter.property === 'task') {
+          if (filter.value === 'without_task' || filter.value === 'without task') {
+            urlParams.push('account_without_task=true');
+          } else {
+            urlParams.push('account_with_task=true');
+          }
+        } else if (filter.property === 'created_time' || filter.property === 'createdTime') {
           urlParams.push(`date_field=created_time`);
           const val = filter.value || filter.date;
           const from = filter.fromDate || filter.value;
@@ -1264,7 +1294,15 @@ export default function Opportunities({ onPageChange }) {
       setTotalOpportunities(totalRecords || oppsData.length);
       setCurrentPage(1);
 
+      if (typeof result?.with_deals_total === 'number' || typeof result?.without_deals_total === 'number') {
+        setApiDealTotals({
+          with_deals: typeof result.with_deals_total === 'number' ? result.with_deals_total : 0,
+          without_deals: typeof result.without_deals_total === 'number' ? result.without_deals_total : 0
+        });
+      }
+
       if (Array.isArray(oppsData)) {
+        lastFetchedUrlRef.current = url;
 
 
         // Set filter applied state and criteria
@@ -1275,6 +1313,9 @@ export default function Opportunities({ onPageChange }) {
           setFilterSidebarOpen(false);
         }, 500);
         const criteriaText = filters.map(f => {
+          if (f.property === 'task') {
+            return f.value === 'without_task' || f.value === 'without task' ? 'Task: Without Task' : 'Task: With Task';
+          }
           const propLabel = f.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
           const op = f.operator || 'is';
           const operatorText = op === 'contains' ? 'contains' : (op === 'is not' || op === 'is_not') ? "isn't" : 'is';
@@ -1493,7 +1534,13 @@ export default function Opportunities({ onPageChange }) {
           }
           if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
             selectedProperties.forEach(p => {
-              if (p.property === 'created_time' || p.property === 'createdTime') {
+              if (p.property === 'task') {
+                if (p.value === 'without_task' || p.value === 'without task') {
+                  params.append('account_without_task', 'true');
+                } else {
+                  params.append('account_with_task', 'true');
+                }
+              } else if (p.property === 'created_time' || p.property === 'createdTime') {
                 const val = p.value || p.date;
                 if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
                   if (p.fromDate && p.toDate) {
@@ -1617,7 +1664,22 @@ export default function Opportunities({ onPageChange }) {
             if (isFilterApplied) {
               toast.success(`Filter applied: ${responseData.total} records found`, { id: 'opp-filter-toast' });
             }
-            if (dealFilter !== 'all') {
+            if (typeof responseData?.with_deals_total === 'number' || typeof responseData?.without_deals_total === 'number') {
+              setApiDealTotals({
+                with_deals: typeof responseData.with_deals_total === 'number' ? responseData.with_deals_total : 0,
+                without_deals: typeof responseData.without_deals_total === 'number' ? responseData.without_deals_total : 0
+              });
+              if (!hasActiveFilter) {
+                defaultDealTotalsRef.current = {
+                  with_deals: typeof responseData.with_deals_total === 'number' ? responseData.with_deals_total : 0,
+                  without_deals: typeof responseData.without_deals_total === 'number' ? responseData.without_deals_total : 0
+                };
+              }
+            } else if (!hasActiveFilter && (defaultDealTotalsRef.current.with_deals > 0 || defaultDealTotalsRef.current.without_deals > 0)) {
+              setApiDealTotals(defaultDealTotalsRef.current);
+            } else if (!hasActiveFilter) {
+              fetchDealTotals(true);
+            } else if (dealFilter !== 'all') {
               setApiDealTotals(prev => ({
                 ...prev,
                 [dealFilter]: responseData.total
@@ -1627,6 +1689,14 @@ export default function Opportunities({ onPageChange }) {
             setTotalOpportunities(responseData.length);
             if (isFilterApplied) {
               toast.success(`Filter applied: ${responseData.length} records found`, { id: 'opp-filter-toast' });
+            }
+            if (typeof responseData?.with_deals_total === 'number' || typeof responseData?.without_deals_total === 'number') {
+              setApiDealTotals({
+                with_deals: typeof responseData.with_deals_total === 'number' ? responseData.with_deals_total : 0,
+                without_deals: typeof responseData.without_deals_total === 'number' ? responseData.without_deals_total : 0
+              });
+            } else if (!hasActiveFilter && (defaultDealTotalsRef.current.with_deals > 0 || defaultDealTotalsRef.current.without_deals > 0)) {
+              setApiDealTotals(defaultDealTotalsRef.current);
             }
           } else {
             // Fallback: set total from extracted data array length (covers search API responses without total field)
@@ -3901,7 +3971,13 @@ export default function Opportunities({ onPageChange }) {
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
-          if (p.property === 'created_time' || p.property === 'createdTime') {
+          if (p.property === 'task') {
+            if (p.value === 'without_task' || p.value === 'without task') {
+              params.append('account_without_task', 'true');
+            } else {
+              params.append('account_with_task', 'true');
+            }
+          } else if (p.property === 'created_time' || p.property === 'createdTime') {
             if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
               params.append('date_type', p.dateOperator);
               if (p.fromDate && p.toDate) {
@@ -4364,17 +4440,17 @@ export default function Opportunities({ onPageChange }) {
   const totalRecords = totalOpportunities || opportunities.length || 1;
   const ratioWith = opportunities.length > 0 ? (calculatedWithDeals / opportunities.length) : 0;
 
-  const displayWithDeals = apiDealTotals.with_deals > 0
+  const displayWithDeals = (apiDealTotals && typeof apiDealTotals.with_deals === 'number' && apiDealTotals.with_deals >= 0)
     ? apiDealTotals.with_deals
     : Math.round(ratioWith * totalRecords);
 
-  const displayWithoutDeals = apiDealTotals.without_deals > 0
+  const displayWithoutDeals = (apiDealTotals && typeof apiDealTotals.without_deals === 'number' && apiDealTotals.without_deals >= 0)
     ? apiDealTotals.without_deals
     : Math.max(0, totalRecords - displayWithDeals);
 
   const totalCount = dealFilter === 'with_deals'
-    ? (totalOpportunities || displayWithDeals)
-    : (dealFilter === 'without_deals' ? (totalOpportunities || displayWithoutDeals) : (totalOpportunities || filteredOpportunities.length));
+    ? (totalOpportunities !== undefined && totalOpportunities !== null ? totalOpportunities : displayWithDeals)
+    : (dealFilter === 'without_deals' ? (totalOpportunities !== undefined && totalOpportunities !== null ? totalOpportunities : displayWithoutDeals) : (totalOpportunities !== undefined && totalOpportunities !== null ? totalOpportunities : filteredOpportunities.length));
 
   const effectiveTotalCount = isSearching
     ? (totalOpportunities === 0 ? 0 : (totalOpportunities || filteredOpportunities.length))
@@ -4593,6 +4669,7 @@ export default function Opportunities({ onPageChange }) {
                   setNewThisWeekFilter(false);
                   setSearchTerm('');
                   setCurrentPage(1);
+                  fetchDealTotals();
                 }}
                 style={{
                   background: 'none',
@@ -10547,7 +10624,7 @@ export default function Opportunities({ onPageChange }) {
                           if (property && !selectedProperties.find(p => p.property === property)) {
                             const newProperty = {
                               property,
-                              value: '',
+                              value: property === 'task' ? 'with_task' : '',
                               operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'mailing_state' || property === 'mailing_country' || property === 'description') ? 'is' : ''
                             };
 
@@ -10570,6 +10647,7 @@ export default function Opportunities({ onPageChange }) {
                         }}
                       >
                         <option value="">Choose Property</option>
+                        <option value="task">Task</option>
                         <option value="contact_owner">Contact Owner</option>
                         <option value="account_type">Account Type</option>
                         <option value="industry">Industry</option>
@@ -10613,6 +10691,31 @@ export default function Opportunities({ onPageChange }) {
                             <X size={16} />
                           </button>
                         </div>
+
+                        {prop.property === 'task' && (
+                          <div>
+                            <select
+                              value={prop.value || 'with_task'}
+                              onChange={(e) => {
+                                const updated = [...selectedProperties];
+                                updated[index].value = e.target.value;
+                                setSelectedProperties(updated);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                background: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              <option value="with_task">With Task</option>
+                              <option value="without_task">Without Task</option>
+                            </select>
+                          </div>
+                        )}
 
                         {prop.property === 'contact_owner' && (
                           <div style={{ display: 'flex', gap: '12px' }}>
@@ -12372,7 +12475,7 @@ export default function Opportunities({ onPageChange }) {
                           </div>
                         )}
 
-                        {prop.property !== 'contact_name' && prop.property !== 'contact_owner' && prop.property !== 'tag' && prop.property !== 'mailing_country' && prop.property !== 'mailing_state' && prop.property !== 'mailing_city' && prop.property !== 'created_time' && prop.property !== 'modified_time' && prop.property !== 'industry' && prop.property !== 'account_type' && prop.property !== 'created_by' && prop.property !== 'modified_by' && prop.property !== 'description' && (
+                        {prop.property !== 'contact_name' && prop.property !== 'contact_owner' && prop.property !== 'tag' && prop.property !== 'mailing_country' && prop.property !== 'mailing_state' && prop.property !== 'mailing_city' && prop.property !== 'created_time' && prop.property !== 'modified_time' && prop.property !== 'industry' && prop.property !== 'account_type' && prop.property !== 'created_by' && prop.property !== 'modified_by' && prop.property !== 'description' && prop.property !== 'task' && (
                           <input
                             type="text"
                             value={prop.value}
@@ -12421,6 +12524,7 @@ export default function Opportunities({ onPageChange }) {
                           if (isApplyingAccountsFilters || accountsFiltersSuccess) return;
                           const activeFilters = selectedProperties.filter(prop => {
                             if (!prop.property) return false;
+                            if (prop.property === 'task') return true;
                             if (['created_time', 'createdTime', 'modified_time', 'modifiedTime', 'closing_date', 'closingDate'].includes(prop.property)) {
                               return Boolean(prop.value || prop.date || (prop.fromDate && prop.toDate) || prop.dateOperator === 'in_the_last');
                             }
@@ -12434,6 +12538,10 @@ export default function Opportunities({ onPageChange }) {
                             setIsFilterApplied(false);
                             setCurrentFilterCriteria('');
                             setFilterSidebarOpen(false);
+                            if (defaultDealTotalsRef.current.with_deals > 0 || defaultDealTotalsRef.current.without_deals > 0) {
+                              setApiDealTotals(defaultDealTotalsRef.current);
+                            }
+                            fetchDealTotals(true);
                             fetchOpportunities();
                           }
                         }}

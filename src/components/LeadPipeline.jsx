@@ -186,6 +186,10 @@ const formatFilterDescription = (filter) => {
 
   const propName = propMap[rawProp] || rawProp.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+  if (rawProp === 'task') {
+    return filter.value === 'without_task' || filter.value === 'without task' ? 'Task: Without Task' : 'Task: With Task';
+  }
+
   if (rawProp === 'untouched_records') {
     const fType = filter.filterType || filter.value;
     if (fType === '15_days') return 'Untouched records: 15 Days';
@@ -788,24 +792,31 @@ export default function LeadPipeline({ onPageChange }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showRemainingSummary, setShowRemainingSummary] = useState(false);
 
+  const defaultStatusSummaryRef = useRef(null);
+
+  const fetchDefaultStatusSummary = async (force = false) => {
+    try {
+      if (!force && defaultStatusSummaryRef.current) {
+        setApiStatusSummary(defaultStatusSummaryRef.current);
+        return;
+      }
+      const currentUserName = getApiUserName(user);
+      const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL || 'https://api.sat2farm.com/business/leads/status-summary';
+      const url = `${summaryApiUrl}?user=${encodeURIComponent(currentUserName)}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        defaultStatusSummaryRef.current = data;
+        setApiStatusSummary(data);
+      }
+    } catch (err) {
+      console.error('Error fetching lead status summary:', err);
+    }
+  };
+
   // Fetch status summary metrics directly from backend API
   useEffect(() => {
-    const fetchStatusSummary = async () => {
-      try {
-        const currentUserName = getApiUserName(user);
-        const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL || 'https://api.sat2farm.com/business/leads/status-summary';
-        const url = `${summaryApiUrl}?user=${encodeURIComponent(currentUserName)}`;
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          setApiStatusSummary(data);
-        }
-      } catch (err) {
-        console.error('Error fetching lead status summary:', err);
-      }
-    };
-
-    fetchStatusSummary();
+    fetchDefaultStatusSummary();
   }, [user, refreshKey]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -971,7 +982,13 @@ export default function LeadPipeline({ onPageChange }) {
             }
             if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
               selectedProperties.forEach(p => {
-                if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+                if (p.property === 'task') {
+                  if (p.value === 'without_task' || p.value === 'without task') {
+                    params.append('task_filter', 'without_task');
+                  } else {
+                    params.append('task_filter', 'with_task');
+                  }
+                } else if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
                   const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
                   params.append('date_field', dateField);
                   const op = p.dateOperator || 'on';
@@ -1026,8 +1043,18 @@ export default function LeadPipeline({ onPageChange }) {
         let totalCount = 0;
 
         if (data && typeof data === 'object' && !Array.isArray(data)) {
-          // API returns paginated response object with metadata
+          // Check for summary in filter response and update dynamically
+          if (data.summary && typeof data.summary === 'object') {
+            setApiStatusSummary(data.summary);
+          } else if (!hasActiveFilter) {
+            if (defaultStatusSummaryRef.current) {
+              setApiStatusSummary(defaultStatusSummaryRef.current);
+            } else {
+              fetchDefaultStatusSummary();
+            }
+          }
 
+          // API returns paginated response object with metadata
           leadsArray = data.data || data.results || data.leads || data.items || data.records || data.rows || [];
 
           // Fallback: find the first array property in the response
@@ -2352,7 +2379,13 @@ export default function LeadPipeline({ onPageChange }) {
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
-          if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+          if (p.property === 'task') {
+            if (p.value === 'without_task' || p.value === 'without task') {
+              params.append('task_filter', 'without_task');
+            } else {
+              params.append('task_filter', 'with_task');
+            }
+          } else if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
             const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
             params.append('date_field', dateField);
             const op = p.dateOperator || 'on';
@@ -3009,6 +3042,11 @@ export default function LeadPipeline({ onPageChange }) {
                 setNewThisWeekFilter(false);
                 setSearchTerm('');
                 setOffset(0);
+                if (defaultStatusSummaryRef.current) {
+                  setApiStatusSummary(defaultStatusSummaryRef.current);
+                } else {
+                  fetchDefaultStatusSummary(true);
+                }
               }}
               style={{
                 background: 'none',
@@ -3740,7 +3778,7 @@ export default function LeadPipeline({ onPageChange }) {
                           if (property && !selectedProperties.find(p => p.property === property)) {
                             const newProperty = {
                               property,
-                              value: property === 'untouched_records' ? '15_days' : '',
+                              value: property === 'untouched_records' ? '15_days' : property === 'task' ? 'with_task' : '',
                               filterType: property === 'untouched_records' ? '15_days' : '',
                               operator: (property === 'contact_name' || property === 'created_by' || property === 'modified_by' || property === 'mailing_city' || property === 'lead_source' || property === 'description') ? 'is' : ''
                             };
@@ -3763,6 +3801,7 @@ export default function LeadPipeline({ onPageChange }) {
                       >
                         <option value="">Choose Property</option>
                         <option value="contact_owner">Contact Owner</option>
+                        <option value="task">Task</option>
                         <option value="created_time">Created Time</option>
                         <option value="lead_status">Lead Status</option>
                         <option value="tag">Tag</option>
@@ -6049,6 +6088,32 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
+                        {/* Task special case with With Task / Without Task dropdown */}
+                        {prop.property === 'task' && (
+                          <div>
+                            <select
+                              value={prop.value || 'with_task'}
+                              onChange={(e) => {
+                                const updated = [...selectedProperties];
+                                updated[index].value = e.target.value;
+                                setSelectedProperties(updated);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '13px',
+                                background: 'var(--surface)',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              <option value="with_task">With Task</option>
+                              <option value="without_task">Without Task</option>
+                            </select>
+                          </div>
+                        )}
+
                         {/* Other properties with text input */}
                         {['description', 'mailing_street', 'notes', 'pipelines', 'pipeline_stage'].includes(prop.property) && (
                           <input
@@ -6088,6 +6153,11 @@ export default function LeadPipeline({ onPageChange }) {
                           setCurrentFilterCriteria('');
                           setContactOwnerFilter('');
                           setContactOwnerFilterOperator('is');
+                          if (defaultStatusSummaryRef.current) {
+                            setApiStatusSummary(defaultStatusSummaryRef.current);
+                          } else {
+                            fetchDefaultStatusSummary(true);
+                          }
                           // Refetch all leads to show unfiltered results
                           fetchLeads();
                         }}
@@ -6293,6 +6363,15 @@ export default function LeadPipeline({ onPageChange }) {
                               value: fType,
                               fromDate: untouchedProp.fromDate || '',
                               toDate: untouchedProp.toDate || ''
+                            });
+                          }
+
+                          // Add task filter if configured
+                          const taskProp = selectedProperties.find(prop => prop.property === 'task');
+                          if (taskProp) {
+                            activeFilters.push({
+                              property: 'task',
+                              value: taskProp.value || 'with_task'
                             });
                           }
 
