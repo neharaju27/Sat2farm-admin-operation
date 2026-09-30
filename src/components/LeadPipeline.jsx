@@ -801,7 +801,8 @@ export default function LeadPipeline({ onPageChange }) {
         return;
       }
       const currentUserName = getApiUserName(user);
-      const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL || 'https://api.sat2farm.com/business/leads/status-summary';
+      const summaryApiUrl = import.meta.env.VITE_LEAD_STATUS_SUMMARY_API_URL;
+      if (!summaryApiUrl) return;
       const url = `${summaryApiUrl}?user=${encodeURIComponent(currentUserName)}`;
       const response = await fetch(url);
       if (response.ok) {
@@ -990,9 +991,9 @@ export default function LeadPipeline({ onPageChange }) {
         };
 
         // 1. If untouched_records filter is active, call dedicated untouched leads endpoint with full filter and pagination support
-        if (untouchedProp) {
+        const untouchedBaseUrl = import.meta.env.VITE_UNTOUCHED_LEADS_API_URL;
+        if (untouchedProp && untouchedBaseUrl) {
           try {
-            const untouchedBaseUrl = import.meta.env.VITE_UNTOUCHED_LEADS_API_URL || 'https://api.sat2farm.com/business/leads/untouched';
             const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
             const params = buildCommonFilterParams({ filter_type: fType });
             if (fType === 'custom') {
@@ -1708,7 +1709,8 @@ export default function LeadPipeline({ onPageChange }) {
   const fetchActivities = async (leadId) => {
     if (!leadId) return;
     try {
-      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL || 'https://api.sat2farm.com/business/leads/activity';
+      const activityApiUrl = import.meta.env.VITE_LEAD_ACTIVITY_API_URL;
+      if (!activityApiUrl) return;
       const currentUserName = getApiUserName(user);
       const url = `${activityApiUrl}?lead_id=${encodeURIComponent(leadId)}&user=${encodeURIComponent(currentUserName)}`;
 
