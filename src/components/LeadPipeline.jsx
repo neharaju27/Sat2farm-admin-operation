@@ -921,15 +921,80 @@ export default function LeadPipeline({ onPageChange }) {
           untouchedProp = selectedProperties.find(p => p.property === 'untouched_records');
         }
 
-        // 1. If untouched_records filter is active, call dedicated untouched leads endpoint
+        // Helper to build common query parameters for filter and untouched endpoints
+        const buildCommonFilterParams = (baseParams = {}) => {
+          const params = new URLSearchParams({
+            user: currentUserName,
+            offset: fetchOffset.toString(),
+            limit: fetchLimit.toString(),
+            ...baseParams
+          });
+
+          if (isSearching) {
+            params.append('query', searchTerm.trim());
+          }
+
+          if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
+            params.append('status_is', filterStatus);
+          }
+          if (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter) {
+            const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
+            const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
+            const ownerKey = isNot ? 'owner_is_not' : 'owner_is';
+            params.append(ownerKey, contactOwnerFilter);
+          }
+          if (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) {
+            params.append('date_type', 'in_last');
+            params.append('last_count', '7');
+            params.append('last_unit', 'days');
+          }
+          if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
+            selectedProperties.forEach(p => {
+              if (p.property === 'untouched_records') return;
+              if (p.property === 'task') {
+                if (p.value === 'without_task' || p.value === 'without task') {
+                  params.append('task_filter', 'without_task');
+                } else {
+                  params.append('task_filter', 'with_task');
+                }
+              } else if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
+                const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
+                params.append('date_field', dateField);
+                const op = p.dateOperator || 'on';
+                params.append('date_type', op);
+
+                const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
+                const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
+                const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
+
+                if (op === 'between' || op === 'custom') {
+                  if (formattedFrom && formattedTo) {
+                    params.append('from', formattedFrom);
+                    params.append('to', formattedTo);
+                  } else if (formattedDate) {
+                    params.append('date', formattedDate);
+                  }
+                } else if (formattedDate) {
+                  params.append('date', formattedDate);
+                }
+              } else if (p.property && (p.value || (p.operator === 'contains' && p.searchTerm))) {
+                const val = p.value || (p.operator === 'contains' ? p.searchTerm.trim() : '');
+                if (val) {
+                  const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
+                  params.append(paramKey, val);
+                }
+              }
+            });
+          }
+          return params;
+        };
+
+        // 1. If untouched_records filter is active, call dedicated untouched leads endpoint with full filter and pagination support
         if (untouchedProp) {
           try {
             const untouchedBaseUrl = import.meta.env.VITE_UNTOUCHED_LEADS_API_URL || 'https://api.sat2farm.com/business/leads/untouched';
             const fType = untouchedProp.filterType || untouchedProp.value || '15_days';
-            const params = new URLSearchParams({
-              user: currentUserName,
-              filter_type: fType
-            });
+            const params = buildCommonFilterParams({ filter_type: fType });
             if (fType === 'custom') {
               if (untouchedProp.fromDate) params.append('from_date', untouchedProp.fromDate);
               if (untouchedProp.toDate) params.append('to_date', untouchedProp.toDate);
@@ -956,67 +1021,7 @@ export default function LeadPipeline({ onPageChange }) {
         // 2. If not searching or dedicated search failed, call filter API if filters active
         if ((!response || !response.ok) && hasActiveFilter && import.meta.env.VITE_FILTER_LEADS_API_URL) {
           try {
-            const params = new URLSearchParams({
-              user: currentUserName,
-              offset: fetchOffset.toString(),
-              limit: fetchLimit.toString()
-            });
-
-            if (isSearching) {
-              params.append('query', searchTerm.trim());
-            }
-
-            if (typeof filterStatus !== 'undefined' && filterStatus !== 'all') {
-              params.append('status_is', filterStatus);
-            }
-            if (typeof contactOwnerFilter !== 'undefined' && contactOwnerFilter) {
-              const opLower = String(contactOwnerFilterOperator || '').toLowerCase().trim();
-              const isNot = opLower.includes('not') || opLower.includes("isn't") || opLower.includes('isnt') || opLower === 'is_not';
-              const ownerKey = isNot ? 'owner_is_not' : 'owner_is';
-              params.append(ownerKey, contactOwnerFilter);
-            }
-            if (typeof newThisWeekFilter !== 'undefined' && newThisWeekFilter) {
-              params.append('date_type', 'in_last');
-              params.append('last_count', '7');
-              params.append('last_unit', 'days');
-            }
-            if (isFilterApplied && typeof selectedProperties !== 'undefined' && selectedProperties.length > 0) {
-              selectedProperties.forEach(p => {
-                if (p.property === 'task') {
-                  if (p.value === 'without_task' || p.value === 'without task') {
-                    params.append('task_filter', 'without_task');
-                  } else {
-                    params.append('task_filter', 'with_task');
-                  }
-                } else if (p.property === 'created_time' || p.property === 'createdTime' || p.property === 'modified_time' || p.property === 'modifiedTime') {
-                  const dateField = (p.property === 'modified_time' || p.property === 'modifiedTime') ? 'modified_time' : 'created_time';
-                  params.append('date_field', dateField);
-                  const op = p.dateOperator || 'on';
-                  params.append('date_type', op);
-
-                  const formattedDate = formatDateToDDMMYYYY(p.value || p.date || '');
-                  const formattedFrom = formatDateToDDMMYYYY(p.fromDate || '');
-                  const formattedTo = formatDateToDDMMYYYY(p.toDate || '');
-
-                  if (op === 'between' || op === 'custom') {
-                    if (formattedFrom && formattedTo) {
-                      params.append('from', formattedFrom);
-                      params.append('to', formattedTo);
-                    } else if (formattedDate) {
-                      params.append('date', formattedDate);
-                    }
-                  } else if (formattedDate) {
-                    params.append('date', formattedDate);
-                  }
-                } else if (p.property && (p.value || (p.operator === 'contains' && p.searchTerm))) {
-                  const val = p.value || (p.operator === 'contains' ? p.searchTerm.trim() : '');
-                  if (val) {
-                    const paramKey = getFilterQueryParamKey(p.property, p.operator || 'is');
-                    params.append(paramKey, val);
-                  }
-                }
-              });
-            }
+            const params = buildCommonFilterParams();
             url = `${import.meta.env.VITE_FILTER_LEADS_API_URL}?${params.toString()}`;
             response = await fetch(url);
           } catch (filterErr) {
