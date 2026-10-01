@@ -2386,7 +2386,14 @@ export default function LeadPipeline({ onPageChange }) {
       }
       if (isFilterApplied && selectedProperties && selectedProperties.length > 0) {
         selectedProperties.forEach(p => {
-          if (p.property === 'task') {
+          if (p.property === 'untouched_records') {
+            const fType = p.filterType || p.value || '15_days';
+            params.append('filter_type', fType);
+            if (fType === 'custom') {
+              if (p.fromDate) params.append('from_date', p.fromDate);
+              if (p.toDate) params.append('to_date', p.toDate);
+            }
+          } else if (p.property === 'task') {
             if (p.value === 'without_task' || p.value === 'without task') {
               params.append('task_filter', 'without_task');
             } else {
