@@ -3812,7 +3812,6 @@ export default function LeadPipeline({ onPageChange }) {
                         <option value="created_time">Created Time</option>
                         <option value="lead_status">Lead Status</option>
                         <option value="tag">Tag</option>
-                        <option value="industry">Industry</option>
                         <option value="mailing_country">Mailing Country</option>
                         <option value="mailing_state">Mailing State</option>
                         <option value="created_by">Created By</option>
@@ -5529,177 +5528,6 @@ export default function LeadPipeline({ onPageChange }) {
                           </div>
                         )}
 
-                        {prop.property === 'industry' && (
-                          <div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div style={{ minWidth: '80px' }}>
-                                <select
-                                  value={prop.operator || 'is'}
-                                  onChange={(e) => {
-                                    const updated = [...selectedProperties];
-                                    updated[index].operator = e.target.value;
-                                    setSelectedProperties(updated);
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px 12px',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--r)',
-                                    fontSize: '13px',
-                                    background: 'var(--surface)',
-                                    color: 'var(--text)'
-                                  }}
-                                >
-                                  <option value="is">Is</option>
-                                  <option value="is not">Is Not</option>
-                                </select>
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <div className="filter-property-dropdown-container" data-leads-index={index} style={{ position: 'relative' }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Search industries..."
-                                    value={prop.searchTerm || ''}
-                                    onChange={(e) => {
-                                      const updated = [...selectedProperties];
-                                      updated[index].searchTerm = e.target.value;
-                                      setSelectedProperties(updated);
-                                    }}
-                                    onFocus={() => {
-                                      const updated = [...selectedProperties];
-                                      updated[index].dropdownOpen = true;
-                                      setSelectedProperties(updated);
-                                    }}
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px 12px',
-                                      border: '1px solid var(--border)',
-                                      borderRadius: 'var(--r)',
-                                      fontSize: '13px',
-                                      background: 'var(--surface)',
-                                      color: 'var(--text)'
-                                    }}
-                                  />
-                                  {prop.dropdownOpen && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '100%',
-                                      left: 0,
-                                      right: 0,
-                                      background: 'var(--surface)',
-                                      border: '1px solid var(--border)',
-                                      borderRadius: 'var(--r)',
-                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                      zIndex: 10,
-                                      maxHeight: '200px',
-                                      overflowY: 'auto',
-                                      marginTop: '4px'
-                                    }}>
-                                      {getUniqueValues(prop.property)
-                                        .filter(ind => !prop.searchTerm || ind.toLowerCase().includes(prop.searchTerm.toLowerCase()))
-                                        .map(ind => (
-                                          <div
-                                            key={ind}
-                                            onClick={() => {
-                                              const updated = [...selectedProperties];
-                                              const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-
-                                              if (currentValues.includes(ind)) {
-                                                const indexToRemove = currentValues.indexOf(ind);
-                                                currentValues.splice(indexToRemove, 1);
-                                              } else {
-                                                currentValues.push(ind);
-                                              }
-
-                                              updated[index].value = currentValues.join(',');
-                                              updated[index].dropdownOpen = false;
-                                              updated[index].searchTerm = '';
-                                              setSelectedProperties(updated);
-                                            }}
-                                            style={{
-                                              padding: '8px 12px',
-                                              cursor: 'pointer',
-                                              fontSize: '13px',
-                                              color: 'var(--text)',
-                                              borderBottom: '1px solid var(--border-soft)',
-                                              backgroundColor: prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                              e.currentTarget.style.background = 'var(--gray-100)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              e.currentTarget.style.background = prop.value && prop.value.includes(ind) ? 'var(--blue-600)15' : 'transparent';
-                                            }}
-                                          >
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                              <span>{ind}</span>
-                                              {prop.value && prop.value.includes(ind) && (
-                                                <Check size={14} style={{ color: 'var(--blue-600)' }} />
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  )}
-                                </div>
-                                {prop.value && (
-                                  <div style={{
-                                    marginTop: '8px',
-                                    fontSize: '12px',
-                                    color: 'var(--text-3)',
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: '4px'
-                                  }}>
-                                    {prop.value.split(',').map((ind, i) => (
-                                      <span key={i} style={{
-                                        background: 'var(--blue-600)15',
-                                        color: 'var(--blue-600)',
-                                        padding: '2px 6px',
-                                        borderRadius: 'var(--r)',
-                                        fontSize: '11px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}>
-                                        {ind}
-                                        <button
-                                          onClick={() => {
-                                            const updated = [...selectedProperties];
-                                            const currentValues = updated[index].value ? updated[index].value.split(',') : [];
-                                            const indexToRemove = currentValues.indexOf(ind);
-                                            if (indexToRemove > -1) {
-                                              currentValues.splice(indexToRemove, 1);
-                                              updated[index].value = currentValues.join(',');
-                                              setSelectedProperties(updated);
-                                            }
-                                          }}
-                                          style={{
-                                            background: 'none',
-                                            border: 'none',
-                                            color: 'var(--blue-600)',
-                                            cursor: 'pointer',
-                                            padding: '0',
-                                            fontSize: '12px',
-                                            lineHeight: '1',
-                                            borderRadius: '50%',
-                                            width: '14px',
-                                            height: '14px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                          }}
-                                          title={`Remove ${ind}`}
-                                        ><X size={12} /></button>
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
                         {prop.property === 'description' && (
                           <div>
                             <div style={{ display: 'flex', gap: '12px' }}>
@@ -6297,16 +6125,6 @@ export default function LeadPipeline({ onPageChange }) {
                               property: 'lead_source',
                               value: leadSourceProp.value,
                               operator: leadSourceProp.operator || 'is'
-                            });
-                          }
-
-                          // Add industry filter if configured
-                          const industryProp = selectedProperties.find(prop => prop.property === 'industry');
-                          if (industryProp && industryProp.value) {
-                            activeFilters.push({
-                              property: 'industry',
-                              value: industryProp.value,
-                              operator: industryProp.operator || 'is'
                             });
                           }
 
