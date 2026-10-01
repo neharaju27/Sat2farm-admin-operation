@@ -1096,30 +1096,37 @@ export default function LeadPipeline({ onPageChange }) {
         }
 
         // Transform API data to match component structure
-        const transformedLeads = leadsArray.map(lead => ({
-          id: lead.id,
-          contactName: lead.full_name || 'Unknown',
-          phoneNumber: lead.phone || '',
-          alternateNumber: lead.alternate_number || '',
-          email: lead.email || '',
-          companyName: lead.company_name || '',
-          contactOwner: lead.owner || 'Unassigned',
-          city: lead.city || '',
-          state: lead.state || '',
-          country: lead.country || 'IN',
-          leadStatus: lead.status || 'New',
-          tags: lead.tags || '',
-          leadSource: lead.lead_source || '',
-          description: lead.description || '',
-          createdTime: lead.created_time || new Date().toISOString(),
-          industry: lead.industry || '',
-          createdBy: lead.created_by || 'System',
-          modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString(),
-          taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
-          taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
-          _raw: lead
-        }));
+        const transformedLeads = leadsArray.map(lead => {
+          const createdTime = lead.created_time || lead.createdTime || lead.created_at || '';
+          const modifiedTime = lead.modified_time || lead.modifiedTime || lead.modified_at || (createdTime || '');
+          const lastActivity = lead.last_activity || lead.lastActivity || lead.last_activity_time || lead.updated_at || (createdTime || '');
+
+          return {
+            id: lead.id,
+            contactName: lead.full_name || 'Unknown',
+            phoneNumber: lead.phone || '',
+            alternateNumber: lead.alternate_number || '',
+            email: lead.email || '',
+            companyName: lead.company_name || '',
+            contactOwner: lead.owner || 'Unassigned',
+            city: lead.city || '',
+            state: lead.state || '',
+            country: lead.country || 'IN',
+            leadStatus: lead.status || 'New',
+            tags: lead.tags || '',
+            leadSource: lead.lead_source || '',
+            description: lead.description || '',
+            createdTime: createdTime,
+            modifiedTime: modifiedTime,
+            industry: lead.industry || '',
+            createdBy: lead.created_by || 'System',
+            modifiedBy: lead.modified_by || 'System',
+            lastActivity: lastActivity,
+            taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
+            taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
+            _raw: lead
+          };
+        });
 
         setLeads(transformedLeads);
         setError(null);
@@ -1148,30 +1155,37 @@ export default function LeadPipeline({ onPageChange }) {
   useEffect(() => {
     let active = true;
 
-    const transformLead = (lead) => ({
-      id: lead.id,
-      contactName: lead.full_name || lead.contact_name || lead.name || '',
-      phoneNumber: lead.phone || lead.phone_number || '',
-      alternateNumber: lead.alternate_number || '',
-      email: lead.email || '',
-      companyName: lead.company_name || lead.company || '',
-      contactOwner: lead.owner || lead.contact_owner || lead.owner_name || '',
-      city: lead.city || lead.mailing_city || '',
-      state: lead.state || lead.mailing_state || '',
-      country: lead.country || lead.mailing_country || 'IN',
-      leadStatus: lead.status || lead.lead_status || '',
-      tags: lead.tags || lead.tag || '',
-      leadSource: lead.lead_source || lead.source || '',
-      description: lead.description || '',
-      createdTime: lead.created_time || lead.created_at || '',
-      industry: lead.industry || '',
-      createdBy: lead.created_by || lead.createdBy || lead.created_user || lead.creator || lead.created_by_name || '',
-      modifiedBy: lead.modified_by || lead.modifiedBy || lead.modified_user || lead.modifier || lead.modified_by_name || '',
-      lastActivity: lead.last_activity || lead.updated_at || '',
-      taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
-      taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
-      _raw: lead
-    });
+    const transformLead = (lead) => {
+      const createdTime = lead.created_time || lead.createdTime || lead.created_at || '';
+      const modifiedTime = lead.modified_time || lead.modifiedTime || lead.modified_at || (createdTime || '');
+      const lastActivity = lead.last_activity || lead.lastActivity || lead.last_activity_time || lead.updated_at || (createdTime || '');
+
+      return {
+        id: lead.id,
+        contactName: lead.full_name || lead.contact_name || lead.name || '',
+        phoneNumber: lead.phone || lead.phone_number || '',
+        alternateNumber: lead.alternate_number || '',
+        email: lead.email || '',
+        companyName: lead.company_name || lead.company || '',
+        contactOwner: lead.owner || lead.contact_owner || lead.owner_name || '',
+        city: lead.city || lead.mailing_city || '',
+        state: lead.state || lead.mailing_state || '',
+        country: lead.country || lead.mailing_country || 'IN',
+        leadStatus: lead.status || lead.lead_status || '',
+        tags: lead.tags || lead.tag || '',
+        leadSource: lead.lead_source || lead.source || '',
+        description: lead.description || '',
+        createdTime: createdTime,
+        modifiedTime: modifiedTime,
+        industry: lead.industry || '',
+        createdBy: lead.created_by || lead.createdBy || lead.created_user || lead.creator || lead.created_by_name || '',
+        modifiedBy: lead.modified_by || lead.modifiedBy || lead.modified_user || lead.modifier || lead.modified_by_name || '',
+        lastActivity: lastActivity,
+        taskStatus: lead.task_status || lead.task_state || lead.latest_task_status || lead.task_name || lead.task || lead.status_task || (lead.task_completed ? 'Completed' : lead.has_pending_task ? 'Pending' : ''),
+        taskName: lead.task_name || lead.task_title || lead.latest_task_name || '',
+        _raw: lead
+      };
+    };
 
     const fetchAllLeadsForFilters = async () => {
       if (active) {
@@ -2308,27 +2322,34 @@ export default function LeadPipeline({ onPageChange }) {
 
 
         // Transform the filtered leads data
-        const transformedLeads = result.data.map(lead => ({
-          id: lead.id,
-          contactName: lead.full_name || 'Unknown',
-          phoneNumber: lead.phone || '',
-          alternateNumber: lead.alternate_number || '',
-          email: lead.email || '',
-          companyName: lead.company_name || '',
-          contactOwner: lead.owner || 'Unassigned',
-          city: lead.city || '',
-          state: lead.state || '',
-          country: lead.country || 'IN',
-          leadStatus: lead.status || 'New',
-          tags: lead.tags || '',
-          leadSource: lead.lead_source || '',
-          description: lead.description || '',
-          createdTime: lead.created_time || new Date().toISOString(),
-          industry: lead.industry || '',
-          createdBy: lead.created_by || 'System',
-          modifiedBy: lead.modified_by || 'System',
-          lastActivity: lead.last_activity || new Date().toISOString()
-        }));
+        const transformedLeads = result.data.map(lead => {
+          const createdTime = lead.created_time || lead.createdTime || lead.created_at || '';
+          const modifiedTime = lead.modified_time || lead.modifiedTime || lead.modified_at || (createdTime || '');
+          const lastActivity = lead.last_activity || lead.lastActivity || lead.last_activity_time || lead.updated_at || (createdTime || '');
+
+          return {
+            id: lead.id,
+            contactName: lead.full_name || 'Unknown',
+            phoneNumber: lead.phone || '',
+            alternateNumber: lead.alternate_number || '',
+            email: lead.email || '',
+            companyName: lead.company_name || '',
+            contactOwner: lead.owner || 'Unassigned',
+            city: lead.city || '',
+            state: lead.state || '',
+            country: lead.country || 'IN',
+            leadStatus: lead.status || 'New',
+            tags: lead.tags || '',
+            leadSource: lead.lead_source || '',
+            description: lead.description || '',
+            createdTime: createdTime,
+            modifiedTime: modifiedTime,
+            industry: lead.industry || '',
+            createdBy: lead.created_by || 'System',
+            modifiedBy: lead.modified_by || 'System',
+            lastActivity: lastActivity
+          };
+        });
 
         setLeads(transformedLeads);
         if (result && result.total !== undefined) {
@@ -2648,27 +2669,34 @@ export default function LeadPipeline({ onPageChange }) {
       }
 
       // Transform API data to match component structure
-      const transformedLeads = leadsList.map(lead => ({
-        id: lead.id,
-        contactName: lead.full_name || 'Unknown',
-        phoneNumber: lead.phone || '',
-        alternateNumber: lead.alternate_number || '',
-        email: lead.email || '',
-        companyName: lead.company_name || '',
-        contactOwner: lead.owner || 'Unassigned',
-        city: lead.city || '',
-        state: lead.state || '',
-        country: lead.country || 'IN',
-        leadStatus: lead.status || 'New',
-        tags: lead.tags || '',
-        leadSource: lead.lead_source || '',
-        description: lead.description || '',
-        createdTime: lead.created_time || new Date().toISOString(),
-        industry: lead.industry || '',
-        createdBy: lead.created_by || 'System',
-        modifiedBy: lead.modified_by || 'System',
-        lastActivity: lead.last_activity || new Date().toISOString()
-      }));
+      const transformedLeads = leadsList.map(lead => {
+        const createdTime = lead.created_time || lead.createdTime || lead.created_at || '';
+        const modifiedTime = lead.modified_time || lead.modifiedTime || lead.modified_at || (createdTime || '');
+        const lastActivity = lead.last_activity || lead.lastActivity || lead.last_activity_time || lead.updated_at || (createdTime || '');
+
+        return {
+          id: lead.id,
+          contactName: lead.full_name || 'Unknown',
+          phoneNumber: lead.phone || '',
+          alternateNumber: lead.alternate_number || '',
+          email: lead.email || '',
+          companyName: lead.company_name || '',
+          contactOwner: lead.owner || 'Unassigned',
+          city: lead.city || '',
+          state: lead.state || '',
+          country: lead.country || 'IN',
+          leadStatus: lead.status || 'New',
+          tags: lead.tags || '',
+          leadSource: lead.lead_source || '',
+          description: lead.description || '',
+          createdTime: createdTime,
+          modifiedTime: modifiedTime,
+          industry: lead.industry || '',
+          createdBy: lead.created_by || 'System',
+          modifiedBy: lead.modified_by || 'System',
+          lastActivity: lastActivity
+        };
+      });
 
       setLeads(transformedLeads);
       setError(null);

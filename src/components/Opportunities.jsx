@@ -687,36 +687,42 @@ export default function Opportunities({ onPageChange }) {
         setTotalOpportunities(data.length);
       }
 
-      const transformedOpportunities = oppsList.map(opp => ({
-        id: opp.id,
-        contactName: opp.full_name || 'Unknown',
-        phoneNumber: opp.phone || '',
-        alternateNumber: opp.alternate_number || '',
-        email: opp.email || '',
-        companyName: opp.company_name || '',
-        contactOwner: opp.owner || 'Unassigned',
-        city: opp.city || '',
-        state: opp.state || '',
-        country: opp.country || 'IN',
-        leadStatus: opp.status || 'New',
-        tags: opp.tags || '',
-        leadSource: opp.lead_source || '',
-        description: opp.description || '',
-        createdTime: opp.created_time || new Date().toISOString(),
-        industry: opp.industry || '',
-        createdBy: opp.created_by || 'System',
-        modifiedBy: opp.modified_by || 'System',
-        lastActivity: opp.last_activity || new Date().toISOString(),
-        accountName: opp.account_name || '',
-        accountNumber: opp.account_number || '',
-        dealPresent: opp.deal_present || 0,
-        website: opp.website || '',
-        accountType: opp.account_type || '',
-        modifiedTime: opp.modified_time || '',
-        taskStatus: opp.task_status || opp.task_state || opp.latest_task_status || opp.task_name || opp.task || opp.status_task || (opp.task_completed ? 'Completed' : opp.has_pending_task ? 'Pending' : ''),
-        taskName: opp.task_name || opp.task_title || opp.latest_task_name || '',
-        _raw: opp
-      }));
+      const transformedOpportunities = oppsList.map(opp => {
+        const createdTime = opp.created_time || opp.createdTime || opp.created_at || '';
+        const modifiedTime = opp.modified_time || opp.modifiedTime || opp.modified_at || (createdTime || '');
+        const lastActivity = opp.last_activity || opp.lastActivity || opp.last_activity_time || opp.updated_at || (createdTime || '');
+
+        return {
+          id: opp.id,
+          contactName: opp.full_name || 'Unknown',
+          phoneNumber: opp.phone || '',
+          alternateNumber: opp.alternate_number || '',
+          email: opp.email || '',
+          companyName: opp.company_name || '',
+          contactOwner: opp.owner || 'Unassigned',
+          city: opp.city || '',
+          state: opp.state || '',
+          country: opp.country || 'IN',
+          leadStatus: opp.status || 'New',
+          tags: opp.tags || '',
+          leadSource: opp.lead_source || '',
+          description: opp.description || '',
+          createdTime: createdTime,
+          industry: opp.industry || '',
+          createdBy: opp.created_by || 'System',
+          modifiedBy: opp.modified_by || 'System',
+          lastActivity: lastActivity,
+          accountName: opp.account_name || '',
+          accountNumber: opp.account_number || '',
+          dealPresent: opp.deal_present || 0,
+          website: opp.website || '',
+          accountType: opp.account_type || '',
+          modifiedTime: modifiedTime,
+          taskStatus: opp.task_status || opp.task_state || opp.latest_task_status || opp.task_name || opp.task || opp.status_task || (opp.task_completed ? 'Completed' : opp.has_pending_task ? 'Pending' : ''),
+          taskName: opp.task_name || opp.task_title || opp.latest_task_name || '',
+          _raw: opp
+        };
+      });
 
       setOpportunities(transformedOpportunities);
       setError(null);
@@ -1324,33 +1330,39 @@ export default function Opportunities({ onPageChange }) {
         setCurrentFilterCriteria(criteriaText);
 
         // Transform the filtered opportunities data
-        const transformedOpportunities = oppsData.map(opp => ({
-          id: opp.id,
-          contactName: opp.full_name || 'Unknown',
-          phoneNumber: opp.phone || '',
-          alternateNumber: opp.alternate_number || '',
-          email: opp.email || '',
-          companyName: opp.company_name || '',
-          contactOwner: opp.owner || 'Unassigned',
-          city: opp.city || '',
-          state: opp.state || '',
-          country: opp.country || 'IN',
-          leadStatus: opp.status || 'New',
-          tags: opp.tags || '',
-          leadSource: opp.lead_source || '',
-          description: opp.description || '',
-          createdTime: opp.created_time || new Date().toISOString(),
-          industry: opp.industry || '',
-          createdBy: opp.created_by || 'System',
-          modifiedBy: opp.modified_by || 'System',
-          lastActivity: opp.last_activity || new Date().toISOString(),
-          accountName: opp.account_name || '',
-          accountNumber: opp.account_number || '',
-          dealPresent: opp.deal_present || 0,
-          website: opp.website || '',
-          accountType: opp.account_type || '',
-          modifiedTime: opp.modified_time || ''
-        }));
+        const transformedOpportunities = oppsData.map(opp => {
+          const createdTime = opp.created_time || opp.createdTime || opp.created_at || '';
+          const modifiedTime = opp.modified_time || opp.modifiedTime || opp.modified_at || (createdTime || '');
+          const lastActivity = opp.last_activity || opp.lastActivity || opp.last_activity_time || opp.updated_at || (createdTime || '');
+
+          return {
+            id: opp.id,
+            contactName: opp.full_name || 'Unknown',
+            phoneNumber: opp.phone || '',
+            alternateNumber: opp.alternate_number || '',
+            email: opp.email || '',
+            companyName: opp.company_name || '',
+            contactOwner: opp.owner || 'Unassigned',
+            city: opp.city || '',
+            state: opp.state || '',
+            country: opp.country || 'IN',
+            leadStatus: opp.status || 'New',
+            tags: opp.tags || '',
+            leadSource: opp.lead_source || '',
+            description: opp.description || '',
+            createdTime: createdTime,
+            industry: opp.industry || '',
+            createdBy: opp.created_by || 'System',
+            modifiedBy: opp.modified_by || 'System',
+            lastActivity: lastActivity,
+            accountName: opp.account_name || '',
+            accountNumber: opp.account_number || '',
+            dealPresent: opp.deal_present || 0,
+            website: opp.website || '',
+            accountType: opp.account_type || '',
+            modifiedTime: modifiedTime
+          };
+        });
 
         setOpportunities(transformedOpportunities);
       } else {
@@ -1704,33 +1716,39 @@ export default function Opportunities({ onPageChange }) {
           }
         }
 
-        const transformedOpportunities = data.map(opp => ({
-          id: opp.id,
-          contactName: opp.full_name || opp.contact_name || opp.name || 'Unknown',
-          phoneNumber: opp.phone || opp.phone_number || '',
-          alternateNumber: opp.alternate_number || opp.alternateNumber || opp.mobile || '',
-          email: opp.email || '',
-          companyName: opp.company_name || opp.companyName || opp.company || '',
-          contactOwner: opp.owner || opp.contact_owner || opp.owner_name || 'Unassigned',
-          city: opp.city || opp.mailing_city || '',
-          state: opp.state || opp.mailing_state || '',
-          country: opp.country || opp.mailing_country || 'IN',
-          leadStatus: opp.status || opp.lead_status || opp.leadStatus || 'New',
-          tags: opp.tags || opp.tag || '',
-          leadSource: opp.lead_source || opp.leadSource || opp.source || '',
-          description: opp.description || '',
-          createdTime: opp.created_time || opp.created_at || new Date().toISOString(),
-          industry: opp.industry || '',
-          createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || 'System',
-          modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || 'System',
-          lastActivity: opp.last_activity || opp.updated_at || new Date().toISOString(),
-          accountName: opp.account_name || opp.accountName || '',
-          accountNumber: opp.account_number || opp.accountNumber || '',
-          dealPresent: opp.deal_present || 0,
-          website: opp.website || '',
-          accountType: opp.account_type || '',
-          modifiedTime: opp.modified_time || ''
-        }));
+        const transformedOpportunities = data.map(opp => {
+          const createdTime = opp.created_time || opp.created_at || opp.createdTime || '';
+          const modifiedTime = opp.modified_time || opp.modifiedTime || opp.modified_at || (createdTime || '');
+          const lastActivity = opp.last_activity || opp.updated_at || opp.lastActivity || opp.last_activity_time || (createdTime || '');
+
+          return {
+            id: opp.id,
+            contactName: opp.full_name || opp.contact_name || opp.name || 'Unknown',
+            phoneNumber: opp.phone || opp.phone_number || '',
+            alternateNumber: opp.alternate_number || opp.alternateNumber || opp.mobile || '',
+            email: opp.email || '',
+            companyName: opp.company_name || opp.companyName || opp.company || '',
+            contactOwner: opp.owner || opp.contact_owner || opp.owner_name || 'Unassigned',
+            city: opp.city || opp.mailing_city || '',
+            state: opp.state || opp.mailing_state || '',
+            country: opp.country || opp.mailing_country || 'IN',
+            leadStatus: opp.status || opp.lead_status || opp.leadStatus || 'New',
+            tags: opp.tags || opp.tag || '',
+            leadSource: opp.lead_source || opp.leadSource || opp.source || '',
+            description: opp.description || '',
+            createdTime: createdTime,
+            industry: opp.industry || '',
+            createdBy: opp.created_by || opp.createdBy || opp.created_user || opp.creator || opp.created_by_name || 'System',
+            modifiedBy: opp.modified_by || opp.modifiedBy || opp.modified_user || opp.modifier || opp.modified_by_name || 'System',
+            lastActivity: lastActivity,
+            accountName: opp.account_name || opp.accountName || '',
+            accountNumber: opp.account_number || opp.accountNumber || '',
+            dealPresent: opp.deal_present || 0,
+            website: opp.website || '',
+            accountType: opp.account_type || '',
+            modifiedTime: modifiedTime
+          };
+        });
         setOpportunities(transformedOpportunities);
       } catch (err) {
         console.error('Error fetching opportunities:', err);
