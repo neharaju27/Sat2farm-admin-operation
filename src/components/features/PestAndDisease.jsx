@@ -32,7 +32,7 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
       
       // Fetch pest/disease data
       const response = await axios.get(
-        `${import.meta.env.VITE_PEST_DISEASE_API_URL}?farm_id=${farmId}&key=${apiKey}&ln=en`
+        `${import.meta.env.VITE_PEST_DISEASE_API_URL}?key=${apiKey}&farm_id=${farmId}&ln=en`
       );
       
       const data = response.data;
@@ -93,42 +93,66 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Date: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Date}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Crop Name: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Crop_name}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Pest Name: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)', fontWeight: '600'}}>{pest.Pest}</span>
       </div>
-      
+
+      {pest.Pest_img_url && pest.Pest_img_url.length > 0 && (
+        <div style={{marginBottom: '16px'}}>
+          <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500', display: 'block', marginBottom: '8px'}}>Images:</span>
+          <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+            {pest.Pest_img_url.map((url, imgIndex) => (
+              <img
+                key={imgIndex}
+                src={url}
+                alt={`${pest.Pest} image ${imgIndex + 1}`}
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer'
+                }}
+                onClick={() => window.open(url, '_blank')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Symptoms: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Symptoms}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Affected Part: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Affected_Part}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Mode of Spread: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Mode_of_Spread}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Pathogen: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Pathogen}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Stage of Infection: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Stage_of_Infection}</span>
       </div>
-      
+
       <div style={{marginBottom: '8px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Solution: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{pest.Solution}</span>
@@ -148,42 +172,66 @@ export default function PestAndDisease({ onClose, onBack, farmId, clientId }) {
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Date: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Date}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Crop Name: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Crop_name}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Disease Name: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)', fontWeight: '600'}}>{disease.Disease}</span>
       </div>
-      
+
+      {disease.Disease_img_url && disease.Disease_img_url.length > 0 && (
+        <div style={{marginBottom: '16px'}}>
+          <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500', display: 'block', marginBottom: '8px'}}>Images:</span>
+          <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+            {disease.Disease_img_url.map((url, imgIndex) => (
+              <img
+                key={imgIndex}
+                src={url}
+                alt={`${disease.Disease} image ${imgIndex + 1}`}
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer'
+                }}
+                onClick={() => window.open(url, '_blank')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Symptoms: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Symptoms}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Affected Part: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Affected_Part}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Mode of Spread: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Mode_of_Spread}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Pathogen: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Pathogen}</span>
       </div>
-      
+
       <div style={{marginBottom: '12px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Stage of Infection: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Stage_of_Infection}</span>
       </div>
-      
+
       <div style={{marginBottom: '8px'}}>
         <span style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Solution: </span>
         <span style={{fontSize: '13px', color: 'var(--text-1)'}}>{disease.Solution}</span>

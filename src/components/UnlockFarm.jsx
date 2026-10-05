@@ -130,6 +130,8 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [featureClientId, setFeatureClientId] = useState(null); // store selected client_id for features
   const [featureFarmStatus, setFeatureFarmStatus] = useState(null); // store farm status for features
   const [featureFarmCategory, setFeatureFarmCategory] = useState(null); // store farm category for features
+  const [featureFarmPlan, setFeatureFarmPlan] = useState(null); // store farm plan duration for features
+  const [featureFarmUnlockDate, setFeatureFarmUnlockDate] = useState(null); // store farm unlock date for features
 
   const getSelectedFarmerId = (farmer = selectedFarmer) =>
     farmer?.user_id || farmer?.userId || farmer?.id;
@@ -3291,7 +3293,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                                 setFeatureFarmId(searchResult.farmId || searchResult.farm_id);
                                 setFeatureClientId(searchResult.clientId);
                                 setFeatureFarmStatus(searchResult.status);
-                                
+
                                 // Fetch farm category from farm details API
                                 try {
                                   const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${searchResult.farmId || searchResult.farm_id}`;
@@ -3301,20 +3303,29 @@ export default function UnlockFarm({ user, onPageChange }) {
                                       'Content-Type': 'application/json'
                                     }
                                   });
-                                  
+
                                   if (response.ok) {
                                     const data = await response.json();
                                     if ((data.status === 'Success' || data.success) && data.data) {
                                       const farmArray = Array.isArray(data.data) ? data.data : [data.data];
                                       const farmInfo = farmArray[0] || {};
                                       setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
+                                      // Extract plan duration from plan field
+                                      const plan = farmInfo.plan || '';
+                                      console.log('Farm plan from search:', plan);
+                                      setFeatureFarmPlan(plan);
+                                      // Extract unlock date from created_time or unlock_date
+                                      const unlockDate = farmInfo.created_time || farmInfo.unlock_date || '';
+                                      console.log('Farm unlock date:', unlockDate);
+                                      setFeatureFarmUnlockDate(unlockDate);
                                     }
                                   }
                                 } catch (error) {
                                   console.error('Error fetching farm category:', error);
                                   setFeatureFarmCategory('');
+                                  setFeatureFarmPlan('6');
                                 }
-                                
+
                                 openModal('feature-dashboard');
                               }}
                               style={{
@@ -3501,8 +3512,8 @@ export default function UnlockFarm({ user, onPageChange }) {
                                         onClick={async () => {
                                           setFeatureFarmId(farm.farmId);
                                           setFeatureFarmStatus(farm.status);
-                                          
-                                          // Fetch clientId and category from farm details API
+
+                                          // Fetch clientId, category and plan from farm details API
                                           try {
                                             const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
                                             const response = await fetch(apiUrl, {
@@ -3511,7 +3522,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                                                 'Content-Type': 'application/json'
                                               }
                                             });
-                                            
+
                                             if (response.ok) {
                                               const data = await response.json();
                                               if ((data.status === 'Success' || data.success) && data.data) {
@@ -3519,14 +3530,23 @@ export default function UnlockFarm({ user, onPageChange }) {
                                                 const farmInfo = farmArray[0] || {};
                                                 setFeatureClientId(farmInfo.client_id || farm.clientId || undefined);
                                                 setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
+                                                // Extract plan duration from plan field
+                                                const plan = farmInfo.plan || '';
+                                                console.log('Farm plan:', plan);
+                                                setFeatureFarmPlan(plan);
+                                                // Extract unlock date from created_time or unlock_date
+                                                const unlockDate = farmInfo.created_time || farmInfo.unlock_date || '';
+                                                console.log('Farm unlock date:', unlockDate);
+                                                setFeatureFarmUnlockDate(unlockDate);
                                               }
                                             }
                                           } catch (error) {
                                             console.error('Error fetching farm details:', error);
                                             setFeatureClientId(farm.clientId || undefined);
                                             setFeatureFarmCategory('');
+                                            setFeatureFarmPlan('6');
                                           }
-                                          
+
                                           openModal('feature-dashboard');
                                         }}
                                         style={{
@@ -3604,6 +3624,8 @@ export default function UnlockFarm({ user, onPageChange }) {
             setFeatureClientId(null);
             setFeatureFarmStatus(null);
             setFeatureFarmCategory(null);
+            setFeatureFarmPlan(null);
+            setFeatureFarmUnlockDate(null);
           }} 
           onFeatureSelect={(feature) => {
             setModalOpen(null);
@@ -3623,7 +3645,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       {featureModalOpen === 'Crop Health' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'LSWI' && <LSWI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); setFeatureFarmPlan(null); setFeatureFarmUnlockDate(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmPlan={featureFarmPlan} farmUnlockDate={featureFarmUnlockDate} />}
       {featureModalOpen === 'Image Advisory' && <ImageAdvisory onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'NDCI' && <NDCI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'NDTI' && <NDTI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}

@@ -144,12 +144,12 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         color: '#64748b',
         fontWeight: 600
       },
-      min: 0,
-      max: Math.max(...weatherData.forecast.map(d => d.rainfall), 0.08) * 1.1,
-      interval: 0.02,
+      min: -0.5,
+      max: 1.5,
+      interval: 0.5,
       axisLabel: {
         color: '#64748b',
-        formatter: (value) => value.toFixed(2)
+        formatter: (value) => value.toFixed(1)
       },
       splitLine: {
         show: true,

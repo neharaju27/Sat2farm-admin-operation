@@ -33,37 +33,52 @@ export default function Irrigation({ onClose, onBack, farmId, clientId }) {
       const irrigationResponse = await axios.get(
         `${import.meta.env.VITE_IRRIGATION_DATA_API_URL}?farm_id=${farmId}&key=${apiKey}`
       );
-      
+
+      console.log('Irrigation API response:', irrigationResponse.data);
+
       if (irrigationResponse.data.status === 'success' && irrigationResponse.data.Irrigation_data) {
         // Fetch actual data from S3 URL
-        const s3Response = await axios.get(irrigationResponse.data.Irrigation_data);
-        const data = s3Response.data;
-        
-        setRemarks(data.Remarks || '');
-        
-        // Convert data to table format
-        const tableData = [];
-        Object.keys(data).forEach(date => {
-          if (date !== 'Remarks') {
-            const dateData = data[date];
-            Object.keys(dateData).forEach(type => {
-              tableData.push({
-                date,
-                type,
-                grossIrrigation: dateData[type].Gross_Irrig,
-                irrigationFrequency: dateData[type].Irrig_freq
+        try {
+          const s3Response = await axios.get(irrigationResponse.data.Irrigation_data);
+          const data = s3Response.data;
+
+          setRemarks(data.Remarks || '');
+
+          // Convert data to table format
+          const tableData = [];
+          Object.keys(data).forEach(date => {
+            if (date !== 'Remarks') {
+              const dateData = data[date];
+              Object.keys(dateData).forEach(type => {
+                tableData.push({
+                  date,
+                  type,
+                  grossIrrigation: dateData[type].Gross_Irrig,
+                  irrigationFrequency: dateData[type].Irrig_freq
+                });
               });
-            });
-          }
-        });
-        
-        setIrrigationData(tableData);
+            }
+          });
+
+          setIrrigationData(tableData);
+        } catch (s3Err) {
+          console.error('Error fetching S3 data:', s3Err);
+          setError('The data will be available by tomorrow morning');
+        }
+      } else if (irrigationResponse.data.error && irrigationResponse.data.error.toLowerCase().includes('corresponding data is not available')) {
+        setError('The data will be available by tomorrow morning');
+      } else if (irrigationResponse.data.error) {
+        setError(irrigationResponse.data.error);
       } else {
         setError('Data is not available. ');
       }
     } catch (err) {
       console.error('Error fetching irrigation data:', err);
-      setError('Data is not available. ');
+      if (err.response && err.response.data && err.response.data.error && err.response.data.error.toLowerCase().includes('corresponding data is not available')) {
+        setError('The data will be available by tomorrow morning');
+      } else {
+        setError('Data is not available. ');
+      }
     } finally {
       setLoading(false);
     }

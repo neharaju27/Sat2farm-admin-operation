@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Languages, RefreshCw, ArrowLeft, Info } from 'lucide-react';
 import axios from 'axios';
 
-export default function SoilReport({ onClose, onBack, farmId, clientId }) {
+export default function SoilReport({ onClose, onBack, farmId, clientId, farmPlan, farmUnlockDate }) {
   const [pdfUrl, setPdfUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -10,6 +10,78 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [translating, setTranslating] = useState(false);
+  const [regenerationInfo, setRegenerationInfo] = useState({ count: 0, lastRegenDate: null });
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  console.log('SoilReport farmPlan:', farmPlan);
+  console.log('SoilReport farmUnlockDate:', farmUnlockDate);
+
+  // Get regeneration limits based on plan
+  const getRegenerationLimits = () => {
+    const planLower = (farmPlan || '').toLowerCase();
+    if (planLower.includes('1 month')) {
+      return { maxRegenerations: 0, cooldownDays: 0 };
+    } else if (planLower.includes('6 month')) {
+      return { maxRegenerations: 1, cooldownDays: 90 };
+    } else if (planLower.includes('12 month')) {
+      return { maxRegenerations: 2, cooldownDays: 180 };
+    }
+    return { maxRegenerations: 1, cooldownDays: 90 }; // default
+  };
+
+  // Load regeneration history from localStorage
+  useEffect(() => {
+    if (farmId) {
+      const history = JSON.parse(localStorage.getItem('soilReportRegeneration') || '{}');
+      setRegenerationInfo(history[farmId] || { count: 0, lastRegenDate: null });
+    }
+  }, [farmId]);
+
+  // Check if regeneration is available
+  const isRegenerationAvailable = () => {
+    const limits = getRegenerationLimits();
+    if (limits.maxRegenerations === 0) return false;
+
+    if (regenerationInfo.count >= limits.maxRegenerations) return false;
+
+    // Check cooldown from unlock date (for first regeneration) or last regeneration date
+    const checkDate = regenerationInfo.lastRegenDate || farmUnlockDate;
+    if (checkDate) {
+      const dateToCheck = new Date(checkDate);
+      const now = new Date();
+      const daysSince = (now - dateToCheck) / (1000 * 60 * 60 * 24);
+      return daysSince >= limits.cooldownDays;
+    }
+
+    return true;
+  };
+
+  // Get tooltip message
+  const getTooltipMessage = () => {
+    const limits = getRegenerationLimits();
+    if (limits.maxRegenerations === 0) {
+      return 'Regeneration not available for 1-month plan';
+    }
+
+    if (regenerationInfo.count >= limits.maxRegenerations) {
+      return `Regeneration limit reached (${regenerationInfo.count}/${limits.maxRegenerations})`;
+    }
+
+    // Check cooldown from unlock date (for first regeneration) or last regeneration date
+    const checkDate = regenerationInfo.lastRegenDate || farmUnlockDate;
+    if (checkDate) {
+      const dateToCheck = new Date(checkDate);
+      const now = new Date();
+      const daysSince = (now - dateToCheck) / (1000 * 60 * 60 * 24);
+      const daysRemaining = limits.cooldownDays - daysSince;
+
+      if (daysSince < limits.cooldownDays) {
+        return `The regenerated data will be available after ${Math.ceil(daysRemaining)} day`;
+      }
+    }
+
+    return 'Regenerate available';
+  };
 
   const languages = [
     { name: 'English', code: 'en' },
@@ -70,22 +142,22 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
     setTranslating(true);
     setError('');
     setShowLanguageDropdown(false);
-    
+
     try {
       // Fetch API key first using client_id
       const keyResponse = await axios.get(
         `${import.meta.env.VITE_FETCH_FARMER_KEY_API_URL}?client_id=${clientId}`
       );
-      
+
       const apiKey = keyResponse.data.api_key;
-      
+
       // Call translation API
       const translateResponse = await axios.get(
         `${import.meta.env.VITE_SOIL_REPORT_TRANSLATE_API_URL}?api_key=${apiKey}&farm_id=${farmId}&lang=${langCode}`
       );
-      
+
       console.log('Translation API response:', translateResponse.data);
-      
+
       if (translateResponse.data.pdf) {
         setPdfUrl(translateResponse.data.pdf);
         setSelectedLanguage(langCode);
@@ -101,6 +173,51 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
       setError('Failed to translate report');
     } finally {
       setTranslating(false);
+    }
+  };
+
+  const regenerateSoilReport = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      // Fetch API key first using client_id
+      const keyResponse = await axios.get(
+        `${import.meta.env.VITE_FETCH_FARMER_KEY_API_URL}?client_id=${clientId}`
+      );
+
+      const apiKey = keyResponse.data.api_key;
+
+      // Call regenerate API
+      const regenerateResponse = await axios.get(
+        `${import.meta.env.VITE_SOIL_REPORT_REGENERATE_API_URL}?key=${apiKey}&farm_id=${farmId}&language=${selectedLanguage}`
+      );
+
+      console.log('Regenerate API response:', regenerateResponse.data);
+
+      if (regenerateResponse.data.pdf) {
+        setPdfUrl(regenerateResponse.data.pdf);
+
+        // Save regeneration history
+        const history = JSON.parse(localStorage.getItem('soilReportRegeneration') || '{}');
+        history[farmId] = {
+          count: (regenerationInfo.count || 0) + 1,
+          lastRegenDate: new Date().toISOString()
+        };
+        localStorage.setItem('soilReportRegeneration', JSON.stringify(history));
+        setRegenerationInfo(history[farmId]);
+      } else if (regenerateResponse.data.status === 'success' && regenerateResponse.data.message) {
+        // Report is being generated asynchronously
+        setError(regenerateResponse.data.message);
+      } else {
+        console.error('No PDF in response. Full response:', regenerateResponse.data);
+        setError('Regeneration failed - no PDF returned');
+      }
+    } catch (err) {
+      console.error('Error regenerating soil report:', err);
+      setError('Failed to regenerate soil report');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -180,15 +297,49 @@ export default function SoilReport({ onClose, onBack, farmId, clientId }) {
                 </div>
               )}
             </div>
-            <button 
-              className="btn btn-primary btn-sm"
-              style={{display: 'flex', alignItems: 'center', gap: '8px'}}
-              onClick={fetchSoilReport}
-              disabled={loading || translating}
-            >
-              <RefreshCw size={16} />
-              Regenerate
-            </button>
+            {(isRegenerationAvailable() || (farmPlan && !farmPlan?.toLowerCase().includes('1 month'))) && (
+              <div
+                style={{position: 'relative'}}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
+                <button
+                  className={isRegenerationAvailable() ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: isRegenerationAvailable() ? 1 : 0.6,
+                    cursor: isRegenerationAvailable() ? 'pointer' : 'not-allowed'
+                  }}
+                  onClick={isRegenerationAvailable() ? regenerateSoilReport : undefined}
+                  disabled={!isRegenerationAvailable() || loading || translating}
+                  title={getTooltipMessage()}
+                >
+                  <RefreshCw size={16} />
+                  Regenerate
+                </button>
+                {showTooltip && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '8px',
+                    backgroundColor: '#1e293b',
+                    color: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    zIndex: 1000,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    pointerEvents: 'none'
+                  }}>
+                    {getTooltipMessage()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {loading && (
