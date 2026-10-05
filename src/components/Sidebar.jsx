@@ -9,6 +9,8 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
   const [todayTasks, setTodayTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [todayGreenTeamAssignments, setTodayGreenTeamAssignments] = useState([]);
+  const [loadingGreenTeamAssignments, setLoadingGreenTeamAssignments] = useState(false);
   
   // Check user role with more flexible matching
   const userRole = user?.role?.toLowerCase().trim();
@@ -143,6 +145,65 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
 
     fetchTodayTasks();
   }, [isSalesUser, user]);
+
+  // Fetch today's Green Team assignments for Operations and Tech Department users
+  useEffect(() => {
+    if (!isOperationsUser && !isTechDepartmentUser) return;
+
+    const fetchTodayGreenTeamAssignments = async () => {
+      try {
+        setLoadingGreenTeamAssignments(true);
+        const greenTeamApiUrl = import.meta.env.VITE_GREEN_TEAM_GET_ASSIGNMENTS_URL;
+        
+        if (!greenTeamApiUrl) {
+          console.error('Green Team API URL not configured');
+          setTodayGreenTeamAssignments([]);
+          return;
+        }
+
+        const response = await fetch(greenTeamApiUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        let assignmentsData = result;
+        
+        // Handle nested API response structure
+        if (result && result.assignment && typeof result.assignment === 'object') {
+          assignmentsData = [result.assignment];
+        } else if (result && result.assignments && Array.isArray(result.assignments)) {
+          assignmentsData = result.assignments;
+        }
+        
+        if (assignmentsData && Array.isArray(assignmentsData)) {
+          const today = new Date();
+          const todaysAssignments = assignmentsData.filter(assignment => {
+            const assignedDate = parseDateRobust(assignment.created_at || assignment.assigned_date);
+            return assignedDate && assignedDate.toDateString() === today.toDateString();
+          });
+          
+          setTodayGreenTeamAssignments(todaysAssignments);
+        } else {
+          setTodayGreenTeamAssignments([]);
+        }
+      } catch (error) {
+        console.error('Error fetching today\'s Green Team assignments:', error);
+        setTodayGreenTeamAssignments([]);
+      } finally {
+        setLoadingGreenTeamAssignments(false);
+      }
+    };
+
+    fetchTodayGreenTeamAssignments();
+  }, [isOperationsUser, isTechDepartmentUser, user]);
   
   // Page activity states
   const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
@@ -302,6 +363,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   <div
                     className={`sb-item ${currentPage === 'green-team' ? 'active' : ''}`}
                     onClick={() => handleNavigationClick('green-team')}
+                    style={{ position: 'relative' }}
                   >
                     <svg className="ic" viewBox="0 0 16 16" fill="none">
                       <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -311,6 +373,28 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                       <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     Green Team
+                    {todayGreenTeamAssignments.length > 0 && (
+                      <span style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: '#ef4444',
+                        color: 'white',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        minWidth: '18px',
+                        height: '18px',
+                        borderRadius: '9px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 6px',
+                        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                      }}>
+                        {todayGreenTeamAssignments.length}
+                      </span>
+                    )}
                   </div>
                 )}
                 {/* Prospect Stats - Only for Operations Users */}
@@ -454,6 +538,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             <div
               className={`sb-item ${currentPage === 'green-team' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('green-team')}
+              style={{ position: 'relative' }}
             >
               <svg className="ic" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -463,7 +548,28 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Green Team
-              <span className="sb-dot"></span>
+              {todayGreenTeamAssignments.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#ef4444',
+                  color: 'white',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  minWidth: '18px',
+                  height: '18px',
+                  borderRadius: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 6px',
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                }}>
+                  {todayGreenTeamAssignments.length}
+                </span>
+              )}
             </div>
           </>
         )}
