@@ -4,7 +4,9 @@ import {
   Filter,
   Building2,
   Eye,
+  X,
 } from "lucide-react";
+import toast from 'react-hot-toast';
 import "../styles/Sat2FarmAdminPortal.css";
 
 const GET_ADMIN_KEY_API_URL =
@@ -16,18 +18,31 @@ const GET_ADMIN_INFO_API_URL =
 const FETCH_SUPERADMIN_AREA_API_URL =
   import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL;
 
+const UPDATE_ADMIN_AREA_API_URL =
+  import.meta.env.VITE_UPDATE_ADMIN_AREA_API_URL;
+
 export default function SuperAdminDashboard({
   user,
   onPageChange,
 }) {
   const [adminInfo, setAdminInfo] = useState([]);
   const [areaData, setAreaData] = useState(null);
+  const [superAdminKey, setSuperAdminKey] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedManager, setSelectedManager] = useState(null);
+  const [assignFormData, setAssignFormData] = useState({
+    area: "",
+    plan: "1 month"
+  });
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState("");
 
   useEffect(() => {
     fetchManagers();
@@ -70,6 +85,9 @@ export default function SuperAdminDashboard({
         throw new Error('Admin key not found in response');
       }
 
+      // Store super admin key for assign acreage
+      setSuperAdminKey(adminKey);
+
       // Step 2: Fetch admin info using the fetched key
       console.log('Fetching admin info with key:', adminKey);
       const adminInfoResponse = await fetch(`${GET_ADMIN_INFO_API_URL}?key=${adminKey}`);
@@ -108,7 +126,30 @@ export default function SuperAdminDashboard({
       
       // Handle array response
       const formattedAdminData = Array.isArray(adminData) ? adminData : [adminData];
-      setAdminInfo(formattedAdminData);
+      
+      // First set admin info with plan data if available in the response
+      const adminInfoWithPlanData = formattedAdminData.map(admin => ({
+        ...admin,
+        plan_acreages: {
+          '1 month': { 
+            total: admin?.['1_month']?.total_area || 0, 
+            used: admin?.['1_month']?.used_area || 0, 
+            available: admin?.['1_month']?.available_area || 0 
+          },
+          '6 months': { 
+            total: admin?.['6_month']?.total_area || 0, 
+            used: admin?.['6_month']?.used_area || 0, 
+            available: admin?.['6_month']?.available_area || 0 
+          },
+          '12 months': { 
+            total: admin?.['12_month']?.total_area || 0, 
+            used: admin?.['12_month']?.used_area || 0, 
+            available: admin?.['12_month']?.available_area || 0 
+          }
+        }
+      }));
+      
+      setAdminInfo(adminInfoWithPlanData);
 
       // Step 3: Fetch superadmin area data
       console.log('Fetching superadmin area data with phone:', phoneNumber);
@@ -150,19 +191,40 @@ export default function SuperAdminDashboard({
           areaDataMap[areaResult.data.mobile_no || areaResult.data.phoneNumber] = areaResult.data;
         }
         
-        // Update adminInfo with area data
-        const mergedAdminInfo = formattedAdminData.map(admin => {
+        // Update adminInfo with area data, merging plan data from both sources
+        const mergedAdminInfo = adminInfoWithPlanData.map(admin => {
           const areaInfo = areaDataMap[admin.mobile_no || admin.phoneNumber];
           return {
             ...admin,
             allocate_area: areaInfo?.allocate_area || areaInfo?.allocated_area || admin.allocate_area || admin.allocated_area || 'N/A',
             available_area: areaInfo?.available_area || admin.available_area || 'N/A',
             used_area: areaInfo?.used_area || admin.used_area || 'N/A',
-            total_area: areaInfo?.total_area || admin.total_area || 'N/A'
+            total_area: areaInfo?.total_area || admin.total_area || 'N/A',
+            // Merge plan-based acreages from both admin info and area API, preferring area API data
+            plan_acreages: {
+              '1 month': { 
+                total: areaInfo?.['1_month']?.total_area || admin?.['1_month']?.total_area || 0, 
+                used: areaInfo?.['1_month']?.used_area || admin?.['1_month']?.used_area || 0, 
+                available: areaInfo?.['1_month']?.available_area || admin?.['1_month']?.available_area || 0 
+              },
+              '6 months': { 
+                total: areaInfo?.['6_month']?.total_area || admin?.['6_month']?.total_area || 0, 
+                used: areaInfo?.['6_month']?.used_area || admin?.['6_month']?.used_area || 0, 
+                available: areaInfo?.['6_month']?.available_area || admin?.['6_month']?.available_area || 0 
+              },
+              '12 months': { 
+                total: areaInfo?.['12_month']?.total_area || admin?.['12_month']?.total_area || 0, 
+                used: areaInfo?.['12_month']?.used_area || admin?.['12_month']?.used_area || 0, 
+                available: areaInfo?.['12_month']?.available_area || admin?.['12_month']?.available_area || 0 
+              }
+            }
           };
         });
         
         setAdminInfo(mergedAdminInfo);
+      } else {
+        // If area data is not available, still use admin info with plan data
+        setAdminInfo(adminInfoWithPlanData);
       }
     } catch (err) {
       setError(err.message);
@@ -228,6 +290,105 @@ export default function SuperAdminDashboard({
     );
 
     onPageChange("manager-monthly-report");
+  };
+
+  const handleOpenAssignModal = (manager) => {
+    setSelectedManager(manager);
+    setAssignFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setAssignError("");
+    setAssignModalOpen(true);
+  };
+
+  const handleCloseAssignModal = () => {
+    setAssignModalOpen(false);
+    setSelectedManager(null);
+    setAssignFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setAssignError("");
+  };
+
+  const handleAssignInputChange = (e) => {
+    const { name, value } = e.target;
+    setAssignFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAssignSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!assignFormData.area) {
+      setAssignError("Please fill in all required fields");
+      return;
+    }
+
+    setAssignLoading(true);
+    setAssignError("");
+
+    try {
+      const adminId = selectedManager?.sub_admin_id || selectedManager?.client_id;
+      
+      console.log('Super Admin Key:', superAdminKey);
+      console.log('Admin ID:', adminId);
+      console.log('Area to increase:', assignFormData.area);
+      console.log('Plan:', assignFormData.plan);
+      
+      if (!superAdminKey) {
+        setAssignError('Super admin key not available. Please refresh the page.');
+        setAssignLoading(false);
+        return;
+      }
+      
+      if (!adminId) {
+        setAssignError('Admin ID not available for this manager.');
+        setAssignLoading(false);
+        return;
+      }
+      
+      // Map plan values to API format
+      let planValue = '';
+      const trimmedPlan = assignFormData.plan.trim();
+      
+      if (trimmedPlan === '1 month') {
+        planValue = '1';
+      } else if (trimmedPlan === '6 months') {
+        planValue = '6';
+      } else if (trimmedPlan === '12 months') {
+        planValue = '12';
+      } else {
+        planValue = '1';
+      }
+
+      const apiUrl = `${UPDATE_ADMIN_AREA_API_URL}?super_admin_key=${superAdminKey}&admin_id=${adminId}&area_to_increase=${assignFormData.area}&plan=${planValue}`;
+      console.log('API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Acreage assigned successfully!');
+        handleCloseAssignModal();
+        // Refresh the data
+        fetchManagers();
+      } else {
+        const errorMessage = data.message || data.error || 'Failed to assign acreage';
+        setAssignError(errorMessage);
+      }
+    } catch (err) {
+      console.error('Assign Error:', err);
+      setAssignError('Network error. Please try again.');
+    } finally {
+      setAssignLoading(false);
+    }
   };
 
   return (
@@ -296,10 +457,10 @@ export default function SuperAdminDashboard({
                     <th style={{ width: "8%" }}>Manager ID</th>
                     <th style={{ width: "12%" }}>Phone Number</th>
                     <th style={{ width: "12%" }}>Registered Date</th>
-                    <th style={{ width: "12%" }}>Allocated Area</th>
-                    <th style={{ width: "12%" }}>Available Area</th>
-                    <th style={{ width: "8%" }}>Status</th>
-                    <th style={{ width: "18%", textAlign: "center" }}>Action</th>
+                    <th style={{ width: "12%" }}>1 Month Plan</th>
+                    <th style={{ width: "12%" }}>6 Months Plan</th>
+                    <th style={{ width: "12%" }}>12 Months Plan</th>
+                    <th style={{ width: "24%", textAlign: "center" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,37 +515,52 @@ export default function SuperAdminDashboard({
                         {/* Registered */}
                         <td>{formatDate(manager.reg_date)}</td>
 
-                        {/* Allocated Area */}
+                        {/* 1 Month Plan */}
                         <td>
-                          <span className="sa-table-id">
-                            {manager.unit_limit || manager.unit_limit || 'N/A'}
-                          </span>
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['1 month']?.total || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['1 month']?.used || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['1 month']?.available || 0).toFixed(2)}</strong></div>
+                          </div>
                         </td>
 
-                        {/* Available Area */}
+                        {/* 6 Months Plan */}
                         <td>
-                          <span className="sa-table-id">
-                            {manager.available_acreage || 'N/A'}
-                          </span>
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['6 months']?.total || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['6 months']?.used || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['6 months']?.available || 0).toFixed(2)}</strong></div>
+                          </div>
                         </td>
 
-                        {/* Status */}
+                        {/* 12 Months Plan */}
                         <td>
-                          <span className="sa-status-pill">
-                            <span className="sa-status-dot"></span>
-                            Active
-                          </span>
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['12 months']?.total || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['12 months']?.used || 0).toFixed(2)}</strong></div>
+                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['12 months']?.available || 0).toFixed(2)}</strong></div>
+                          </div>
                         </td>
 
-                        {/* Action */}
+                        {/* Actions */}
                         <td style={{ textAlign: "center" }}>
-                          <button
-                            className="sa-action-btn"
-                            onClick={() => handleCardClick(manager)}
-                          >
-                            <Eye size={16} />
-                            View Report
-                          </button>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                            <button
+                              className="sa-action-btn"
+                              onClick={() => handleOpenAssignModal(manager)}
+                              style={{ padding: "6px 10px", fontSize: "12px" }}
+                            >
+                              Assign Acreages
+                            </button>
+                            <button
+                              className="sa-action-btn"
+                              onClick={() => handleCardClick(manager)}
+                              style={{ padding: "6px 10px", fontSize: "12px" }}
+                            >
+                              <Eye size={14} />
+                              View Report
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -395,6 +571,158 @@ export default function SuperAdminDashboard({
           )}
         </div>
       </div>
+
+      {/* Assign Acreage Modal */}
+      {assignModalOpen && selectedManager && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="modal" style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '500px',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <div className="modal-head" style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Assign Acreage</h3>
+              <button 
+                onClick={handleCloseAssignModal}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="modal-body" style={{ padding: '20px' }}>
+              {assignError && (
+                <div style={{
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  fontSize: '14px'
+                }}>
+                  {assignError}
+                </div>
+              )}
+
+              {/* Manager Info */}
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #86efac',
+                borderRadius: '6px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>
+                  Manager Details
+                </div>
+                <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #bbf7d0' }}>
+                      <td style={{ padding: '8px 0', color: '#374151', width: '40%', fontWeight: '500' }}>Manager Name</td>
+                      <td style={{ padding: '8px 0', fontWeight: '600', color: '#1f2937' }}>
+                        {selectedManager.full_name}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '8px 0', color: '#374151', fontWeight: '500' }}>Client ID</td>
+                      <td style={{ padding: '8px 0', fontWeight: '600', color: '#1f2937' }}>
+                        {selectedManager.sub_admin_id || selectedManager.client_id || 'N/A'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <form onSubmit={handleAssignSubmit}>
+                {/* Area Input */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                    Area to Add (acres) *
+                  </label>
+                  <input
+                    type="number"
+                    name="area"
+                    value={assignFormData.area}
+                    onChange={handleAssignInputChange}
+                    placeholder="Enter area in acres"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Plan Selection */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                    Plan *
+                  </label>
+                  <select
+                    name="plan"
+                    value={assignFormData.plan}
+                    onChange={handleAssignInputChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="1 month">1 Month</option>
+                    <option value="6 months">6 Months</option>
+                    <option value="12 months">12 Months</option>
+                  </select>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={assignLoading}
+                  className="btn btn-primary"
+                  style={{ width: '100%' }}
+                >
+                  {assignLoading ? 'Assigning...' : 'Submit'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

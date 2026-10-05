@@ -81,11 +81,22 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [usedAcreage, setUsedAcreage] = useState(0);
   const [acreageLoading, setAcreageLoading] = useState(false);
   
+  // State for plan-based acreages
+  const [planAcreages, setPlanAcreages] = useState({
+    '1 month': { total: 0, used: 0, available: 0 },
+    '6 months': { total: 0, used: 0, available: 0 },
+    '12 months': { total: 0, used: 0, available: 0 }
+  });
+  
   // State for plan selection modal
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedFarmId, setSelectedFarmId] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
+  
+  // State for plan purchase warning modal
+  const [showPlanPurchaseWarning, setShowPlanPurchaseWarning] = useState(false);
+  const [missingPlanName, setMissingPlanName] = useState('');
 
   // State for delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -761,6 +772,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           expiryTime: farm.expiry_time || farm.expiry || farm.expiry_date || 'N/A',
           status: farm.farm_status || 'N/A',
+          plan: farm.plan || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
           clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
         }));
@@ -828,6 +840,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           region: farm.state || farm.region || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : (farm.area ? `${farm.area} acre` : 'N/A'),
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
+          plan: farm.plan || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
         }));
         
@@ -841,6 +854,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           region: farm.state || farm.region || 'Unknown Region',
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
+          plan: farm.plan || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
         }));
         
@@ -943,6 +957,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           createdTime: farm.created_time || 'N/A',
           expiryTime: farm.date_of_expiry || 'N/A',
           status: farm.farm_status || 'N/A',
+          plan: farm.plan || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
           clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
         }));
@@ -1006,8 +1021,40 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Acreages API response:', data);
       
       if (data && data.status === "Success" && data.data) {
-        setAvailableAcreage(data.data.available_area || 0);
-        setUsedAcreage(data.data.used_area || 0);
+        // Handle new API response structure with plan-specific data
+        if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
+          setPlanAcreages({
+            '1 month': {
+              total: data.data['1_month']?.total_area || 0,
+              used: data.data['1_month']?.used_area || 0,
+              available: data.data['1_month']?.available_area || 0
+            },
+            '6 months': {
+              total: data.data['6_month']?.total_area || 0,
+              used: data.data['6_month']?.used_area || 0,
+              available: data.data['6_month']?.available_area || 0
+            },
+            '12 months': {
+              total: data.data['12_month']?.total_area || 0,
+              used: data.data['12_month']?.used_area || 0,
+              available: data.data['12_month']?.available_area || 0
+            }
+          });
+          
+          // Also set the overall acreages for backward compatibility
+          const totalAvailable = (data.data['1_month']?.available_area || 0) + 
+                                  (data.data['6_month']?.available_area || 0) + 
+                                  (data.data['12_month']?.available_area || 0);
+          const totalUsed = (data.data['1_month']?.used_area || 0) + 
+                           (data.data['6_month']?.used_area || 0) + 
+                           (data.data['12_month']?.used_area || 0);
+          setAvailableAcreage(totalAvailable);
+          setUsedAcreage(totalUsed);
+        } else {
+          // Handle old API response structure for backward compatibility
+          setAvailableAcreage(data.data.available_area || 0);
+          setUsedAcreage(data.data.used_area || 0);
+        }
       }
     } catch (error) {
       console.error('Error fetching acreages:', error);
@@ -1059,9 +1106,45 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Superadmin area API response:', data);
       
       if (data && data.data) {
-        setTotalAcreage(data.data.total_area || 0);
-        setAvailableAcreage(data.data.available_area || 0);
-        setUsedAcreage(data.data.used_area || 0);
+        // Handle new API response structure with plan-specific data
+        if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
+          setPlanAcreages({
+            '1 month': {
+              total: data.data['1_month']?.total_area || 0,
+              used: data.data['1_month']?.used_area || 0,
+              available: data.data['1_month']?.available_area || 0
+            },
+            '6 months': {
+              total: data.data['6_month']?.total_area || 0,
+              used: data.data['6_month']?.used_area || 0,
+              available: data.data['6_month']?.available_area || 0
+            },
+            '12 months': {
+              total: data.data['12_month']?.total_area || 0,
+              used: data.data['12_month']?.used_area || 0,
+              available: data.data['12_month']?.available_area || 0
+            }
+          });
+          
+          // Calculate overall totals
+          const totalArea = (data.data['1_month']?.total_area || 0) + 
+                           (data.data['6_month']?.total_area || 0) + 
+                           (data.data['12_month']?.total_area || 0);
+          const totalAvailable = (data.data['1_month']?.available_area || 0) + 
+                                  (data.data['6_month']?.available_area || 0) + 
+                                  (data.data['12_month']?.available_area || 0);
+          const totalUsed = (data.data['1_month']?.used_area || 0) + 
+                           (data.data['6_month']?.used_area || 0) + 
+                           (data.data['12_month']?.used_area || 0);
+          setTotalAcreage(totalArea);
+          setAvailableAcreage(totalAvailable);
+          setUsedAcreage(totalUsed);
+        } else {
+          // Handle old API response structure for backward compatibility
+          setTotalAcreage(data.data.total_area || 0);
+          setAvailableAcreage(data.data.available_area || 0);
+          setUsedAcreage(data.data.used_area || 0);
+        }
       }
     } catch (error) {
       console.error('Error fetching superadmin area:', error);
@@ -1087,30 +1170,28 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Locking farm:', apiUrl);
 
       const response = await fetch(apiUrl, {
-        method: 'POST'
+        method: 'GET'
       });
 
       const data = await response.json();
       console.log('Lock farm API response:', data);
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
-      if (data.success || data.status === 'success') {
-        toast.success(`Farm ID ${farmId} locked successfully!`);
-        setMessage(`Farm ID ${farmId} locked successfully!`);
-        setShowLockConfirmModal(false);
-        setFarmToLock(null);
+      // Check for multiple possible success response formats
+      const isSuccess = response.ok && (
+        data.success === true ||
+        data.status === 'success' ||
+        data.status === 'Success' ||
+        data.status?.toLowerCase() === 'success' ||
+        !data.error
+      );
 
-        // Refresh farm list based on role
-        if (currentRole === 'ops' || currentRole === 'sales') {
-          fetchOpsRecentFarms();
-        } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
-          if (selectedView === 'added') {
-            fetchRecentFarms();
-          } else {
-            fetchExpiringFarms();
-          }
-        }
+      if (isSuccess) {
+        toast.success('Farm successfully locked!');
+        setMessage('Farm successfully locked!');
       } else {
-        const errorMessage = data?.message || 'Failed to lock farm';
+        const errorMessage = data?.message || data?.error || 'Failed to lock farm';
         setFormError(errorMessage);
         toast.error(errorMessage);
       }
@@ -1121,6 +1202,20 @@ export default function UnlockFarm({ user, onPageChange }) {
       toast.error(errorMessage);
     } finally {
       setFormLoading(false);
+      // Always close the modal and reset farm to lock
+      setShowLockConfirmModal(false);
+      setFarmToLock(null);
+
+      // Always refresh farm list based on role (even if there was an error, to show updated state)
+      if (currentRole === 'ops' || currentRole === 'sales') {
+        fetchOpsRecentFarms();
+      } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+        if (selectedView === 'added') {
+          fetchRecentFarms();
+        } else {
+          fetchExpiringFarms();
+        }
+      }
     }
   };
 
@@ -1137,6 +1232,21 @@ export default function UnlockFarm({ user, onPageChange }) {
       return;
     }
 
+    // Check if the selected plan has acreages for partner and manager roles
+    if (currentRole === 'partner' || currentRole === 'manager') {
+      const planKey = selectedPlan === '1' ? '1 month' : selectedPlan === '6' ? '6 months' : '12 months';
+      const planData = planAcreages[planKey];
+      
+      // Check if acreages are null or zero for the selected plan
+      if (!planData || planData.total === null || planData.total === 0) {
+        // Show warning modal for missing plan purchase
+        const planName = selectedPlan === '1' ? '1 month' : selectedPlan === '6' ? '6 months' : '12 months';
+        setMissingPlanName(planName);
+        setShowPlanPurchaseWarning(true);
+        return;
+      }
+    }
+
     setPlanLoading(true);
     setFormError('');
     setMessage('');
@@ -1147,7 +1257,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Unlocking farm with plan:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method:'POST'
+        method: 'GET'
       });
       
       if (!response.ok) {
@@ -1161,8 +1271,8 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Unlock API response:', data);
       
       if (data && data.status !== 'Failure') {
-        toast.success(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
-        setMessage(`Farm ID ${selectedFarmId} has been unlocked successfully with ${selectedPlan} month plan!`);
+        toast.success(`Farm successfully unlocked with ${selectedPlan} month plan!`);
+        setMessage(`Farm successfully unlocked with ${selectedPlan} month plan!`);
         
         // Store unlock details
         try {
@@ -1224,8 +1334,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         const errorMessage = data?.message || 'Farm already unlocked';
         // Check if the farm is already unlocked - treat this as success since farm is in desired state
         if (errorMessage.toLowerCase().includes('already unlock') || errorMessage.toLowerCase().includes('already unlocked')) {
-          toast.success(`Farm ID ${selectedFarmId} is already unlocked!`);
-          setMessage(`Farm ID ${selectedFarmId} is already unlocked!`);
+          toast.success('Farm is already unlocked!');
+          setMessage('Farm is already unlocked!');
           
           // Store unlock details even for already unlocked farms
           try {
@@ -1305,6 +1415,12 @@ export default function UnlockFarm({ user, onPageChange }) {
     setFarmToDelete(null);
   };
 
+  // Function to close plan purchase warning modal
+  const closePlanPurchaseWarning = () => {
+    setShowPlanPurchaseWarning(false);
+    setMissingPlanName('');
+  };
+
   // Function to delete a farm
   const handleDeleteFarm = async () => {
     if (!farmToDelete) return;
@@ -1370,7 +1486,7 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       if (data && data.status !== 'Failure') {
         console.log('=== DELETE SUCCESSFUL ===');
-        toast.success(`Farm ID ${farmId} has been deleted successfully!`);
+        toast.success('Farm has been deleted successfully!');
 
         // Remove the deleted farm from the appropriate list based on current view
         if (selectedView === 'added') {
@@ -1568,7 +1684,8 @@ export default function UnlockFarm({ user, onPageChange }) {
             clientId: farmInfo.client_id || undefined,
             createdTime: farmInfo.created_time || 'N/A',
             state: farmInfo.state || 'N/A',
-            country: farmInfo.country || 'N/A'
+            country: farmInfo.country || 'N/A',
+            plan: farmInfo.plan || 'N/A'
           };
           setSearchResult(farmData);
           updateProgress(100);
@@ -1751,7 +1868,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           district: farmInfo.district || 'N/A',
           state: farmInfo.state || 'N/A',
           country: farmInfo.country || 'N/A',
-          timeOfRegistration: farmInfo.time || farmInfo.created_time || 'N/A'
+          timeOfRegistration: farmInfo.time || farmInfo.created_time || 'N/A',
+          plan: farmInfo.plan || 'N/A'
         };
         
         setFarmDetails(farmData);
@@ -1899,7 +2017,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('Calling API:', apiUrl);
       
       const response = await fetch(apiUrl, {
-        method: 'POST'
+        method: 'GET'
       });
       
       if (!response.ok) {
@@ -1935,20 +2053,29 @@ export default function UnlockFarm({ user, onPageChange }) {
       console.log('API Response:', data);
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
-      
-      const apiMessage = data?.message || `Farm ID ${farmId.trim()} has been ${status === 'lock' ? 'locked' : 'unlocked'} successfully!`;
-      const wasSuccessful = data?.status?.toLowerCase() === 'success';
-      
+
+      // Check for multiple possible success response formats
+      const wasSuccessful = response.ok && (
+        data?.status?.toLowerCase() === 'success' ||
+        data?.success === true ||
+        !data?.error
+      );
+
+      const apiMessage = data?.message || `Farm successfully ${status === 'lock' ? 'locked' : 'unlocked'}!`;
+
       if (wasSuccessful) {
         toast.success(apiMessage);
         setMessage(apiMessage);
-        
+
+        // Close the form modal
+        setShowFormModal(false);
+
         // Store unlock details
         try {
           const storedAuth = localStorage.getItem('sat2farm_auth');
           let userName = null;
           let userMobileNumber = null;
-          
+
           if (storedAuth) {
             try {
               const authData = JSON.parse(storedAuth);
@@ -1958,17 +2085,17 @@ export default function UnlockFarm({ user, onPageChange }) {
               console.error('Error parsing auth data:', e);
             }
           }
-          
+
           if (userMobileNumber && farmId.trim()) {
             const storeUnlockUrl = import.meta.env.VITE_STORE_UNLOCK_DETAILS_API_URL;
             console.log('Storing unlock details:', storeUnlockUrl);
-            
+
             const storePayload = {
               name: userName,
               mobile_no: userMobileNumber,
               farm_id: farmId.trim()
             };
-            
+
             const storeResponse = await fetch(storeUnlockUrl, {
               method: 'POST',
               headers: {
@@ -1976,14 +2103,14 @@ export default function UnlockFarm({ user, onPageChange }) {
               },
               body: JSON.stringify(storePayload)
             });
-            
+
             console.log('Store unlock details response:', await storeResponse.json());
           }
         } catch (storeErr) {
           console.error('Error storing unlock details:', storeErr);
           // Don't fail the main operation if storing details fails
         }
-        
+
         // Reset form only when the operation is truly completed or idempotent success
         setFarmId('');
         setStatus('unlock');
@@ -1994,9 +2121,8 @@ export default function UnlockFarm({ user, onPageChange }) {
         console.log('API indicates failure:', apiMessage);
         setFormError(apiMessage);
         toast.error(apiMessage);
-        return;
       }
-      
+
     } catch (err) {
       console.error('API Error:', err);
       const errorMessage = `Failed to update farm status: ${err.message}`;
@@ -2004,6 +2130,22 @@ export default function UnlockFarm({ user, onPageChange }) {
       toast.error(errorMessage);
     } finally {
       setFormLoading(false);
+
+      // Always refresh farm list and acreages automatically (even if there was an error)
+      if (currentRole === 'ops' || currentRole === 'sales') {
+        fetchOpsRecentFarms();
+      } else if (currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') {
+        if (selectedView === 'added') {
+          fetchRecentFarms();
+        } else {
+          fetchExpiringFarms();
+        }
+      }
+      if (currentRole === 'partner') {
+        fetchSuperadminArea();
+      } else {
+        fetchAcreages();
+      }
     }
   };
 
@@ -2062,85 +2204,149 @@ export default function UnlockFarm({ user, onPageChange }) {
         )}
       </div>
 
-      {/* Acreages Cards - Only for Manager */}
+      {/* Plan Acreages Cards - Only for Manager */}
       {currentRole === 'manager' && (
         <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
-          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{padding: '16px'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Acreages</div>
-                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : (
-                    <>
-                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
-                    </>
-                  )}
+          {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>1 Month Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['1 month'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['1 month'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['1 month'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{padding: '16px'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Acreages</div>
-                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : (
-                    <>
-                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
-                    </>
-                  )}
+          )}
+          {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>6 Months Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['6 months'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['6 months'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['6 months'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+          {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>12 Months Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['12 months'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['12 months'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['12 months'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {(planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
+           (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
+           (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
+            <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
+              <div style={{fontSize: '14px', color: '#6b7280'}}>No acreage plans available</div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Acreages Cards - Only for Partner */}
+      {/* Plan Acreages Cards - Only for Partner */}
       {currentRole === 'partner' && (
         <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
-          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{padding: '16px'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Total Area</div>
-                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : (
-                    <>
-                      {Number(totalAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
-                    </>
-                  )}
+          {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>1 Month Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['1 month'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['1 month'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['1 month'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{padding: '16px'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Available Area</div>
-                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : (
-                    <>
-                      {Number(availableAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
-                    </>
-                  )}
+          )}
+          {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>6 Months Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['6 months'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['6 months'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['6 months'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="card" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div className="card-body" style={{padding: '16px'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>Used Area</div>
-                <div style={{fontSize: '28px', color: 'var(--text-1)', fontWeight: '600'}}>
-                  {acreageLoading ? '...' : (
-                    <>
-                      {Number(usedAcreage).toFixed(2)} <span style={{fontSize: '14px', marginLeft: '4px'}}>acres</span>
-                    </>
-                  )}
+          )}
+          {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
+            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
+                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>12 Months Plan</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['12 months'].total.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['12 months'].used.toFixed(2)} ac</strong>
+                    </div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['12 months'].available.toFixed(2)} ac</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+          {(planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
+           (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
+           (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
+            <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
+              <div style={{fontSize: '14px', color: '#6b7280'}}>No acreage plans available</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2212,7 +2418,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                     <button 
                       className={`btn ${selectedPlan === '1' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px', position: 'relative'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('1'); }}
                     >
                       <div>
@@ -2221,11 +2427,15 @@ export default function UnlockFarm({ user, onPageChange }) {
                           Short term access
                         </div>
                       </div>
+                      {(currentRole === 'partner' || currentRole === 'manager') && 
+                       (planAcreages['1 month'].total === null || planAcreages['1 month'].total === 0) && (
+                        <div style={{position: 'absolute', top: '8px', right: '8px', fontSize: '16px'}}>⚠️</div>
+                      )}
                     </button>
                     
                     <button 
                       className={`btn ${selectedPlan === '6' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px', position: 'relative'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('6'); }}
                     >
                       <div>
@@ -2234,11 +2444,15 @@ export default function UnlockFarm({ user, onPageChange }) {
                           Standard plan
                         </div>
                       </div>
+                      {(currentRole === 'partner' || currentRole === 'manager') && 
+                       (planAcreages['6 months'].total === null || planAcreages['6 months'].total === 0) && (
+                        <div style={{position: 'absolute', top: '8px', right: '8px', fontSize: '16px'}}>⚠️</div>
+                      )}
                     </button>
                     
                     <button 
                       className={`btn ${selectedPlan === '12' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px'}}
+                      style={{justifyContent: 'flex-start', textAlign: 'left', padding: '12px 16px', minHeight: '60px', position: 'relative'}}
                       onClick={(e) => { e.stopPropagation(); setSelectedPlan('12'); }}
                     >
                       <div>
@@ -2247,8 +2461,20 @@ export default function UnlockFarm({ user, onPageChange }) {
                           Best value
                         </div>
                       </div>
+                      {(currentRole === 'partner' || currentRole === 'manager') && 
+                       (planAcreages['12 months'].total === null || planAcreages['12 months'].total === 0) && (
+                        <div style={{position: 'absolute', top: '8px', right: '8px', fontSize: '16px'}}>⚠️</div>
+                      )}
                     </button>
                   </div>
+                  {(currentRole === 'partner' || currentRole === 'manager') && 
+                   ((planAcreages['1 month'].total === null || planAcreages['1 month'].total === 0) ||
+                    (planAcreages['6 months'].total === null || planAcreages['6 months'].total === 0) ||
+                    (planAcreages['12 months'].total === null || planAcreages['12 months'].total === 0)) && (
+                    <div style={{fontSize: '12px', color: '#f59e0b', marginTop: '8px'}}>
+                      ⚠️ Plans with warning icon are not purchased. Contact support to purchase.
+                    </div>
+                  )}
                 </div>
                 
                 <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
@@ -2265,6 +2491,49 @@ export default function UnlockFarm({ user, onPageChange }) {
                     disabled={planLoading || !selectedPlan}
                   >
                     {planLoading ? 'Processing...' : 'Unlock Farm'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Purchase Warning Modal */}
+      {showPlanPurchaseWarning && (
+        <div className="modal-overlay">
+          <div className="modal" style={{width: '400px', maxWidth: '90vw'}}>
+            <div className="modal-head">
+              <h3>Plan Not Purchased</h3>
+              <button className="btn btn-ghost btn-sm" onClick={closePlanPurchaseWarning}>
+                <X className="ic-xs" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{padding: '16px 0', textAlign: 'center'}}>
+                <div style={{fontSize: '48px', marginBottom: '16px'}}>⚠️</div>
+                <p style={{fontSize: '16px', color: 'var(--text-1)', marginBottom: '8px', fontWeight: '500'}}>
+                  You have not purchased the {missingPlanName} plan
+                </p>
+                <p style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '24px'}}>
+                  To unlock farms with this plan, please contact the support team to purchase the {missingPlanName} plan.
+                </p>
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={closePlanPurchaseWarning}
+                  >
+                    Close
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => {
+                      // Open support contact (you can customize this based on your support system)
+                      window.open('mailto:support@sat2farm.com?subject=Plan Purchase Inquiry - ' + missingPlanName + ' Plan', '_blank');
+                      closePlanPurchaseWarning();
+                    }}
+                  >
+                    Contact Support
                   </button>
                 </div>
               </div>
@@ -3105,6 +3374,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm Name</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Region</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Plan</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Added Time</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Client ID</th>
                             </tr>
@@ -3116,6 +3386,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmName}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.region}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.area}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.plan || 'N/A'}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.createdTime}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
                               </tr>
@@ -3235,6 +3506,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Plan</th>
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Crop Type</th>
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
                       <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
@@ -3246,6 +3518,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                       <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.farmName || searchResult.farm_name || 'N/A'}</td>
                       <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.region || searchResult.district || 'N/A'}</td>
                       <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.area || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.plan || 'N/A'}</td>
                       <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.cropType || searchResult.croptype || 'N/A'}</td>
                       <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.status || 'N/A'}</td>
                       <td style={{padding: '10px 16px'}}>
@@ -3430,6 +3703,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Client ID</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
+                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Plan</th>
                             <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
                             {selectedView === 'added' && (
                               <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
@@ -3450,6 +3724,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.clientId || farm.client_id || 'N/A'}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.region}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.area}</td>
+                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.plan || 'N/A'}</td>
                               <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
                               {selectedView === 'added' && (
                                 <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.status}</td>
