@@ -8624,15 +8624,7 @@ export default function Opportunities({ onPageChange }) {
                         <input type="text" value={dealAmount} onChange={(e) => setDealAmount(e.target.value)} placeholder="0.00" style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
                       </div>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>
-                        Probability<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <input type="number" value={dealProbability} onChange={(e) => setDealProbability(e.target.value)} placeholder="0" min="0" max="100" style={{ width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)' }} />
-                        <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', fontSize: '13px', fontWeight: '500' }}>%</span>
-                      </div>
-                    </div>
+
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Description</label>
                       <textarea value={dealDescription} onChange={(e) => setDealDescription(e.target.value)} placeholder="A few words about this deal" rows={4}
@@ -8671,11 +8663,11 @@ export default function Opportunities({ onPageChange }) {
                   <button
                     onClick={async () => {
                       if (isCreatingDeal) return;
-                      if (!dealName || !dealClosingDate || !dealStage || !dealType || dealProbability === '' || dealProbability === null || dealProbability === undefined) {
+                      if (!dealName || !dealClosingDate || !dealStage || !dealType) {
                         toast.error('Please fill in all mandatory fields');
                         return;
                       }
-                      if (dealName && dealClosingDate && dealStage && dealType && dealProbability !== '' && dealProbability !== null && dealProbability !== undefined) {
+                      if (dealName && dealClosingDate && dealStage && dealType) {
                         setIsCreatingDeal(true);
                         try {
                           toast.loading('Creating deal...');
@@ -8995,23 +8987,7 @@ export default function Opportunities({ onPageChange }) {
                             }}>{selectedDeal.contact_owner || '-'}</div>
                           </div>
                         )}
-                        {user?.role?.toLowerCase().trim() === 'sales' ? (
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>
-                              Probability<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
-                            </label>
-                            <div style={{
-                              padding: '8px 12px',
-                              background: 'var(--gray-100)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--r)',
-                              fontSize: '12px',
-                              color: 'var(--text)'
-                            }}>{selectedDeal.probability ? selectedDeal.probability : '-'}</div>
-                          </div>
-                        ) : (
-                          <EditableDealField label="Probability" required={true} value={selectedDeal.probability?.replace('%', '') || ''} fieldName="deal_probability" type="number" />
-                        )}
+
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
                           <div style={{
