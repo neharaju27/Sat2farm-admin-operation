@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle, Download } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 
@@ -1473,6 +1473,21 @@ export default function Opportunities({ onPageChange }) {
   // â”€â”€ Sales Pipeline List View Pagination State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [salesPipelineItemsPerPage, setSalesPipelineItemsPerPage] = useState(100);
   const [salesPipelineCurrentPage, setSalesPipelineCurrentPage] = useState(1);
+  const [dealSortConfig, setDealSortConfig] = useState({ key: null, direction: null }); // { key: 'deal_close_date' | 'created_time' | 'modified_time', direction: 'asc' | 'desc' }
+
+  const handleDealSort = (columnKey) => {
+    setDealSortConfig(prev => {
+      if (prev.key === columnKey) {
+        if (prev.direction === 'asc') {
+          return { key: columnKey, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { key: null, direction: null };
+        }
+      }
+      return { key: columnKey, direction: 'asc' };
+    });
+    setSalesPipelineCurrentPage(1);
+  };
 
   const isSearching = Boolean(searchTerm && searchTerm.trim() !== '');
 
@@ -2028,6 +2043,35 @@ export default function Opportunities({ onPageChange }) {
 
     return filteredByStage;
   }, [kanbanDeals, selectedSalesProperties, salesFiltersApplied, isSearching, searchTerm, kanbanUpdateTimestamp]);
+
+  // Compute sorted list of deals for List View
+  const sortedKanbanDealsList = useMemo(() => {
+    const list = Object.values(filteredKanbanDeals).flat();
+    if (!dealSortConfig.key || !dealSortConfig.direction) {
+      return list;
+    }
+
+    const getTimeValue = (val) => {
+      if (!val || val === '-') return 0;
+      const parsed = new Date(val).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    return [...list].sort((a, b) => {
+      const aTime = getTimeValue(a[dealSortConfig.key]);
+      const bTime = getTimeValue(b[dealSortConfig.key]);
+
+      if (dealSortConfig.direction === 'asc') {
+        if (aTime === 0 && bTime !== 0) return 1;
+        if (bTime === 0 && aTime !== 0) return -1;
+        return aTime - bTime;
+      } else {
+        if (aTime === 0 && bTime !== 0) return 1;
+        if (bTime === 0 && aTime !== 0) return -1;
+        return bTime - aTime;
+      }
+    });
+  }, [filteredKanbanDeals, dealSortConfig]);
 
   // Dynamic summary metrics fetched directly from backend APIs:
   // - Open, Won, Closed (Lost) fetched from VITE_DEALS_SUMMARY_API_URL (deals/summary)
@@ -7391,7 +7435,7 @@ export default function Opportunities({ onPageChange }) {
                               if (val === 'last50') {
                                 setIsLast50Mode(true);
                                 setSalesPipelineItemsPerPage(50);
-                                const total = (filteredKanbanDeals && Object.values(filteredKanbanDeals).flat().length) || (dealMetrics && dealMetrics.total) || 50;
+                                const total = (sortedKanbanDealsList && sortedKanbanDealsList.length) || (dealMetrics && dealMetrics.total) || 50;
                                 const lastPage = Math.max(Math.ceil(total / 50), 1);
                                 setSalesPipelineCurrentPage(lastPage);
                               } else {
@@ -7436,14 +7480,115 @@ export default function Opportunities({ onPageChange }) {
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Amount</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Stage</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '110px', borderRight: '1px solid #eaeaea' }}>Probability</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Closing Date</th>
+                            <th
+                              onClick={() => handleDealSort('deal_close_date')}
+                              style={{
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: dealSortConfig.key === 'deal_close_date' ? '#1d4ed8' : '#333',
+                                whiteSpace: 'nowrap',
+                                minWidth: '150px',
+                                borderRight: '1px solid #eaeaea',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                background: dealSortConfig.key === 'deal_close_date' ? '#eff6ff' : 'transparent',
+                                transition: 'background-color 0.15s ease'
+                              }}
+                              title={
+                                dealSortConfig.key === 'deal_close_date'
+                                  ? dealSortConfig.direction === 'asc'
+                                    ? 'Currently: Ascending (Oldest First) • Click for Descending (Newest First)'
+                                    : 'Currently: Descending (Newest First) • Click to Reset'
+                                  : 'Click to sort by Closing Date (Oldest to Newest)'
+                              }
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span>Closing Date</span>
+                                {dealSortConfig.key === 'deal_close_date' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                    {dealSortConfig.direction === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+                                  </span>
+                                ) : (
+                                  <ArrowUpDown size={14} style={{ color: '#9ca3af', opacity: 0.6, flexShrink: 0 }} />
+                                )}
+                              </div>
+                            </th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Deal Owner</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Deal Type</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '220px', borderRight: '1px solid #eaeaea' }}>Description</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Created By</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Created Time</th>
+                            <th
+                              onClick={() => handleDealSort('created_time')}
+                              style={{
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: dealSortConfig.key === 'created_time' ? '#1d4ed8' : '#333',
+                                whiteSpace: 'nowrap',
+                                minWidth: '150px',
+                                borderRight: '1px solid #eaeaea',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                background: dealSortConfig.key === 'created_time' ? '#eff6ff' : 'transparent',
+                                transition: 'background-color 0.15s ease'
+                              }}
+                              title={
+                                dealSortConfig.key === 'created_time'
+                                  ? dealSortConfig.direction === 'asc'
+                                    ? 'Currently: Ascending (Oldest First) • Click for Descending (Newest First)'
+                                    : 'Currently: Descending (Newest First) • Click to Reset'
+                                  : 'Click to sort by Created Time (Oldest to Newest)'
+                              }
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span>Created Time</span>
+                                {dealSortConfig.key === 'created_time' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                    {dealSortConfig.direction === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+                                  </span>
+                                ) : (
+                                  <ArrowUpDown size={14} style={{ color: '#9ca3af', opacity: 0.6, flexShrink: 0 }} />
+                                )}
+                              </div>
+                            </th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Modified By</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px' }}>Modified Time</th>
+                            <th
+                              onClick={() => handleDealSort('modified_time')}
+                              style={{
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: dealSortConfig.key === 'modified_time' ? '#1d4ed8' : '#333',
+                                whiteSpace: 'nowrap',
+                                minWidth: '150px',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                background: dealSortConfig.key === 'modified_time' ? '#eff6ff' : 'transparent',
+                                transition: 'background-color 0.15s ease'
+                              }}
+                              title={
+                                dealSortConfig.key === 'modified_time'
+                                  ? dealSortConfig.direction === 'asc'
+                                    ? 'Currently: Ascending (Oldest First) • Click for Descending (Newest First)'
+                                    : 'Currently: Descending (Newest First) • Click to Reset'
+                                  : 'Click to sort by Modified Time (Oldest to Newest)'
+                              }
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span>Modified Time</span>
+                                {dealSortConfig.key === 'modified_time' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                    {dealSortConfig.direction === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+                                  </span>
+                                ) : (
+                                  <ArrowUpDown size={14} style={{ color: '#9ca3af', opacity: 0.6, flexShrink: 0 }} />
+                                )}
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -7456,7 +7601,7 @@ export default function Opportunities({ onPageChange }) {
                               </tr>
                             ))
                           ) : (
-                            Object.values(filteredKanbanDeals).flat()
+                            sortedKanbanDealsList
                               .slice((salesPipelineCurrentPage - 1) * salesPipelineItemsPerPage, salesPipelineCurrentPage * salesPipelineItemsPerPage)
                               .map((deal, idx) => (
                                 <tr key={deal.deal_id || deal.id || idx} style={{ borderBottom: '1px solid #e0e0e0' }}>
