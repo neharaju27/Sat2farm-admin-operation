@@ -915,7 +915,7 @@ export default function TaskCalendar() {
             {/* Day Headers */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               background: palette.canvas,
               borderBottom: `1px solid ${palette.border}`,
               position: 'sticky',
@@ -928,7 +928,10 @@ export default function TaskCalendar() {
                   textAlign: 'center', 
                   fontSize: '12px', 
                   fontWeight: '600',
-                  color: palette.ink
+                  color: palette.ink,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}>
                   {day}
                 </div>
@@ -938,7 +941,7 @@ export default function TaskCalendar() {
             {/* Calendar Days */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               minHeight: '100%'
             }}>
               {days.map((date, index) => {
@@ -951,6 +954,9 @@ export default function TaskCalendar() {
                     style={{
                       minHeight: '80px',
                       padding: '6px',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
                       borderRight: `1px solid ${palette.border}`,
                       borderBottom: `1px solid ${palette.border}`,
                       borderLeft: index % 7 === 0 ? `1px solid ${palette.border}` : 'none',
@@ -993,14 +999,16 @@ export default function TaskCalendar() {
                                 fontSize: '10px',
                                 marginBottom: '3px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                minWidth: 0,
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.02)';
                                 e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)';
                                 e.currentTarget.style.boxShadow = 'none';
                               }}
                               title={`${task.task_name}${displayName ? ` - ${displayName}` : ''}${task.message ? `: ${task.message}` : ''}${isTaskOverdue(task) ? ' (Overdue)' : ''}`}
@@ -1009,7 +1017,10 @@ export default function TaskCalendar() {
                                 fontWeight: '500',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                minWidth: 0,
+                                maxWidth: '100%',
+                                display: 'block'
                               }}>
                                 {task.task_name}
                               </div>
@@ -1020,7 +1031,10 @@ export default function TaskCalendar() {
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  marginTop: '1px'
+                                  marginTop: '1px',
+                                  minWidth: 0,
+                                  maxWidth: '100%',
+                                  display: 'block'
                                 }}>
                                   {displayName}
                                 </div>
@@ -1032,7 +1046,10 @@ export default function TaskCalendar() {
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  marginTop: '1px'
+                                  marginTop: '1px',
+                                  minWidth: 0,
+                                  maxWidth: '100%',
+                                  display: 'block'
                                 }}>
                                   {task.message}
                                 </div>
