@@ -884,6 +884,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          status: farm.farm_status || farm.status || farm.lockstatus || 'N/A',
           farmerDetails: extractFarmerDetails(farm)
         }));
         
@@ -899,6 +900,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
           clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          status: farm.farm_status || farm.status || farm.lockstatus || 'N/A',
           farmerDetails: extractFarmerDetails(farm)
         }));
         
@@ -1205,8 +1207,12 @@ export default function UnlockFarm({ user, onPageChange }) {
     setShowPlanModal(true);
   };
 
-  // Function to lock farm
+  // Function to lock farm directly
   const lockRecentFarm = async (farmId) => {
+    if (!confirm('Are you sure you want to lock this farm?')) {
+      return;
+    }
+
     setFormLoading(true);
     setFormError('');
 
@@ -3415,7 +3421,7 @@ export default function UnlockFarm({ user, onPageChange }) {
                         </span>
                       </div>
                       <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%'}}>
-                        <table style={{width: '100%', minWidth: '1000px', borderCollapse: 'collapse', fontSize: '14px'}}>
+                        <table style={{width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '14px'}}>
                           <thead>
                             <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farm ID</th>
@@ -3426,15 +3432,17 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Area</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Plan</th>
                               <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Added Time</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Status</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             {groupFarms.map((farm, index) => (
                               <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmId}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmName}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.farmId}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.farmName}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', minWidth: '150px'}}>
                                   {farm.farmerDetails && typeof farm.farmerDetails === 'object' ? (
                                     <div>
                                       <div style={{fontWeight: '500'}}>{farm.farmerDetails.farmer_name || farm.farmerDetails.name || 'N/A'}</div>
@@ -3448,10 +3456,32 @@ export default function UnlockFarm({ user, onPageChange }) {
                                     farm.farmerDetails || 'N/A'
                                   )}
                                 </td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.region}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.area}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.plan || 'N/A'}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.createdTime}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.region}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.area}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.plan || 'N/A'}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.createdTime}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{farm.status || 'N/A'}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>
+                                  {String(farm.status).toLowerCase() === 'locked' ? (
+                                    <button
+                                      onClick={() => unlockRecentFarm(farm.farmId)}
+                                      disabled={formLoading}
+                                      className="btn btn-primary btn-sm"
+                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', cursor: formLoading ? 'not-allowed' : 'pointer'}}
+                                    >
+                                      Unlock
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => lockRecentFarm(farm.farmId)}
+                                      disabled={formLoading}
+                                      className="btn btn-danger btn-sm"
+                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', cursor: formLoading ? 'not-allowed' : 'pointer'}}
+                                    >
+                                      Lock
+                                    </button>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
