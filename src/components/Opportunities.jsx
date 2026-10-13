@@ -461,6 +461,8 @@ const getApiUserName = (u) => {
 
 export default function Opportunities({ onPageChange }) {
   const { user } = useAuth();
+  const userRole = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
+  const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -3339,7 +3341,8 @@ export default function Opportunities({ onPageChange }) {
       deal_type: deal.deal_type || '',
       deal_stage: deal.deal_stage || '',
       contact_owner: deal.deal_owner || '',
-      probability: `${deal.deal_probability}%`,
+      probability: deal.deal_probability !== undefined && deal.deal_probability !== null && deal.deal_probability !== '' ? `${deal.deal_probability}%` : '-',
+      expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-',
       account_name: deal.account_name || '',
       account_number: deal.account_number || '',
       created_time: deal.created_time || '',
@@ -7479,7 +7482,12 @@ export default function Opportunities({ onPageChange }) {
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '160px', borderRight: '1px solid #eaeaea' }}>Contact Name</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Amount</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '140px', borderRight: '1px solid #eaeaea' }}>Stage</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '110px', borderRight: '1px solid #eaeaea' }}>Probability</th>
+                            {isOperationRole && (
+                              <>
+                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Deal Probability</th>
+                                <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '150px', borderRight: '1px solid #eaeaea' }}>Expected Revenue</th>
+                              </>
+                            )}
                             <th
                               onClick={() => handleDealSort('deal_close_date')}
                               style={{
@@ -7595,8 +7603,8 @@ export default function Opportunities({ onPageChange }) {
                           {isDealsLoading ? (
                             Array.from({ length: 6 }).map((_, idx) => (
                               <tr key={`deal-skeleton-${idx}`} style={{ borderBottom: '1px solid #e0e0e0' }}>
-                                {Array.from({ length: 15 }).map((_, cIdx) => (
-                                  <td key={`col-skel-${cIdx}`} style={{ padding: '10px 14px', borderRight: cIdx < 14 ? '1px solid #f0f0f0' : 'none' }}><div className="skeleton-shimmer" style={{ width: '70%', height: '16px' }} /></td>
+                                {Array.from({ length: isOperationRole ? 16 : 14 }).map((_, cIdx) => (
+                                  <td key={`col-skel-${cIdx}`} style={{ padding: '10px 14px', borderRight: cIdx < (isOperationRole ? 15 : 13) ? '1px solid #f0f0f0' : 'none' }}><div className="skeleton-shimmer" style={{ width: '70%', height: '16px' }} /></td>
                                 ))}
                               </tr>
                             ))
@@ -7622,6 +7630,7 @@ export default function Opportunities({ onPageChange }) {
                                         deal_stage: deal.deal_stage || '',
                                         contact_owner: deal.deal_owner || '',
                                         probability: deal.deal_probability !== undefined && deal.deal_probability !== null ? `${deal.deal_probability}%` : '-',
+                                        expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-',
                                         account_name: deal.account_name || '',
                                         account_number: deal.account_number || '',
                                         created_time: deal.created_time || '',
@@ -7638,9 +7647,16 @@ export default function Opportunities({ onPageChange }) {
                                     {deal.deal_amount ? `₹${deal.deal_amount}` : '-'}
                                   </td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.deal_stage || '-'}</td>
-                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
-                                    {deal.deal_probability !== undefined && deal.deal_probability !== null ? `${deal.deal_probability}%` : '-'}
-                                  </td>
+                                  {isOperationRole && (
+                                    <>
+                                      <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                        {deal.deal_probability !== undefined && deal.deal_probability !== null && deal.deal_probability !== '' ? `${deal.deal_probability}%` : '-'}
+                                      </td>
+                                      <td style={{ padding: '10px 14px', fontSize: '13px', color: '#2563eb', fontWeight: '600', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                        {deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-'}
+                                      </td>
+                                    </>
+                                  )}
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
                                     {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                                   </td>
@@ -8684,7 +8700,8 @@ export default function Opportunities({ onPageChange }) {
                                               deal_type: deal.deal_type || '',
                                               deal_stage: deal.deal_stage || '',
                                               contact_owner: deal.deal_owner || '',
-                                              probability: `${deal.deal_probability}%`,
+                                              probability: deal.deal_probability !== undefined && deal.deal_probability !== null && deal.deal_probability !== '' ? `${deal.deal_probability}%` : '-',
+                                              expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-',
                                               account_name: deal.account_name || '',
                                               account_number: deal.account_number || '',
                                               created_time: deal.created_time || '',
@@ -9131,6 +9148,33 @@ export default function Opportunities({ onPageChange }) {
                               color: 'var(--text)'
                             }}>{selectedDeal.contact_owner || '-'}</div>
                           </div>
+                        )}
+
+                        {isOperationRole && (
+                          <>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Probability</label>
+                              <div style={{
+                                padding: '8px 12px',
+                                background: 'var(--gray-100)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '12px',
+                                color: 'var(--text)'
+                              }}>{selectedDeal.probability ? selectedDeal.probability : '-'}</div>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Expected Revenue</label>
+                              <div style={{
+                                padding: '8px 12px',
+                                background: 'var(--gray-100)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--r)',
+                                fontSize: '12px',
+                                color: 'var(--text)'
+                              }}>{selectedDeal.expected_revenue ? selectedDeal.expected_revenue : '-'}</div>
+                            </div>
+                          </>
                         )}
 
                         <div>

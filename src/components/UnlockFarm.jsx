@@ -681,6 +681,45 @@ export default function UnlockFarm({ user, onPageChange }) {
     reader.readAsText(file);
   };
 
+  // Helper to extract farmer details (handles root farmer_name and nested farmer_details object)
+  const extractFarmerDetails = (farm) => {
+    if (!farm) return undefined;
+
+    let detailsObj = farm.farmer_details;
+    if (typeof detailsObj === 'string' && detailsObj.trim().startsWith('{')) {
+      try {
+        detailsObj = JSON.parse(detailsObj);
+      } catch (e) {
+        // Keep as string if parsing fails
+      }
+    }
+
+    const name = (typeof farm.farmer_name === 'string' && farm.farmer_name.trim()) 
+      || (typeof farm.farmerName === 'string' && farm.farmerName.trim()) 
+      || (typeof farm.farmer === 'string' && farm.farmer.trim())
+      || (typeof detailsObj === 'object' && typeof detailsObj?.farmer_name === 'string' && detailsObj.farmer_name.trim())
+      || (typeof detailsObj === 'object' && typeof detailsObj?.farmerName === 'string' && detailsObj.farmerName.trim())
+      || (typeof detailsObj === 'object' && typeof detailsObj?.name === 'string' && detailsObj.name.trim())
+      || (typeof detailsObj === 'object' && typeof detailsObj?.farmer === 'string' && detailsObj.farmer.trim())
+      || '';
+
+    const phone = (typeof detailsObj === 'object' && (detailsObj?.phone_number || detailsObj?.phoneNumber || detailsObj?.mobile || detailsObj?.mobile_no || detailsObj?.phone))
+      || farm.phone_number
+      || farm.phoneNumber
+      || farm.mobile_no
+      || farm.mobile
+      || '';
+
+    if (name || phone) {
+      return {
+        farmer_name: name,
+        phone_number: String(phone || '').trim()
+      };
+    }
+
+    return typeof farm.farmer_details === 'string' ? farm.farmer_details : undefined;
+  };
+
   // Function to fetch top 50 recently added farms
   const fetchRecentFarms = async () => {
     // Fetch for client, manager, ops, sales, and partner roles
@@ -758,7 +797,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       
       // Handle different response structures
       let farmsArray = null;
-      if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
+      if (data && (data.status === "Success" || data.status?.toLowerCase() === "success" || data.data) && Array.isArray(data.data)) {
         farmsArray = data.data;
       } else if (Array.isArray(data)) {
         farmsArray = data;
@@ -776,7 +815,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           status: farm.farm_status || 'N/A',
           plan: farm.plan || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
-          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
+          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined),
+          farmerDetails: extractFarmerDetails(farm)
         }));
         
         setRecentFarms(formattedFarms);
@@ -843,12 +883,13 @@ export default function UnlockFarm({ user, onPageChange }) {
           area: farm.area ? `${farm.area} acre` : (farm.area ? `${farm.area} acre` : 'N/A'),
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          farmerDetails: extractFarmerDetails(farm)
         }));
         
         setOpsRecentFarms(formattedFarms);
         console.log(`Successfully loaded ${formattedFarms.length} ops farms`);
-      } else if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
+      } else if (data && (data.status === "Success" || data.status?.toLowerCase() === "success" || data.data) && Array.isArray(data.data)) {
         // Handle if API returns data in {status: "Success", data: [...]} format
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || farm.farmId || `FARM${String(index + 1).padStart(5, '0')}`,
@@ -857,7 +898,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           area: farm.area ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined
+          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          farmerDetails: extractFarmerDetails(farm)
         }));
         
         setOpsRecentFarms(formattedFarms);
@@ -949,7 +991,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       const data = await response.json();
       console.log('Expiring farms API response:', data);
       
-      if (data && data.status === "Success" && data.data && Array.isArray(data.data)) {
+      if (data && (data.status === "Success" || data.status?.toLowerCase() === "success" || data.data) && Array.isArray(data.data)) {
         // Format the API response data to match the expected structure
         const formattedFarms = data.data.map((farm, index) => ({
           farmId: farm.farm_id || `FARM${String(index + 1).padStart(5, '0')}`,
@@ -961,7 +1003,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           status: farm.farm_status || 'N/A',
           plan: farm.plan || 'N/A',
           adminName: isPartner ? (farm.admin_name || farm.adminName || farm.adminname || 'N/A') : undefined,
-          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined)
+          clientId: isPartner ? (farm.farmer_client_id || farm.client_id || farm.clientId || undefined) : (farm.client_id || farm.clientId || undefined),
+          farmerDetails: extractFarmerDetails(farm)
         }));
         
         setExpiringFarms(formattedFarms);
@@ -1662,7 +1705,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          cache: 'no-cache'
         });
         
         if (!response.ok) {
@@ -1679,6 +1723,7 @@ export default function UnlockFarm({ user, onPageChange }) {
           const farmData = {
             farmId: farmInfo.farm_id || farmIdValue,
             farmName: farmInfo.farm_name || 'N/A',
+            farmerDetails: extractFarmerDetails(farmInfo),
             area: farmInfo.area ? `${farmInfo.area} acre` : 'N/A',
             region: farmInfo.district || 'N/A',
             cropType: farmInfo.croptype || 'N/A',
@@ -1871,7 +1916,8 @@ export default function UnlockFarm({ user, onPageChange }) {
           state: farmInfo.state || 'N/A',
           country: farmInfo.country || 'N/A',
           timeOfRegistration: farmInfo.time || farmInfo.created_time || 'N/A',
-          plan: farmInfo.plan || 'N/A'
+          plan: farmInfo.plan || 'N/A',
+          farmerDetails: extractFarmerDetails(farmInfo)
         };
         
         setFarmDetails(farmData);
@@ -3368,17 +3414,18 @@ export default function UnlockFarm({ user, onPageChange }) {
                           {startIdx + 1} to {endIdx} farm ids in {groupNumber}
                         </span>
                       </div>
-                      <div style={{overflowX: 'auto'}}>
-                        <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+                      <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%'}}>
+                        <table style={{width: '100%', minWidth: '1000px', borderCollapse: 'collapse', fontSize: '14px'}}>
                           <thead>
                             <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm Name</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Region</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Plan</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Added Time</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Client ID</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farm ID</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farm Name</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Client ID</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farmer Details</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Region</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Area</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Plan</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Added Time</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3386,11 +3433,25 @@ export default function UnlockFarm({ user, onPageChange }) {
                               <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmId}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.farmName}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
+                                <td style={{padding: '12px', color: 'var(--text-1)'}}>
+                                  {farm.farmerDetails && typeof farm.farmerDetails === 'object' ? (
+                                    <div>
+                                      <div style={{fontWeight: '500'}}>{farm.farmerDetails.farmer_name || farm.farmerDetails.name || 'N/A'}</div>
+                                      {farm.farmerDetails.phone_number && (
+                                        <div style={{fontSize: '12px', color: 'var(--text-2, #6b7280)', marginTop: '2px'}}>
+                                          {farm.farmerDetails.phone_number}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    farm.farmerDetails || 'N/A'
+                                  )}
+                                </td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.region}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.area}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.plan || 'N/A'}</td>
                                 <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.createdTime}</td>
-                                <td style={{padding: '12px', color: 'var(--text-1)'}}>{farm.clientId || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -3500,29 +3561,51 @@ export default function UnlockFarm({ user, onPageChange }) {
             
             {/* Search Result */}
             {searchResult && (
-              <div style={{marginTop: '16px'}}>
-                <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '16px'}}>
+              <div style={{marginTop: '16px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%'}}>
+                <table style={{width: '100%', minWidth: '950px', borderCollapse: 'collapse', fontSize: '16px'}}>
                   <thead>
                     <tr style={{borderBottom: '1px solid var(--border)'}}>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Plan</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Crop Type</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm ID</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm Name</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farmer Details</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Region</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Area</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Plan</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Crop Type</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Status</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px', whiteSpace: 'nowrap'}}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr style={{borderBottom: '1px solid var(--border)'}}>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.farmId || searchResult.farm_id || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.farmName || searchResult.farm_name || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.region || searchResult.district || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.area || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.plan || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.cropType || searchResult.croptype || 'N/A'}</td>
-                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{searchResult.status || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.farmId || searchResult.farm_id || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.farmName || searchResult.farm_name || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', minWidth: '150px'}}>
+                        {searchResult.farmerDetails && typeof searchResult.farmerDetails === 'object' ? (
+                          <div>
+                            {(searchResult.farmerDetails.farmer_name || searchResult.farmerDetails.name) && (
+                              <div style={{fontWeight: '500'}}>{searchResult.farmerDetails.farmer_name || searchResult.farmerDetails.name}</div>
+                            )}
+                            {searchResult.farmerDetails.phone_number && (
+                              <div style={{
+                                fontSize: (searchResult.farmerDetails.farmer_name || searchResult.farmerDetails.name) ? '12px' : '14px',
+                                color: (searchResult.farmerDetails.farmer_name || searchResult.farmerDetails.name) ? 'var(--text-2, #6b7280)' : 'var(--text-1)',
+                                marginTop: (searchResult.farmerDetails.farmer_name || searchResult.farmerDetails.name) ? '2px' : '0px'
+                              }}>
+                                {searchResult.farmerDetails.phone_number}
+                              </div>
+                            )}
+                            {!searchResult.farmerDetails.farmer_name && !searchResult.farmerDetails.name && !searchResult.farmerDetails.phone_number && 'N/A'}
+                          </div>
+                        ) : (
+                          searchResult.farmerDetails || 'N/A'
+                        )}
+                      </td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.region || searchResult.district || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.area || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.plan || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.cropType || searchResult.croptype || 'N/A'}</td>
+                      <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{searchResult.status || 'N/A'}</td>
                       <td style={{padding: '10px 16px'}}>
                         <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                           {String(searchResult.status).toLowerCase() === 'locked' ? (
@@ -3706,148 +3789,172 @@ export default function UnlockFarm({ user, onPageChange }) {
                           {startIdx + 1} to {endIdx} farm ids in {groupNumber}
                         </span>
                       </div>
-                      <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '16px'}}>
-                        <thead>
-                          <tr style={{borderBottom: '1px solid var(--border)'}}>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm ID</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Farm Name</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Client ID</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Region</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Area</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Plan</th>
-                            <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
-                            {selectedView === 'added' && (
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Status</th>
-                            )}
-                            {currentRole === 'partner' && (
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px'}}>Admin Name</th>
-                            )}
-                            {selectedView === 'added' && (
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px'}}>Action</th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {groupFarms.map((farm, index) => (
-                            <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmId}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.farmName}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.clientId || farm.client_id || 'N/A'}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.region}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.area}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.plan || 'N/A'}</td>
-                              <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
+                      <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%'}}>
+                        <table style={{width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '14px'}}>
+                          <thead>
+                            <tr style={{borderBottom: '1px solid var(--border)'}}>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm ID</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm Name</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Client ID</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farmer Details</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Region</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Area</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Plan</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
                               {selectedView === 'added' && (
-                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.status}</td>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Status</th>
                               )}
                               {currentRole === 'partner' && (
-                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px'}}>{farm.adminName || 'N/A'}</td>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Admin Name</th>
                               )}
                               {selectedView === 'added' && (
-                                <td style={{padding: '10px 16px'}}>
-                                  <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                                    {String(farm.status).toLowerCase() === 'locked' ? (
-                                      <button
-                                        onClick={() => {
-                                          console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-                                          unlockRecentFarm(farm.farmId);
-                                        }}
-                                        disabled={formLoading}
-                                        className="btn btn-primary btn-sm"
-                                        style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
-                                      >
-                                        {formLoading ? '...' : 'Unlock'}
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => {
-                                          setFarmToLock(farm.farmId);
-                                          setShowLockConfirmModal(true);
-                                        }}
-                                        disabled={formLoading}
-                                        className="btn btn-danger btn-sm"
-                                        style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', fontWeight: 'bold'}}
-                                      >
-                                        {formLoading ? '...' : 'Lock'}
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        console.log('Delete button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
-                                        openDeleteModal(farm.farmId, startIdx + index);
-                                      }}
-                                      disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
-                                      className="btn btn-danger btn-sm"
-                                      style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
-                                    >
-                                      Delete
-                                    </button>
-                                    {(currentRole === 'partner' || currentRole === 'manager') && (
-                                      <button
-                                        onClick={async () => {
-                                          setFeatureFarmId(farm.farmId);
-                                          setFeatureFarmStatus(farm.status);
-
-                                          // Fetch clientId, category and plan from farm details API
-                                          try {
-                                            const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
-                                            const response = await fetch(apiUrl, {
-                                              method: 'GET',
-                                              headers: {
-                                                'Content-Type': 'application/json'
-                                              }
-                                            });
-
-                                            if (response.ok) {
-                                              const data = await response.json();
-                                              if ((data.status === 'Success' || data.success) && data.data) {
-                                                const farmArray = Array.isArray(data.data) ? data.data : [data.data];
-                                                const farmInfo = farmArray[0] || {};
-                                                setFeatureClientId(farmInfo.client_id || farm.clientId || undefined);
-                                                setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
-                                                // Extract plan duration from plan field
-                                                const plan = farmInfo.plan || '';
-                                                console.log('Farm plan:', plan);
-                                                setFeatureFarmPlan(plan);
-                                                // Extract unlock date from created_time or unlock_date
-                                                const unlockDate = farmInfo.created_time || farmInfo.unlock_date || '';
-                                                console.log('Farm unlock date:', unlockDate);
-                                                setFeatureFarmUnlockDate(unlockDate);
-                                              }
-                                            }
-                                          } catch (error) {
-                                            console.error('Error fetching farm details:', error);
-                                            setFeatureClientId(farm.clientId || undefined);
-                                            setFeatureFarmCategory('');
-                                            setFeatureFarmPlan('6');
-                                          }
-
-                                          openModal('feature-dashboard');
-                                        }}
-                                        style={{
-                                          background: 'transparent',
-                                          border: '1px solid var(--border)',
-                                          borderRadius: '6px',
-                                          padding: '6px 8px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          height: '32px',
-                                          width: '32px'
-                                        }}
-                                        title="Features"
-                                      >
-                                        <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap', minWidth: '220px'}}>Action</th>
                               )}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {groupFarms.map((farm, index) => (
+                              <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.farmId}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.farmName}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.clientId || farm.client_id || 'N/A'}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', minWidth: '150px'}}>
+                                  {farm.farmerDetails && typeof farm.farmerDetails === 'object' ? (
+                                    <div>
+                                      {(farm.farmerDetails.farmer_name || farm.farmerDetails.name) && (
+                                        <div style={{fontWeight: '500'}}>{farm.farmerDetails.farmer_name || farm.farmerDetails.name}</div>
+                                      )}
+                                      {farm.farmerDetails.phone_number && (
+                                        <div style={{
+                                          fontSize: (farm.farmerDetails.farmer_name || farm.farmerDetails.name) ? '12px' : '14px',
+                                          color: (farm.farmerDetails.farmer_name || farm.farmerDetails.name) ? 'var(--text-2, #6b7280)' : 'var(--text-1)',
+                                          marginTop: (farm.farmerDetails.farmer_name || farm.farmerDetails.name) ? '2px' : '0px'
+                                        }}>
+                                          {farm.farmerDetails.phone_number}
+                                        </div>
+                                      )}
+                                      {!farm.farmerDetails.farmer_name && !farm.farmerDetails.name && !farm.farmerDetails.phone_number && 'N/A'}
+                                    </div>
+                                  ) : (
+                                    farm.farmerDetails || 'N/A'
+                                  )}
+                                </td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.region}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.area}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.plan || 'N/A'}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{selectedView === 'added' ? farm.createdTime : farm.expiryTime}</td>
+                                {selectedView === 'added' && (
+                                  <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.status}</td>
+                                )}
+                                {currentRole === 'partner' && (
+                                  <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.adminName || 'N/A'}</td>
+                                )}
+                                {selectedView === 'added' && (
+                                  <td style={{padding: '10px 16px', whiteSpace: 'nowrap'}}>
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                      {String(farm.status).toLowerCase() === 'locked' ? (
+                                        <button
+                                          onClick={() => {
+                                            console.log('Unlock button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                            unlockRecentFarm(farm.farmId);
+                                          }}
+                                          disabled={formLoading}
+                                          className="btn btn-primary btn-sm"
+                                          style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
+                                        >
+                                          {formLoading ? '...' : 'Unlock'}
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            setFarmToLock(farm.farmId);
+                                            setShowLockConfirmModal(true);
+                                          }}
+                                          disabled={formLoading}
+                                          className="btn btn-danger btn-sm"
+                                          style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', fontWeight: 'bold'}}
+                                        >
+                                          {formLoading ? '...' : 'Lock'}
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => {
+                                          console.log('Delete button clicked - Role:', currentRole, 'Status:', farm.status, 'Farm ID:', farm.farmId);
+                                          openDeleteModal(farm.farmId, startIdx + index);
+                                        }}
+                                        disabled={formLoading || (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked')}
+                                        className="btn btn-danger btn-sm"
+                                        style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
+                                      >
+                                        Delete
+                                      </button>
+                                      {(currentRole === 'partner' || currentRole === 'manager') && (
+                                        <button
+                                          onClick={async () => {
+                                            setFeatureFarmId(farm.farmId);
+                                            setFeatureFarmStatus(farm.status);
+
+                                            // Fetch clientId, category and plan from farm details API
+                                            try {
+                                              const apiUrl = import.meta.env.VITE_FARM_DETAILS_API_URL + `?farm_id=${farm.farmId}`;
+                                              const response = await fetch(apiUrl, {
+                                                method: 'GET',
+                                                headers: {
+                                                  'Content-Type': 'application/json'
+                                                }
+                                              });
+
+                                              if (response.ok) {
+                                                const data = await response.json();
+                                                if ((data.status === 'Success' || data.success) && data.data) {
+                                                  const farmArray = Array.isArray(data.data) ? data.data : [data.data];
+                                                  const farmInfo = farmArray[0] || {};
+                                                  setFeatureClientId(farmInfo.client_id || farm.clientId || undefined);
+                                                  setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
+                                                  // Extract plan duration from plan field
+                                                  const plan = farmInfo.plan || '';
+                                                  console.log('Farm plan:', plan);
+                                                  setFeatureFarmPlan(plan);
+                                                  // Extract unlock date from created_time or unlock_date
+                                                  const unlockDate = farmInfo.created_time || farmInfo.unlock_date || '';
+                                                  console.log('Farm unlock date:', unlockDate);
+                                                  setFeatureFarmUnlockDate(unlockDate);
+                                                }
+                                              }
+                                            } catch (error) {
+                                              console.error('Error fetching farm details:', error);
+                                              setFeatureClientId(farm.clientId || undefined);
+                                              setFeatureFarmCategory('');
+                                              setFeatureFarmPlan('6');
+                                            }
+
+                                            openModal('feature-dashboard');
+                                          }}
+                                          style={{
+                                            background: 'transparent',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            padding: '6px 8px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            height: '32px',
+                                            width: '32px'
+                                          }}
+                                          title="Features"
+                                        >
+                                          <MoreVertical size={16} style={{color: 'var(--text-2)'}} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                       
                       {/* Pagination Buttons */}
                       <div style={{display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', padding: '8px', backgroundColor: 'var(--bg-1)', borderRadius: '4px', border: '1px solid var(--border)'}}>
