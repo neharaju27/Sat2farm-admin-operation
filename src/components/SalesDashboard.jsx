@@ -80,73 +80,58 @@ export default function SalesDashboard({ user, onPageChange }) {
     setLoading(true);
     const currentUserName = user?.name || user?.phone_number || 'Sales';
     const encodedUser = encodeURIComponent(currentUserName);
-    const dealsApiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
+    const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
 
-    const [
-      leadsResponse,
-      dealsResponse,
-      totalOpportunitiesResponse,
-      closedWonResponse,
-      invoicedResponse,
-      paidResponse
-    ] = await Promise.all([
-      axios.get(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodedUser}`),
-      axios.get(`${import.meta.env.VITE_DEALS_API_URL}?user=${encodedUser}`),
-      axios.get(`${import.meta.env.VITE_ACCOUNTS_API_URL}?user=${encodedUser}`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Closed Won')}&offset=0&limit=1000`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Invoiced')}&offset=0&limit=1000`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Paid')}&offset=0&limit=1000`)
-    ]);
+    // Fetch counts from operation_dashboard API
+    const countsResponse = await axios.get(`${baseUrl}?user=${encodedUser}`);
+    console.log('Sales Dashboard Counts Response:', countsResponse.data);
 
-    const leadsCount = leadsResponse.data?.total || leadsResponse.data?.data?.length || leadsResponse.data?.length || 0;
-    const dealsCount = dealsResponse.data?.total || dealsResponse.data?.data?.length || dealsResponse.data?.length || 0;
-    const totalOpportunitiesCount = totalOpportunitiesResponse.data?.total || totalOpportunitiesResponse.data?.data?.length || totalOpportunitiesResponse.data?.length || 0;
+    const leadsCount = countsResponse.data?.total_leads || 0;
+    const totalOpportunitiesCount = countsResponse.data?.total_accounts || 0;
+    const dealsCount = countsResponse.data?.total_deals || 0;
+    const closedWonDeals = countsResponse.data?.closed_won_deals || 0;
+    const invoicedDeals = countsResponse.data?.invoiced_deals || 0;
+    const paidDeals = countsResponse.data?.paid_deals || 0;
 
-    const closedWonCount = closedWonResponse.data?.total ?? closedWonResponse.data?.count ?? (closedWonResponse.data?.data?.length || 0);
-    const invoicedCount = invoicedResponse.data?.total ?? invoicedResponse.data?.count ?? (invoicedResponse.data?.data?.length || 0);
-    const paidCount = paidResponse.data?.total ?? paidResponse.data?.count ?? (paidResponse.data?.data?.length || 0);
+    // Fetch total deal amount
+    const totalDealAmountResponse = await axios.get(`${baseUrl}?amount&user=${encodedUser}`);
+    console.log('Total Deal Amount API Response:', totalDealAmountResponse.data);
+    const totalDealValue = parseFloat(totalDealAmountResponse.data?.total_deal_value || totalDealAmountResponse.data?.total_deal_amount || 0);
+    console.log('Total Deal Value:', totalDealValue);
 
-    // Closed won includes invoiced and paid deals
-    const totalClosedWon = closedWonCount + invoicedCount + paidCount;
+    // Fetch closed own deals amount (Closed Won + Invoiced + Paid)
+    const closedWonAmountResponse = await axios.get(`${baseUrl}?amount&stage=Closed%20Won,invoiced,Paid&user=${encodedUser}`);
+    console.log('Closed Won Amount API Response:', closedWonAmountResponse.data);
+    const closedWonAmount = parseFloat(closedWonAmountResponse.data?.total_deal_amount || 0);
+    console.log('Closed Won Amount:', closedWonAmount);
 
-    // Invoiced + Paid total
-    const totalInvoicedPaidCount = invoicedCount + paidCount;
+    // Fetch invoiced+paid amount
+    const invoicedAmountResponse = await axios.get(`${baseUrl}?amount&stage=Invoiced,Paid&user=${encodedUser}`);
+    console.log('Invoiced Amount API Response:', invoicedAmountResponse.data);
+    const invoicedAmount = parseFloat(invoicedAmountResponse.data?.total_deal_amount || 0);
+    console.log('Invoiced Amount:', invoicedAmount);
 
-    // Fetch total deal value and deal stage amounts from API
-    const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
-    const dealStageAmountResponse = await axios.get(`${dealStageAmountApiUrl}?user=${encodedUser}`);
-
-    console.log('Deal Stage Amounts API Response:', dealStageAmountResponse.data);
-
-    const totalDealValue = parseFloat(dealStageAmountResponse.data?.Total || 0);
-    console.log('Total Deal Value from API:', totalDealValue);
-
-    const invoicedAmountFromAPI = parseFloat(dealStageAmountResponse.data?.Invoiced || 0);
-    const paidAmount = parseFloat(dealStageAmountResponse.data?.Paid || 0);
-    const invoicedAmount = invoicedAmountFromAPI + paidAmount;
-    console.log('Invoiced Amount (Invoiced + Paid):', invoicedAmount);
-    console.log('Paid Amount from API:', paidAmount);
-
-    // Closed Won Amount: Closed Won + Invoiced + Paid from API
-    const closedWonAmountFromAPI = parseFloat(dealStageAmountResponse.data?.['Closed Won'] || 0);
-    const closedWonAmount = closedWonAmountFromAPI + invoicedAmountFromAPI + paidAmount;
-    console.log('Closed Won Amount (Closed Won + Invoiced + Paid):', closedWonAmount);
+    // Fetch paid amount
+    const paidAmountResponse = await axios.get(`${baseUrl}?amount&stage=Paid&user=${encodedUser}`);
+    console.log('Paid Amount API Response:', paidAmountResponse.data);
+    const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
+    console.log('Paid Amount:', paidAmount);
 
     setMetrics({
       leads: leadsCount,
       totalOpportunities: totalOpportunitiesCount,
       deals: dealsCount,
-      closedWonDeals: totalClosedWon,
-      invoiced: totalInvoicedPaidCount,
-      paid: paidCount,
+      closedWonDeals: closedWonDeals,
+      invoiced: invoicedDeals,
+      paid: paidDeals,
       assignedToGreenTeam: 0,
       leadsGrowth: 0,
       dealsGrowth: 0,
       revenueGrowth: 0,
       totalDealValue,
       closedWonAmount,
-      invoicedAmount: invoicedAmount,
-      paidAmount: paidAmount
+      invoicedAmount,
+      paidAmount
     });
 
     setLastUpdated(new Date());

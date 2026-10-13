@@ -61,71 +61,55 @@ export default function AllSalesData({ user, onPageChange }) {
   const fetchAllSalesData = async () => {
     try {
       setLoading(true);
+      const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
+
       // List of sales users
       const salesUsers = [
-      'Aymen','Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
-        'Mustaqeem', 'Akhil Kumar M','Amith', 'Rohini','Ashok', 'Lipsa', 'Pragya', 'Alisha','Shyamli', 'Rohith S' ,'Fathima',
+        'Aymen', 'Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
+        'Mustaqeem', 'Akhil Kumar M', 'Amith', 'Rohini', 'Ashok', 'Lipsa', 'Pragya', 'Alisha',
+        'Shyamli', 'Rohith S', 'Fathima', 'Krishna', 'Purnima', 'Supriyo'
       ];
 
       const salesDataPromises = salesUsers.map(async (salesName) => {
         const encodedUser = encodeURIComponent(salesName);
-        const dealsApiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
 
         try {
-          const [
-            leadsResponse,
-            dealsResponse,
-            totalOpportunitiesResponse,
-            closedWonResponse,
-            invoicedResponse,
-            paidResponse,
-            dealStageAmountResponse
-          ] = await Promise.all([
-            axios.get(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodedUser}`),
-            axios.get(`${import.meta.env.VITE_DEALS_API_URL}?user=${encodedUser}`),
-            axios.get(`${import.meta.env.VITE_ACCOUNTS_API_URL}?user=${encodedUser}`),
-            axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Closed Won')}&offset=0&limit=1000`),
-            axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Invoiced')}&offset=0&limit=1000`),
-            axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Paid')}&offset=0&limit=1000`),
-            axios.get(`${import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL}?user=${encodedUser}`)
-          ]);
+          // Fetch counts from operation_dashboard API
+          const countsResponse = await axios.get(`${baseUrl}?user=${encodedUser}`);
+          console.log(`Counts Response for ${salesName}:`, countsResponse.data);
 
-          const totalLeads = leadsResponse.data?.total || leadsResponse.data?.data?.length || leadsResponse.data?.length || 0;
-          const totalDeals = dealsResponse.data?.total || dealsResponse.data?.data?.length || dealsResponse.data?.length || 0;
-          const totalOpportunities = totalOpportunitiesResponse.data?.total || totalOpportunitiesResponse.data?.data?.length || totalOpportunitiesResponse.data?.length || 0;
-          const closedWonCount = closedWonResponse.data?.total ?? closedWonResponse.data?.count ?? (closedWonResponse.data?.data?.length || 0);
-          const invoicedCount = invoicedResponse.data?.total ?? invoicedResponse.data?.count ?? (invoicedResponse.data?.data?.length || 0);
-          const paidCount = paidResponse.data?.total ?? paidResponse.data?.count ?? (paidResponse.data?.data?.length || 0);
+          const totalLeads = countsResponse.data?.total_leads || 0;
+          const totalOpportunities = countsResponse.data?.total_accounts || 0;
+          const totalDeals = countsResponse.data?.total_deals || 0;
+          const closedWonDeals = countsResponse.data?.closed_won_deals || 0;
+          const invoicedDeals = countsResponse.data?.invoiced_deals || 0;
+          const paidDeals = countsResponse.data?.paid_deals || 0;
 
-          // Assigned to Green Team - currently set to 0 as per operation dashboard
-          const assignedToGreenTeam = 0;
+          // Fetch total deal amount
+          const totalDealAmountResponse = await axios.get(`${baseUrl}?amount&user=${encodedUser}`);
+          const totalDealValue = parseFloat(totalDealAmountResponse.data?.total_deal_value || totalDealAmountResponse.data?.total_deal_amount || 0);
 
-          // Deal Stage Amounts from API
-          const dealStageAmountData = dealStageAmountResponse.data;
-          const totalDealValue = parseFloat(dealStageAmountData?.Total || 0);
-          const invoicedAmountFromAPI = parseFloat(dealStageAmountData?.Invoiced || 0);
-          const paidAmount = parseFloat(dealStageAmountData?.Paid || 0);
-          const invoicedAmount = invoicedAmountFromAPI + paidAmount;
+          // Fetch closed own deals amount (Closed Won + Invoiced + Paid)
+          const closedWonAmountResponse = await axios.get(`${baseUrl}?amount&stage=Closed%20Won,Invoiced,Paid&user=${encodedUser}`);
+          const closedWonAmount = parseFloat(closedWonAmountResponse.data?.total_deal_amount || 0);
 
-          // Closed Won + Invoiced + Paid total
-          const totalClosedWon = closedWonCount + invoicedCount + paidCount;
+          // Fetch invoiced+paid amount
+          const invoicedAmountResponse = await axios.get(`${baseUrl}?amount&stage=Invoiced,Paid&user=${encodedUser}`);
+          const invoicedAmount = parseFloat(invoicedAmountResponse.data?.total_deal_amount || 0);
 
-          // Invoiced + Paid total
-          const totalInvoicedPaidCount = invoicedCount + paidCount;
-
-          // Closed Won Amount: Closed Won + Invoiced + Paid from API
-          const closedWonAmountFromAPI = parseFloat(dealStageAmountData?.['Closed Won'] || 0);
-          const closedWonAmount = closedWonAmountFromAPI + invoicedAmountFromAPI + paidAmount;
+          // Fetch paid amount
+          const paidAmountResponse = await axios.get(`${baseUrl}?amount&stage=Paid&user=${encodedUser}`);
+          const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
 
           return {
             salesName: salesName,
             totalLeads: totalLeads,
             totalOpportunities: totalOpportunities,
             deals: totalDeals,
-            closedWonDeal: totalClosedWon,
-            invoiced: totalInvoicedPaidCount,
-            paid: paidCount,
-            assignedToGreenTeam: assignedToGreenTeam,
+            closedWonDeal: closedWonDeals,
+            invoiced: invoicedDeals,
+            paid: paidDeals,
+            assignedToGreenTeam: 0,
             totalDealValue: totalDealValue,
             closedWonAmount: closedWonAmount,
             invoicedAmount: invoicedAmount,
