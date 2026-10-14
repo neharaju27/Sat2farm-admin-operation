@@ -71,7 +71,7 @@ const formatCurrency = (num, currency = 'INR') => {
     const actualPrice = acresNum * baseRatePerAcre;
 
     // Discount % formula: Floor(Min(15 * log10(acres), 70))
-    const rawDiscount = Math.floor(Math.min(15 * Math.log10(acresNum), 70));
+    const rawDiscount = Math.min(Math.ceil(15 * Math.log10(acresNum)), 70);
     const discountPercentage = Math.max(0, rawDiscount);
 
     const finalPrice = actualPrice * (1 - discountPercentage / 100);
