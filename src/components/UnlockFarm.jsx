@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical } from 'lucide-react';
+import { X, MoreVertical, RefreshCw, AlertCircle } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -34,6 +34,10 @@ export default function UnlockFarm({ user, onPageChange }) {
 
   const handleRoleSwitch = (role) => {
     setCurrentRole(role);
+    if (role === 'partner' || role === 'manager') {
+      setAcreageLoading(true);
+      setAcreageError('');
+    }
     // Stay on the unlock farm page for all role switches
     // No redirects for any role - ops, sales, manager, or client
   };
@@ -79,7 +83,11 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [totalAcreage, setTotalAcreage] = useState(0);
   const [availableAcreage, setAvailableAcreage] = useState(0);
   const [usedAcreage, setUsedAcreage] = useState(0);
-  const [acreageLoading, setAcreageLoading] = useState(false);
+  const [acreageLoading, setAcreageLoading] = useState(() => {
+    const role = normalizeUserRole(user);
+    return role === 'partner' || role === 'manager';
+  });
+  const [acreageError, setAcreageError] = useState('');
   
   // State for plan-based acreages
   const [planAcreages, setPlanAcreages] = useState({
@@ -148,12 +156,28 @@ export default function UnlockFarm({ user, onPageChange }) {
     farmer?.user_id || farmer?.userId || farmer?.id;
 
   const getLoggedInMobileNumber = () => {
-    const fallback = user?.phone_number || user?.phoneNumber || user?.username || '';
+    const fallback = 
+      user?.phone_number || 
+      user?.phoneNumber || 
+      user?.mobile_no || 
+      user?.mobile || 
+      user?.phone || 
+      user?.username || 
+      '';
     try {
       const storedAuth = localStorage.getItem('sat2farm_auth');
       if (!storedAuth) return fallback;
       const authData = JSON.parse(storedAuth);
-      return authData?.phone_number || authData?.username || fallback;
+      return (
+        authData?.phone_number || 
+        authData?.phoneNumber || 
+        authData?.mobile_no || 
+        authData?.mobile || 
+        authData?.phone || 
+        authData?.username || 
+        authData?.user?.phone_number || 
+        fallback
+      );
     } catch {
       return fallback;
     }
@@ -1026,33 +1050,26 @@ export default function UnlockFarm({ user, onPageChange }) {
   // Function to fetch acreages data
   const fetchAcreages = async () => {
     setAcreageLoading(true);
+    setAcreageError('');
     
     try {
-      // Get user mobile number from login storage
-      const storedAuth = localStorage.getItem('sat2farm_auth');
-      let userMobileNumber = null;
-      let authToken = null;
-      
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          userMobileNumber = authData.phone_number;
-          authToken = authData.token || authData.jwt;
-        } catch (e) {
-          console.error('Error parsing auth data:', e);
-        }
-      }
-      
+      const userMobileNumber = getLoggedInMobileNumber();
       if (!userMobileNumber) {
         console.error('User mobile number not found');
+        setAcreageError('User mobile number not found in session.');
         return;
       }
 
+      let cleanMobile = String(userMobileNumber).trim();
+      if (cleanMobile.startsWith('+91')) cleanMobile = cleanMobile.slice(3);
+      else if (cleanMobile.startsWith('+')) cleanMobile = cleanMobile.slice(1);
+
       // Call API to fetch available area
-      const apiUrl = import.meta.env.VITE_AVAILABLE_AREA_API_URL + `?mobile_no=${userMobileNumber}`;
+      const baseAreaUrl = import.meta.env.VITE_AVAILABLE_AREA_API_URL;
+      let apiUrl = `${baseAreaUrl}?mobile_no=${encodeURIComponent(cleanMobile)}`;
       console.log('Fetching acreages:', apiUrl);
       
-      const response = await fetch(apiUrl, {
+      let response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -1061,13 +1078,28 @@ export default function UnlockFarm({ user, onPageChange }) {
       
       if (!response.ok) {
         console.error('Failed to fetch acreages:', response.status);
+        setAcreageError(`Server responded with status ${response.status}`);
         return;
       }
       
-      const data = await response.json();
+      let data = await response.json();
       console.log('Acreages API response:', data);
+
+      // If failed and number had 91 prefix, try stripping it
+      if ((data.status === 'Failure' || data.status === 'failed') && cleanMobile.startsWith('91') && cleanMobile.length > 10) {
+        const retryMobile = cleanMobile.slice(2);
+        const retryUrl = `${baseAreaUrl}?mobile_no=${encodeURIComponent(retryMobile)}`;
+        const retryResp = await fetch(retryUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        if (retryResp.ok) {
+          const retryData = await retryResp.json();
+          if (retryData && (retryData.status === 'Success' || retryData.status === 'success')) {
+            data = retryData;
+          }
+        }
+      }
       
-      if (data && data.status === "Success" && data.data) {
+      if (data && (data.status === "Success" || data.status === "success") && data.data) {
+        setAcreageError('');
         // Handle new API response structure with plan-specific data
         if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
           setPlanAcreages({
@@ -1116,9 +1148,12 @@ export default function UnlockFarm({ user, onPageChange }) {
           setAvailableAcreage(Number(data.data.available_area || 0));
           setUsedAcreage(Number(data.data.used_area || 0));
         }
+      } else {
+        setAcreageError(data?.message || 'Failed to fetch acreage plans from server');
       }
     } catch (error) {
       console.error('Error fetching acreages:', error);
+      setAcreageError('Unable to connect to acreage server. Please try again.');
     } finally {
       setAcreageLoading(false);
     }
@@ -1127,36 +1162,26 @@ export default function UnlockFarm({ user, onPageChange }) {
   // Function to fetch superadmin area data for partner role
   const fetchSuperadminArea = async () => {
     setAcreageLoading(true);
+    setAcreageError('');
     
     try {
-      // Get user mobile number from login storage
-      const storedAuth = localStorage.getItem('sat2farm_auth');
-      let userMobileNumber = null;
-      
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          userMobileNumber = authData.phone_number || authData.phoneNumber || authData.username;
-        } catch (e) {
-          console.error('Error parsing auth data:', e);
-        }
-      }
-      
-      if (!userMobileNumber) {
-        userMobileNumber = getLoggedInMobileNumber();
-      }
-      
+      const userMobileNumber = getLoggedInMobileNumber();
       if (!userMobileNumber) {
         console.error('User mobile number not found');
+        setAcreageError('User mobile number not found in session.');
         return;
       }
 
+      let cleanMobile = String(userMobileNumber).trim();
+      if (cleanMobile.startsWith('+91')) cleanMobile = cleanMobile.slice(3);
+      else if (cleanMobile.startsWith('+')) cleanMobile = cleanMobile.slice(1);
+
       // Call API to fetch superadmin area data
-      const baseSuperadminUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL || 'https://api.sat2farm.com/fetch_superadmin_area/prod';
-      const apiUrl = `${baseSuperadminUrl}?mobile_no=${encodeURIComponent(userMobileNumber)}`;
+      const baseSuperadminUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL;
+      let apiUrl = `${baseSuperadminUrl}?mobile_no=${encodeURIComponent(cleanMobile)}`;
       console.log('Fetching superadmin area:', apiUrl);
       
-      const response = await fetch(apiUrl, {
+      let response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -1165,13 +1190,28 @@ export default function UnlockFarm({ user, onPageChange }) {
       
       if (!response.ok) {
         console.error('Failed to fetch superadmin area:', response.status);
+        setAcreageError(`Server responded with status ${response.status}`);
         return;
       }
       
-      const data = await response.json();
+      let data = await response.json();
       console.log('Superadmin area API response:', data);
+
+      // If failed and number had 91 prefix, try stripping it
+      if ((data.status === 'Failure' || data.status === 'failed') && cleanMobile.startsWith('91') && cleanMobile.length > 10) {
+        const retryMobile = cleanMobile.slice(2);
+        const retryUrl = `${baseSuperadminUrl}?mobile_no=${encodeURIComponent(retryMobile)}`;
+        const retryResp = await fetch(retryUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        if (retryResp.ok) {
+          const retryData = await retryResp.json();
+          if (retryData && (retryData.status === 'Success' || retryData.status === 'success')) {
+            data = retryData;
+          }
+        }
+      }
       
-      if (data && data.data) {
+      if (data && (data.status === "Success" || data.status === "success") && data.data) {
+        setAcreageError('');
         // Handle new API response structure with plan-specific data
         if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
           setPlanAcreages({
@@ -1220,9 +1260,12 @@ export default function UnlockFarm({ user, onPageChange }) {
           setAvailableAcreage(Number(data.data.available_area || 0));
           setUsedAcreage(Number(data.data.used_area || 0));
         }
+      } else {
+        setAcreageError(data?.message || 'Failed to fetch superadmin acreage from server');
       }
     } catch (error) {
       console.error('Error fetching superadmin area:', error);
+      setAcreageError('Unable to connect to acreage server. Please try again.');
     } finally {
       setAcreageLoading(false);
     }
@@ -2253,7 +2296,7 @@ export default function UnlockFarm({ user, onPageChange }) {
   useEffect(() => {
     if (currentRole === 'partner') {
       fetchSuperadminArea();
-    } else {
+    } else if (currentRole === 'manager') {
       fetchAcreages();
     }
   }, [currentRole]);
@@ -2287,388 +2330,255 @@ export default function UnlockFarm({ user, onPageChange }) {
         )}
       </div>
 
-      {/* Plan Acreages Cards - Only for Manager */}
-      {currentRole === 'manager' && (
+      {/* Plan Acreages Cards - For Manager and Partner */}
+      {(currentRole === 'manager' || currentRole === 'partner') && (
         <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px', flexWrap: 'wrap'}}>
-          {/* Total Acreage Card */}
-          {(totalAcreage > 0 || availableAcreage > 0 || usedAcreage > 0) && (
+          {acreageLoading ? (
             <div 
-              className="card metric-accent" 
+              className="card" 
               style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                flex: 1, 
+                padding: '24px 20px', 
+                textAlign: 'center', 
+                backgroundColor: '#f8fafc', 
+                border: '1px dashed #cbd5e1', 
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                minHeight: '100px'
+              }}
             >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>Total Acreage</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#475569'}}>All Plans</span>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {(totalAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {(usedAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {(availableAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '10px', color: '#16a34a', fontWeight: '600', fontSize: '14px'}}>
+                <RefreshCw style={{width: '18px', height: '18px', animation: 'spin 1s linear infinite'}} />
+                <span>Fetching acreage plans...</span>
               </div>
+              <div style={{fontSize: '12px', color: '#64748b'}}>Retrieving acreage allocation data from server</div>
             </div>
-          )}
-
-          {/* 1 Month Plan Card */}
-          {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
+          ) : acreageError ? (
             <div 
-              className="card metric-accent" 
+              className="card" 
               style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                flex: 1, 
+                padding: '20px 24px', 
+                textAlign: 'center', 
+                backgroundColor: '#fef2f2', 
+                border: '1px solid #fecaca', 
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
             >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['1 month'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['1 month'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['1 month'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: '600', fontSize: '14px'}}>
+                <AlertCircle style={{width: '18px', height: '18px'}} />
+                <span>Failed to fetch acreage data</span>
               </div>
+              <div style={{fontSize: '12px', color: '#7f1d1d'}}>{acreageError}</div>
+              <button 
+                className="btn btn-outline btn-sm" 
+                onClick={currentRole === 'partner' ? fetchSuperadminArea : fetchAcreages}
+                style={{marginTop: '4px', fontSize: '12px', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px'}}
+              >
+                <RefreshCw style={{width: '12px', height: '12px'}} />
+                Retry
+              </button>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Total Acreage Card */}
+              {(totalAcreage > 0 || availableAcreage > 0 || usedAcreage > 0) && (
+                <div 
+                  className="card metric-accent" 
+                  style={{
+                    flex: '1 1 300px', 
+                    minWidth: '280px', 
+                    maxWidth: '460px',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                    cursor: 'pointer',
+                    borderLeft: '4px solid #16a34a'
+                  }} 
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div className="card-body" style={{padding: '16px 20px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>Total Acreage</span>
+                      <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#475569'}}>All Plans</span>
+                    </div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                          {(totalAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                          {(usedAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                          {(availableAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          {/* 6 Months Plan Card */}
-          {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+              {/* 1 Month Plan Card */}
+              {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
+                <div 
+                  className="card metric-accent" 
+                  style={{
+                    flex: '1 1 300px', 
+                    minWidth: '280px', 
+                    maxWidth: '460px',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                    cursor: 'pointer',
+                    borderLeft: '4px solid #16a34a'
+                  }} 
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div className="card-body" style={{padding: '16px 20px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
+                      <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                    </div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                          {planAcreages['1 month'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                          {planAcreages['1 month'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                          {planAcreages['1 month'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['6 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['6 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['6 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* 12 Months Plan Card */}
-          {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+              {/* 6 Months Plan Card */}
+              {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
+                <div 
+                  className="card metric-accent" 
+                  style={{
+                    flex: '1 1 300px', 
+                    minWidth: '280px', 
+                    maxWidth: '460px',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                    cursor: 'pointer',
+                    borderLeft: '4px solid #16a34a'
+                  }} 
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div className="card-body" style={{padding: '16px 20px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
+                      <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                    </div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                          {planAcreages['6 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                          {planAcreages['6 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                          {planAcreages['6 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['12 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['12 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['12 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Empty state when no acreages at all */}
-          {(!totalAcreage || totalAcreage === 0) &&
-           (!availableAcreage || availableAcreage === 0) &&
-           (!usedAcreage || usedAcreage === 0) &&
-           (planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
-           (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
-           (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
-            <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
-              <div style={{fontSize: '14px', color: '#6b7280'}}>No acreage plans available</div>
-            </div>
-          )}
-        </div>
-      )}
+              {/* 12 Months Plan Card */}
+              {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
+                <div 
+                  className="card metric-accent" 
+                  style={{
+                    flex: '1 1 300px', 
+                    minWidth: '280px', 
+                    maxWidth: '460px',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                    cursor: 'pointer',
+                    borderLeft: '4px solid #16a34a'
+                  }} 
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div className="card-body" style={{padding: '16px 20px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
+                      <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                    </div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                          {planAcreages['12 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                          {planAcreages['12 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                          {planAcreages['12 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-      {/* Plan Acreages Cards - Only for Partner */}
-      {currentRole === 'partner' && (
-        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px', flexWrap: 'wrap'}}>
-          {/* Total Acreage Card */}
-          {(totalAcreage > 0 || availableAcreage > 0 || usedAcreage > 0) && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>Total Acreage</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#475569'}}>All Plans</span>
+              {/* Empty state when no acreages at all (only shown after loading completed with no error and no plans) */}
+              {(!totalAcreage || totalAcreage === 0) &&
+               (!availableAcreage || availableAcreage === 0) &&
+               (!usedAcreage || usedAcreage === 0) &&
+               (planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
+               (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
+               (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
+                <div className="card" style={{flex: 1, padding: '20px', textAlign: 'center', backgroundColor: '#f9fafb', border: '1px dashed #e2e8f0', borderRadius: '8px'}}>
+                  <div style={{fontSize: '14px', color: '#6b7280', fontWeight: '500'}}>No acreage plans available</div>
+                  <div style={{fontSize: '12px', color: '#94a3b8', marginTop: '4px'}}>No active acreage quota has been allocated to this account yet</div>
                 </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {(totalAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {(usedAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {(availableAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 1 Month Plan Card */}
-          {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['1 month'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['1 month'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['1 month'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 6 Months Plan Card */}
-          {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['6 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['6 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['6 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 12 Months Plan Card */}
-          {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
-            <div 
-              className="card metric-accent" 
-              style={{
-                flex: '1 1 300px', 
-                minWidth: '280px', 
-                maxWidth: '460px',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
-                cursor: 'pointer',
-                borderLeft: '4px solid #16a34a'
-              }} 
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div className="card-body" style={{padding: '16px 20px'}}>
-                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
-                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
-                </div>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
-                      {planAcreages['12 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
-                      {planAcreages['12 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
-                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
-                      {planAcreages['12 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Empty state when no acreages at all */}
-          {(!totalAcreage || totalAcreage === 0) &&
-           (!availableAcreage || availableAcreage === 0) &&
-           (!usedAcreage || usedAcreage === 0) &&
-           (planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
-           (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
-           (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
-            <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
-              <div style={{fontSize: '14px', color: '#6b7280'}}>No acreage plans available</div>
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
