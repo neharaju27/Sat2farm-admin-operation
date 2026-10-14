@@ -35,7 +35,7 @@ export default function Pricing({ user, onPageChange }) {
     setCreatedDateTime(formatted);
   }, []);
 
-  const USD_DIVISOR = 80; // matches sheet formula: Total cost (USD) = Total cost / 80
+  const USD_DIVISOR = 92; // 1 USD = 92 Rupees
 
 const formatCurrency = (num, currency = 'INR') => {
   let displayAmount = num || 0;
