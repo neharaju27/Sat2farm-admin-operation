@@ -73,7 +73,14 @@ export default function SalesPipelineKanbanBoard({
       ? filteredKanbanDeals[column.stage] || []
       : kanbanDeals[column.stage] || [];
 
+  const isFilteringOrSearching = Boolean(salesFiltersApplied || isSearching);
+
   const handleColumnScroll = (stage, e) => {
+    // When filters or search are applied, do not load or append more deals on scroll
+    if (isFilteringOrSearching) {
+      return;
+    }
+
     const { scrollTop, clientHeight, scrollHeight } = e.target;
     if (scrollTop + clientHeight >= scrollHeight - 60) {
       if (onLoadMoreStage) {
@@ -280,7 +287,7 @@ export default function SalesPipelineKanbanBoard({
                         </KanbanDraggableCard>
                       ))
                     )}
-                    {loadingMoreStages[column.stage] && (
+                    {!isFilteringOrSearching && loadingMoreStages[column.stage] && (
                       <div style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#6b7280' }}>
                         Loading more deals...
                       </div>

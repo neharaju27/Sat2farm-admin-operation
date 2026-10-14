@@ -2889,6 +2889,11 @@ export default function Opportunities({ onPageChange }) {
 
   // Infinite scroll: fetch next batch of 50 deals for a specific stage when user scrolls near column bottom
   const handleLoadMoreStageDeals = async (stage) => {
+    // If any filter or search is applied, do not load or append more deals on scroll
+    if (salesFiltersApplied || isSearching || (searchTerm && searchTerm.trim()) || (selectedSalesProperties && selectedSalesProperties.length > 0) || newThisWeekFilter) {
+      return;
+    }
+
     if (loadingMoreStages[stage]) return;
 
     const currentDeals = kanbanDeals[stage] || [];
@@ -7745,8 +7750,8 @@ export default function Opportunities({ onPageChange }) {
                     onDealClick={handleKanbanDealClick}
                     stageTotals={stageTotals}
                     stageValues={stageValues}
-                    isSearching={isSearching}
-                    salesFiltersApplied={salesFiltersApplied}
+                    isSearching={Boolean(isSearching || (searchTerm && searchTerm.trim()))}
+                    salesFiltersApplied={Boolean(salesFiltersApplied || (selectedSalesProperties && selectedSalesProperties.length > 0) || newThisWeekFilter)}
                     onLoadMoreStage={handleLoadMoreStageDeals}
                     loadingMoreStages={loadingMoreStages}
                     isDealsLoading={isDealsLoading}

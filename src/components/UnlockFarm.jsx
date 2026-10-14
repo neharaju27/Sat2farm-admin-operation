@@ -1072,35 +1072,49 @@ export default function UnlockFarm({ user, onPageChange }) {
         if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
           setPlanAcreages({
             '1 month': {
-              total: data.data['1_month']?.total_area || 0,
-              used: data.data['1_month']?.used_area || 0,
-              available: data.data['1_month']?.available_area || 0
+              total: Number(data.data['1_month']?.total_area || 0),
+              used: Number(data.data['1_month']?.used_area || 0),
+              available: Number(data.data['1_month']?.available_area || 0)
             },
             '6 months': {
-              total: data.data['6_month']?.total_area || 0,
-              used: data.data['6_month']?.used_area || 0,
-              available: data.data['6_month']?.available_area || 0
+              total: Number(data.data['6_month']?.total_area || 0),
+              used: Number(data.data['6_month']?.used_area || 0),
+              available: Number(data.data['6_month']?.available_area || 0)
             },
             '12 months': {
-              total: data.data['12_month']?.total_area || 0,
-              used: data.data['12_month']?.used_area || 0,
-              available: data.data['12_month']?.available_area || 0
+              total: Number(data.data['12_month']?.total_area || 0),
+              used: Number(data.data['12_month']?.used_area || 0),
+              available: Number(data.data['12_month']?.available_area || 0)
             }
           });
           
-          // Also set the overall acreages for backward compatibility
-          const totalAvailable = (data.data['1_month']?.available_area || 0) + 
-                                  (data.data['6_month']?.available_area || 0) + 
-                                  (data.data['12_month']?.available_area || 0);
-          const totalUsed = (data.data['1_month']?.used_area || 0) + 
-                           (data.data['6_month']?.used_area || 0) + 
-                           (data.data['12_month']?.used_area || 0);
+          // Set overall / total acreages from top-level response or fallback to sum of plans
+          const totalArea = data.data.total_area !== undefined && data.data.total_area !== null
+            ? Number(data.data.total_area)
+            : ((data.data['1_month']?.total_area || 0) + 
+               (data.data['6_month']?.total_area || 0) + 
+               (data.data['12_month']?.total_area || 0));
+
+          const totalAvailable = data.data.available_area !== undefined && data.data.available_area !== null
+            ? Number(data.data.available_area)
+            : ((data.data['1_month']?.available_area || 0) + 
+               (data.data['6_month']?.available_area || 0) + 
+               (data.data['12_month']?.available_area || 0));
+
+          const totalUsed = data.data.used_area !== undefined && data.data.used_area !== null
+            ? Number(data.data.used_area)
+            : ((data.data['1_month']?.used_area || 0) + 
+               (data.data['6_month']?.used_area || 0) + 
+               (data.data['12_month']?.used_area || 0));
+
+          setTotalAcreage(totalArea);
           setAvailableAcreage(totalAvailable);
           setUsedAcreage(totalUsed);
         } else {
           // Handle old API response structure for backward compatibility
-          setAvailableAcreage(data.data.available_area || 0);
-          setUsedAcreage(data.data.used_area || 0);
+          setTotalAcreage(Number(data.data.total_area || 0));
+          setAvailableAcreage(Number(data.data.available_area || 0));
+          setUsedAcreage(Number(data.data.used_area || 0));
         }
       }
     } catch (error) {
@@ -1122,10 +1136,14 @@ export default function UnlockFarm({ user, onPageChange }) {
       if (storedAuth) {
         try {
           const authData = JSON.parse(storedAuth);
-          userMobileNumber = authData.phone_number;
+          userMobileNumber = authData.phone_number || authData.phoneNumber || authData.username;
         } catch (e) {
           console.error('Error parsing auth data:', e);
         }
+      }
+      
+      if (!userMobileNumber) {
+        userMobileNumber = getLoggedInMobileNumber();
       }
       
       if (!userMobileNumber) {
@@ -1134,7 +1152,8 @@ export default function UnlockFarm({ user, onPageChange }) {
       }
 
       // Call API to fetch superadmin area data
-      const apiUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL + `?mobile_no=${userMobileNumber}`;
+      const baseSuperadminUrl = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL || 'https://api.sat2farm.com/fetch_superadmin_area/prod';
+      const apiUrl = `${baseSuperadminUrl}?mobile_no=${encodeURIComponent(userMobileNumber)}`;
       console.log('Fetching superadmin area:', apiUrl);
       
       const response = await fetch(apiUrl, {
@@ -1157,40 +1176,49 @@ export default function UnlockFarm({ user, onPageChange }) {
         if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
           setPlanAcreages({
             '1 month': {
-              total: data.data['1_month']?.total_area || 0,
-              used: data.data['1_month']?.used_area || 0,
-              available: data.data['1_month']?.available_area || 0
+              total: Number(data.data['1_month']?.total_area || 0),
+              used: Number(data.data['1_month']?.used_area || 0),
+              available: Number(data.data['1_month']?.available_area || 0)
             },
             '6 months': {
-              total: data.data['6_month']?.total_area || 0,
-              used: data.data['6_month']?.used_area || 0,
-              available: data.data['6_month']?.available_area || 0
+              total: Number(data.data['6_month']?.total_area || 0),
+              used: Number(data.data['6_month']?.used_area || 0),
+              available: Number(data.data['6_month']?.available_area || 0)
             },
             '12 months': {
-              total: data.data['12_month']?.total_area || 0,
-              used: data.data['12_month']?.used_area || 0,
-              available: data.data['12_month']?.available_area || 0
+              total: Number(data.data['12_month']?.total_area || 0),
+              used: Number(data.data['12_month']?.used_area || 0),
+              available: Number(data.data['12_month']?.available_area || 0)
             }
           });
           
           // Calculate overall totals
-          const totalArea = (data.data['1_month']?.total_area || 0) + 
-                           (data.data['6_month']?.total_area || 0) + 
-                           (data.data['12_month']?.total_area || 0);
-          const totalAvailable = (data.data['1_month']?.available_area || 0) + 
-                                  (data.data['6_month']?.available_area || 0) + 
-                                  (data.data['12_month']?.available_area || 0);
-          const totalUsed = (data.data['1_month']?.used_area || 0) + 
-                           (data.data['6_month']?.used_area || 0) + 
-                           (data.data['12_month']?.used_area || 0);
+          const totalArea = data.data.total_area !== undefined && data.data.total_area !== null
+            ? Number(data.data.total_area)
+            : ((data.data['1_month']?.total_area || 0) + 
+               (data.data['6_month']?.total_area || 0) + 
+               (data.data['12_month']?.total_area || 0));
+
+          const totalAvailable = data.data.available_area !== undefined && data.data.available_area !== null
+            ? Number(data.data.available_area)
+            : ((data.data['1_month']?.available_area || 0) + 
+               (data.data['6_month']?.available_area || 0) + 
+               (data.data['12_month']?.available_area || 0));
+
+          const totalUsed = data.data.used_area !== undefined && data.data.used_area !== null
+            ? Number(data.data.used_area)
+            : ((data.data['1_month']?.used_area || 0) + 
+               (data.data['6_month']?.used_area || 0) + 
+               (data.data['12_month']?.used_area || 0));
+
           setTotalAcreage(totalArea);
           setAvailableAcreage(totalAvailable);
           setUsedAcreage(totalUsed);
         } else {
           // Handle old API response structure for backward compatibility
-          setTotalAcreage(data.data.total_area || 0);
-          setAvailableAcreage(data.data.available_area || 0);
-          setUsedAcreage(data.data.used_area || 0);
+          setTotalAcreage(Number(data.data.total_area || 0));
+          setAvailableAcreage(Number(data.data.available_area || 0));
+          setUsedAcreage(Number(data.data.used_area || 0));
         }
       }
     } catch (error) {
@@ -2242,6 +2270,7 @@ export default function UnlockFarm({ user, onPageChange }) {
               {currentRole === 'ops' ? 'Operations · Access Control' : 
                currentRole === 'sales' ? 'Sales · Access Control' : 
                currentRole === 'manager' ? 'Manager · Access Control' :
+               currentRole === 'partner' ? 'Partner · Access Control' :
                'Client · Access Control'}
             </div>
           </div>
@@ -2253,75 +2282,195 @@ export default function UnlockFarm({ user, onPageChange }) {
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
           <div className="section-title">Farm requests</div>
         </div>
-        {(currentRole === 'manager' || currentRole === 'client') && (
+        {(currentRole === 'manager' || currentRole === 'client' || currentRole === 'partner') && (
           <button className="btn btn-primary btn-sm" onClick={openAddFarmModal}>+ Add Farms</button>
         )}
       </div>
 
       {/* Plan Acreages Cards - Only for Manager */}
       {currentRole === 'manager' && (
-        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
+        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px', flexWrap: 'wrap'}}>
+          {/* Total Acreage Card */}
+          {(totalAcreage > 0 || availableAcreage > 0 || usedAcreage > 0) && (
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>Total Acreage</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#475569'}}>All Plans</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {(totalAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {(usedAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {(availableAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1 Month Plan Card */}
           {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>1 Month Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['1 month'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['1 month'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['1 month'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['1 month'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['1 month'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['1 month'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* 6 Months Plan Card */}
           {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>6 Months Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['6 months'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['6 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['6 months'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['6 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['6 months'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['6 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* 12 Months Plan Card */}
           {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>12 Months Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['12 months'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['12 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['12 months'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['12 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['12 months'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['12 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-          {(planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
+
+          {/* Empty state when no acreages at all */}
+          {(!totalAcreage || totalAcreage === 0) &&
+           (!availableAcreage || availableAcreage === 0) &&
+           (!usedAcreage || usedAcreage === 0) &&
+           (planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
            (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
            (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
             <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
@@ -2333,68 +2482,188 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       {/* Plan Acreages Cards - Only for Partner */}
       {currentRole === 'partner' && (
-        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px'}}>
+        <div style={{display: 'flex', gap: '16px', padding: '0 24px', marginBottom: '16px', flexWrap: 'wrap'}}>
+          {/* Total Acreage Card */}
+          {(totalAcreage > 0 || availableAcreage > 0 || usedAcreage > 0) && (
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>Total Acreage</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#f1f5f9', color: '#475569'}}>All Plans</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {(totalAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {(usedAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {(availableAcreage || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1 Month Plan Card */}
           {planAcreages['1 month'].total > 0 && planAcreages['1 month'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>1 Month Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['1 month'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['1 month'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['1 month'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['1 month'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['1 month'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['1 month'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* 6 Months Plan Card */}
           {planAcreages['6 months'].total > 0 && planAcreages['6 months'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>6 Months Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['6 months'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['6 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['6 months'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['6 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['6 months'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['6 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* 12 Months Plan Card */}
           {planAcreages['12 months'].total > 0 && planAcreages['12 months'].total !== null && (
-            <div className="card metric-accent" style={{flex: 1, transition: 'transform 0.2s ease, box-shadow 0.2s ease', cursor: 'pointer'}} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-              <div className="card-body" style={{padding: '16px', textAlign: 'center'}}>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center'}}>
-                  <div style={{fontSize: '13px', color: 'var(--text-2)', fontWeight: '500'}}>12 Months Plan</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Total:</span> <strong>{planAcreages['12 months'].total.toFixed(2)} ac</strong>
+            <div 
+              className="card metric-accent" 
+              style={{
+                flex: '1 1 300px', 
+                minWidth: '280px', 
+                maxWidth: '460px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                cursor: 'pointer',
+                borderLeft: '4px solid #16a34a'
+              }} 
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div className="card-body" style={{padding: '16px 20px'}}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
+                  <span style={{fontSize: '11px', fontWeight: '500', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669'}}>Active Plan</span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {planAcreages['12 months'].total.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Used:</span> <strong>{planAcreages['12 months'].used.toFixed(2)} ac</strong>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {planAcreages['12 months'].used.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)'}}>
-                      <span style={{color: '#666'}}>Available:</span> <strong>{planAcreages['12 months'].available.toFixed(2)} ac</strong>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {planAcreages['12 months'].available.toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-          {(planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
+
+          {/* Empty state when no acreages at all */}
+          {(!totalAcreage || totalAcreage === 0) &&
+           (!availableAcreage || availableAcreage === 0) &&
+           (!usedAcreage || usedAcreage === 0) &&
+           (planAcreages['1 month'].total === 0 || planAcreages['1 month'].total === null) && 
            (planAcreages['6 months'].total === 0 || planAcreages['6 months'].total === null) && 
            (planAcreages['12 months'].total === 0 || planAcreages['12 months'].total === null) && (
             <div className="card" style={{flex: 1, padding: '16px', textAlign: 'center', backgroundColor: '#f9fafb'}}>
