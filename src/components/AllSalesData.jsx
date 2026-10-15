@@ -63,14 +63,13 @@ export default function AllSalesData({ user, onPageChange }) {
       setLoading(true);
       const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
 
-      // List of sales users
-      const salesUsers = [
-        'Aymen', 'Chaturya', 'Priyanshu', 'Bhagwati', 'Harshitha', 'Shurti', 'Vijay K B',
-        'Mustaqeem', 'Akhil Kumar M', 'Amith', 'Rohini', 'Ashok', 'Lipsa', 'Pragya', 'Alisha',
-        'Shyamli', 'Rohith S', 'Fathima', 'Krishna', 'Purnima', 'Supriyo'
-      ];
+      // Fetch all sales data from API
+      const allSalesResponse = await axios.get(`${baseUrl}?allsalesdata=true`);
+      console.log('All Sales Data API Response:', allSalesResponse.data);
 
-      const salesDataPromises = salesUsers.map(async (salesName) => {
+      const salesUsers = allSalesResponse.data?.data || [];
+      const salesDataPromises = salesUsers.map(async (salesUser) => {
+        const salesName = salesUser.sales_name;
         const encodedUser = encodeURIComponent(salesName);
 
         try {
