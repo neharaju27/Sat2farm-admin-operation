@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Users, Target, DollarSign, CheckCircle, FileText, IndianRupee,
-  RefreshCw, X, Search, ArrowUpRight, ChevronDown, BarChart3
+  Users, Target, DollarSign, FileText, IndianRupee,
+  RefreshCw, X, Search, ChevronDown, BarChart3, ArrowUpRight, Edit
 } from "lucide-react";
 import axios from "axios";
 import toast from 'react-hot-toast';
@@ -41,7 +41,7 @@ export default function ProspectStatsCards({ user }) {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [availableMonths, setAvailableMonths] = useState([]);
   const isInitialLoad = useRef(true);
-  const [selectedOwner, setSelectedOwner] = useState('');
+  const [selectedOwner, setSelectedOwner] = useState('all');
   const [ownerOptions, setOwnerOptions] = useState([]);
   const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
   const ownerDropdownRef = useRef(null);
@@ -51,38 +51,62 @@ export default function ProspectStatsCards({ user }) {
     invoicedAmount: 0,
     paidAmount: 0,
     totalDealAmount: 0,
+    expectedRevenue: 0,
     closedLostAmount: 0,
-    pendingAmount: 0
+    pendingAmount: 0,
+    totalPaidAmount: 0,
+    overdueDeals: 0,
+    overdueAmount: 0
   });
-  const [accountsData, setAccountsData] = useState(null);
-  const [showAccountsTable, setShowAccountsTable] = useState(false);
-  const [dealsData, setDealsData] = useState(null);
-  const [otherDealsData, setOtherDealsData] = useState(null);
-  const [paidInvoicedData, setPaidInvoicedData] = useState(null);
-  const [paidData, setPaidData] = useState(null);
-  const [closedLostDealsData, setClosedLostDealsData] = useState(null);
-  const [showDealsTable, setShowDealsTable] = useState(false);
   const [showOwnerSummaryTable, setShowOwnerSummaryTable] = useState(false);
   const [ownerSummaryData, setOwnerSummaryData] = useState(null);
   const [ownerSummaryLoading, setOwnerSummaryLoading] = useState(false);
-  const [dealsFilterType, setDealsFilterType] = useState('all'); // 'all', 'invoiced', 'paid', 'closed_lost'
-  const [accountsSearchTerm, setAccountsSearchTerm] = useState('');
-  const [dealsSearchTerm, setDealsSearchTerm] = useState('');
   const [ownerSummarySearchTerm, setOwnerSummarySearchTerm] = useState('');
-  const [selectedDealHistory, setSelectedDealHistory] = useState(null);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  
-  // Date filter states
-  const [dateType, setDateType] = useState('on');
-  const [showDateTypeDropdown, setShowDateTypeDropdown] = useState(false);
-  const dateTypeRef = useRef(null);
-  const [dateValue, setDateValue] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [lastCount, setLastCount] = useState(7);
-  const [lastUnit, setLastUnit] = useState('days');
-  const [showLastUnitDropdown, setShowLastUnitDropdown] = useState(false);
-  const lastUnitRef = useRef(null);
+  const [showProspectDetails, setShowProspectDetails] = useState(false);
+  const [prospectDetailsData, setProspectDetailsData] = useState(null);
+  const [prospectDetailsLoading, setProspectDetailsLoading] = useState(false);
+  const [prospectDetailsSearchTerm, setProspectDetailsSearchTerm] = useState('');
+  const [showDealDetails, setShowDealDetails] = useState(false);
+  const [dealDetailsData, setDealDetailsData] = useState(null);
+  const [dealDetailsLoading, setDealDetailsLoading] = useState(false);
+  const [dealDetailsSearchTerm, setDealDetailsSearchTerm] = useState('');
+  const [showInvoicedDetails, setShowInvoicedDetails] = useState(false);
+  const [invoicedDetailsData, setInvoicedDetailsData] = useState(null);
+  const [invoicedDetailsLoading, setInvoicedDetailsLoading] = useState(false);
+  const [invoicedDetailsSearchTerm, setInvoicedDetailsSearchTerm] = useState('');
+  const [showPaymentReceivedDetails, setShowPaymentReceivedDetails] = useState(false);
+  const [paymentReceivedDetailsData, setPaymentReceivedDetailsData] = useState(null);
+  const [paymentReceivedDetailsLoading, setPaymentReceivedDetailsLoading] = useState(false);
+  const [paymentReceivedDetailsSearchTerm, setPaymentReceivedDetailsSearchTerm] = useState('');
+  const [showTotalPaidDetails, setShowTotalPaidDetails] = useState(false);
+  const [totalPaidDetailsData, setTotalPaidDetailsData] = useState(null);
+  const [totalPaidDetailsLoading, setTotalPaidDetailsLoading] = useState(false);
+  const [totalPaidDetailsSearchTerm, setTotalPaidDetailsSearchTerm] = useState('');
+  const [showOverdueDetails, setShowOverdueDetails] = useState(false);
+  const [overdueDetailsData, setOverdueDetailsData] = useState(null);
+  const [overdueDetailsLoading, setOverdueDetailsLoading] = useState(false);
+  const [overdueDetailsSearchTerm, setOverdueDetailsSearchTerm] = useState('');
+  const [overdueSortOrder, setOverdueSortOrder] = useState('latest');
+  const [showTotalDealAmountDetails, setShowTotalDealAmountDetails] = useState(false);
+  const [totalDealAmountDetailsData, setTotalDealAmountDetailsData] = useState(null);
+  const [totalDealAmountDetailsLoading, setTotalDealAmountDetailsLoading] = useState(false);
+  const [totalDealAmountDetailsSearchTerm, setTotalDealAmountDetailsSearchTerm] = useState('');
+  const [showExpectedRevenueDetails, setShowExpectedRevenueDetails] = useState(false);
+  const [expectedRevenueDetailsData, setExpectedRevenueDetailsData] = useState(null);
+  const [expectedRevenueDetailsLoading, setExpectedRevenueDetailsLoading] = useState(false);
+  const [expectedRevenueDetailsSearchTerm, setExpectedRevenueDetailsSearchTerm] = useState('');
+  const [totalExpectedRevenue, setTotalExpectedRevenue] = useState(0);
+  const [closingDateHistory, setClosingDateHistory] = useState(null);
+  const [showClosingDateHistory, setShowClosingDateHistory] = useState(false);
+  const [closingDateHistoryLoading, setClosingDateHistoryLoading] = useState(false);
+  const [closingDateHistoryDealName, setClosingDateHistoryDealName] = useState('');
+  const [currentDealHistory, setCurrentDealHistory] = useState(null);
+  const [leadsWithHistory, setLeadsWithHistory] = useState(new Set());
+  const [leadIdToDealIdMap, setLeadIdToDealIdMap] = useState(new Map());
+  const [showClosingDateEditModal, setShowClosingDateEditModal] = useState(false);
+  const [editingClosingDateDeal, setEditingClosingDateDeal] = useState(null);
+  const [newClosingDate, setNewClosingDate] = useState('');
+  const [isUpdatingClosingDate, setIsUpdatingClosingDate] = useState(false);
 
   // Validate user prop
   if (!user) {
@@ -161,8 +185,86 @@ export default function ProspectStatsCards({ user }) {
     return `Synced ${hours}h ago`;
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const day = date.getDate();
+      const month = date.toLocaleString('default', { month: 'short' });
+      const year = date.getFullYear();
+      
+      return `${day} ${month} ${year}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
   const handleMonthSelect = (month) => {
     setSelectedMonth(month);
+  };
+
+  // Function to close all detail tables
+  const closeAllTables = () => {
+    setShowOwnerSummaryTable(false);
+    setShowProspectDetails(false);
+    setShowDealDetails(false);
+    setShowInvoicedDetails(false);
+    setShowPaymentReceivedDetails(false);
+    setShowTotalPaidDetails(false);
+    setShowOverdueDetails(false);
+    setShowTotalDealAmountDetails(false);
+    setShowExpectedRevenueDetails(false);
+  };
+
+  // Function to sort overdue details
+  const sortOverdueDetails = (data) => {
+    if (!data || data.length === 0) return data;
+    
+    const sortedData = [...data].sort((a, b) => {
+      const dateA = new Date(a.closing_date || a.stage_created_time || '1970-01-01');
+      const dateB = new Date(b.closing_date || b.stage_created_time || '1970-01-01');
+      
+      if (overdueSortOrder === 'latest') {
+        return dateB - dateA; // Latest first
+      } else {
+        return dateA - dateB; // Oldest first
+      }
+    });
+    
+    return sortedData;
+  };
+
+  // Function to get closing date history for a specific lead
+  const getLeadClosingDateHistory = (leadId) => {
+    if (!closingDateHistory || !leadId) return [];
+    return closingDateHistory.filter(item => String(item.lead_id) === String(leadId));
+  };
+
+  // Function to handle closing date click
+  const handleClosingDateClick = (deal, dealName) => {
+    const lookupId = getHistoryLookupId(deal);
+    const history = getLeadClosingDateHistory(lookupId);
+    if (history.length > 0) {
+      setCurrentDealHistory(history); // Set the filtered history for this specific lead
+      setClosingDateHistoryDealName(dealName || deal.deal_name || 'Unknown Deal');
+      setShowClosingDateHistory(true);
+    }
+  };
+
+  // Function to check if a lead has closing date history
+  const hasClosingDateHistory = (leadId, accountId) => {
+    if (!leadId && !accountId) return false;
+    // Check lead_id first, then fall back to account_id
+    if (leadId && leadsWithHistory.has(String(leadId))) return true;
+    if (accountId && leadsWithHistory.has(String(accountId))) return true;
+    return false;
+  };
+
+  // Function to get the appropriate ID for history lookup
+  const getHistoryLookupId = (deal) => {
+    return deal.lead_id || deal.account_id || deal.deal_id;
   };
 
   // Convert month label (e.g., "Sep 26") to API format (e.g., "2026-09")
@@ -204,45 +306,12 @@ export default function ProspectStatsCards({ user }) {
   };
 
   // ============================================================
-  // BUILD DATE FILTER QUERY
-  // ============================================================
-  const buildDateFilterQuery = ({
-    skipDateFilter = false,
-    filterState = {}
-  } = {}) => {
-    if (skipDateFilter) return '';
-
-    const type = filterState.dateType ?? dateType;
-    const value = filterState.dateValue ?? dateValue;
-    const from = filterState.dateFrom ?? dateFrom;
-    const to = filterState.dateTo ?? dateTo;
-    const count = filterState.lastCount ?? lastCount;
-    const unit = filterState.lastUnit ?? lastUnit;
-
-    if ((type === 'on' || type === 'before' || type === 'after') && value) {
-      return `&date_field=created_time&date_type=${type}&date=${encodeURIComponent(value)}`;
-    }
-
-    if (type === 'between' && from && to) {
-      return `&date_field=created_time&date_type=${type}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-    }
-
-    if (type === 'in_last' && count) {
-      return `&date_field=created_time&date_type=in_last&last_count=${encodeURIComponent(count)}&last_unit=${encodeURIComponent(unit)}`;
-    }
-
-    return '';
-  };
-
-  // ============================================================
   // FETCH PROSPECT DATA
   // ============================================================
   const fetchProspectData = async (month = selectedMonth, options = {}) => {
     const {
-      skipDateFilter = false,
       owner: ownerOverride,
-      forceRefresh = false,
-      filterState = {}
+      forceRefresh = false
     } = options;
 
     try {
@@ -257,20 +326,13 @@ export default function ProspectStatsCards({ user }) {
         return;
       }
 
-      const ownerToUse = ownerOverride !== undefined
-        ? ownerOverride
-        : (filterState.selectedOwner ?? selectedOwner);
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
 
       let apiUrl = `${prospectStatsUrl}?month=${encodeURIComponent(apiMonth)}`;
 
-      if (ownerToUse) {
+      if (ownerToUse && ownerToUse !== 'all') {
         apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
       }
-
-      apiUrl += buildDateFilterQuery({
-        skipDateFilter,
-        filterState
-      });
 
       // Prevent browser/proxy caching when the user explicitly refreshes.
       if (forceRefresh) {
@@ -281,14 +343,7 @@ export default function ProspectStatsCards({ user }) {
         apiUrl,
         month,
         ownerToUse,
-        skipDateFilter,
-        forceRefresh,
-        dateType: filterState.dateType ?? dateType,
-        dateValue: filterState.dateValue ?? dateValue,
-        dateFrom: filterState.dateFrom ?? dateFrom,
-        dateTo: filterState.dateTo ?? dateTo,
-        lastCount: filterState.lastCount ?? lastCount,
-        lastUnit: filterState.lastUnit ?? lastUnit
+        forceRefresh
       });
 
       const response = await axios.get(apiUrl, {
@@ -304,30 +359,37 @@ export default function ProspectStatsCards({ user }) {
       });
 
       if (response.data && response.data.status === 'success') {
-        const data = response.data;
+        const data = response.data.data;
 
         // Update available months from API response.
         if (data.filters && data.filters.available_months) {
           const monthLabels = extractMonthLabels(data.filters.available_months);
-          setAvailableMonths(monthLabels);
+          // Reverse order so first month comes at the end
+          const reversedMonthLabels = [...monthLabels].reverse();
+          setAvailableMonths(reversedMonthLabels);
 
           // First request only discovers the available months.
           // The second request is made by the selectedMonth effect.
-          if (isInitialLoad.current && monthLabels.length > 0) {
-            const lastMonth = monthLabels[monthLabels.length - 1];
+          if (isInitialLoad.current && reversedMonthLabels.length > 0) {
+            const lastMonth = reversedMonthLabels[reversedMonthLabels.length - 1];
             isInitialLoad.current = false;
             setSelectedMonth(lastMonth);
             return;
           }
         }
 
-        const totalProspects = Number(data.accounts?.total_accounts) || 0;
-        const totalDeals = Number(data.total_other?.total_deals) || 0;
-        const totalDealAmount = Number(data.total_other?.total_amount) || 0;
-        const paidAmount = Number(data.paid?.amount) || 0;
-        const invoicedAmount = Number(data.paid_invoiced?.amount) || 0;
-        const closedLostAmount = Number(data.closed_lost?.amount) || 0;
+        const summary = data.summary || {};
+        const totalProspects = Number(summary.total_prospects?.count) || 0;
+        const totalDeals = Number(summary.total_deals?.count) || 0;
+        const totalDealAmount = Number(summary.total_deal_amount?.amount) || 0;
+        const paidAmount = Number(summary.payment_received_amount?.amount) || 0;
+        const invoicedAmount = Number(summary.invoiced_amount?.amount) || 0;
+        const closedLostAmount = 0; // Not provided in new API
         const pendingAmount = Math.max(0, invoicedAmount - paidAmount);
+        const totalPaidAmount = Number(summary.total_paid_amount?.amount) || 0;
+        const overdueDeals = Number(summary.overdue_deals?.count) || 0;
+        const overdueAmount = Number(summary.overdue_deals?.amount) || 0;
+        const expectedRevenue = Number(summary.expected_revenue?.amount) || 0;
 
         setMetrics({
           totalProspects,
@@ -335,15 +397,16 @@ export default function ProspectStatsCards({ user }) {
           invoicedAmount,
           paidAmount,
           totalDealAmount,
+          expectedRevenue,
           closedLostAmount,
-          pendingAmount
+          pendingAmount,
+          totalPaidAmount,
+          overdueDeals,
+          overdueAmount
         });
 
-        setAccountsData(data.accounts?.details || []);
-        setOtherDealsData(data.total_other?.details || []);
-        setPaidData(data.paid?.details || []);
-        setPaidInvoicedData(data.paid_invoiced?.details || []);
-        setClosedLostDealsData(data.closed_lost?.details || []);
+        // Set owner summary data from the new API
+        setOwnerSummaryData(data.owner_summary || []);
         setLastUpdated(new Date());
       } else {
         throw new Error('API returned unsuccessful status');
@@ -361,10 +424,8 @@ export default function ProspectStatsCards({ user }) {
   // ============================================================
   const fetchOwnerSummaryData = async (month = selectedMonth, options = {}) => {
     const {
-      skipDateFilter = false,
       owner: ownerOverride,
-      forceRefresh = false,
-      filterState = {}
+      forceRefresh = false
     } = options;
 
     try {
@@ -379,21 +440,15 @@ export default function ProspectStatsCards({ user }) {
         return;
       }
 
-      const ownerToUse = ownerOverride !== undefined
-        ? ownerOverride
-        : (filterState.selectedOwner ?? selectedOwner);
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
 
       let apiUrl = `${ownerSummaryUrl}?month=${encodeURIComponent(apiMonth)}`;
 
-      if (ownerToUse) {
+      if (ownerToUse && ownerToUse !== 'all') {
         apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
       }
 
-      apiUrl += buildDateFilterQuery({
-        skipDateFilter,
-        filterState
-      });
-
+      // Prevent browser/proxy caching when the user explicitly refreshes.
       if (forceRefresh) {
         apiUrl += `&refresh=${Date.now()}`;
       }
@@ -408,7 +463,8 @@ export default function ProspectStatsCards({ user }) {
       });
 
       if (response.data && response.data.status === 'success') {
-        setOwnerSummaryData(response.data.owner_summary || []);
+        const data = response.data.data;
+        setOwnerSummaryData(data.owner_summary || []);
       } else {
         throw new Error('API returned unsuccessful status');
       }
@@ -418,6 +474,646 @@ export default function ProspectStatsCards({ user }) {
       setOwnerSummaryData([]);
     } finally {
       setOwnerSummaryLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH PROSPECT DETAILS
+  // ============================================================
+  const fetchProspectDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setProspectDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const prospectDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!prospectDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${prospectDetailsUrl}?type=prospects&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH PROSPECT DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setProspectDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching prospect details:', error);
+      toast.error('Failed to load prospect details');
+      setProspectDetailsData([]);
+    } finally {
+      setProspectDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH DEAL DETAILS
+  // ============================================================
+  const fetchDealDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setDealDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const dealDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!dealDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${dealDetailsUrl}?type=deals&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH DEAL DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setDealDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching deal details:', error);
+      toast.error('Failed to load deal details');
+      setDealDetailsData([]);
+    } finally {
+      setDealDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH INVOICED DETAILS
+  // ============================================================
+  const fetchInvoicedDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setInvoicedDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const invoicedDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!invoicedDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${invoicedDetailsUrl}?type=invoiced&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH INVOICED DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setInvoicedDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching invoiced details:', error);
+      toast.error('Failed to load invoiced details');
+      setInvoicedDetailsData([]);
+    } finally {
+      setInvoicedDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH PAYMENT RECEIVED DETAILS
+  // ============================================================
+  const fetchPaymentReceivedDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setPaymentReceivedDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const paymentReceivedDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!paymentReceivedDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${paymentReceivedDetailsUrl}?type=payment_received&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH PAYMENT RECEIVED DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setPaymentReceivedDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching payment received details:', error);
+      toast.error('Failed to load payment received details');
+      setPaymentReceivedDetailsData([]);
+    } finally {
+      setPaymentReceivedDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH TOTAL PAID DETAILS
+  // ============================================================
+  const fetchTotalPaidDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setTotalPaidDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const totalPaidDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!totalPaidDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${totalPaidDetailsUrl}?type=total_paid&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH TOTAL PAID DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setTotalPaidDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching total paid details:', error);
+      toast.error('Failed to load total paid details');
+      setTotalPaidDetailsData([]);
+    } finally {
+      setTotalPaidDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH OVERDUE DETAILS
+  // ============================================================
+  const fetchOverdueDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setOverdueDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const overdueDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!overdueDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${overdueDetailsUrl}?type=overdue_deals&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH OVERDUE DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setOverdueDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching overdue details:', error);
+      toast.error('Failed to load overdue details');
+      setOverdueDetailsData([]);
+    } finally {
+      setOverdueDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH TOTAL DEAL AMOUNT DETAILS
+  // ============================================================
+  const fetchTotalDealAmountDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setTotalDealAmountDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const totalDealAmountDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!totalDealAmountDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${totalDealAmountDetailsUrl}?type=total_deal_amount&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH TOTAL DEAL AMOUNT DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setTotalDealAmountDetailsData(response.data.data || []);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching total deal amount details:', error);
+      toast.error('Failed to load total deal amount details');
+      setTotalDealAmountDetailsData([]);
+    } finally {
+      setTotalDealAmountDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH EXPECTED REVENUE DETAILS
+  // ============================================================
+  const fetchExpectedRevenueDetails = async (month = selectedMonth, options = {}) => {
+    const {
+      owner: ownerOverride,
+      forceRefresh = false
+    } = options;
+
+    try {
+      setExpectedRevenueDetailsLoading(true);
+
+      const apiMonth = convertMonthToApiFormat(month);
+      const expectedRevenueDetailsUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!expectedRevenueDetailsUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      const ownerToUse = ownerOverride !== undefined ? ownerOverride : selectedOwner;
+
+      let apiUrl = `${expectedRevenueDetailsUrl}?type=expected_revenue&month=${encodeURIComponent(apiMonth)}`;
+
+      if (ownerToUse && ownerToUse !== 'all') {
+        apiUrl += `&owner=${encodeURIComponent(String(ownerToUse).toLowerCase())}`;
+      }
+
+      // Prevent browser/proxy caching when the user explicitly refreshes.
+      if (forceRefresh) {
+        apiUrl += `&refresh=${Date.now()}`;
+      }
+
+      console.log('FETCH EXPECTED REVENUE DETAILS:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        setExpectedRevenueDetailsData(response.data.data || []);
+
+        // Update expected revenue metric from API response details
+        if (response.data.details && response.data.details.total_expected_revenue !== undefined) {
+          const totalRevenue = Number(response.data.details.total_expected_revenue) || 0;
+          setTotalExpectedRevenue(totalRevenue);
+          setMetrics(prevMetrics => ({
+            ...prevMetrics,
+            expectedRevenue: totalRevenue
+          }));
+        }
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching expected revenue details:', error);
+      toast.error('Failed to load expected revenue details');
+      setExpectedRevenueDetailsData([]);
+    } finally {
+      setExpectedRevenueDetailsLoading(false);
+    }
+  };
+
+  // ============================================================
+  // FETCH CLOSING DATE HISTORY
+  // ============================================================
+  const fetchClosingDateHistory = async () => {
+    try {
+      setClosingDateHistoryLoading(true);
+
+      const closingDateHistoryUrl = import.meta.env.VITE_PROSPECT_DETAILS_API_URL;
+
+      if (!closingDateHistoryUrl) {
+        console.error('VITE_PROSPECT_DETAILS_API_URL not defined');
+        toast.error('API configuration error');
+        return;
+      }
+
+      let apiUrl = `${closingDateHistoryUrl}?type=closing_date`;
+
+      console.log('FETCH CLOSING DATE HISTORY:', apiUrl);
+
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
+
+      if (response.data && response.data.status === 'success') {
+        const historyData = response.data.data || [];
+        setClosingDateHistory(historyData);
+        
+        // Extract lead_ids that have history and create lead_id to deal_id mapping
+        const leadIdsWithHistory = new Set();
+        const leadToDealMap = new Map();
+        historyData.forEach(item => {
+          if (item.lead_id) {
+            leadIdsWithHistory.add(String(item.lead_id));
+            // Map lead_id to deal_id for lookup
+            if (!leadToDealMap.has(String(item.lead_id))) {
+              leadToDealMap.set(String(item.lead_id), String(item.deal_id));
+            }
+          }
+        });
+        setLeadsWithHistory(leadIdsWithHistory);
+        setLeadIdToDealIdMap(leadToDealMap);
+        
+        console.log('Leads with history:', leadIdsWithHistory);
+        console.log('Lead to deal mapping:', leadToDealMap);
+      } else {
+        throw new Error('API returned unsuccessful status');
+      }
+    } catch (error) {
+      console.error('Error fetching closing date history:', error);
+      toast.error('Failed to load closing date history');
+      setClosingDateHistory([]);
+      setLeadsWithHistory(new Set());
+    } finally {
+      setClosingDateHistoryLoading(false);
+    }
+  };
+
+  // ============================================================
+  // UPDATE CLOSING DATE
+  // ============================================================
+  const handleClosingDateEdit = (deal) => {
+    setEditingClosingDateDeal(deal);
+    // Convert closing_date to YYYY-MM-DD format for date input
+    let formattedDate = '';
+    if (deal.closing_date) {
+      try {
+        const date = new Date(deal.closing_date);
+        if (!isNaN(date.getTime())) {
+          formattedDate = date.toISOString().split('T')[0];
+        }
+      } catch (error) {
+        console.error('Error formatting date:', error);
+      }
+    }
+    setNewClosingDate(formattedDate);
+    setShowClosingDateEditModal(true);
+  };
+
+  const handleClosingDateUpdate = async () => {
+    if (!editingClosingDateDeal || !newClosingDate) {
+      toast.error('Please select a closing date');
+      return;
+    }
+
+    try {
+      setIsUpdatingClosingDate(true);
+      toast.loading('Updating closing date...', { id: 'closing-date-update-toast' });
+
+      const updateDealUrl = import.meta.env.VITE_UPDATE_CLOSE_DATE_API_URL;
+
+      if (!updateDealUrl) {
+        toast.dismiss('closing-date-update-toast');
+        toast.error('Update Deal API URL not configured');
+        return;
+      }
+
+      const dealId = editingClosingDateDeal.deal_id || editingClosingDateDeal.id;
+      const currentUserName = user?.name || user?.fullName || user?.first_name || 'Operation User';
+
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        deal_close_date: newClosingDate,
+        user: currentUserName
+      };
+
+      console.log('UPDATING CLOSING DATE:', requestBody);
+
+      // Construct URL with query parameters (matching Opportunities component pattern)
+      const dealUrl = `${updateDealUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&deal_close_date=${encodeURIComponent(newClosingDate)}`;
+
+      const response = await fetch(dealUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('CLOSING DATE UPDATE RESPONSE STATUS:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('CLOSING DATE UPDATE RESPONSE:', result);
+
+      toast.dismiss('closing-date-update-toast');
+      toast.success('Closing date updated successfully');
+
+      // Refresh the data to show updated closing date
+      if (showDealDetails) {
+        await fetchDealDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showInvoicedDetails) {
+        await fetchInvoicedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showPaymentReceivedDetails) {
+        await fetchPaymentReceivedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalPaidDetails) {
+        await fetchTotalPaidDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showOverdueDetails) {
+        await fetchOverdueDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalDealAmountDetails) {
+        await fetchTotalDealAmountDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showExpectedRevenueDetails) {
+        await fetchExpectedRevenueDetails(selectedMonth, { forceRefresh: true });
+      }
+
+      // Refresh closing date history
+      await fetchClosingDateHistory();
+
+      setShowClosingDateEditModal(false);
+      setEditingClosingDateDeal(null);
+      setNewClosingDate('');
+    } catch (error) {
+      console.error('Error updating closing date:', error);
+      toast.dismiss('closing-date-update-toast');
+      toast.error('Failed to update closing date');
+    } finally {
+      setIsUpdatingClosingDate(false);
     }
   };
 
@@ -443,14 +1139,6 @@ export default function ProspectStatsCards({ user }) {
       if (ownerDropdownRef.current && !ownerDropdownRef.current.contains(target)) {
         setShowOwnerDropdown(false);
       }
-
-      if (dateTypeRef.current && !dateTypeRef.current.contains(target)) {
-        setShowDateTypeDropdown(false);
-      }
-
-      if (lastUnitRef.current && !lastUnitRef.current.contains(target)) {
-        setShowLastUnitDropdown(false);
-      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -471,108 +1159,57 @@ export default function ProspectStatsCards({ user }) {
         forceRefresh: true
       });
     }
-  }, [selectedMonth, selectedOwner]);
 
-  // ============================================================
-  // APPLY FILTER
-  // ============================================================
-  const handleApplyFilter = async () => {
-    if (!selectedMonth || refreshing) return;
-
-    setRefreshing(true);
-    setLoading(true);
-
-    try {
-      const currentFilterState = {
-        dateType,
-        dateValue,
-        dateFrom,
-        dateTo,
-        lastCount,
-        lastUnit,
-        selectedOwner
-      };
-
-      await fetchProspectData(selectedMonth, {
-        filterState: currentFilterState,
+    if (showProspectDetails) {
+      fetchProspectDetails(selectedMonth, {
         forceRefresh: true
       });
-
-      if (showOwnerSummaryTable) {
-        await fetchOwnerSummaryData(selectedMonth, {
-          filterState: currentFilterState,
-          forceRefresh: true
-        });
-      }
-
-      toast.success('Filter applied and data refreshed');
-    } catch (error) {
-      console.error('Error applying filter:', error);
-      toast.error('Failed to apply filter');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
 
-  // ============================================================
-  // REMOVE FILTER
-  // ============================================================
-  const handleRemoveFilter = async () => {
-    if (!selectedMonth || refreshing) return;
-
-    setDateType('on');
-    setDateValue('');
-    setDateFrom('');
-    setDateTo('');
-    setLastCount(7);
-    setLastUnit('days');
-
-    setRefreshing(true);
-    setLoading(true);
-
-    try {
-      // Explicitly skip the old date filter so React's asynchronous
-      // state updates cannot cause the old filter to be sent again.
-      await fetchProspectData(selectedMonth, {
-        skipDateFilter: true,
-        forceRefresh: true,
-        filterState: {
-          dateType: 'on',
-          dateValue: '',
-          dateFrom: '',
-          dateTo: '',
-          lastCount: 7,
-          lastUnit: 'days',
-          selectedOwner
-        }
+    if (showDealDetails) {
+      fetchDealDetails(selectedMonth, {
+        forceRefresh: true
       });
-
-      if (showOwnerSummaryTable) {
-        await fetchOwnerSummaryData(selectedMonth, {
-          skipDateFilter: true,
-          forceRefresh: true,
-          filterState: {
-            dateType: 'on',
-            dateValue: '',
-            dateFrom: '',
-            dateTo: '',
-            lastCount: 7,
-            lastUnit: 'days',
-            selectedOwner
-          }
-        });
-      }
-
-      toast.success('Filter removed and data refreshed');
-    } catch (error) {
-      console.error('Error removing filter:', error);
-      toast.error('Failed to refresh data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+
+    if (showInvoicedDetails) {
+      fetchInvoicedDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+
+    if (showPaymentReceivedDetails) {
+      fetchPaymentReceivedDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+
+    if (showTotalPaidDetails) {
+      fetchTotalPaidDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+
+    if (showOverdueDetails) {
+      fetchOverdueDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+
+    if (showTotalDealAmountDetails) {
+      fetchTotalDealAmountDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+
+    if (showExpectedRevenueDetails) {
+      fetchExpectedRevenueDetails(selectedMonth, {
+        forceRefresh: true
+      });
+    }
+  }, [selectedMonth, selectedOwner]);
+
+
 
   // ============================================================
   // MANUAL REFRESH
@@ -584,24 +1221,24 @@ export default function ProspectStatsCards({ user }) {
     setLoading(true);
 
     try {
-      const currentFilterState = {
-        dateType,
-        dateValue,
-        dateFrom,
-        dateTo,
-        lastCount,
-        lastUnit,
-        selectedOwner
-      };
-
       await fetchProspectData(selectedMonth, {
-        filterState: currentFilterState,
         forceRefresh: true
       });
 
       if (showOwnerSummaryTable) {
         await fetchOwnerSummaryData(selectedMonth, {
-          filterState: currentFilterState,
+          forceRefresh: true
+        });
+      }
+
+      if (showTotalDealAmountDetails) {
+        await fetchTotalDealAmountDetails(selectedMonth, {
+          forceRefresh: true
+        });
+      }
+
+      if (showExpectedRevenueDetails) {
+        await fetchExpectedRevenueDetails(selectedMonth, {
           forceRefresh: true
         });
       }
@@ -627,10 +1264,14 @@ export default function ProspectStatsCards({ user }) {
       subtitle: 'Active leads in pipeline',
       isCurrency: false,
       onClick: () => {
-        setAccountsSearchTerm('');
-        setShowDealsTable(false); // Close deals table if open
-        setShowOwnerSummaryTable(false); // Close owner summary table if open
-        setShowAccountsTable(true);
+        closeAllTables();
+        setProspectDetailsSearchTerm('');
+        setShowProspectDetails(true);
+        fetchProspectDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     },
     {
@@ -642,11 +1283,14 @@ export default function ProspectStatsCards({ user }) {
       subtitle: 'All deal stages',
       isCurrency: false,
       onClick: () => {
-        setDealsSearchTerm('');
-        setDealsFilterType('total_other');
-        setShowAccountsTable(false); // Close accounts table if open
-        setShowOwnerSummaryTable(false); // Close owner summary table if open
-        setShowDealsTable(true);
+        closeAllTables();
+        setDealDetailsSearchTerm('');
+        setShowDealDetails(true);
+        fetchDealDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     },
     {
@@ -658,11 +1302,30 @@ export default function ProspectStatsCards({ user }) {
       subtitle: 'All deal stages value',
       isCurrency: true,
       onClick: () => {
-        setDealsSearchTerm('');
-        setDealsFilterType('total_other');
-        setShowAccountsTable(false);
-        setShowOwnerSummaryTable(false);
-        setShowDealsTable(true);
+        closeAllTables();
+        setTotalDealAmountDetailsSearchTerm('');
+        setShowTotalDealAmountDetails(true);
+        fetchTotalDealAmountDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
+      }
+    },
+    {
+      key: 'expectedRevenue',
+      title: 'Expected Revenue',
+      value: metrics.expectedRevenue,
+      icon: ArrowUpRight,
+      accent: palette.slate,
+      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 && !isNaN(metrics.expectedRevenue)
+        ? `${((metrics.expectedRevenue / metrics.totalDealAmount) * 100).toFixed(1)}% of total`
+        : 'Projected revenue',
+      isCurrency: true,
+      onClick: () => {
+        closeAllTables();
+        setShowExpectedRevenueDetails(true);
+        fetchExpectedRevenueDetails(selectedMonth, { forceRefresh: true });
       }
     },
     {
@@ -676,11 +1339,14 @@ export default function ProspectStatsCards({ user }) {
         : 'Total invoiced value',
       isCurrency: true,
       onClick: () => {
-        setDealsSearchTerm('');
-        setDealsFilterType('paid_invoiced');
-        setShowAccountsTable(false); // Close accounts table if open
-        setShowOwnerSummaryTable(false); // Close owner summary table if open
-        setShowDealsTable(true);
+        closeAllTables();
+        setInvoicedDetailsSearchTerm('');
+        setShowInvoicedDetails(true);
+        fetchInvoicedDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     },
     {
@@ -694,29 +1360,52 @@ export default function ProspectStatsCards({ user }) {
         : 'Amount collected',
       isCurrency: true,
       onClick: () => {
-        setDealsSearchTerm('');
-        setDealsFilterType('paid');
-        setShowAccountsTable(false); // Close accounts table if open
-        setShowOwnerSummaryTable(false); // Close owner summary table if open
-        setShowDealsTable(true);
+        closeAllTables();
+        setPaymentReceivedDetailsSearchTerm('');
+        setShowPaymentReceivedDetails(true);
+        fetchPaymentReceivedDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     },
     {
-      key: 'closedLostAmount',
-      title: 'Closed Lost Amount',
-      value: metrics.closedLostAmount,
-      icon: X,
-      accent: palette.rust,
-      subtitle: metrics.totalDealAmount && metrics.totalDealAmount > 0 && !isNaN(metrics.closedLostAmount)
-        ? `${((metrics.closedLostAmount / metrics.totalDealAmount) * 100).toFixed(1)}% of total`
-        : 'Lost deal value',
+      key: 'totalPaidAmount',
+      title: 'Total Paid Amount',
+      value: metrics.totalPaidAmount,
+      icon: DollarSign,
+      accent: palette.growth,
+      subtitle: 'Cumulative payments received',
       isCurrency: true,
       onClick: () => {
-        setDealsSearchTerm('');
-        setDealsFilterType('closed_lost');
-        setShowAccountsTable(false);
-        setShowOwnerSummaryTable(false);
-        setShowDealsTable(true);
+        closeAllTables();
+        setTotalPaidDetailsSearchTerm('');
+        setShowTotalPaidDetails(true);
+        fetchTotalPaidDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
+      }
+    },
+    {
+      key: 'overdueDeals',
+      title: 'Overdue Deals',
+      value: metrics.overdueDeals,
+      icon: Target,
+      accent: palette.rust,
+      subtitle: `${formatCurrency(metrics.overdueAmount)} overdue`,
+      isCurrency: false,
+      onClick: () => {
+        closeAllTables();
+        setOverdueDetailsSearchTerm('');
+        setShowOverdueDetails(true);
+        fetchOverdueDetails(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     },
     {
@@ -728,11 +1417,14 @@ export default function ProspectStatsCards({ user }) {
       subtitle: 'Complete sales overview',
       isCurrency: false,
       onClick: () => {
+        closeAllTables();
         setOwnerSummarySearchTerm('');
-        setShowAccountsTable(false);
-        setShowDealsTable(false);
         setShowOwnerSummaryTable(true);
-        fetchOwnerSummaryData();
+        fetchOwnerSummaryData(selectedMonth);
+        // Ensure closing date history is loaded
+        if (!closingDateHistory) {
+          fetchClosingDateHistory();
+        }
       }
     }
   ];
@@ -746,8 +1438,8 @@ export default function ProspectStatsCards({ user }) {
         .fr-mono { font-family: var(--font-mono), monospace; }
 
         @keyframes frFadeUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(20px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes frPulse {
           0%, 100% { opacity: 1; }
@@ -823,7 +1515,7 @@ export default function ProspectStatsCards({ user }) {
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.growth}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
               >
-                {selectedOwner || 'All Owners'}
+                {selectedOwner === 'all' ? 'All Owners' : selectedOwner}
                 <ChevronDown size={14} />
               </button>
               
@@ -846,7 +1538,7 @@ export default function ProspectStatsCards({ user }) {
                 >
                   <div
                     onClick={() => {
-                      setSelectedOwner('');
+                      setSelectedOwner('all');
                       setShowOwnerDropdown(false);
                     }}
                     style={{
@@ -883,343 +1575,6 @@ export default function ProspectStatsCards({ user }) {
               )}
             </div>
           </div>
-
-          {/* Date Type Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>Choose Date Type:</span>
-            <div style={{ position: 'relative' }} ref={dateTypeRef}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowDateTypeDropdown(!showDateTypeDropdown);
-                }}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-mono), monospace',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  minWidth: '140px',
-                  justifyContent: 'space-between'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
-              >
-                {dateType}
-                <ChevronDown size={14} />
-              </button>
-              
-              {showDateTypeDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    background: palette.surface,
-                    border: `1px solid ${palette.border}`,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    zIndex: 1000
-                  }}
-                >
-                  {['on', 'before', 'after', 'between', 'in_last'].map((type) => (
-                    <div
-                      key={type}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDateType(type);
-                        setShowDateTypeDropdown(false);
-
-                        // Clear incompatible date values when changing filter type.
-                        if (type === 'on' || type === 'before' || type === 'after') {
-                          setDateFrom('');
-                          setDateTo('');
-                        } else if (type === 'between') {
-                          setDateValue('');
-                        } else if (type === 'in_last') {
-                          setDateValue('');
-                          setDateFrom('');
-                          setDateTo('');
-                        }
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        borderTop: type !== 'on' ? `1px solid ${palette.border}` : 'none'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                    >
-                      {type}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Conditional Date Inputs */}
-          {dateType === 'on' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="date"
-                value={dateValue}
-                onChange={(e) => setDateValue(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-            </div>
-          )}
-
-          {dateType === 'before' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="date"
-                value={dateValue}
-                onChange={(e) => setDateValue(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-            </div>
-          )}
-
-          {dateType === 'after' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="date"
-                value={dateValue}
-                onChange={(e) => setDateValue(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-            </div>
-          )}
-
-          {dateType === 'between' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-              <span className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft }}>to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-            </div>
-          )}
-
-          {/* 'custom' date type removed */}
-
-          {dateType === 'in_last' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="number"
-                value={lastCount}
-                onChange={(e) => setLastCount(e.target.value)}
-                min="1"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.border}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace',
-                  width: '70px'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-              />
-              <div style={{ position: 'relative' }} ref={lastUnitRef}>
-                <button
-                  onClick={() => setShowLastUnitDropdown(!showLastUnitDropdown)}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: `1px solid ${palette.border}`,
-                    fontSize: '13px',
-                    outline: 'none',
-                    background: palette.surface,
-                    color: palette.ink,
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-mono), monospace',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    minWidth: '90px',
-                    justifyContent: 'space-between'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.growth}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
-                >
-                  {lastUnit}
-                  <ChevronDown size={14} />
-                </button>
-                
-                {showLastUnitDropdown && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      marginTop: '4px',
-                      background: palette.surface,
-                      border: `1px solid ${palette.border}`,
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      zIndex: 10
-                    }}
-                  >
-                    {['days', 'weeks', 'months'].map((unit) => (
-                      <div
-                        key={unit}
-                        onClick={() => {
-                          setLastUnit(unit);
-                          setShowLastUnitDropdown(false);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          borderTop: unit !== 'days' ? `1px solid ${palette.border}` : 'none'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                      >
-                        {unit}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Apply / Remove Filter Buttons */}
-          {(dateValue || dateFrom || dateTo || (dateType === 'in_last' && lastCount)) && (
-            <>
-              <button
-                onClick={handleApplyFilter}
-                disabled={refreshing}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.growth}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.growth,
-                  color: '#ffffff',
-                  cursor: refreshing ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  opacity: refreshing ? 0.7 : 1
-                }}
-              >
-                <RefreshCw size={14} className={refreshing ? 'fr-spin' : ''} />
-                Apply Filter
-              </button>
-
-              <button
-                onClick={handleRemoveFilter}
-                disabled={refreshing}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: `1px solid ${palette.rust}`,
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.surface,
-                  color: palette.rust,
-                  cursor: refreshing ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  opacity: refreshing ? 0.7 : 1
-                }}
-                onMouseEnter={(e) => {
-                  if (!refreshing) e.currentTarget.style.background = '#FEF2F2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = palette.surface;
-                }}
-              >
-                <X size={14} />
-                Remove Filter
-              </button>
-            </>
-          )}
 
           <div
             className="fr-mono"
@@ -1310,12 +1665,6 @@ export default function ProspectStatsCards({ user }) {
               >
                 Prospect Overview
               </h1>
-              <p
-                className="fr-body"
-                style={{ color: '#2b2a29', fontSize: '14px', marginTop: '8px', maxWidth: '480px' }}
-              >
-                Track your prospect pipeline performance — from initial leads to final payments.
-              </p>
             </div>
           </div>
 
@@ -1362,16 +1711,16 @@ export default function ProspectStatsCards({ user }) {
                   style={{
                     animationDelay: `${index * 0.05}s`,
                     background: palette.surface,
-                    borderRadius: '12px',
-                    padding: '18px 20px 20px',
+                    borderRadius: '8px',
+                    padding: '14px 16px 16px',
                     border: `1px solid #b3b4b4`,
                     cursor: card.onClick ? 'pointer' : 'default',
                     transition: 'transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease',
                     position: 'relative'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.boxShadow = '0 10px 24px rgba(22, 36, 28, 0.08)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(22, 36, 28, 0.08)';
                     e.currentTarget.style.backgroundColor = '#f0fdf4';
                     e.currentTarget.style.borderColor = '#86efac';
                   }}
@@ -1385,40 +1734,27 @@ export default function ProspectStatsCards({ user }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div
                       style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
                         background: `${card.accent}1A`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}
                     >
-                      <Icon size={16} color={card.accent} />
+                      <Icon size={14} color={card.accent} />
                     </div>
                   </div>
 
                   <div
                     className="fr-mono"
-                    style={{ fontSize: '30px', fontWeight: 600, color: palette.ink, marginTop: '14px', lineHeight: 1 }}
+                    style={{ fontSize: '22px', fontWeight: 600, color: palette.ink, marginTop: '10px', lineHeight: 1 }}
                   >
                     {typeof card.value === 'string' ? card.value : (card.isCurrency ? formatCurrency(card.value) : formatNumber(card.value))}
                   </div>
-                  {(card.key === 'invoicedAmount' || card.key === 'paidAmount' || card.key === 'closedLostAmount') && metrics.totalDealAmount && metrics.totalDealAmount > 0 && typeof card.value === 'number' && !isNaN(card.value) && (
-                    <div
-                      style={{
-                        fontSize: '12px',
-                        color: card.accent,
-                        fontWeight: 600,
-                        marginTop: '4px',
-                        opacity: 0.85
-                      }}
-                    >
-                      {metrics.totalDealAmount > 0 ? ((card.value / metrics.totalDealAmount) * 100).toFixed(1) : '0'}% of total
-                    </div>
-                  )}
 
-                  <div className="fr-body" style={{ fontSize: '13px', color: palette.inkSoft, marginTop: '6px', fontWeight: 500 }}>
+                  <div className="fr-body" style={{ fontSize: '12px', color: palette.inkSoft, marginTop: '5px', fontWeight: 500 }}>
                     {card.title}
                   </div>
 
@@ -1427,8 +1763,8 @@ export default function ProspectStatsCards({ user }) {
                       className="fr-card-arrow"
                       style={{
                         position: 'absolute',
-                        top: '18px',
-                        right: '18px',
+                        top: '14px',
+                        right: '14px',
                         opacity: 0,
                         transition: 'all 0.18s ease',
                         color: palette.inkFaint
@@ -1442,666 +1778,17 @@ export default function ProspectStatsCards({ user }) {
             })}
           </div>
 
-          {/* Accounts Table */}
-          {showAccountsTable && (
-            <div className="sa-table-card" style={{ marginTop: '24px' }}>
-              {/* Table Header */}
-              <div
-                style={{
-                  padding: '20px 24px',
-                  borderBottom: `1px solid ${palette.border}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <h3
-                    className="fr-display"
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 500,
-                      color: palette.ink,
-                      margin: 0
-                    }}
-                  >
-                    Account Details
-                  </h3>
-                  <p
-                    className="fr-body"
-                    style={{
-                      fontSize: '13px',
-                      color: palette.inkSoft,
-                      margin: '4px 0 0 0'
-                    }}
-                  >
-                    Total Accounts: {accountsData?.length || 0} | Month: {selectedMonth}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowAccountsTable(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                >
-                  <X size={20} color={palette.inkSoft} />
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div
-                style={{
-                  padding: '16px 24px',
-                  borderBottom: `1px solid ${palette.border}`
-                }}
-              >
-                <div
-                  style={{
-                    position: 'relative',
-                    maxWidth: '400px'
-                  }}
-                >
-                  <Search
-                    size={16}
-                    color={palette.inkFaint}
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)'
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search by name, account, account number, contact, owner, city, type, deals..."
-                    value={accountsSearchTerm || ''}
-                    onChange={(e) => {
-                      try {
-                        setAccountsSearchTerm(e.target.value);
-                      } catch (error) {
-                        console.error('Error setting search term:', error);
-                      }
-                    }}
-                    style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 40px',
-                  border: `1px solid ${palette.border}`,
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.canvas,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                  onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-                  />
-                </div>
-              </div>
-
-              {/* Table Content */}
-              <div style={{ overflowX: 'auto' }}>
-                <table className="sa-table">
-                  <thead>
-                    <tr>
-                      <th>Prospect Name</th>
-                      <th>Account Name</th>
-                      <th>Account Number</th>
-                      <th>Contact</th>
-                      <th>Owner</th>
-                      <th>City</th>
-                      <th>Account Type</th>
-                      <th>Deals</th>
-                      <th>Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.isArray(accountsData) && accountsData.length > 0 ? (
-                      accountsData
-                        .filter(account => {
-                          if (!account) return false;
-                          if (accountsSearchTerm === '' || accountsSearchTerm === null || accountsSearchTerm === undefined) return true;
-                          const searchTerm = String(accountsSearchTerm).toLowerCase().trim();
-                          try {
-                            return (
-                              (String(account.full_name || '').toLowerCase()).includes(searchTerm) ||
-                              (String(account.account_name || '').toLowerCase()).includes(searchTerm) ||
-                              (String(account.account_number || '').toLowerCase()).includes(searchTerm) ||
-                              (String(account.email || '').toLowerCase()).includes(searchTerm) ||
-                              String(account.phone || '').includes(searchTerm) ||
-                              (String(account.owner || '').toLowerCase()).includes(searchTerm) ||
-                              (String(account.city || '').toLowerCase()).includes(searchTerm) ||
-                              (String(account.account_type || '').toLowerCase()).includes(searchTerm) ||
-                              String(account.deal_present || '').includes(searchTerm)
-                            );
-                          } catch (error) {
-                            console.error('Error filtering account:', error, account);
-                            return false;
-                          }
-                        })
-                        .map((account, index) => {
-                          if (!account) return null;
-                          try {
-                            return (
-                              <tr key={account.id || index} className="sa-table-row">
-                                <td>
-                                  <div className="sa-manager-cell">
-                                    <div className="sa-avatar">
-                                      {String(account.full_name || 'P').charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                      <div className="sa-manager-name">{account.full_name || 'N/A'}</div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>{account.account_name || 'N/A'}</td>
-                                <td>
-                                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '13px', color: palette.ink }}>
-                                    {account.account_number || 'N/A'}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div style={{ fontSize: '13px' }}>
-                                    <div style={{ fontWeight: 500 }}>{account.phone || 'N/A'}</div>
-                                    <div style={{ fontSize: '11px', color: palette.inkSoft }}>
-                                      {account.email || 'No email'}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>
-                                  <span
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      padding: '4px 10px',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      background: '#DCFCE7',
-                                      color: '#166534'
-                                    }}
-                                  >
-                                    {account.owner || 'Unassigned'}
-                                  </span>
-                                </td>
-                                <td>{account.city || 'N/A'}</td>
-                                <td>{account.account_type || 'N/A'}</td>
-                          <td>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                background: account.deal_present > 0 ? '#DCFCE7' : '#F1F5F9',
-                                color: account.deal_present > 0 ? '#166534' : '#64748B'
-                              }}
-                            >
-                              {account.deal_present || 0}
-                            </span>
-                          </td>
-                          <td>
-                            {account.created_time 
-                              ? new Date(account.created_time).toLocaleDateString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric'
-                                })
-                              : 'N/A'
-                            }
-                          </td>
-                              </tr>
-                            );
-                          } catch (error) {
-                            console.error('Error rendering account row:', error, account);
-                            return null;
-                          }
-                        })
-                    ) : (
-                      <tr>
-                        <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
-                          {loading ? 'Loading accounts...' : 'No accounts found'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Deals Table */}
-          {showDealsTable && (
-            <div className="sa-table-card" style={{ marginTop: '24px' }}>
-              {/* Table Header */}
-              <div
-                style={{
-                  padding: '20px 24px',
-                  borderBottom: `1px solid ${palette.border}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <div>
-                  <h3
-                    className="fr-display"
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 500,
-                      color: palette.ink,
-                      margin: 0
-                    }}
-                  >
-                    Deal Details
-                  </h3>
-                  <p
-                    className="fr-body"
-                    style={{
-                      fontSize: '13px',
-                      color: palette.inkSoft,
-                      margin: '4px 0 0 0'
-                    }}
-                  >
-                    {dealsFilterType === 'total_other' ? 'All Deals' : 
-                     dealsFilterType === 'paid_invoiced' ? 'Invoiced Deals' : 
-                     dealsFilterType === 'paid' ? 'Paid Deals' : 
-                     dealsFilterType === 'closed_lost' ? 'Closed Lost Deals' : 'Deals'}: {(() => {
-                       if (dealsFilterType === 'total_other') {
-                         return otherDealsData?.length || 0;
-                       } else if (dealsFilterType === 'paid_invoiced') {
-                         return paidInvoicedData?.length || 0;
-                       } else if (dealsFilterType === 'paid') {
-                         return paidData?.length || 0;
-                       } else if (dealsFilterType === 'closed_lost') {
-                         return closedLostDealsData?.length || 0;
-                       } else {
-                         return dealsData?.length || 0;
-                       }
-                     })()} | Month: {selectedMonth}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowDealsTable(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                >
-                  <X size={20} color={palette.inkSoft} />
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div
-                style={{
-                  padding: '16px 24px',
-                  borderBottom: `1px solid ${palette.border}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}
-              >
-                <div
-                  style={{
-                    position: 'relative',
-                    maxWidth: '400px',
-                    flex: 1
-                  }}
-                >
-                  <Search
-                    size={16}
-                    color={palette.inkFaint}
-                    style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)'
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search by deal, contact, account number, stage, owner, amount..."
-                    value={dealsSearchTerm}
-                    onChange={(e) => setDealsSearchTerm(e.target.value)}
-                    style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 40px',
-                  border: `1px solid ${palette.border}`,
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  background: palette.canvas,
-                  color: palette.ink,
-                  fontFamily: 'var(--font-mono), monospace'
-                }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
-                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
-                    />
-                </div>
-                
-                {/* Filter Buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setDealsFilterType('total_other')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: `1px solid ${dealsFilterType === 'total_other' ? palette.growth : palette.border}`,
-                      background: dealsFilterType === 'total_other' ? palette.growth : palette.surface,
-                      color: dealsFilterType === 'total_other' ? '#ffffff' : palette.ink,
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (dealsFilterType !== 'total_other') {
-                        e.currentTarget.style.background = palette.canvas;
-                        e.currentTarget.style.borderColor = palette.growth;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (dealsFilterType !== 'total_other') {
-                        e.currentTarget.style.background = palette.surface;
-                        e.currentTarget.style.borderColor = palette.border;
-                      }
-                    }}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setDealsFilterType('paid_invoiced')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: `1px solid ${dealsFilterType === 'paid_invoiced' ? palette.amberDeep : palette.border}`,
-                      background: dealsFilterType === 'paid_invoiced' ? palette.amberDeep : palette.surface,
-                      color: dealsFilterType === 'paid_invoiced' ? '#ffffff' : palette.ink,
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (dealsFilterType !== 'paid_invoiced') {
-                        e.currentTarget.style.background = palette.canvas;
-                        e.currentTarget.style.borderColor = palette.amberDeep;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (dealsFilterType !== 'paid_invoiced') {
-                        e.currentTarget.style.background = palette.surface;
-                        e.currentTarget.style.borderColor = palette.border;
-                      }
-                    }}
-                  >
-                    Invoiced
-                  </button>
-                  <button
-                    onClick={() => setDealsFilterType('paid')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: `1px solid ${dealsFilterType === 'paid' ? palette.teal : palette.border}`,
-                      background: dealsFilterType === 'paid' ? palette.teal : palette.surface,
-                      color: dealsFilterType === 'paid' ? '#ffffff' : palette.ink,
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (dealsFilterType !== 'paid') {
-                        e.currentTarget.style.background = palette.canvas;
-                        e.currentTarget.style.borderColor = palette.teal;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (dealsFilterType !== 'paid') {
-                        e.currentTarget.style.background = palette.surface;
-                        e.currentTarget.style.borderColor = palette.border;
-                      }
-                    }}
-                  >
-                    Paid
-                  </button>
-                  <button
-                    onClick={() => setDealsFilterType('closed_lost')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: `1px solid ${dealsFilterType === 'closed_lost' ? palette.rust : palette.border}`,
-                      background: dealsFilterType === 'closed_lost' ? palette.rust : palette.surface,
-                      color: dealsFilterType === 'closed_lost' ? '#ffffff' : palette.ink,
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (dealsFilterType !== 'closed_lost') {
-                        e.currentTarget.style.background = palette.canvas;
-                        e.currentTarget.style.borderColor = palette.rust;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (dealsFilterType !== 'closed_lost') {
-                        e.currentTarget.style.background = palette.surface;
-                        e.currentTarget.style.borderColor = palette.border;
-                      }
-                    }}
-                  >
-                    Closed Lost
-                  </button>
-                </div>
-              </div>
-
-              {/* Table Content */}
-              <div style={{ overflowX: 'auto' }}>
-                <table className="sa-table">
-                  <thead>
-                    <tr>
-                      <th>Deal Name</th>
-                      <th>Contact Name</th>
-                      <th>Account Number</th>
-                      <th>Amount</th>
-                      <th>Stage</th>
-                      <th>Deal Owner</th>
-                      <th>Closing Date</th>
-                      <th>Created Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      // Combine deals based on filter type
-                      let filteredDeals = [];
-                      if (dealsFilterType === 'total_other') {
-                        // Show total_other deals (for Total Deals and Total Deal Amount cards)
-                        filteredDeals = otherDealsData || [];
-                      } else if (dealsFilterType === 'paid_invoiced') {
-                        // Show paid_invoiced deals (for Invoiced Amount card)
-                        filteredDeals = paidInvoicedData || [];
-                      } else if (dealsFilterType === 'paid') {
-                        // Show paid deals (for Paid Amount card)
-                        filteredDeals = paidData || [];
-                      } else if (dealsFilterType === 'closed_lost') {
-                        // Show closed lost deals (for Closed Lost Amount card)
-                        filteredDeals = closedLostDealsData || [];
-                      } else {
-                        filteredDeals = dealsData || [];
-                      }
-                      
-                      return filteredDeals.length > 0 ? (
-                        filteredDeals
-                          .filter(deal => {
-                            // Find the associated account to get the contact name for search
-                            const associatedAccount = accountsData.find(account => account.id === deal.account_id);
-                            const contactName = deal.account_name || associatedAccount?.full_name || '';
-                            const accountNumber = deal.account_number || associatedAccount?.account_number || '';
-
-                            // Apply search filter
-                            if (dealsSearchTerm === '') return true;
-                            const searchTerm = dealsSearchTerm.toLowerCase().trim();
-                            return (
-                              (deal.deal_name?.toLowerCase() || '').includes(searchTerm) ||
-                              contactName.toLowerCase().includes(searchTerm) ||
-                              String(accountNumber).toLowerCase().includes(searchTerm) ||
-                              (deal.deal_stage?.toLowerCase() || '').includes(searchTerm) ||
-                              (deal.deal_owner?.toLowerCase() || '').includes(searchTerm) ||
-                              String(deal.deal_amount || '').includes(searchTerm)
-                            );
-                          })
-                        .map((deal, index) => {
-                          // Find the associated account to get the contact name (full_name)
-                          const associatedAccount = accountsData.find(account => account.id === deal.account_id);
-                          const contactName = deal.account_name || associatedAccount?.full_name || 'N/A';
-                          const accountNumber = deal.account_number || associatedAccount?.account_number || 'N/A';
-                          
-                          return (
-                        <tr key={deal.deal_id || index} className="sa-table-row">
-                          <td>
-                            <div className="sa-manager-name">{deal.deal_name || 'N/A'}</div>
-                          </td>
-                          <td>
-                            <div className="sa-manager-name">{contactName}</div>
-                          </td>
-                          <td>
-                            <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '13px', color: palette.ink }}>
-                              {accountNumber}
-                            </span>
-                          </td>
-                          <td>
-                            <span style={{ fontWeight: 600, color: palette.ink }}>
-                              {formatCurrency(deal.deal_amount || 0)}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                background: deal.deal_stage === 'Paid' ? '#DCFCE7' : 
-                                           deal.deal_stage === 'Invoiced' ? '#FEF3C7' :
-                                           deal.deal_stage === 'Closed Won' ? '#DCFCE7' :
-                                           deal.deal_stage === 'Proposal' ? '#DBEAFE' :
-                                           deal.deal_stage === 'Opportunity' ? '#E0E7FF' :
-                                           deal.deal_stage === 'Negotiation' ? '#FEF3C7' :
-                                           '#F1F5F9',
-                                color: deal.deal_stage === 'Paid' ? '#166534' :
-                                       deal.deal_stage === 'Invoiced' ? '#92400E' :
-                                       deal.deal_stage === 'Closed Won' ? '#166534' :
-                                       deal.deal_stage === 'Proposal' ? '#1E40AF' :
-                                       deal.deal_stage === 'Opportunity' ? '#4338CA' :
-                                       deal.deal_stage === 'Negotiation' ? '#92400E' :
-                                       '#64748B'
-                              }}
-                            >
-                              {deal.deal_stage || 'N/A'}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                background: '#DCFCE7',
-                                color: '#166534'
-                              }}
-                            >
-                              {deal.deal_owner || 'Unassigned'}
-                            </span>
-                          </td>
-                          <td>
-                            {deal.deal_close_date 
-                              ? (
-                                <span
-                                  onClick={() => {
-                                    if (deal.deal_close_date_history && deal.deal_close_date_history.length > 0) {
-                                      setSelectedDealHistory(deal);
-                                      setShowHistoryModal(true);
-                                    }
-                                  }}
-                                  style={{
-                                    cursor: deal.deal_close_date_history && deal.deal_close_date_history.length > 0 ? 'pointer' : 'default',
-                                    color: deal.deal_close_date_history && deal.deal_close_date_history.length > 0 ? '#3B82F6' : palette.ink,
-                                    textDecoration: deal.deal_close_date_history && deal.deal_close_date_history.length > 0 ? 'underline' : 'none'
-                                  }}
-                                >
-                                  {new Date(deal.deal_close_date).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                              )
-                              : 'N/A'
-                            }
-                          </td>
-                          <td>
-                            {deal.created_time 
-                              ? new Date(deal.created_time).toLocaleDateString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric'
-                                })
-                              : 'N/A'
-                            }
-                          </td>
-                        </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
-                          {loading ? 'Loading deals...' : `No ${dealsFilterType === 'total_other' ? '' : dealsFilterType.replace('_', ' ')} deals found`}
-                        </td>
-                      </tr>
-                    );
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {/* Owner Summary Table */}
           {showOwnerSummaryTable && (
-            <div className="sa-table-card" style={{ marginTop: '24px' }}>
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
               {/* Table Header */}
               <div
                 style={{
@@ -2201,16 +1888,18 @@ export default function ProspectStatsCards({ user }) {
               </div>
 
               {/* Table Content */}
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
                 <table className="sa-table">
                   <thead>
                     <tr>
-                      <th>Owner</th>
-                      <th>Accounts Count</th>
-                      <th>Deals Amount</th>
-                      <th>Invoiced Amount</th>
-                      <th>Paid Amount</th>
-                      <th>Closed Lost Amount</th>
+                      <th style={{ width: '18%' }} title="Owner">Owner</th>
+                      <th style={{ width: '10%' }} title="Accounts">Accounts</th>
+                      <th style={{ width: '10%' }} title="Deals">Deals</th>
+                      <th style={{ width: '14%' }} title="Invoiced">Invoiced</th>
+                      <th style={{ width: '14%' }} title="Paid Amount">Paid Amount</th>
+                      <th style={{ width: '14%' }} title="Total Paid">Total Paid</th>
+                      <th style={{ width: '14%' }} title="Expected Revenue">Expected Revenue</th>
+                      <th style={{ width: '14%' }} title="Overdue">Overdue</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2223,74 +1912,76 @@ export default function ProspectStatsCards({ user }) {
                         })
                         .map((owner, index) => (
                         <tr key={owner.owner || index} className="sa-table-row">
-                          <td>
-                            <div className="sa-manager-name">{owner.owner || 'N/A'}</div>
+                          <td style={{ width: '18%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div className="sa-manager-name" title={owner.owner || 'N/A'}>{owner.owner || 'N/A'}</div>
                           </td>
-                          <td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ fontWeight: 600, color: palette.ink }}>
-                              {owner.accounts?.count || 0}
+                              {owner.account_count || 0}
                             </span>
                           </td>
-                          <td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 600, color: palette.ink }}>
+                              {owner.deal_count || 0}
+                            </span>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.ink }}>
-                                {formatCurrency(owner.deals?.amount || 0)}
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: palette.amberDeep }}>
+                                {formatCurrency(owner.invoiced_amount || 0)}
                               </div>
-                              <div style={{ fontSize: '15px', color: palette.inkSoft, fontWeight: 600 }}>
-                                {owner.deals?.count || 0} deals
+                              <div style={{ fontSize: '11px', color: palette.inkSoft, fontWeight: 600 }}>
+                                {owner.invoiced_count || 0} invoiced
                               </div>
                             </div>
                           </td>
-                          <td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.amberDeep }}>
-                                {formatCurrency(owner.paid_invoiced?.amount || 0)}
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: palette.teal }}>
+                                {formatCurrency(owner.payment_received_amount || 0)}
                               </div>
-                              <div style={{ fontSize: '12px', color: palette.inkSoft, fontWeight: 600 }}>
-                                {owner.paid_invoiced?.count || 0} invoiced
+                              <div style={{ fontSize: '11px', color: palette.inkSoft, fontWeight: 600 }}>
+                                {owner.payment_received_count || 0} paid
                               </div>
-                              {owner.deals?.amount > 0 && (
-                                <div style={{ fontSize: '11px', color: palette.amberDeep, fontWeight: 500, marginTop: '2px' }}>
-                                  {((owner.paid_invoiced?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: palette.growth }}>
+                                {formatCurrency(owner.total_paid_amount || 0)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: palette.inkSoft, fontWeight: 600 }}>
+                                {owner.total_paid_count || 0} total
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }}>
+                                {formatCurrency(owner.expected_revenue || 0)}
+                              </div>
+                              {(owner.expected_revenue_count || 0) > 0 && (
+                                <div style={{ fontSize: '11px', color: palette.inkSoft, fontWeight: 600 }}>
+                                  {owner.expected_revenue_count} expected
                                 </div>
                               )}
                             </div>
                           </td>
-                          <td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.teal }}>
-                                {formatCurrency(owner.paid?.amount || 0)}
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: palette.rust }}>
+                                {formatCurrency(owner.overdue_amount || 0)}
                               </div>
-                              <div style={{ fontSize: '12px', color: palette.inkSoft, fontWeight: 600 }}>
-                                {owner.paid?.count || 0} paid
+                              <div style={{ fontSize: '11px', color: palette.inkSoft, fontWeight: 600 }}>
+                                {owner.overdue_count || 0} overdue
                               </div>
-                              {owner.deals?.amount > 0 && (
-                                <div style={{ fontSize: '11px', color: palette.teal, fontWeight: 500, marginTop: '2px' }}>
-                                  {((owner.paid?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: palette.rust }}>
-                                {formatCurrency(owner.closed_lost?.amount || 0)}
-                              </div>
-                              <div style={{ fontSize: '12px', color: palette.inkSoft, fontWeight: 600 }}>
-                                {owner.closed_lost?.count || 0} lost
-                              </div>
-                              {owner.deals?.amount > 0 && (
-                                <div style={{ fontSize: '11px', color: palette.rust, fontWeight: 500, marginTop: '2px' }}>
-                                  {((owner.closed_lost?.amount || 0) / owner.deals?.amount * 100).toFixed(1)}%
-                                </div>
-                              )}
                             </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
                           No owner summary data found
                         </td>
                       </tr>
@@ -2301,32 +1992,1954 @@ export default function ProspectStatsCards({ user }) {
             </div>
           )}
 
-          {/* Deal Close Date History Modal */}
-          {showHistoryModal && selectedDealHistory && (
+          {/* Prospect Details Table */}
+          {showProspectDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Prospect Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Prospects: {prospectDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowProspectDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by account name, contact, or owner..."
+                    value={prospectDetailsSearchTerm}
+                    onChange={(e) => setProspectDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '15%' }} title="Account Name">Account Name</th>
+                      <th style={{ width: '15%' }} title="Account Number">Account Number</th>
+                      <th style={{ width: '15%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '20%' }} title="Contact">Contact</th>
+                      <th style={{ width: '15%' }} title="Account Owner">Account Owner</th>
+                      <th style={{ width: '15%' }} title="Country">Country</th>
+                      <th style={{ width: '15%' }} title="Account Type">Account Type</th>
+                      <th style={{ width: '15%' }} title="Deal Present">Deal Present</th>
+                      <th style={{ width: '15%' }} title="Created">Created Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prospectDetailsLoading ? (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading prospect details...
+                        </td>
+                      </tr>
+                    ) : prospectDetailsData && prospectDetailsData.length > 0 ? (
+                      prospectDetailsData
+                        .filter(prospect => {
+                          if (prospectDetailsSearchTerm === '') return true;
+                          const searchTerm = prospectDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (prospect.account_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (prospect.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (prospect.account_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((prospect) => (
+                        <tr key={prospect.id} className="sa-table-row">
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={prospect.account_name || 'N/A'}>
+                              {prospect.account_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={prospect.account_number}>
+                              #{prospect.account_number}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={prospect.contact_name || 'N/A'}>
+                              {prospect.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={prospect.phone || 'N/A'}>
+                              {prospect.phone || 'N/A'}
+                            </div>
+                            <div style={{ color: palette.inkSoft, fontSize: '12px' }} title={prospect.email || 'N/A'}>
+                              {prospect.email || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={prospect.account_owner || 'N/A'}>
+                              {prospect.account_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.inkSoft, fontSize: '12px' }} title={prospect.country || 'N/A'}>
+                              {prospect.country || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={prospect.account_type || 'N/A'}>
+                              {prospect.account_type || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={prospect.deal_present || 0}>
+                              {prospect.deal_present || 0}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.inkSoft, fontSize: '12px' }} title={prospect.account_created_time || 'N/A'}>
+                              {formatDate(prospect.account_created_time)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No prospect details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Deal Details Table */}
+          {showDealDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Deal Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Deals: {dealDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDealDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, account, or owner..."
+                    value={dealDetailsSearchTerm}
+                    onChange={(e) => setDealDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '16%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '12%' }} title="Account Name">Account Name</th>
+                      <th style={{ width: '10%' }} title="Account Number">Account Number</th>
+                      <th style={{ width: '12%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '10%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Amount">Expected Amount</th>
+                      <th style={{ width: '10%' }} title="Stage">Stage</th>
+                      <th style={{ width: '12%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dealDetailsLoading ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading deal details...
+                        </td>
+                      </tr>
+                    ) : dealDetailsData && dealDetailsData.length > 0 ? (
+                      dealDetailsData
+                        .filter(deal => {
+                          if (dealDetailsSearchTerm === '') return true;
+                          const searchTerm = dealDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (deal.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.account_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((deal) => {
+                          const probability = deal.deal_probability || deal.probability || 0;
+                          const expectedAmount = deal.expected_revenue || (deal.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={deal.deal_id} className="sa-table-row">
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_name || 'N/A'}>
+                              {deal.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.account_name || 'N/A'}>
+                              {deal.account_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={deal.account_number}>
+                              #{deal.account_number}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.contact_name || 'N/A'}>
+                              {deal.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.growth }} title={formatCurrency(deal.amount || 0)}>
+                              {formatCurrency(deal.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedAmount)}>
+                              {formatCurrency(expectedAmount)}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: deal.stage === 'Closed Won' ? '#DCFCE7' :
+                                       deal.stage === 'Closed Lost' ? '#FEE2E2' : '#FEF3C7',
+                              color: deal.stage === 'Closed Won' ? '#166534' :
+                                     deal.stage === 'Closed Lost' ? '#991B1B' : '#92400E'
+                            }} title={deal.stage || 'N/A'}>
+                              {deal.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_owner || 'N/A'}>
+                              {deal.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(deal.lead_id, deal.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'underline' : 'none'
+                                }}
+                                title={deal.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(deal.lead_id, deal.account_id) && handleClosingDateClick(deal, deal.deal_name)}
+                              >
+                                {formatDate(deal.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(deal)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No deal details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Invoiced Details Table */}
+          {showInvoicedDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Invoiced Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Invoiced: {invoicedDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowInvoicedDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, contact, or owner..."
+                    value={invoicedDetailsSearchTerm}
+                    onChange={(e) => setInvoicedDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '20%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '14%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '12%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Amount">Expected Amount</th>
+                      <th style={{ width: '12%' }} title="Stage">Stage</th>
+                      <th style={{ width: '14%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoicedDetailsLoading ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading invoiced details...
+                        </td>
+                      </tr>
+                    ) : invoicedDetailsData && invoicedDetailsData.length > 0 ? (
+                      invoicedDetailsData
+                        .filter(invoice => {
+                          if (invoicedDetailsSearchTerm === '') return true;
+                          const searchTerm = invoicedDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (invoice.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (invoice.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (invoice.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((invoice) => {
+                          const probability = invoice.deal_probability || invoice.probability || 0;
+                          const expectedAmount = invoice.expected_revenue || (invoice.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={invoice.deal_id} className="sa-table-row">
+                          <td style={{ width: '18%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={invoice.deal_name || 'N/A'}>
+                              {invoice.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={invoice.contact_name || 'N/A'}>
+                              {invoice.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.amberDeep }} title={formatCurrency(invoice.amount || 0)}>
+                              {formatCurrency(invoice.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedAmount)}>
+                              {formatCurrency(expectedAmount)}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: invoice.stage === 'Invoiced' ? '#DCFCE7' : '#FEF3C7',
+                              color: invoice.stage === 'Invoiced' ? '#166534' : '#92400E'
+                            }} title={invoice.stage || 'N/A'}>
+                              {invoice.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={invoice.deal_owner || 'N/A'}>
+                              {invoice.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(invoice.lead_id, invoice.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(invoice.lead_id, invoice.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(invoice.lead_id, invoice.account_id) ? 'underline' : 'none'
+                                }}
+                                title={invoice.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(invoice.lead_id, invoice.account_id) && handleClosingDateClick(invoice, invoice.deal_name)}
+                              >
+                                {formatDate(invoice.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(invoice)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No invoiced details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Received Details Table */}
+          {showPaymentReceivedDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Paid Amount Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Payments: {paymentReceivedDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPaymentReceivedDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, contact, or owner..."
+                    value={paymentReceivedDetailsSearchTerm}
+                    onChange={(e) => setPaymentReceivedDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '20%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '14%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '12%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Amount">Expected Amount</th>
+                      <th style={{ width: '12%' }} title="Stage">Stage</th>
+                      <th style={{ width: '14%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentReceivedDetailsLoading ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading paid amount details...
+                        </td>
+                      </tr>
+                    ) : paymentReceivedDetailsData && paymentReceivedDetailsData.length > 0 ? (
+                      paymentReceivedDetailsData
+                        .filter(payment => {
+                          if (paymentReceivedDetailsSearchTerm === '') return true;
+                          const searchTerm = paymentReceivedDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (payment.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (payment.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (payment.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((payment) => {
+                          const probability = payment.deal_probability || payment.probability || 0;
+                          const expectedAmount = payment.expected_revenue || (payment.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={payment.deal_id} className="sa-table-row">
+                          <td style={{ width: '18%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={payment.deal_name || 'N/A'}>
+                              {payment.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={payment.contact_name || 'N/A'}>
+                              {payment.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.teal }} title={formatCurrency(payment.amount || 0)}>
+                              {formatCurrency(payment.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedAmount)}>
+                              {formatCurrency(expectedAmount)}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: payment.stage === 'Paid' ? '#DCFCE7' : '#FEF3C7',
+                              color: payment.stage === 'Paid' ? '#166534' : '#92400E'
+                            }} title={payment.stage || 'N/A'}>
+                              {payment.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={payment.deal_owner || 'N/A'}>
+                              {payment.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(payment.lead_id, payment.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(payment.lead_id, payment.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(payment.lead_id, payment.account_id) ? 'underline' : 'none'
+                                }}
+                                title={payment.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(payment.lead_id, payment.account_id) && handleClosingDateClick(payment, payment.deal_name)}
+                              >
+                                {formatDate(payment.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(payment)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No paid amount details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Total Paid Details Table */}
+          {showTotalPaidDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Total Paid Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Paid: {totalPaidDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowTotalPaidDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, contact, or owner..."
+                    value={totalPaidDetailsSearchTerm}
+                    onChange={(e) => setTotalPaidDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '16%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '12%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '10%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Amount">Expected Amount</th>
+                      <th style={{ width: '10%' }} title="Stage">Stage</th>
+                      <th style={{ width: '12%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totalPaidDetailsLoading ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading total paid details...
+                        </td>
+                      </tr>
+                    ) : totalPaidDetailsData && totalPaidDetailsData.length > 0 ? (
+                      totalPaidDetailsData
+                        .filter(paid => {
+                          if (totalPaidDetailsSearchTerm === '') return true;
+                          const searchTerm = totalPaidDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (paid.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (paid.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (paid.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((paid) => {
+                          const probability = paid.deal_probability || paid.probability || 0;
+                          const expectedAmount = paid.expected_revenue || (paid.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={paid.deal_id} className="sa-table-row">
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={paid.deal_name || 'N/A'}>
+                              {paid.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={paid.contact_name || 'N/A'}>
+                              {paid.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.growth }} title={formatCurrency(paid.amount || 0)}>
+                              {formatCurrency(paid.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedAmount)}>
+                              {formatCurrency(expectedAmount)}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: paid.stage === 'Paid' ? '#DCFCE7' : '#FEF3C7',
+                              color: paid.stage === 'Paid' ? '#166534' : '#92400E'
+                            }} title={paid.stage || 'N/A'}>
+                              {paid.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={paid.deal_owner || 'N/A'}>
+                              {paid.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(paid.lead_id, paid.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(paid.lead_id, paid.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(paid.lead_id, paid.account_id) ? 'underline' : 'none'
+                                }}
+                                title={paid.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(paid.lead_id, paid.account_id) && handleClosingDateClick(paid, paid.deal_name)}
+                              >
+                                {formatDate(paid.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(paid)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No total paid details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Overdue Details Table */}
+          {showOverdueDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Overdue Deals Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Overdue: {overdueDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => setOverdueSortOrder(overdueSortOrder === 'latest' ? 'oldest' : 'latest')}
+                    style={{
+                      background: palette.canvas,
+                      border: `1px solid ${palette.border}`,
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.15s',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#e8e8e8'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.canvas}
+                  >
+                    {overdueSortOrder === 'latest' ? 'Latest First' : 'Oldest First'}
+                  </button>
+                  <button
+                    onClick={() => setShowOverdueDetails(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, contact, or owner..."
+                    value={overdueDetailsSearchTerm}
+                    onChange={(e) => setOverdueDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '20%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '15%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '15%' }} title="Account Number">Account Number</th>
+                      <th style={{ width: '15%' }} title="Amount">Amount</th>
+                      <th style={{ width: '10%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Revenue">Expected Revenue</th>
+                      <th style={{ width: '15%' }} title="Stage">Stage</th>
+                      <th style={{ width: '15%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '15%' }} title="Closing Date">Closing Date</th>
+                      <th style={{ width: '15%' }} title="Overdue Days">Overdue Days</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overdueDetailsLoading ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading overdue details...
+                        </td>
+                      </tr>
+                    ) : overdueDetailsData && overdueDetailsData.length > 0 ? (
+                      sortOverdueDetails(overdueDetailsData)
+                        .filter(overdue => {
+                          if (overdueDetailsSearchTerm === '') return true;
+                          const searchTerm = overdueDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (overdue.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (overdue.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (overdue.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((overdue) => {
+                          const probability = overdue.deal_probability || overdue.probability || 0;
+                          const expectedRevenue = overdue.expected_revenue || (overdue.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={overdue.deal_id} className="sa-table-row">
+                          <td style={{ width: '15%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={overdue.deal_name || 'N/A'}>
+                              {overdue.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '13%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={overdue.contact_name || 'N/A'}>
+                              {overdue.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={overdue.account_number}>
+                              #{overdue.account_number}
+                            </div>
+                          </td>
+                          <td style={{ width: '11%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.rust }} title={formatCurrency(overdue.amount || 0)}>
+                              {formatCurrency(overdue.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedRevenue)}>
+                              {formatCurrency(expectedRevenue)}
+                            </div>
+                          </td>
+                          <td style={{ width: '11%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: overdue.stage === 'Closed Won' ? '#DCFCE7' :
+                                       overdue.stage === 'Closed Lost' ? '#FEE2E2' : '#FEF3C7',
+                              color: overdue.stage === 'Closed Won' ? '#166534' :
+                                     overdue.stage === 'Closed Lost' ? '#991B1B' : '#92400E'
+                            }} title={overdue.stage || 'N/A'}>
+                              {overdue.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '13%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={overdue.deal_owner || 'N/A'}>
+                              {overdue.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '11%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(overdue.lead_id, overdue.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(overdue.lead_id, overdue.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(overdue.lead_id, overdue.account_id) ? 'underline' : 'none'
+                                }}
+                                title={overdue.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(overdue.lead_id, overdue.account_id) && handleClosingDateClick(overdue, overdue.deal_name)}
+                              >
+                                {formatDate(overdue.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(overdue)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                          <td style={{ width: '11%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: overdue.overdue_days > 90 ? '#FEE2E2' :
+                                       overdue.overdue_days > 30 ? '#FEF3C7' : '#DCFCE7',
+                              color: overdue.overdue_days > 90 ? '#991B1B' :
+                                     overdue.overdue_days > 30 ? '#92400E' : '#166534'
+                            }} title={`${overdue.overdue_days || 0} days`}>
+                              {overdue.overdue_days || 0} days
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No overdue details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Total Deal Amount Details Table */}
+          {showTotalDealAmountDetails && (
+            <div 
+              className="sa-table-card" 
+              style={{ 
+                marginTop: '24px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Total Deal Amount Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Deals: {totalDealAmountDetailsData?.length || 0} | Month: {selectedMonth}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowTotalDealAmountDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, account, contact, or owner..."
+                    value={totalDealAmountDetailsSearchTerm}
+                    onChange={(e) => setTotalDealAmountDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '16%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '12%' }} title="Account Name">Account Name</th>
+                      <th style={{ width: '10%' }} title="Account Number">Account Number</th>
+                      <th style={{ width: '12%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '10%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Amount">Expected Amount</th>
+                      <th style={{ width: '10%' }} title="Stage">Stage</th>
+                      <th style={{ width: '12%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totalDealAmountDetailsLoading ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading total deal amount details...
+                        </td>
+                      </tr>
+                    ) : totalDealAmountDetailsData && totalDealAmountDetailsData.length > 0 ? (
+                      totalDealAmountDetailsData
+                        .filter(deal => {
+                          if (totalDealAmountDetailsSearchTerm === '') return true;
+                          const searchTerm = totalDealAmountDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (deal.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.account_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((deal) => {
+                          const probability = deal.deal_probability || deal.probability || 0;
+                          const expectedAmount = deal.expected_revenue || (deal.amount || 0) * (probability / 100);
+                          return (
+                        <tr key={deal.deal_id} className="sa-table-row">
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_name || 'N/A'}>
+                              {deal.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.account_name || 'N/A'}>
+                              {deal.account_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={deal.account_number}>
+                              #{deal.account_number}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.contact_name || 'N/A'}>
+                              {deal.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.growth }} title={formatCurrency(deal.amount || 0)}>
+                              {formatCurrency(deal.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedAmount)}>
+                              {formatCurrency(expectedAmount)}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: deal.stage === 'Closed Won' ? '#DCFCE7' :
+                                       deal.stage === 'Closed Lost' ? '#FEE2E2' :
+                                       deal.stage === 'Paid' ? '#DCFCE7' :
+                                       deal.stage === 'Invoiced' ? '#FEF3C7' :
+                                       deal.stage === 'Proposal' ? '#E0F2FE' :
+                                       deal.stage === 'Negotiation' ? '#FEF3C7' : '#F3F4F6',
+                              color: deal.stage === 'Closed Won' ? '#166534' :
+                                     deal.stage === 'Closed Lost' ? '#991B1B' :
+                                     deal.stage === 'Paid' ? '#166534' :
+                                     deal.stage === 'Invoiced' ? '#92400E' :
+                                     deal.stage === 'Proposal' ? '#0369A1' :
+                                     deal.stage === 'Negotiation' ? '#92400E' : '#374151'
+                            }} title={deal.stage || 'N/A'}>
+                              {deal.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_owner || 'N/A'}>
+                              {deal.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(deal.lead_id, deal.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'underline' : 'none'
+                                }}
+                                title={deal.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(deal.lead_id, deal.account_id) && handleClosingDateClick(deal, deal.deal_name)}
+                              >
+                                {formatDate(deal.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(deal)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No total deal amount details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Expected Revenue Details Table */}
+          {showExpectedRevenueDetails && (
             <div
+              className="sa-table-card"
+              style={{
+                marginTop: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                animation: 'frFadeUp 0.4s ease both'
+              }}
+            >
+              {/* Table Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${palette.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3
+                    className="fr-display"
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 500,
+                      color: palette.ink,
+                      margin: 0
+                    }}
+                  >
+                    Expected Revenue Details
+                  </h3>
+                  <p
+                    className="fr-body"
+                    style={{
+                      fontSize: '13px',
+                      color: palette.inkSoft,
+                      margin: '4px 0 0 0'
+                    }}
+                  >
+                    Total Deals: {expectedRevenueDetailsData?.length || 0} | Month: {selectedMonth} | Total Expected Revenue: {formatCurrency(totalExpectedRevenue)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowExpectedRevenueDetails(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <X size={20} color={palette.inkSoft} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderBottom: `1px solid ${palette.border}`
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '400px'
+                  }}
+                >
+                  <Search
+                    size={16}
+                    color={palette.inkFaint}
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by deal name, account, contact, or owner..."
+                    value={expectedRevenueDetailsSearchTerm}
+                    onChange={(e) => setExpectedRevenueDetailsSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 40px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      background: palette.canvas,
+                      color: palette.ink,
+                      fontFamily: 'var(--font-mono), monospace'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                    onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                  />
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px', background: 'rgb(245, 245, 245)' }}>
+                <table className="sa-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '16%' }} title="Deal Name">Deal Name</th>
+                      <th style={{ width: '12%' }} title="Account Name">Account Name</th>
+                      <th style={{ width: '10%' }} title="Account Number">Account Number</th>
+                      <th style={{ width: '12%' }} title="Contact Name">Contact Name</th>
+                      <th style={{ width: '10%' }} title="Amount">Amount</th>
+                      <th style={{ width: '8%' }} title="Probability">Probability</th>
+                      <th style={{ width: '10%' }} title="Expected Revenue">Expected Revenue</th>
+                      <th style={{ width: '10%' }} title="Stage">Stage</th>
+                      <th style={{ width: '12%' }} title="Deal Owner">Deal Owner</th>
+                      <th style={{ width: '12%' }} title="Closing Date">Closing Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expectedRevenueDetailsLoading ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                          Loading expected revenue details...
+                        </td>
+                      </tr>
+                    ) : expectedRevenueDetailsData && expectedRevenueDetailsData.length > 0 ? (
+                      expectedRevenueDetailsData
+                        .filter(deal => {
+                          if (expectedRevenueDetailsSearchTerm === '') return true;
+                          const searchTerm = expectedRevenueDetailsSearchTerm.toLowerCase().trim();
+                          return (
+                            (deal.deal_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.account_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.contact_name?.toLowerCase() || '').includes(searchTerm) ||
+                            (deal.deal_owner?.toLowerCase() || '').includes(searchTerm)
+                          );
+                        })
+                        .map((deal) => {
+                          const probability = deal.deal_probability || 0;
+                          const expectedRevenue = deal.expected_revenue || 0;
+                          return (
+                        <tr key={deal.deal_id} className="sa-table-row">
+                          <td style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_name || 'N/A'}>
+                              {deal.deal_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.account_name || 'N/A'}>
+                              {deal.account_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={deal.account_number}>
+                              #{deal.account_number}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: palette.ink }} title={deal.contact_name || 'N/A'}>
+                              {deal.contact_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.growth }} title={formatCurrency(deal.amount || 0)}>
+                              {formatCurrency(deal.amount || 0)}
+                            </div>
+                          </td>
+                          <td style={{ width: '8%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }} title={`${probability}%`}>
+                              {probability}%
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: palette.slate }} title={formatCurrency(expectedRevenue)}>
+                              {formatCurrency(expectedRevenue)}
+                            </div>
+                          </td>
+                          <td style={{ width: '10%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: deal.stage === 'Closed Won' ? '#DCFCE7' :
+                                       deal.stage === 'Closed Lost' ? '#FEE2E2' :
+                                       deal.stage === 'Paid' ? '#DCFCE7' :
+                                       deal.stage === 'Invoiced' ? '#FEF3C7' :
+                                       deal.stage === 'Proposal' ? '#E0F2FE' :
+                                       deal.stage === 'Negotiation' ? '#FEF3C7' : '#F3F4F6',
+                              color: deal.stage === 'Closed Won' ? '#166534' :
+                                     deal.stage === 'Closed Lost' ? '#991B1B' :
+                                     deal.stage === 'Paid' ? '#166534' :
+                                     deal.stage === 'Invoiced' ? '#92400E' :
+                                     deal.stage === 'Proposal' ? '#0369A1' :
+                                     deal.stage === 'Negotiation' ? '#92400E' : '#374151'
+                            }} title={deal.stage || 'N/A'}>
+                              {deal.stage || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 600, color: palette.ink }} title={deal.deal_owner || 'N/A'}>
+                              {deal.deal_owner || 'N/A'}
+                            </div>
+                          </td>
+                          <td style={{ width: '12%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div
+                                style={{
+                                  color: hasClosingDateHistory(deal.lead_id, deal.account_id) ? '#3B82F6' : palette.inkSoft,
+                                  fontSize: '12px',
+                                  cursor: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'pointer' : 'default',
+                                  textDecoration: hasClosingDateHistory(deal.lead_id, deal.account_id) ? 'underline' : 'none'
+                                }}
+                                title={deal.closing_date || 'N/A'}
+                                onClick={() => hasClosingDateHistory(deal.lead_id, deal.account_id) && handleClosingDateClick(deal, deal.deal_name)}
+                              >
+                                {formatDate(deal.closing_date)}
+                              </div>
+                              <Edit
+                                size={14}
+                                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                                onClick={() => handleClosingDateEdit(deal)}
+                                title="Edit Closing Date"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    ) : (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                          No expected revenue details found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Closing Date History Modal */}
+          {showClosingDateHistory && (
+            <div 
               style={{
                 position: 'fixed',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: 'rgba(0, 0, 0, 0.5)',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000
+                zIndex: 1000,
+                animation: 'frFadeUp 0.3s ease both'
               }}
-              onClick={() => setShowHistoryModal(false)}
+              onClick={() => setShowClosingDateHistory(false)}
             >
-              <div
+              <div 
                 style={{
                   background: palette.surface,
                   borderRadius: '12px',
-                  maxWidth: '600px',
+                  maxWidth: '900px',
                   width: '90%',
                   maxHeight: '80vh',
-                  overflow: 'auto',
-                  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -2350,7 +3963,7 @@ export default function ProspectStatsCards({ user }) {
                         margin: 0
                       }}
                     >
-                      Deal Close Date History
+                      Closing Date History
                     </h3>
                     <p
                       className="fr-body"
@@ -2360,11 +3973,11 @@ export default function ProspectStatsCards({ user }) {
                         margin: '4px 0 0 0'
                       }}
                     >
-                      Deal: {selectedDealHistory.deal_name || 'N/A'}
+                      Deal: {closingDateHistoryDealName}
                     </p>
                   </div>
                   <button
-                    onClick={() => setShowHistoryModal(false)}
+                    onClick={() => setShowClosingDateHistory(false)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -2384,85 +3997,256 @@ export default function ProspectStatsCards({ user }) {
                 </div>
 
                 {/* Modal Content */}
-                <div style={{ padding: '24px' }}>
-                  {selectedDealHistory.deal_close_date_history && selectedDealHistory.deal_close_date_history.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {selectedDealHistory.deal_close_date_history.map((historyItem, index) => (
-                        <div
-                          key={index}
-                          style={{
-                            padding: '16px',
-                            borderRadius: '8px',
-                            background: palette.canvas,
-                            border: `1px solid ${palette.border}`
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: palette.ink }}>
-                              Change #{index + 1}
-                            </div>
-                            <div style={{ fontSize: '12px', color: palette.inkSoft }}>
-                              {historyItem.deal_close_date_changed_at 
-                                ? new Date(historyItem.deal_close_date_changed_at).toLocaleString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })
-                                : 'N/A'
-                              }
-                            </div>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <div>
-                              <div style={{ fontSize: '11px', color: palette.inkSoft, marginBottom: '4px' }}>
-                                Previous Date
-                              </div>
-                              <div style={{ fontSize: '13px', color: palette.ink }}>
-                                {historyItem.deal_close_date_old 
-                                  ? new Date(historyItem.deal_close_date_old).toLocaleDateString('en-IN', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })
-                                  : 'N/A'
-                                }
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '11px', color: palette.inkSoft, marginBottom: '4px' }}>
-                                New Date
-                              </div>
-                              <div style={{ fontSize: '13px', color: palette.growth, fontWeight: 600 }}>
-                                {historyItem.deal_close_date_new 
-                                  ? new Date(historyItem.deal_close_date_new).toLocaleDateString('en-IN', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })
-                                  : 'N/A'
-                                }
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ marginTop: '8px', fontSize: '12px', color: palette.inkSoft }}>
-                            Changed by: <span style={{ color: palette.ink, fontWeight: 500 }}>
-                              {historyItem.deal_close_date_changed_by || 'N/A'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '20px' }}>
+                  {closingDateHistoryLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
+                      <RefreshCw size={24} className="fr-spin" style={{ margin: '0 auto 12px', display: 'block' }} />
+                      Loading closing date history...
                     </div>
+                  ) : currentDealHistory && currentDealHistory.length > 0 ? (
+                    <table className="sa-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '25%' }} title="Previous Date">Previous Date</th>
+                          <th style={{ width: '25%' }} title="New Date">New Date</th>
+                          <th style={{ width: '25%' }} title="Changed By">Changed By</th>
+                          <th style={{ width: '25%' }} title="Modified Time">Modified Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentDealHistory
+                          .sort((a, b) => new Date(b.closing_date_modified_time) - new Date(a.closing_date_modified_time))
+                          .map((history) => (
+                          <tr key={history.timeline_id} className="sa-table-row">
+                            <td style={{ width: '20%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ color: palette.inkSoft, fontSize: '12px' }} title={history.previous_closing_date || 'N/A'}>
+                                {formatDate(history.previous_closing_date)}
+                              </div>
+                            </td>
+                            <td style={{ width: '20%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ color: palette.growth, fontSize: '12px', fontWeight: 600 }} title={history.new_closing_date || 'N/A'}>
+                                {formatDate(history.new_closing_date)}
+                              </div>
+                            </td>
+                            <td style={{ width: '20%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 600, color: palette.ink }} title={history.changed_by || 'N/A'}>
+                                {history.changed_by || 'N/A'}
+                              </div>
+                            </td>
+                            <td style={{ width: '20%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ color: palette.inkSoft, fontSize: '12px' }} title={history.closing_date_modified_time || 'N/A'}>
+                                {formatDate(history.closing_date_modified_time)}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '40px', color: palette.inkSoft }}>
-                      No history available
+                      No closing date history found
                     </div>
                   )}
                 </div>
               </div>
             </div>
           )}
+
+          {/* Closing Date Edit Modal */}
+          {showClosingDateEditModal && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                backdropFilter: 'blur(2px)',
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+              }}
+              onClick={() => setShowClosingDateEditModal(false)}
+            >
+              <div
+                style={{
+                  backgroundColor: palette.surface,
+                  borderRadius: '12px',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  width: '100%',
+                  maxWidth: '500px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div
+                  style={{
+                    padding: '20px 24px',
+                    borderBottom: `1px solid ${palette.border}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <h3
+                      className="fr-display"
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 500,
+                        color: palette.ink,
+                        margin: 0
+                      }}
+                    >
+                      Edit Closing Date
+                    </h3>
+                    <p
+                      className="fr-body"
+                      style={{
+                        fontSize: '13px',
+                        color: palette.inkSoft,
+                        margin: '4px 0 0 0'
+                      }}
+                    >
+                      Deal: {editingClosingDateDeal?.deal_name || 'Unknown Deal'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowClosingDateEditModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div style={{ flex: '1 1 0%', overflow: 'auto', padding: '24px' }}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      Current Closing Date
+                    </label>
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: palette.canvas,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: palette.inkSoft
+                      }}
+                    >
+                      {formatDate(editingClosingDateDeal?.closing_date) || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      New Closing Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={newClosingDate}
+                      onChange={(e) => setNewClosingDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 0.15s'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                      onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div
+                  style={{
+                    padding: '16px 24px',
+                    borderTop: `1px solid ${palette.border}`,
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '12px'
+                  }}
+                >
+                  <button
+                    onClick={() => setShowClosingDateEditModal(false)}
+                    disabled={isUpdatingClosingDate}
+                    style={{
+                      padding: '10px 20px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingClosingDate ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingClosingDate && (e.currentTarget.style.background = palette.canvas)}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.surface}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClosingDateUpdate}
+                    disabled={isUpdatingClosingDate || !newClosingDate}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: isUpdatingClosingDate || !newClosingDate ? palette.inkSoft : palette.growth,
+                      color: palette.surface,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingClosingDate || !newClosingDate ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingClosingDate && newClosingDate && (e.currentTarget.style.background = '#2A4A2E')}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
+                  >
+                    {isUpdatingClosingDate ? 'Updating...' : 'Update Closing Date'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </>
       )}
         </div>
