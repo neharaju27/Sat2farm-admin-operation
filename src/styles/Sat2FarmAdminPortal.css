@@ -987,10 +987,9 @@ textarea {
 
 /* Table */
 .sa-table-card {
-  background: white;
+  background: transparent;
   border-radius: 18px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
   border: 1px solid #E5E7EB;
   box-shadow: 0 8px 30px rgba(0,0,0,.05);
 }
@@ -998,28 +997,48 @@ textarea {
 .sa-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+  border: 1px solid #E5E7EB;
+  background: white;
 }
 
 .sa-table thead {
-  background: #F8FAFC;
+  background: #F9FAFB;
 }
 
 .sa-table th {
-  padding: 10px 16px;
-  font-size: 13px;
+  padding: 12px 14px;
+  font-size: 11px;
   text-transform: uppercase;
-  color: #64748B;
-  letter-spacing: .08em;
+  color: #6B7280;
+  letter-spacing: 0.05em;
   font-weight: 600;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid #E5E7EB;
+  border-right: 1px solid #E5E7EB;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sa-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid #F1F5F9;
+  padding: 10px 14px;
+  border-bottom: 1px solid #E5E7EB;
+  border-right: 1px solid #E5E7EB;
   vertical-align: middle;
-  font-size: 15px;
+  font-size: 13px;
   white-space: nowrap;
+  color: #374151;
+  text-align: left;
+}
+
+.sa-table th:last-child,
+.sa-table td:last-child {
+  border-right: none;
+}
+
+.sa-table tr:last-child td {
+  border-bottom: none;
 }
 
 .sa-table-row {
@@ -1401,8 +1420,8 @@ button:active {
 /* ── Operation Dashboard Responsive Grids ── */
 .op-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(140px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
   margin-bottom: 28px;
 }
 
@@ -1415,15 +1434,15 @@ button:active {
 
 @media (min-width: 1400px) {
   .op-dashboard-grid {
-    grid-template-columns: repeat(8, minmax(160px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
   }
 }
 
 @media (max-width: 1200px) {
   .op-dashboard-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
   }
 
   .op-deal-amount-grid {
@@ -1434,8 +1453,8 @@ button:active {
 
 @media (max-width: 768px) {
   .op-dashboard-grid {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
   }
 
   .op-deal-amount-grid {
@@ -1447,7 +1466,7 @@ button:active {
 @media (max-width: 480px) {
   .op-dashboard-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 8px;
   }
 
   .op-deal-amount-grid {
@@ -1536,4 +1555,3 @@ button:active {
     justify-content: center;
   }
 }
-
