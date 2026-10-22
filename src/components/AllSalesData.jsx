@@ -100,6 +100,11 @@ export default function AllSalesData({ user, onPageChange }) {
           const paidAmountResponse = await axios.get(`${baseUrl}?amount&stage=Paid&user=${encodedUser}`);
           const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
 
+          // Fetch green team count
+          const greenTeamResponse = await axios.get(`${baseUrl}?green_team&user=${encodedUser}`);
+          console.log(`Green Team Response for ${salesName}:`, greenTeamResponse.data);
+          const assignedToGreenTeam = greenTeamResponse.data?.green_team_count || greenTeamResponse.data?.assigned_to_green_team || greenTeamResponse.data?.count || greenTeamResponse.data?.total || greenTeamResponse.data?.green_team || 0;
+
           return {
             salesName: salesName,
             totalLeads: totalLeads,
@@ -108,7 +113,7 @@ export default function AllSalesData({ user, onPageChange }) {
             closedWonDeal: closedWonDeals,
             invoiced: invoicedDeals,
             paid: paidDeals,
-            assignedToGreenTeam: 0,
+            assignedToGreenTeam: assignedToGreenTeam,
             totalDealValue: totalDealValue,
             closedWonAmount: closedWonAmount,
             invoicedAmount: invoicedAmount,

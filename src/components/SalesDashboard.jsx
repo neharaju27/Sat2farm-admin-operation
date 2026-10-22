@@ -117,6 +117,12 @@ export default function SalesDashboard({ user, onPageChange }) {
     const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
     console.log('Paid Amount:', paidAmount);
 
+    // Fetch green team count
+    const greenTeamResponse = await axios.get(`${baseUrl}?green_team&user=${encodedUser}`);
+    console.log('Green Team API Response:', greenTeamResponse.data);
+    const assignedToGreenTeam = greenTeamResponse.data?.green_team_count || greenTeamResponse.data?.assigned_to_green_team || greenTeamResponse.data?.count || greenTeamResponse.data?.total || greenTeamResponse.data?.green_team || 0;
+    console.log('Assigned to Green Team:', assignedToGreenTeam);
+
     setMetrics({
       leads: leadsCount,
       totalOpportunities: totalOpportunitiesCount,
@@ -124,7 +130,7 @@ export default function SalesDashboard({ user, onPageChange }) {
       closedWonDeals: closedWonDeals,
       invoiced: invoicedDeals,
       paid: paidDeals,
-      assignedToGreenTeam: 0,
+      assignedToGreenTeam: assignedToGreenTeam,
       leadsGrowth: 0,
       dealsGrowth: 0,
       revenueGrowth: 0,
