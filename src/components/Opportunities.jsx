@@ -504,7 +504,7 @@ export default function Opportunities({ onPageChange }) {
 
   const [predefinedDealTypes, setPredefinedDealTypes] = useState(() => {
     const saved = localStorage.getItem('opportunities_predefinedDealTypes');
-    return saved ? JSON.parse(saved) : ['Trial', 'Starter', 'Growth', 'Entrepreneur'];
+    return saved ? JSON.parse(saved) : ['Trial', 'Starter', 'Growth', 'Enterprises'];
   });
 
   const [predefinedDealStages, setPredefinedDealStages] = useState([
@@ -6103,7 +6103,7 @@ export default function Opportunities({ onPageChange }) {
                                       overflowY: 'auto',
                                       marginTop: '4px'
                                     }}>
-                                      {(predefinedDealTypes || ['Trial', 'Starter', 'Growth', 'Entrepreneur']).filter(type => !prop.searchTerm || type.toLowerCase().includes(prop.searchTerm.toLowerCase()))
+                                      {(predefinedDealTypes || ['Trial', 'Starter', 'Growth', 'Enterprises']).filter(type => !prop.searchTerm || type.toLowerCase().includes(prop.searchTerm.toLowerCase()))
                                         .map(type => (
                                           <div
                                             key={type}
@@ -8781,7 +8781,7 @@ export default function Opportunities({ onPageChange }) {
                       <label style={{ display: 'block', color: 'var(--text-3)', fontSize: '12px', fontWeight: '500', marginBottom: '6px' }}>Deal Type<span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span></label>
                       <select value={dealType} onChange={(e) => setDealType(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r)', fontSize: '13px', outline: 'none', backgroundColor: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
                         <option value="">Choose a deal type</option>
-                        {['Trial', 'Starter', 'Growth', 'Entrepreneur'].map(s => <option key={s} value={s}>{s}</option>)}
+                        {['Trial', 'Starter', 'Growth', 'Enterprises'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>

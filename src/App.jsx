@@ -30,6 +30,9 @@ import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
 
+import EarlyAccessBannerCustom from './components/EarlyAccessBannerCustom';
+import * as XLSX from 'xlsx';
+
 function App() {
   const { user, loading, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => {
@@ -38,6 +41,82 @@ function App() {
   const [hasRedirected, setHasRedirected] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  
+
+const [excelNumbers, setExcelNumbers] = useState([]);
+
+const normalizePhoneNumber = (value) => {
+  return String(value ?? '').replace(/\D/g, '');
+};
+
+useEffect(() => {
+  let cancelled = false;
+
+  const loadPhoneNumbers = async () => {
+    const filePaths = [
+      '/pending_payments_numbers.xlsx',
+      '/pending_payments_numbers.xls',
+      '/pending_payments_numbers.csv',
+    ];
+
+    for (const path of filePaths) {
+      try {
+        const response = await fetch(path, {
+          cache: 'no-store',
+        });
+
+        if (!response.ok) continue;
+
+        // Missing files may return the app's HTML page.
+        const contentType =
+          response.headers.get('content-type') || '';
+
+        if (contentType.includes('text/html')) continue;
+
+        const buffer = await response.arrayBuffer();
+        const workbook = XLSX.read(buffer, {
+          type: 'array',
+          raw: true,
+        });
+
+        if (!workbook.SheetNames.length) continue;
+
+        const sheet =
+          workbook.Sheets[workbook.SheetNames[0]];
+
+        const rows = XLSX.utils.sheet_to_json(sheet, {
+          defval: '',
+          raw: false,
+        });
+
+        const numbers = rows
+        .map(row => normalizePhoneNumber(row.phone_number))
+        .filter(number => number.length > 0);
+
+        if (!cancelled) {
+          setExcelNumbers([...new Set(numbers)]);
+        }
+
+        return;
+      } catch (error) {
+        console.warn(`Could not read ${path}:`, error);
+      }
+    }
+
+    if (!cancelled) {
+      setExcelNumbers([]);
+      console.error('No valid Pending Payments Excel/CSV file found.');
+    }
+  };
+
+  loadPhoneNumbers();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -213,12 +292,23 @@ function App() {
       username: username,
       fullName: formattedName,
       role: user.role || user.user_role || user.type || 'User',
-      phone_number: user.phone_number || user.phoneNumber || user.pNumber || username,
+      phone_number: normalizePhoneNumber(
+      user.phone_number || user.phoneNumber || user.pNumber
+    ),
       admin_api_key: user.admin_api_key || null
     };
   };
 
   const userDisplay = getUserDisplay();
+  console.log('Login user data:', user);
+  console.log('Mapped phone number:', userDisplay?.phone_number);
+  console.log('Excel numbers state:', excelNumbers);
+console.log(
+  'Custom banner match:',
+  excelNumbers.includes(
+    normalizePhoneNumber(userDisplay?.phone_number)
+  )
+);
 
   const shouldShowBanner = () => {
     if (!userDisplay) return false;
@@ -407,7 +497,17 @@ function App() {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {shouldShowBanner() && <EarlyAccessBanner />}
+          
+{shouldShowBanner() && (
+  excelNumbers.includes(
+    normalizePhoneNumber(userDisplay?.phone_number)
+  ) ? (
+    <EarlyAccessBannerCustom user={userDisplay} />
+  ) : (
+    <EarlyAccessBanner user={userDisplay} />
+  )
+)}
+
         <div style={{
           flex: 1,
           overflow: 'hidden'
