@@ -184,7 +184,7 @@ const InvoiceInfo = ({ user, onPageChange }) => {
                     const isSelected = selectedAccount?.account_number === account.account_number;
                     return (
                       <div
-                        key={account.account_number}
+                        key={account.account_number || `account-${index}`}
                         onClick={() => handleAccountSelect(account, result.deals)}
                         style={{
                           padding: '12px 16px',
@@ -339,7 +339,7 @@ const InvoiceInfo = ({ user, onPageChange }) => {
                     const isSelected = selectedAccount?.account_number === account.account_number;
                     return (
                       <div
-                        key={account.account_number}
+                        key={account.account_number || `account-${index}`}
                         onClick={() => handleAccountSelect(account, result.deals)}
                         style={{
                           padding: '12px 16px',
