@@ -406,7 +406,7 @@ export default function SuperAdminDashboard({
 
       <div className="content-area">
         <div className="sa-container">
-          {/* ================= Welcome ================= */}
+          {/* ================= Welcome & Controls ================= */}
           <div className="sa-welcome">
             <div>
               <h1 className="sa-welcome-title">
@@ -421,15 +421,41 @@ export default function SuperAdminDashboard({
               </p>
             </div>
 
-            <div className="sa-sort">
-              <Filter size={16} />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-              </select>
+            <div className="sa-controls-bar">
+              {/* Search Box */}
+              <div className="sa-search-wrap">
+                <Search size={16} className="sa-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Search managers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="sa-search-input"
+                  aria-label="Search managers"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="sa-search-clear"
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="sa-sort">
+                <Filter size={16} style={{ color: "#64748B" }} />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  aria-label="Sort managers"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -447,126 +473,136 @@ export default function SuperAdminDashboard({
             </div>
           )}
 
-          {/* ================= Table ================= */}
+          {/* ================= Mobile/Tablet Scroll Hint ================= */}
+          {!loading && !error && filteredManagers.length > 0 && (
+            <div className="sa-scroll-hint-banner">
+              <span>↔</span>
+              <span>Scroll horizontally to view all manager columns & plans</span>
+            </div>
+          )}
+
+          {/* ================= Table Card ================= */}
           {!loading && !error && (
             <div className="sa-table-card">
-              <table className="sa-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "20%" }}>Manager</th>
-                    <th style={{ width: "8%" }}>Manager ID</th>
-                    <th style={{ width: "12%" }}>Phone Number</th>
-                    <th style={{ width: "12%" }}>Registered Date</th>
-                    <th style={{ width: "12%" }}>1 Month Plan</th>
-                    <th style={{ width: "12%" }}>6 Months Plan</th>
-                    <th style={{ width: "12%" }}>12 Months Plan</th>
-                    <th style={{ width: "24%", textAlign: "center" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredManagers.length === 0 ? (
+              <div className="sa-table-wrapper">
+                <table className="sa-table">
+                  <thead>
                     <tr>
-                      <td
-                        colSpan="8"
-                        style={{
-                          textAlign: "center",
-                          padding: "60px",
-                          color: "#64748b",
-                        }}
-                      >
-                        No managers found.
-                      </td>
+                      <th style={{ minWidth: "190px" }}>Manager</th>
+                      <th style={{ minWidth: "110px" }}>Manager ID</th>
+                      <th style={{ minWidth: "130px" }}>Phone Number</th>
+                      <th style={{ minWidth: "130px" }}>Registered Date</th>
+                      <th style={{ minWidth: "135px" }}>1 Month Plan</th>
+                      <th style={{ minWidth: "135px" }}>6 Months Plan</th>
+                      <th style={{ minWidth: "135px" }}>12 Months Plan</th>
+                      <th style={{ minWidth: "220px", textAlign: "center" }}>Actions</th>
                     </tr>
-                  ) : (
-                    filteredManagers.map((manager, index) => (
-                      <tr
-                        key={manager.mobile_no || index}
-                        className="sa-table-row"
-                      >
-                        {/* Manager */}
-                        <td>
-                          <div className="sa-manager-cell">
-                            <div className="sa-avatar">
-                              {manager.full_name
-                                ?.charAt(0)
-                                ?.toUpperCase() || "M"}
-                            </div>
-                            <div>
-                              <div className="sa-manager-name">
-                                {manager.full_name}
-                              </div>
-                              <div className="sa-manager-role">
-                                Manager
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Manager ID */}
-                        <td>
-                          <span className="sa-table-id">
-                            {manager.sub_admin_id}
-                          </span>
-                        </td>
-
-                        {/* Phone */}
-                        <td>{manager.mobile_no}</td>
-
-                        {/* Registered */}
-                        <td>{formatDate(manager.reg_date)}</td>
-
-                        {/* 1 Month Plan */}
-                        <td>
-                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['1 month']?.total || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['1 month']?.used || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['1 month']?.available || 0).toFixed(2)}</strong></div>
-                          </div>
-                        </td>
-
-                        {/* 6 Months Plan */}
-                        <td>
-                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['6 months']?.total || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['6 months']?.used || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['6 months']?.available || 0).toFixed(2)}</strong></div>
-                          </div>
-                        </td>
-
-                        {/* 12 Months Plan */}
-                        <td>
-                          <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                            <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['12 months']?.total || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['12 months']?.used || 0).toFixed(2)}</strong></div>
-                            <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['12 months']?.available || 0).toFixed(2)}</strong></div>
-                          </div>
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                            <button
-                              className="sa-action-btn"
-                              onClick={() => handleOpenAssignModal(manager)}
-                              style={{ padding: "6px 10px", fontSize: "12px" }}
-                            >
-                              Assign Acreages
-                            </button>
-                            <button
-                              className="sa-action-btn"
-                              onClick={() => handleCardClick(manager)}
-                              style={{ padding: "6px 10px", fontSize: "12px" }}
-                            >
-                              <Eye size={14} />
-                              View Report
-                            </button>
-                          </div>
+                  </thead>
+                  <tbody>
+                    {filteredManagers.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          style={{
+                            textAlign: "center",
+                            padding: "60px 20px",
+                            color: "#64748b",
+                          }}
+                        >
+                          No managers found.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredManagers.map((manager, index) => (
+                        <tr
+                          key={manager.mobile_no || index}
+                          className="sa-table-row"
+                        >
+                          {/* Manager */}
+                          <td>
+                            <div className="sa-manager-cell">
+                              <div className="sa-avatar">
+                                {manager.full_name
+                                  ?.charAt(0)
+                                  ?.toUpperCase() || "M"}
+                              </div>
+                              <div>
+                                <div className="sa-manager-name">
+                                  {manager.full_name}
+                                </div>
+                                <div className="sa-manager-role">
+                                  Manager
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Manager ID */}
+                          <td>
+                            <span className="sa-table-id">
+                              {manager.sub_admin_id}
+                            </span>
+                          </td>
+
+                          {/* Phone */}
+                          <td>{manager.mobile_no}</td>
+
+                          {/* Registered */}
+                          <td>{formatDate(manager.reg_date)}</td>
+
+                          {/* 1 Month Plan */}
+                          <td>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['1 month']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['1 month']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['1 month']?.available || 0).toFixed(2)}</strong></div>
+                            </div>
+                          </td>
+
+                          {/* 6 Months Plan */}
+                          <td>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['6 months']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['6 months']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['6 months']?.available || 0).toFixed(2)}</strong></div>
+                            </div>
+                          </td>
+
+                          {/* 12 Months Plan */}
+                          <td>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
+                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['12 months']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['12 months']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['12 months']?.available || 0).toFixed(2)}</strong></div>
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td style={{ textAlign: "center" }}>
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "nowrap" }}>
+                              <button
+                                className="sa-action-btn"
+                                onClick={() => handleOpenAssignModal(manager)}
+                                style={{ padding: "7px 12px", fontSize: "12px" }}
+                              >
+                                Assign Acreages
+                              </button>
+                              <button
+                                className="sa-action-btn"
+                                onClick={() => handleCardClick(manager)}
+                                style={{ padding: "7px 12px", fontSize: "12px" }}
+                              >
+                                <Eye size={14} />
+                                View Report
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -581,19 +617,21 @@ export default function SuperAdminDashboard({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(3px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 100000,
+          padding: '16px'
         }}>
           <div className="modal" style={{
             backgroundColor: 'white',
-            borderRadius: '8px',
-            width: '500px',
-            maxWidth: '90vw',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '480px',
             maxHeight: '90vh',
             overflow: 'auto',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
           }}>
             <div className="modal-head" style={{
               display: 'flex',

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock } from 'lucide-react';
+import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock, X } from 'lucide-react';
 import sat2farmLogo from '../assets/satyukt.webp';
 
-export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
+export default function Sidebar({ onLogout, user, onPageChange, currentPage, onClose, isMobile }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [salesOpen, setSalesOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
@@ -283,7 +283,29 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     <div className="h-full flex flex-col shadow-xl" style={{backgroundColor: '#0f2010'}}>
       
       {/* Header */}
-      <div className="sb-logo">
+      <div className="sb-logo" style={{ position: 'relative' }}>
+        {isMobile && onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#ffffff',
+              padding: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="Close menu"
+          >
+            <X size={18} />
+          </button>
+        )}
         <div className="sb-logo-text">SATYUKT</div>
         <div style={{
           width: '72px',

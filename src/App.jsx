@@ -489,7 +489,14 @@ console.log(
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
         }
       }>
-        <Sidebar onLogout={handleLogout} user={userDisplay} onPageChange={handlePageChange} currentPage={currentPage} />
+        <Sidebar 
+          onLogout={handleLogout} 
+          user={userDisplay} 
+          onPageChange={handlePageChange} 
+          currentPage={currentPage}
+          onClose={() => setIsSidebarOpen(false)}
+          isMobile={isMobile}
+        />
       </div>
       <div style={{
         flex: 1,
