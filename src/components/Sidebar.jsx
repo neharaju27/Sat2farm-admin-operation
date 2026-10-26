@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock, X } from 'lucide-react';
+import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock } from 'lucide-react';
 import sat2farmLogo from '../assets/satyukt.webp';
 
-export default function Sidebar({ onLogout, user, onPageChange, currentPage, onClose, isMobile }) {
+export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [salesOpen, setSalesOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
   const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(false);
   const [todayTasks, setTodayTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [todayGreenTeamAssignments, setTodayGreenTeamAssignments] = useState([]);
@@ -21,6 +22,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage, onC
   const isPartnerUser = userRole === 'partner';
   const isMarketingUser = userRole === 'marketing';
   const isTechDepartmentUser = userRole?.includes('tech') || userRole === 'tech department' || userRole === 'tech-department' || userRole === 'tech';
+  const isAccountsUser = userRole === 'accounts';
 
   // Helper to normalize user parameter for backend API
   const getApiUserName = (u) => {
@@ -219,7 +221,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage, onC
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -283,29 +285,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage, onC
     <div className="h-full flex flex-col shadow-xl" style={{backgroundColor: '#0f2010'}}>
       
       {/* Header */}
-      <div className="sb-logo" style={{ position: 'relative' }}>
-        {isMobile && onClose && (
-          <button
-            onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: 'none',
-              borderRadius: '6px',
-              color: '#ffffff',
-              padding: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            aria-label="Close menu"
-          >
-            <X size={18} />
-          </button>
-        )}
+      <div className="sb-logo">
         <div className="sb-logo-text">SATYUKT</div>
         <div style={{
           width: '72px',
@@ -330,6 +310,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage, onC
         user?.role?.toLowerCase().includes('partner') ? 'Partner' :
         user?.role?.toLowerCase().includes('marketing') ? 'Marketing' :
         user?.role?.toLowerCase().includes('tech') ? 'Tech Department' :
+        user?.role?.toLowerCase().includes('accounts') ? 'Accounts' :
         'Operations'
       }</span></div>
       
@@ -480,76 +461,122 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage, onC
         {/* Operations Section - Only for Operations Users (not Tech Department) */}
         {isOperationsUser && !isTechDepartmentUser && (
           <>
-            <div className="sb-section">Operations</div>
             <div 
-              className={`sb-item ${currentPage === 'operation-dashboard' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('operation-dashboard')}
+              className="sb-section"
+              onClick={() => setOperationsOpen(!operationsOpen)}
+              style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              Dashboard
-              <span className="sb-dot"></span>
+              Operations
+              <ChevronDown 
+                size={16} 
+                style={{transform: operationsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
+              />
             </div>
+            {operationsOpen && (
+              <div style={{marginLeft: '12px'}}>
+                <div 
+                  className={`sb-item ${currentPage === 'operation-dashboard' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('operation-dashboard')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  Dashboard
+                  <span className="sb-dot"></span>
+                </div>
+                <div 
+                  className={`sb-item ${currentPage === 'monthly-acreages' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('monthly-acreages')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor"/>
+                    <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+                    <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+                    <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+                  </svg>
+                  Monthly Acreage
+                  <span className="sb-dot"></span>
+                </div>
+                <div 
+                  className={`sb-item ${currentPage === 'unlock-farm' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('unlock-farm')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
+                  </svg>
+                  Farms
+                  <span className="sb-dot"></span>
+                </div>
+                <div 
+                  className={`sb-item ${currentPage === 'register' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('register')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  New Registration
+                  <span className="sb-dot"></span>
+                </div>
+                <div
+                  className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('assign-acreages')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Assign Acreages
+                  <span className="sb-dot"></span>
+                </div>
+                <div
+                  className={`sb-item ${currentPage === 'pricing' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('pricing')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  Pricing
+                  <span className="sb-dot"></span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Accounts Section - For Operations and Accounts Users */}
+        {(isOperationsUser || isAccountsUser) && !isTechDepartmentUser && (
+          <>
             <div 
-              className={`sb-item ${currentPage === 'monthly-acreages' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('monthly-acreages')}
+              className="sb-section"
+              onClick={() => setAccountsOpen(!accountsOpen)}
+              style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor"/>
-                <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
-                <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
-                <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
-              </svg>
-              Monthly Acreage
-              <span className="sb-dot"></span>
+              Accounts
+              <ChevronDown 
+                size={16} 
+                style={{transform: accountsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
+              />
             </div>
-            <div 
-              className={`sb-item ${currentPage === 'unlock-farm' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('unlock-farm')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
-              </svg>
-              Farms
-              <span className="sb-dot"></span>
-            </div>
-            <div 
-              className={`sb-item ${currentPage === 'register' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('register')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              New Registration
-              <span className="sb-dot"></span>
-            </div>
-            <div
-              className={`sb-item ${currentPage === 'assign-acreages' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('assign-acreages')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Assign Acreages
-              <span className="sb-dot"></span>
-            </div>
-            <div
-              className={`sb-item ${currentPage === 'pricing' ? 'active' : ''}`}
-              onClick={() => handleNavigationClick('pricing')}
-            >
-              <svg className="ic" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              Pricing
-              <span className="sb-dot"></span>
-            </div>
+            {accountsOpen && (
+              <div style={{marginLeft: '12px'}}>
+                <div
+                  className={`sb-item ${currentPage === 'invoice-info' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('invoice-info')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  Invoice Info
+                </div>
+              </div>
+            )}
           </>
         )}
 
