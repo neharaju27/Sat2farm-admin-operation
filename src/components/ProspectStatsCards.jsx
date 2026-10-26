@@ -1605,12 +1605,18 @@ export default function ProspectStatsCards({ user }) {
   ];
 
   // ---- Table column builders (UI only) -------------------------------------
-  const probOf = (r, strict) => strict ? (r.deal_probability || 0) : (r.deal_probability || r.probability || 0);
+
+  const probOf = (r, strict) =>
+    strict
+      ? (r.deal_probability || 0)
+      : (r.deal_probability || r.probability || 0);
+
   const expectedOf = (r, strict) => {
-    if (strict) return r.expected_revenue || 0;
-    const p = probOf(r, false);
-    return r.expected_revenue || (r.amount || 0) * (p / 100);
+    return r.expected_revenue != null
+      ? Number(r.expected_revenue)
+      : 0;
   };
+
 
   const txt = (value, style) => (
     <span style={style} title={value || 'N/A'}>{value || 'N/A'}</span>
@@ -2080,15 +2086,17 @@ export default function ProspectStatsCards({ user }) {
           overflow: auto;
           -webkit-overflow-scrolling: touch;
           border-radius: 8px;
-          scrollbar-width: thin;
+          border: 1px solid #dfe3da;
+          background: ${palette.surface};
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
-        .pt-table-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
-        .pt-table-scroll::-webkit-scrollbar-thumb { background: #c4cbc0; border-radius: 8px; }
-        .pt-table-scroll::-webkit-scrollbar-track { background: #eef0ea; }
+        .pt-table-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .pt-table {
           width: max-content;
           min-width: 100%;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0;
           background: ${palette.surface};
           font-size: 13px;
         }
@@ -2103,7 +2111,7 @@ export default function ProspectStatsCards({ user }) {
           background: #fafafa;
           border-bottom: 1px solid ${palette.border};
           white-space: nowrap;
-          z-index: 1;
+          z-index: 2;
         }
         .pt-table tbody td {
           padding: 12px 14px;
@@ -2112,12 +2120,12 @@ export default function ProspectStatsCards({ user }) {
           vertical-align: middle;
           white-space: nowrap;
         }
-        .pt-table { border: 1px solid #dfe3da; }
         .pt-table thead th,
         .pt-table tbody td { border-right: 1px solid #dfe3da; }
         .pt-table thead th:last-child,
         .pt-table tbody td:last-child { border-right: none; }
         .pt-table tbody td { border-bottom-color: #dfe3da; }
+        .pt-table tbody tr:last-child td { border-bottom: none; }
         .pt-table tbody tr.pt-row:hover { background: #f7faf5; }
         /* long text -> "..." (full text on hover via title) */
         .pt-table td span[title] {
@@ -2240,7 +2248,7 @@ export default function ProspectStatsCards({ user }) {
           .pt-card-body { padding: 10px; }
 
           /* TABLE  ->  CARD LIST */
-          .pt-table-scroll { overflow: visible; max-height: none; }
+          .pt-table-scroll { overflow: visible; max-height: none; border: none; background: transparent; }
           .pt-scroll-bar { display: none; }
           .pt-table,
           .pt-table tbody,
