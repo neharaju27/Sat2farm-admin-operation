@@ -2193,7 +2193,7 @@ export default function ProspectStatsCards({ user }) {
           justify-content: flex-end;
           gap: 12px;
         }
-        .pt-modal-history .pt-table { min-width: 560px; }
+        .pt-modal-history .pt-table { min-width: 100%; }
 
         /* =========================================================
            TABLET  (<= 1024px)
