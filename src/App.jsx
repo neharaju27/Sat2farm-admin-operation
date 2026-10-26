@@ -308,15 +308,7 @@ useEffect(() => {
   };
 
   const userDisplay = getUserDisplay();
-  console.log('Login user data:', user);
-  console.log('Mapped phone number:', userDisplay?.phone_number);
-  console.log('Excel numbers state:', excelNumbers);
-console.log(
-  'Custom banner match:',
-  excelNumbers.includes(
-    normalizePhoneNumber(userDisplay?.phone_number)
-  )
-);
+
 
   const shouldShowBanner = () => {
     if (!userDisplay) return false;
