@@ -658,36 +658,36 @@ const InvoiceInfo = ({ user, onPageChange }) => {
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                      {deal.deal_amount && (
+                      {deal.deal_amount != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Amount:</span> ₹{deal.deal_amount.toLocaleString()}
                         </div>
                       )}
-                      {deal.deal_close_date && (
+                      {deal.deal_close_date != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <Calendar size={16} style={{ color: 'var(--green-600)' }} />
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Closing Date:</span> {formatDate(deal.deal_close_date)}
                         </div>
                       )}
-                      {deal.deal_owner && (
+                      {deal.deal_owner != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <User size={16} style={{ color: 'var(--green-600)' }} />
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Owner:</span> {deal.deal_owner}
                         </div>
                       )}
-                      {deal.deal_type && (
+                      {deal.deal_type != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <FileText size={16} style={{ color: 'var(--green-600)' }} />
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Deal Type:</span> {deal.deal_type}
                         </div>
                       )}
-                      {deal.deal_probability && (
+                      {deal.deal_probability != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <ArrowRight size={16} style={{ color: 'var(--green-600)' }} />
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Probability:</span> {deal.deal_probability}%
                         </div>
                       )}
-                      {deal.expected_revenue && (
+                      {deal.expected_revenue != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Expected Revenue:</span> ₹{deal.expected_revenue.toLocaleString()}
                         </div>
