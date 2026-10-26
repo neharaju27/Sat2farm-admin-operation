@@ -223,6 +223,7 @@ useEffect(() => {
     const allowedManagerPages = ['unlock-farm', 'register', 'manager-monthly-report'];
     const allowedClientPages = ['client-monthly-report', 'unlock-farm', 'register'];
     const allowedTechPages = ['green-team'];
+    const allowedAccountsPages = ['invoice-info'];
 
     // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
@@ -238,6 +239,9 @@ useEffect(() => {
       } else if (role === 'client' && !allowedClientPages.includes(savedPage)) {
         setCurrentPage('client-monthly-report');
         localStorage.setItem('currentPage', 'client-monthly-report');
+      } else if (role === 'accounts' && !allowedAccountsPages.includes(savedPage)) {
+        setCurrentPage('invoice-info');
+        localStorage.setItem('currentPage', 'invoice-info');
       } else {
         // Normal page restore
         setCurrentPage(savedPage);
@@ -259,6 +263,9 @@ useEffect(() => {
     } else if (role === 'client') {
       setCurrentPage('client-monthly-report');
       localStorage.setItem('currentPage', 'client-monthly-report');
+    } else if (role === 'accounts') {
+      setCurrentPage('invoice-info');
+      localStorage.setItem('currentPage', 'invoice-info');
     } else if (role.includes('tech')) {
       setCurrentPage('green-team');
       localStorage.setItem('currentPage', 'green-team');
