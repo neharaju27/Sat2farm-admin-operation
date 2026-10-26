@@ -3,16 +3,6 @@ import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calen
 import sat2farmLogo from '../assets/satyukt.webp';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
-  const [operationsOpen, setOperationsOpen] = useState(true);
-  const [salesOpen, setSalesOpen] = useState(false);
-  const [clientOpen, setClientOpen] = useState(false);
-  const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
-  const [accountsOpen, setAccountsOpen] = useState(false);
-  const [todayTasks, setTodayTasks] = useState([]);
-  const [loadingTasks, setLoadingTasks] = useState(false);
-  const [todayGreenTeamAssignments, setTodayGreenTeamAssignments] = useState([]);
-  const [loadingGreenTeamAssignments, setLoadingGreenTeamAssignments] = useState(false);
-  
   // Check user role with more flexible matching
   const userRole = user?.role?.toLowerCase().trim();
   const isOperationsUser = userRole === 'operation' || userRole === 'operations';
@@ -23,6 +13,16 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isMarketingUser = userRole === 'marketing';
   const isTechDepartmentUser = userRole?.includes('tech') || userRole === 'tech department' || userRole === 'tech-department' || userRole === 'tech';
   const isAccountsUser = userRole === 'accounts';
+
+  const [operationsOpen, setOperationsOpen] = useState(true);
+  const [salesOpen, setSalesOpen] = useState(false);
+  const [clientOpen, setClientOpen] = useState(false);
+  const [satyuktCrmOpen, setSatyuktCrmOpen] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(isAccountsUser);
+  const [todayTasks, setTodayTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [todayGreenTeamAssignments, setTodayGreenTeamAssignments] = useState([]);
+  const [loadingGreenTeamAssignments, setLoadingGreenTeamAssignments] = useState(false);
 
   // Helper to normalize user parameter for backend API
   const getApiUserName = (u) => {
@@ -215,6 +215,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'register';
   const isMarketingActive = currentPage === 'marketing-dashboard';
   const isSatyuktCrmActive = currentPage === 'lead-pipeline' || currentPage === 'opportunities' || currentPage === 'green-team' || currentPage === 'prospect-stats' || currentPage === 'task-calendar';
+  const isAccountsActive = currentPage === 'invoice-info';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -266,6 +267,14 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         onPageChange(page);
       } else {
         alert('Access denied: Marketing users cannot access this page');
+      }
+    } else if (isAccountsUser) {
+      // Accounts users can only access specific pages
+      const allowedAccountsPages = ['invoice-info'];
+      if (allowedAccountsPages.includes(page)) {
+        onPageChange(page);
+      } else {
+        alert('Access denied: Accounts users cannot access this page');
       }
     } else if (isTechDepartmentUser) {
       // Tech Department users can only access Green Team
@@ -548,17 +557,17 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
           </>
         )}
 
-        {/* Accounts Section - For Operations and Accounts Users */}
-        {(isOperationsUser || isAccountsUser) && !isTechDepartmentUser && (
+        {/* Accounts Section - For Operations Users */}
+        {isOperationsUser && !isTechDepartmentUser && (
           <>
-            <div 
+            <div
               className="sb-section"
               onClick={() => setAccountsOpen(!accountsOpen)}
               style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
               Accounts
-              <ChevronDown 
-                size={16} 
+              <ChevronDown
+                size={16}
                 style={{transform: accountsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
               />
             </div>
@@ -577,6 +586,25 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {/* Accounts User Only Section */}
+        {isAccountsUser && (
+          <>
+            <div className="sb-section">Accounts</div>
+            <div
+              className={`sb-item ${currentPage === 'invoice-info' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('invoice-info')}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Invoice Info
+              <span className="sb-dot"></span>
+            </div>
           </>
         )}
 
