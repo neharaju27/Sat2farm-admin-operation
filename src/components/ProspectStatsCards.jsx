@@ -275,6 +275,7 @@ export default function ProspectStatsCards({ user }) {
   const [closingDateHistoryDealName, setClosingDateHistoryDealName] = useState('');
   const [currentDealHistory, setCurrentDealHistory] = useState(null);
   const [leadsWithHistory, setLeadsWithHistory] = useState(new Set());
+  const [dealsWithHistory, setDealsWithHistory] = useState(new Set());
   const [leadIdToDealIdMap, setLeadIdToDealIdMap] = useState(new Map());
   const [showClosingDateEditModal, setShowClosingDateEditModal] = useState(false);
   const [editingClosingDateDeal, setEditingClosingDateDeal] = useState(null);
@@ -428,12 +429,11 @@ export default function ProspectStatsCards({ user }) {
     }
   };
 
-  // Function to check if a lead has closing date history
-  const hasClosingDateHistory = (leadId, accountId) => {
-    if (!leadId && !accountId) return false;
-    // Check lead_id first, then fall back to account_id
-    if (leadId && leadsWithHistory.has(String(leadId))) return true;
-    if (accountId && leadsWithHistory.has(String(accountId))) return true;
+  // Function to check if a deal has closing date history
+  const hasClosingDateHistory = (leadId, accountId, dealId) => {
+    if (!dealId) return false;
+    // Check deal_id first - closing should be blue only if deal_id is present in history
+    if (dealId && dealsWithHistory.has(String(dealId))) return true;
     return false;
   };
 
@@ -1148,8 +1148,9 @@ export default function ProspectStatsCards({ user }) {
         const historyData = response.data.data || [];
         setClosingDateHistory(historyData);
 
-        // Extract lead_ids that have history and create lead_id to deal_id mapping
+        // Extract lead_ids and deal_ids that have history and create lead_id to deal_id mapping
         const leadIdsWithHistory = new Set();
+        const dealIdsWithHistory = new Set();
         const leadToDealMap = new Map();
         historyData.forEach(item => {
           if (item.lead_id) {
@@ -1159,11 +1160,16 @@ export default function ProspectStatsCards({ user }) {
               leadToDealMap.set(String(item.lead_id), String(item.deal_id));
             }
           }
+          if (item.deal_id) {
+            dealIdsWithHistory.add(String(item.deal_id));
+          }
         });
         setLeadsWithHistory(leadIdsWithHistory);
+        setDealsWithHistory(dealIdsWithHistory);
         setLeadIdToDealIdMap(leadToDealMap);
 
         console.log('Leads with history:', leadIdsWithHistory);
+        console.log('Deals with history:', dealIdsWithHistory);
         console.log('Lead to deal mapping:', leadToDealMap);
       } else {
         throw new Error('API returned unsuccessful status');
@@ -1173,6 +1179,7 @@ export default function ProspectStatsCards({ user }) {
       toast.error('Failed to load closing date history');
       setClosingDateHistory([]);
       setLeadsWithHistory(new Set());
+      setDealsWithHistory(new Set());
     } finally {
       setClosingDateHistoryLoading(false);
     }
@@ -1685,7 +1692,7 @@ export default function ProspectStatsCards({ user }) {
   const cClosing = () => ({
     label: 'Closing Date',
     render: (r) => {
-      const hasHistory = hasClosingDateHistory(r.lead_id, r.account_id);
+      const hasHistory = hasClosingDateHistory(r.lead_id, r.account_id, r.deal_id);
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
           <span
