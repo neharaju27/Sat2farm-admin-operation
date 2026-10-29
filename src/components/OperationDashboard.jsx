@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Users, Target, DollarSign, CheckCircle, FileText, Leaf, Sprout, IndianRupee,
-  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio
+  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio, Filter
 } from "lucide-react";
 import axios from "axios";
 import toast from 'react-hot-toast';
@@ -29,8 +29,16 @@ export default function OperationDashboard({ user, onPageChange }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterType, setFilterType] = useState('month'); // 'month', 'year', 'custom'
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [availableYears, setAvailableYears] = useState([]);
   const [metrics, setMetrics] = useState({
     leads: 0,
+    interested: 0,
     totalOpportunities: 0,
     deals: 0,
     closedWonDeals: 0,
@@ -43,7 +51,8 @@ export default function OperationDashboard({ user, onPageChange }) {
     totalDealValue: 0,
     closedWonAmount: 0,
     invoicedAmount: 0,
-    paidAmount: 0
+    paidAmount: 0,
+    invoicedPaidAmount: 0
   });
 
   const displayName = user?.name || user?.fullName || user?.first_name || "Operation User";
@@ -53,6 +62,9 @@ export default function OperationDashboard({ user, onPageChange }) {
   };
 
   const formatCurrency = (num) => {
+    if (num === undefined || num === null || isNaN(num)) {
+      return '₹0';
+    }
     if (num >= 100000) {
       const lakhs = (num / 100000).toFixed(1);
       return `₹${lakhs} L`;
@@ -79,56 +91,70 @@ export default function OperationDashboard({ user, onPageChange }) {
     return `Synced ${hours}h ago`;
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (filterParams = null) => {
   try {
     setLoading(true);
     const currentUserName = user?.name || user?.phone_number || 'Operation';
     const encodedUser = encodeURIComponent(currentUserName);
     const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
 
-    // Fetch counts from operation_dashboard API
-    const countsResponse = await axios.get(`${baseUrl}?user=${encodedUser}`);
-    console.log('Operation Dashboard Counts Response:', countsResponse.data);
+    // Build URL with filter parameters if provided
+    let url;
+    if (filterParams) {
+      url = `${baseUrl}?filter`;
+      if (filterParams.month) {
+        url += `&month=${filterParams.month}`;
+      }
+      if (filterParams.year) {
+        url += `&year=${filterParams.year}`;
+      }
+      if (filterParams.startDate && filterParams.endDate) {
+        // Convert date format from YYYY-MM-DD to MM/DD/YYYY
+        const formatDate = (dateStr) => {
+          const [year, month, day] = dateStr.split('-');
+          return `${month}/${day}/${year}`;
+        };
+        url += `&custom&from_date=${formatDate(filterParams.startDate)}&to_date=${formatDate(filterParams.endDate)}`;
+      }
+    } else {
+      url = `${baseUrl}?user=${encodedUser}`;
+    }
 
-    const leadsCount = countsResponse.data?.total_leads || 0;
-    const totalOpportunitiesCount = countsResponse.data?.total_accounts || 0;
-    const dealsCount = countsResponse.data?.total_deals || 0;
-    const closedWonDeals = countsResponse.data?.closed_won_deals || 0;
-    const invoicedPaidCount = countsResponse.data?.invoiced_deals || 0;
-    const paidCount = countsResponse.data?.paid_deals || 0;
+    console.log('Operation Dashboard API URL:', url);
 
-    // Fetch total deal amount
-    const totalDealAmountResponse = await axios.get(`${baseUrl}?amount&user=${encodedUser}`);
-    console.log('Total Deal Amount API Response:', totalDealAmountResponse.data);
-    const totalDealValue = parseFloat(totalDealAmountResponse.data?.total_deal_value || totalDealAmountResponse.data?.total_deal_amount || 0);
+    // Fetch all data from operation_dashboard API
+    const response = await axios.get(url);
+    console.log('Operation Dashboard API Response:', response.data);
+
+    const leadsCount = response.data?.total_leads || 0;
+    const totalOpportunitiesCount = response.data?.total_accounts || 0;
+    const dealsCount = response.data?.total_deals || 0;
+    const closedWonDeals = response.data?.closed_won_deals || 0;
+    const invoicedPaidCount = response.data?.invoiced_deals || 0;
+    const paidCount = response.data?.paid_deals || 0;
+
+    const totalDealValue = parseFloat(response.data?.total_deal_amount || 0);
     console.log('Total Deal Value:', totalDealValue);
 
-    // Fetch closed own deals amount (Closed Won + Invoiced + Paid)
-    const closedWonAmountResponse = await axios.get(`${baseUrl}?amount&stage=Closed%20Won,Invoiced,Paid&user=${encodedUser}`);
-    console.log('Closed Won Amount API Response:', closedWonAmountResponse.data);
-    const closedWonAmount = parseFloat(closedWonAmountResponse.data?.total_deal_amount || 0);
+    // Extract amounts from data array based on deal_stage
+    const dealData = response.data?.data || [];
+    console.log('Deal Data Array:', dealData);
+
+    const closedWonAmount = parseFloat(dealData.find(item => item.deal_stage === 'Closed Won')?.deal_amount || 0);
     console.log('Closed Won Amount:', closedWonAmount);
 
-    // Fetch invoiced+paid amount
-    const invoicedAmountResponse = await axios.get(`${baseUrl}?amount&stage=Invoiced,Paid&user=${encodedUser}`);
-    console.log('Invoiced Amount API Response:', invoicedAmountResponse.data);
-    const invoicedAmount = parseFloat(invoicedAmountResponse.data?.total_deal_amount || 0);
+    const invoicedAmount = parseFloat(dealData.find(item => item.deal_stage === 'Invoiced')?.deal_amount || 0);
     console.log('Invoiced Amount:', invoicedAmount);
 
-    // Fetch paid amount
-    const paidAmountResponse = await axios.get(`${baseUrl}?amount&stage=Paid&user=${encodedUser}`);
-    console.log('Paid Amount API Response:', paidAmountResponse.data);
-    const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
+    const paidAmount = parseFloat(dealData.find(item => item.deal_stage === 'Paid')?.deal_amount || 0);
     console.log('Paid Amount:', paidAmount);
 
-    // Fetch green team count
-    const greenTeamResponse = await axios.get(`${baseUrl}?green_team`);
-    console.log('Green Team API Response:', greenTeamResponse.data);
-    const assignedToGreenTeam = greenTeamResponse.data?.green_team_count || greenTeamResponse.data?.assigned_to_green_team || greenTeamResponse.data?.count || greenTeamResponse.data?.total || greenTeamResponse.data?.green_team || 0;
+    const assignedToGreenTeam = response.data?.green_team_assigned || 0;
     console.log('Assigned to Green Team:', assignedToGreenTeam);
 
     setMetrics({
       leads: leadsCount,
+      interested: totalOpportunitiesCount,
       totalOpportunities: totalOpportunitiesCount,
       deals: dealsCount,
       closedWonDeals: closedWonDeals,
@@ -141,7 +167,8 @@ export default function OperationDashboard({ user, onPageChange }) {
       totalDealValue,
       closedWonAmount,
       invoicedAmount,
-      paidAmount
+      paidAmount,
+      invoicedPaidAmount: invoicedAmount + paidAmount
     });
 
     setLastUpdated(new Date());
@@ -176,8 +203,22 @@ export default function OperationDashboard({ user, onPageChange }) {
     toast.success('Dashboard refreshed');
   };
 
+  const fetchAvailableYears = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
+      const response = await axios.get(`${baseUrl}?filter`);
+      console.log('Available Years API Response:', response.data);
+      const years = response.data?.available_years || [];
+      setAvailableYears(years);
+    } catch (error) {
+      console.error('Error fetching available years:', error);
+      setAvailableYears([]);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchAvailableYears();
   }, []);
 
   // ---- Field Report metric definitions -----------------------------------
@@ -446,18 +487,346 @@ export default function OperationDashboard({ user, onPageChange }) {
   </div>
 ) : (
   <>
-    <h2
-      className="fr-display"
-      style={{
-        fontSize: '20px',
-        fontWeight: 500,
-        color: palette.ink,
-        marginBottom: '20px',
-        marginTop: '0'
-      }}
-    >
-      Lead Data Summary
-    </h2>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', marginTop: '0' }}>
+      <div style={{ position: 'relative' }}>
+        <button
+          onClick={() => setShowFilter(!showFilter)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: '6px',
+            transition: 'background-color 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${palette.pine}15`}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <Filter size={20} color={palette.inkSoft} strokeWidth={2} />
+        </button>
+
+        {showFilter && (
+          <div style={{
+            position: 'fixed',
+            top: '80px',
+            right: '40px',
+            background: palette.surface,
+            border: `1px solid ${palette.border}`,
+            borderRadius: '12px',
+            padding: '20px',
+            width: '320px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+            zIndex: 100
+          }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                fontSize: '13px',
+                fontWeight: 500,
+                color: palette.inkSoft,
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Filter Type
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setFilterType('month')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'month' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'month' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'month' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Month
+                </button>
+                <button
+                  onClick={() => setFilterType('year')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'year' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'year' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'year' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Year
+                </button>
+                <button
+                  onClick={() => setFilterType('custom')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'custom' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'custom' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'custom' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Custom
+                </button>
+              </div>
+            </div>
+
+            {filterType === 'month' && (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Month
+                  </label>
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={1}>January</option>
+                    <option value={2}>February</option>
+                    <option value={3}>March</option>
+                    <option value={4}>April</option>
+                    <option value={5}>May</option>
+                    <option value={6}>June</option>
+                    <option value={7}>July</option>
+                    <option value={8}>August</option>
+                    <option value={9}>September</option>
+                    <option value={10}>October</option>
+                    <option value={11}>November</option>
+                    <option value={12}>December</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Year
+                  </label>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {availableYears.length > 0 ? (
+                      availableYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))
+                    ) : (
+                      <option value={filterYear}>{filterYear}</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {filterType === 'year' && (
+              <div>
+                <label style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: palette.inkSoft,
+                  marginBottom: '8px',
+                  display: 'block'
+                }}>
+                  Year
+                </label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${palette.border}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    backgroundColor: palette.surface,
+                    color: palette.ink,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {availableYears.length > 0 ? (
+                    availableYears.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))
+                  ) : (
+                    <option value={filterYear}>{filterYear}</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            {filterType === 'custom' && (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowFilter(false)}
+                style={{
+                  padding: '6px 12px',
+                  border: `1px solid ${palette.border}`,
+                  backgroundColor: palette.surface,
+                  color: palette.ink,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  let filterParams = null;
+                  const monthNames = ['', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+                  if (filterType === 'month') {
+                    filterParams = {
+                      month: monthNames[filterMonth],
+                      year: filterYear
+                    };
+                  } else if (filterType === 'year') {
+                    filterParams = {
+                      year: filterYear
+                    };
+                  } else if (filterType === 'custom') {
+                    filterParams = {
+                      startDate: customStartDate,
+                      endDate: customEndDate
+                    };
+                  }
+
+                  console.log('Apply filter:', { filterType, filterParams });
+                  await fetchDashboardData(filterParams);
+                  setShowFilter(false);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  border: `1px solid ${palette.pine}`,
+                  backgroundColor: palette.pine,
+                  color: '#ffffff',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <h2
+        className="fr-display"
+        style={{
+          fontSize: '20px',
+          fontWeight: 500,
+          color: palette.ink,
+          margin: '0'
+        }}
+      >
+        Lead Data Summary
+      </h2>
+    </div>
     <div className="op-dashboard-grid">
       {dashboardCards.map((card, index) => {
         const Icon = card.icon;

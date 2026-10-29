@@ -63,83 +63,42 @@ export default function AllSalesData({ user, onPageChange }) {
       setLoading(true);
       const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
 
-      // Fetch all sales data from API
-      const allSalesResponse = await axios.get(`${baseUrl}?allsalesdata=true`);
-      console.log('All Sales Data API Response:', allSalesResponse.data);
+      // Fetch deals data from API
+      const dealsUrl = `${baseUrl}?allsalesdata=true`;
+      console.log('All Sales Deals Data API URL:', dealsUrl);
+      const dealsResponse = await axios.get(dealsUrl);
+      console.log('All Sales Deals Data API Response:', dealsResponse.data);
 
-      const salesUsers = allSalesResponse.data?.data || [];
-      const salesDataPromises = salesUsers.map(async (salesUser) => {
-        const salesName = salesUser.sales_name;
-        const encodedUser = encodeURIComponent(salesName);
+      const dealsData = dealsResponse.data?.data || [];
 
-        try {
-          // Fetch counts from operation_dashboard API
-          const countsResponse = await axios.get(`${baseUrl}?user=${encodedUser}`);
-          console.log(`Counts Response for ${salesName}:`, countsResponse.data);
+      // Fetch revenue data from API
+      const revenueUrl = `${baseUrl}?allsalesdata&revenue`;
+      console.log('All Sales Revenue Data API URL:', revenueUrl);
+      const revenueResponse = await axios.get(revenueUrl);
+      console.log('All Sales Revenue Data API Response:', revenueResponse.data);
 
-          const totalLeads = countsResponse.data?.total_leads || 0;
-          const totalOpportunities = countsResponse.data?.total_accounts || 0;
-          const totalDeals = countsResponse.data?.total_deals || 0;
-          const closedWonDeals = countsResponse.data?.closed_won_deals || 0;
-          const invoicedDeals = countsResponse.data?.invoiced_deals || 0;
-          const paidDeals = countsResponse.data?.paid_deals || 0;
+      const revenueData = revenueResponse.data?.data || [];
 
-          // Fetch total deal amount
-          const totalDealAmountResponse = await axios.get(`${baseUrl}?amount&user=${encodedUser}`);
-          const totalDealValue = parseFloat(totalDealAmountResponse.data?.total_deal_value || totalDealAmountResponse.data?.total_deal_amount || 0);
-
-          // Fetch closed own deals amount (Closed Won + Invoiced + Paid)
-          const closedWonAmountResponse = await axios.get(`${baseUrl}?amount&stage=Closed%20Won,Invoiced,Paid&user=${encodedUser}`);
-          const closedWonAmount = parseFloat(closedWonAmountResponse.data?.total_deal_amount || 0);
-
-          // Fetch invoiced+paid amount
-          const invoicedAmountResponse = await axios.get(`${baseUrl}?amount&stage=Invoiced,Paid&user=${encodedUser}`);
-          const invoicedAmount = parseFloat(invoicedAmountResponse.data?.total_deal_amount || 0);
-
-          // Fetch paid amount
-          const paidAmountResponse = await axios.get(`${baseUrl}?amount&stage=Paid&user=${encodedUser}`);
-          const paidAmount = parseFloat(paidAmountResponse.data?.total_deal_amount || 0);
-
-          // Fetch green team count
-          const greenTeamResponse = await axios.get(`${baseUrl}?green_team&user=${encodedUser}`);
-          console.log(`Green Team Response for ${salesName}:`, greenTeamResponse.data);
-          const assignedToGreenTeam = greenTeamResponse.data?.green_team_count || greenTeamResponse.data?.assigned_to_green_team || greenTeamResponse.data?.count || greenTeamResponse.data?.total || greenTeamResponse.data?.green_team || 0;
-
-          return {
-            salesName: salesName,
-            totalLeads: totalLeads,
-            totalOpportunities: totalOpportunities,
-            deals: totalDeals,
-            closedWonDeal: closedWonDeals,
-            invoiced: invoicedDeals,
-            paid: paidDeals,
-            assignedToGreenTeam: assignedToGreenTeam,
-            totalDealValue: totalDealValue,
-            closedWonAmount: closedWonAmount,
-            invoicedAmount: invoicedAmount,
-            paidAmount: paidAmount
-          };
-        } catch (error) {
-          console.error(`Error fetching data for ${salesName}:`, error);
-          return {
-            salesName: salesName,
-            totalLeads: 0,
-            totalOpportunities: 0,
-            deals: 0,
-            closedWonDeal: 0,
-            invoiced: 0,
-            paid: 0,
-            assignedToGreenTeam: 0,
-            totalDealValue: 0,
-            closedWonAmount: 0,
-            invoicedAmount: 0,
-            paidAmount: 0
-          };
-        }
+      // Merge deals and revenue data by sales_name
+      const mergedData = dealsData.map(dealItem => {
+        const revenueItem = revenueData.find(r => r.sales_name === dealItem.sales_name);
+        return {
+          salesName: dealItem.sales_name,
+          totalLeads: dealItem.total_leads || 0,
+          totalOpportunities: dealItem.total_accounts || 0,
+          deals: dealItem.total_deals || 0,
+          closedWonDeal: dealItem.closed_won_deals || 0,
+          invoiced: dealItem.invoiced_deals || 0,
+          paid: dealItem.paid_deals || 0,
+          assignedToGreenTeam: dealItem.green_team_assigned || 0,
+          totalDealValue: revenueItem?.total_deal_amount || 0,
+          closedWonAmount: revenueItem?.closed_won_amount || 0,
+          invoicedAmount: revenueItem?.invoiced_amount || 0,
+          paidAmount: revenueItem?.paid_amount || 0
+        };
       });
 
-      const allSalesData = await Promise.all(salesDataPromises);
-      setAllSalesData(allSalesData);
+      setAllSalesData(mergedData);
       setLastUpdated(new Date());
       setLoading(false);
     } catch (error) {
