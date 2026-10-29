@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
-  Users, Target, DollarSign, CheckCircle, FileText, Leaf,
-  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio
+  Users, Target, DollarSign, CheckCircle, FileText, Leaf, Sprout, IndianRupee,
+  TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Radio, Filter
 } from "lucide-react";
 import axios from "axios";
 import toast from 'react-hot-toast';
@@ -28,6 +28,13 @@ export default function OperationDashboard({ user, onPageChange }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterType, setFilterType] = useState('month'); // 'month', 'year', 'custom'
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [availableYears, setAvailableYears] = useState([]);
   const [metrics, setMetrics] = useState({
     leads: 0,
     interested: 0,
@@ -72,65 +79,84 @@ export default function OperationDashboard({ user, onPageChange }) {
     return `Synced ${hours}h ago`;
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (filterParams = null) => {
   try {
     setLoading(true);
     const currentUserName = user?.name || user?.phone_number || 'Operation';
     const encodedUser = encodeURIComponent(currentUserName);
-    const dealsApiUrl = import.meta.env.VITE_FILTER_DEALS_API_URL || import.meta.env.VITE_DEALS_API_URL;
+    const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
 
-    const [
-      leadsResponse,
-      dealsResponse,
-      interestedResponse,
-      accountsResponse,
-      closedWonResponse,
-      invoicedResponse,
-      paidResponse
-    ] = await Promise.all([
-      axios.get(`${import.meta.env.VITE_LEADS_API_URL}?user=${encodedUser}`),
-      axios.get(`${import.meta.env.VITE_FILTER_DEALS_API_URL}?user=${encodedUser}&deal_stage_is_not=Paid`),
-      axios.get(`${import.meta.env.VITE_FILTER_LEADS_API_URL}?user=${encodedUser}&offset=0&limit=100&status_is=Starter,Growth,Enterprise,Interested`),
-      axios.get(`https://api.sat2farm.com/sat2business_leads/accounts?user=${encodedUser}`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Closed Won')}&offset=0&limit=1000`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Invoiced')}&offset=0&limit=1000`),
-      axios.get(`${dealsApiUrl}?user=${encodedUser}&deal_stage=${encodeURIComponent('Paid')}&offset=0&limit=1000`)
-    ]);
+    // Build URL with filter parameters if provided
+    let url = `${baseUrl}?user=${encodedUser}`;
+    if (filterParams) {
+      if (filterParams.month) {
+        url += `&month=${filterParams.month}`;
+      }
+      if (filterParams.year) {
+        url += `&year=${filterParams.year}`;
+      }
+      if (filterParams.startDate && filterParams.endDate) {
+        // Convert date format from YYYY-MM-DD to MM/DD/YYYY
+        const formatDate = (dateStr) => {
+          const [year, month, day] = dateStr.split('-');
+          return `${month}/${day}/${year}`;
+        };
+        url += `&filter&custom&from_date=${formatDate(filterParams.startDate)}&to_date=${formatDate(filterParams.endDate)}`;
+      }
+    }
 
-    const leadsCount = leadsResponse.data?.total || leadsResponse.data?.data?.length || leadsResponse.data?.length || 0;
-    const dealsCount = dealsResponse.data?.total || dealsResponse.data?.data?.length || dealsResponse.data?.length || 0;
-    const interestedLeadsCount = interestedResponse.data?.total || interestedResponse.data?.data?.length || interestedResponse.data?.length || 0;
-    const accountsCount = accountsResponse.data?.total || accountsResponse.data?.data?.length || accountsResponse.data?.length || 0;
-    const interestedCount = interestedLeadsCount + accountsCount;
+    // Fetch counts from operation_dashboard API
+    const countsResponse = await axios.get(url);
+    console.log('Operation Dashboard Counts Response:', countsResponse.data);
 
-    const closedWonCount = closedWonResponse.data?.total ?? closedWonResponse.data?.count ?? (closedWonResponse.data?.data?.length || 0);
-    const invoicedCount = invoicedResponse.data?.total ?? invoicedResponse.data?.count ?? (invoicedResponse.data?.data?.length || 0);
-    const paidData = paidResponse.data?.data || paidResponse.data || [];
+    const leadsCount = countsResponse.data?.total_leads || 0;
+    const totalOpportunitiesCount = countsResponse.data?.total_accounts || 0;
+    const dealsCount = countsResponse.data?.total_deals || 0;
+    const closedWonDeals = countsResponse.data?.closed_won_deals || 0;
+    const invoicedPaidCount = countsResponse.data?.invoiced_deals || 0;
+    const paidCount = countsResponse.data?.paid_deals || 0;
 
-    // Closed won includes invoiced deals (kept as-is, matches existing "Closed Won Deals" card logic)
-    const totalClosedWon = closedWonCount + invoicedCount;
+    // Fetch deal data summary with same filter parameters
+    let dealDataUrl = baseUrl;
+    if (filterParams) {
+      dealDataUrl += '?';
+      if (filterParams.month) {
+        dealDataUrl += `month=${filterParams.month}&`;
+      }
+      if (filterParams.year) {
+        dealDataUrl += `year=${filterParams.year}&`;
+      }
+      if (filterParams.startDate && filterParams.endDate) {
+        // Convert date format from YYYY-MM-DD to MM/DD/YYYY
+        const formatDate = (dateStr) => {
+          const [year, month, day] = dateStr.split('-');
+          return `${month}/${day}/${year}`;
+        };
+        dealDataUrl += `filter&custom&from_date=${formatDate(filterParams.startDate)}&to_date=${formatDate(filterParams.endDate)}`;
+      }
+      // Remove trailing & if present
+      dealDataUrl = dealDataUrl.endsWith('&') ? dealDataUrl.slice(0, -1) : dealDataUrl;
+    }
+    const dealDataResponse = await axios.get(dealDataUrl);
+    console.log('Deal Data Summary API Response:', dealDataResponse.data);
 
-    // Fetch total deal value and invoiced+paid amount from deal stage amount API
-    const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
-    const [totalDealValueResponse, invoicedPaidAmountResponse] = await Promise.all([
-      axios.get(`${dealStageAmountApiUrl}?user=${encodedUser}`),
-      axios.get(`${dealStageAmountApiUrl}?user=${encodedUser}&stage=Invoiced,Paid`)
-    ]);
+    const totalDealValue = parseFloat(dealDataResponse.data?.total_deal_amount || 0);
+    console.log('Total Deal Value:', totalDealValue);
 
-    console.log('Total Deal Value API Response:', totalDealValueResponse.data);
-    console.log('Invoiced+Paid API Response:', invoicedPaidAmountResponse.data);
+    // Extract amounts from data array based on deal_stage
+    const dealData = dealDataResponse.data?.data || [];
+    const closedWonAmount = parseFloat(dealData.find(item => item.deal_stage === 'Closed Won')?.deal_amount || 0);
+    console.log('Closed Won Amount:', closedWonAmount);
 
-    const totalDealValue = parseFloat(totalDealValueResponse.data?.Total || 0);
-    console.log('Total Deal Value from API:', totalDealValue);
+    const invoicedAmount = parseFloat(dealData.find(item => item.deal_stage === 'Invoiced')?.deal_amount || 0);
+    console.log('Invoiced Amount:', invoicedAmount);
 
-    const invoicedPaidData = invoicedPaidAmountResponse.data;
-    const invoicedAmount = parseFloat(invoicedPaidData?.Invoiced || 0);
-    const paidAmount = parseFloat(invoicedPaidData?.Paid || 0);
-    const totalInvoicedPaid = invoicedAmount + paidAmount;
-    console.log('Invoiced + Paid Amount from API:', totalInvoicedPaid);
+    const paidAmount = parseFloat(dealData.find(item => item.deal_stage === 'Paid')?.deal_amount || 0);
+    console.log('Paid Amount:', paidAmount);
 
-    // Closed Won Amount: only Closed Won stage
-    const closedWonAmount = closedWonResponse.data?.data?.reduce((sum, deal) => sum + (parseFloat(deal.deal_amount) || 0), 0) || 0;
+    // Green team count is already in dealDataResponse
+    const assignedToGreenTeam = dealDataResponse.data?.green_team_assigned || 0;
+    console.log('Assigned to Green Team:', assignedToGreenTeam);
 
     setMetrics({
       leads: leadsCount,
@@ -177,8 +203,22 @@ export default function OperationDashboard({ user, onPageChange }) {
     toast.success('Dashboard refreshed');
   };
 
+  const fetchAvailableYears = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_OPERATION_DASHBOARD_API_URL;
+      const response = await axios.get(`${baseUrl}?filter`);
+      console.log('Available Years API Response:', response.data);
+      const years = response.data?.available_years || [];
+      setAvailableYears(years);
+    } catch (error) {
+      console.error('Error fetching available years:', error);
+      setAvailableYears([]);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchAvailableYears();
   }, []);
 
   // ---- Field Report metric definitions -----------------------------------
@@ -255,10 +295,11 @@ export default function OperationDashboard({ user, onPageChange }) {
 
   const funnelSteps = [
     { label: 'Sown', sub: 'Leads', value: metrics.leads, accent: palette.pine },
-    { label: 'Sprouted', sub: 'Interested', value: metrics.interested, accent: palette.amber },
-    { label: 'Rooted', sub: 'Deals', value: metrics.deals, accent: palette.slate },
-    { label: 'Harvested', sub: 'Closed Won', value: metrics.closedWonDeals, accent: palette.growth },
+    { label: 'Sprouted', sub: 'Total Opportunity', value: metrics.totalOpportunities, accent: palette.amber },
+    { label: 'Rooted', sub: 'Total Deals', value: metrics.deals, accent: palette.slate },
+    { label: 'Harvested', sub: 'Closed Won Deals', value: metrics.closedWonDeals, accent: palette.growth },
     { label: 'Invoiced', sub: 'Invoiced', value: metrics.invoiced, accent: palette.amberDeep },
+    { label: 'Paid', sub: 'Paid', value: metrics.paid, accent: palette.teal },
   ];
   const funnelBase = Math.max(metrics.leads, 1);
 
@@ -383,12 +424,6 @@ export default function OperationDashboard({ user, onPageChange }) {
             </svg>
 
             <div style={{ position: 'relative', zIndex: 1 }}>
-              <div
-                className="fr-eyebrow"
-                style={{ color: palette.amber, fontSize: '11px', marginBottom: '10px' }}
-              >
-                Field Report · Live Season
-              </div>
               <h1
                 className="fr-display"
                 style={{ color: '#ffffff', fontSize: '30px', fontWeight: 500, margin: 0, lineHeight: 1.2 }}
@@ -421,18 +456,346 @@ export default function OperationDashboard({ user, onPageChange }) {
   </div>
 ) : (
   <>
-    <h2
-      className="fr-display"
-      style={{
-        fontSize: '20px',
-        fontWeight: 500,
-        color: palette.ink,
-        marginBottom: '20px',
-        marginTop: '0'
-      }}
-    >
-      Lead Data Summary
-    </h2>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', marginTop: '0' }}>
+      <div style={{ position: 'relative' }}>
+        <button
+          onClick={() => setShowFilter(!showFilter)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: '6px',
+            transition: 'background-color 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${palette.pine}15`}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <Filter size={20} color={palette.inkSoft} strokeWidth={2} />
+        </button>
+
+        {showFilter && (
+          <div style={{
+            position: 'fixed',
+            top: '80px',
+            right: '40px',
+            background: palette.surface,
+            border: `1px solid ${palette.border}`,
+            borderRadius: '12px',
+            padding: '20px',
+            width: '320px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+            zIndex: 100
+          }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                fontSize: '13px',
+                fontWeight: 500,
+                color: palette.inkSoft,
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Filter Type
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setFilterType('month')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'month' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'month' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'month' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Month
+                </button>
+                <button
+                  onClick={() => setFilterType('year')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'year' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'year' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'year' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Year
+                </button>
+                <button
+                  onClick={() => setFilterType('custom')}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${filterType === 'custom' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'custom' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'custom' ? palette.pine : palette.ink,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                    flex: 1
+                  }}
+                >
+                  Custom
+                </button>
+              </div>
+            </div>
+
+            {filterType === 'month' && (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Month
+                  </label>
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={1}>January</option>
+                    <option value={2}>February</option>
+                    <option value={3}>March</option>
+                    <option value={4}>April</option>
+                    <option value={5}>May</option>
+                    <option value={6}>June</option>
+                    <option value={7}>July</option>
+                    <option value={8}>August</option>
+                    <option value={9}>September</option>
+                    <option value={10}>October</option>
+                    <option value={11}>November</option>
+                    <option value={12}>December</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Year
+                  </label>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {availableYears.length > 0 ? (
+                      availableYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))
+                    ) : (
+                      <option value={filterYear}>{filterYear}</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {filterType === 'year' && (
+              <div>
+                <label style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: palette.inkSoft,
+                  marginBottom: '8px',
+                  display: 'block'
+                }}>
+                  Year
+                </label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: `1px solid ${palette.border}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    backgroundColor: palette.surface,
+                    color: palette.ink,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {availableYears.length > 0 ? (
+                    availableYears.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))
+                  ) : (
+                    <option value={filterYear}>{filterYear}</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            {filterType === 'custom' && (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: palette.inkSoft,
+                    marginBottom: '8px',
+                    display: 'block'
+                  }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowFilter(false)}
+                style={{
+                  padding: '6px 12px',
+                  border: `1px solid ${palette.border}`,
+                  backgroundColor: palette.surface,
+                  color: palette.ink,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  let filterParams = null;
+                  const monthNames = ['', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+                  if (filterType === 'month') {
+                    filterParams = {
+                      month: monthNames[filterMonth],
+                      year: filterYear
+                    };
+                  } else if (filterType === 'year') {
+                    filterParams = {
+                      year: filterYear
+                    };
+                  } else if (filterType === 'custom') {
+                    filterParams = {
+                      startDate: customStartDate,
+                      endDate: customEndDate
+                    };
+                  }
+
+                  console.log('Apply filter:', { filterType, filterParams });
+                  await fetchDashboardData(filterParams);
+                  setShowFilter(false);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  border: `1px solid ${palette.pine}`,
+                  backgroundColor: palette.pine,
+                  color: '#ffffff',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <h2
+        className="fr-display"
+        style={{
+          fontSize: '20px',
+          fontWeight: 500,
+          color: palette.ink,
+          margin: '0'
+        }}
+      >
+        Lead Data Summary
+      </h2>
+    </div>
     <div className="op-dashboard-grid">
       {dashboardCards.map((card, index) => {
         const Icon = card.icon;
