@@ -1195,29 +1195,17 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push('account_with_task=true');
           }
         } else if (filter.property === 'created_time' || filter.property === 'createdTime') {
-          urlParams.push(`date_field=created_time`);
           const val = filter.value || filter.date;
           const from = filter.fromDate || filter.value;
           const to = filter.toDate || filter.value2;
           if (filter.dateOperator === 'on' && val) {
             urlParams.push(`created_time_on=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=on`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
-          } else if (filter.dateOperator === 'after' && val) {
-            urlParams.push(`created_time_after=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=after`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
           } else if (filter.dateOperator === 'before' && val) {
             urlParams.push(`created_time_before=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=before`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'after' && val) {
+            urlParams.push(`created_time_after=${encodeURIComponent(val)}`);
           } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && from && to) {
             urlParams.push(`created_time_between=${encodeURIComponent(from)},${encodeURIComponent(to)}`);
-            urlParams.push(`date_type=${filter.dateOperator}`);
-            urlParams.push(`from=${encodeURIComponent(from)}`);
-            urlParams.push(`to=${encodeURIComponent(to)}`);
-            urlParams.push(`from_date=${encodeURIComponent(from)}`);
-            urlParams.push(`to_date=${encodeURIComponent(to)}`);
           } else if (filter.dateOperator === 'in_the_last') {
             const unitMap = { day: 'days', week: 'weeks', month: 'months' };
             const count = filter.count ? parseInt(filter.count) : 1;
@@ -1226,29 +1214,17 @@ export default function Opportunities({ onPageChange }) {
             urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
           }
         } else if (filter.property === 'modified_time' || filter.property === 'modifiedTime') {
-          urlParams.push(`date_field=modified_time`);
           const val = filter.value || filter.date;
           const from = filter.fromDate || filter.value;
           const to = filter.toDate || filter.value2;
           if (filter.dateOperator === 'on' && val) {
             urlParams.push(`modified_time_on=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=on`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
-          } else if (filter.dateOperator === 'after' && val) {
-            urlParams.push(`modified_time_after=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=after`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
           } else if (filter.dateOperator === 'before' && val) {
             urlParams.push(`modified_time_before=${encodeURIComponent(val)}`);
-            urlParams.push(`date_type=before`);
-            urlParams.push(`date=${encodeURIComponent(val)}`);
+          } else if (filter.dateOperator === 'after' && val) {
+            urlParams.push(`modified_time_after=${encodeURIComponent(val)}`);
           } else if ((filter.dateOperator === 'between' || filter.dateOperator === 'custom') && from && to) {
             urlParams.push(`modified_time_between=${encodeURIComponent(from)},${encodeURIComponent(to)}`);
-            urlParams.push(`date_type=${filter.dateOperator}`);
-            urlParams.push(`from=${encodeURIComponent(from)}`);
-            urlParams.push(`to=${encodeURIComponent(to)}`);
-            urlParams.push(`from_date=${encodeURIComponent(from)}`);
-            urlParams.push(`to_date=${encodeURIComponent(to)}`);
           } else if (filter.dateOperator === 'in_the_last') {
             const unitMap = { day: 'days', week: 'weeks', month: 'months' };
             const count = filter.count ? parseInt(filter.count) : 1;
@@ -1323,6 +1299,22 @@ export default function Opportunities({ onPageChange }) {
         const criteriaText = filters.map(f => {
           if (f.property === 'task') {
             return f.value === 'without_task' || f.value === 'without task' ? 'Task: Without Task' : 'Task: With Task';
+          }
+          if (f.property === 'created_time' || f.property === 'createdTime') {
+            const from = f.fromDate || f.value;
+            const to = f.toDate || f.value2;
+            if (f.dateOperator === 'between' && from && to) {
+              return `Created Time between ${from} and ${to}`;
+            }
+            return `Created Time ${f.dateOperator || 'on'} ${f.value || ''}`;
+          }
+          if (f.property === 'modified_time' || f.property === 'modifiedTime') {
+            const from = f.fromDate || f.value;
+            const to = f.toDate || f.value2;
+            if (f.dateOperator === 'between' && from && to) {
+              return `Modified Time between ${from} and ${to}`;
+            }
+            return `Modified Time ${f.dateOperator || 'on'} ${f.value || ''}`;
           }
           const propLabel = f.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
           const op = f.operator || 'is';
@@ -1571,27 +1563,16 @@ export default function Opportunities({ onPageChange }) {
                 }
               } else if (p.property === 'created_time' || p.property === 'createdTime') {
                 const val = p.value || p.date;
-                if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-                  if (p.fromDate && p.toDate) {
-                    params.append('created_time_between', `${p.fromDate},${p.toDate}`);
-                    params.append('from', p.fromDate);
-                    params.append('to', p.toDate);
-                  } else if (val) {
-                    params.append('date', val);
-                  }
-                  params.append('date_type', p.dateOperator);
+                const from = p.fromDate || p.value;
+                const to = p.toDate || p.value2;
+                if ((p.dateOperator === 'between' || p.dateOperator === 'custom') && from && to) {
+                  params.append('created_time_between', `${from},${to}`);
                 } else if (p.dateOperator === 'on' && val) {
                   params.append('created_time_on', val);
-                  params.append('date_type', 'on');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'before' && val) {
                   params.append('created_time_before', val);
-                  params.append('date_type', 'before');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'after' && val) {
                   params.append('created_time_after', val);
-                  params.append('date_type', 'after');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
                   const unitMap = { day: 'days', week: 'weeks', month: 'months' };
                   const count = p.count ? parseInt(p.count) : 1;
@@ -1601,27 +1582,16 @@ export default function Opportunities({ onPageChange }) {
                 }
               } else if (p.property === 'modified_time' || p.property === 'modifiedTime') {
                 const val = p.value || p.date;
-                if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-                  if (p.fromDate && p.toDate) {
-                    params.append('modified_time_between', `${p.fromDate},${p.toDate}`);
-                    params.append('from', p.fromDate);
-                    params.append('to', p.toDate);
-                  } else if (val) {
-                    params.append('date', val);
-                  }
-                  params.append('date_type', p.dateOperator);
+                const from = p.fromDate || p.value;
+                const to = p.toDate || p.value2;
+                if ((p.dateOperator === 'between' || p.dateOperator === 'custom') && from && to) {
+                  params.append('modified_time_between', `${from},${to}`);
                 } else if (p.dateOperator === 'on' && val) {
                   params.append('modified_time_on', val);
-                  params.append('date_type', 'on');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'before' && val) {
                   params.append('modified_time_before', val);
-                  params.append('date_type', 'before');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'after' && val) {
                   params.append('modified_time_after', val);
-                  params.append('date_type', 'after');
-                  params.append('date', val);
                 } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
                   const unitMap = { day: 'days', week: 'weeks', month: 'months' };
                   const count = p.count ? parseInt(p.count) : 1;
@@ -4048,23 +4018,17 @@ export default function Opportunities({ onPageChange }) {
               params.append('account_with_task', 'true');
             }
           } else if (p.property === 'created_time' || p.property === 'createdTime') {
-            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-              params.append('date_type', p.dateOperator);
-              if (p.fromDate && p.toDate) {
-                params.append('from', p.fromDate);
-                params.append('to', p.toDate);
-              } else if (p.value || p.date) {
-                params.append('date', p.value || p.date);
-              }
-            } else if (p.dateOperator === 'on' && (p.value || p.date)) {
-              params.append('date_type', 'on');
-              params.append('date', p.value || p.date);
-            } else if (p.dateOperator === 'before' && (p.value || p.date)) {
-              params.append('date_type', 'before');
-              params.append('date', p.value || p.date);
-            } else if (p.dateOperator === 'after' && (p.value || p.date)) {
-              params.append('date_type', 'after');
-              params.append('date', p.value || p.date);
+            const val = p.value || p.date;
+            const from = p.fromDate || p.value;
+            const to = p.toDate || p.value2;
+            if ((p.dateOperator === 'between' || p.dateOperator === 'custom') && from && to) {
+              params.append('created_time_between', `${from},${to}`);
+            } else if (p.dateOperator === 'on' && val) {
+              params.append('created_time_on', val);
+            } else if (p.dateOperator === 'before' && val) {
+              params.append('created_time_before', val);
+            } else if (p.dateOperator === 'after' && val) {
+              params.append('created_time_after', val);
             } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
               const unitMap = { day: 'days', week: 'weeks', month: 'months' };
               const count = p.count ? parseInt(p.count) : 1;
@@ -4074,27 +4038,16 @@ export default function Opportunities({ onPageChange }) {
             }
           } else if (p.property === 'modified_time' || p.property === 'modifiedTime') {
             const val = p.value || p.date;
-            if (p.dateOperator === 'between' || p.dateOperator === 'custom') {
-              if (p.fromDate && p.toDate) {
-                params.append('modified_time_between', `${p.fromDate},${p.toDate}`);
-                params.append('from', p.fromDate);
-                params.append('to', p.toDate);
-              } else if (val) {
-                params.append('date', val);
-              }
-              params.append('date_type', p.dateOperator);
+            const from = p.fromDate || p.value;
+            const to = p.toDate || p.value2;
+            if ((p.dateOperator === 'between' || p.dateOperator === 'custom') && from && to) {
+              params.append('modified_time_between', `${from},${to}`);
             } else if (p.dateOperator === 'on' && val) {
               params.append('modified_time_on', val);
-              params.append('date_type', 'on');
-              params.append('date', val);
             } else if (p.dateOperator === 'before' && val) {
               params.append('modified_time_before', val);
-              params.append('date_type', 'before');
-              params.append('date', val);
             } else if (p.dateOperator === 'after' && val) {
               params.append('modified_time_after', val);
-              params.append('date_type', 'after');
-              params.append('date', val);
             } else if (p.dateOperator === 'in_the_last' || p.dateOperator === 'in_last') {
               const unitMap = { day: 'days', week: 'weeks', month: 'months' };
               const count = p.count ? parseInt(p.count) : 1;

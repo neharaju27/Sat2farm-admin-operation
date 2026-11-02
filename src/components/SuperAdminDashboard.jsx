@@ -5,6 +5,7 @@ import {
   Building2,
   Eye,
   X,
+  RotateCcw,
 } from "lucide-react";
 import toast from 'react-hot-toast';
 import "../styles/Sat2FarmAdminPortal.css";
@@ -20,6 +21,9 @@ const FETCH_SUPERADMIN_AREA_API_URL =
 
 const UPDATE_ADMIN_AREA_API_URL =
   import.meta.env.VITE_UPDATE_ADMIN_AREA_API_URL;
+
+const ROLLBACK_AREA_API_URL =
+  import.meta.env.VITE_ROLLBACK_AREA_API_URL;
 
 export default function SuperAdminDashboard({
   user,
@@ -43,6 +47,15 @@ export default function SuperAdminDashboard({
   });
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState("");
+
+  const [revokeModalOpen, setRevokeModalOpen] = useState(false);
+  const [revokeManager, setRevokeManager] = useState(null);
+  const [revokeFormData, setRevokeFormData] = useState({
+    area: "",
+    plan: "1 month"
+  });
+  const [revokeLoading, setRevokeLoading] = useState(false);
+  const [revokeError, setRevokeError] = useState("");
 
   useEffect(() => {
     fetchManagers();
@@ -258,7 +271,98 @@ export default function SuperAdminDashboard({
       const q = searchTerm.toLowerCase();
 
       list = list.filter((m) => {
-        return (
+        const handleOpenRevokeModal = (manager) => {
+    setRevokeManager(manager);
+    setRevokeFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setRevokeError("");
+    setRevokeModalOpen(true);
+  };
+
+  const handleCloseRevokeModal = () => {
+    setRevokeModalOpen(false);
+    setRevokeManager(null);
+    setRevokeFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setRevokeError("");
+  };
+
+  const handleRevokeInputChange = (e) => {
+    const { name, value } = e.target;
+    setRevokeFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRevokeSubmit = async (e) => {
+    e.preventDefault();
+
+    const areaNum = parseFloat(revokeFormData.area);
+    if (!revokeFormData.area || isNaN(areaNum) || areaNum <= 0) {
+      setRevokeError("Please enter a valid area in acres");
+      return;
+    }
+
+    const clientId = revokeManager?.sub_admin_id || revokeManager?.client_id;
+    if (!clientId) {
+      setRevokeError("Client ID not available for this manager.");
+      return;
+    }
+
+    let planValue = '1';
+    const trimmedPlan = revokeFormData.plan.trim();
+    if (trimmedPlan === '1 month') planValue = '1';
+    else if (trimmedPlan === '6 months') planValue = '6';
+    else if (trimmedPlan === '12 months') planValue = '12';
+    else planValue = '1';
+
+    const availableArea = revokeManager?.plan_acreages?.[trimmedPlan]?.available || 0;
+    if (areaNum > availableArea) {
+      setRevokeError(`Requested area (${areaNum} acres) exceeds available area (${availableArea.toFixed(2)} acres) for the ${trimmedPlan} plan.`);
+      return;
+    }
+
+    if (!ROLLBACK_AREA_API_URL) {
+      setRevokeError("Rollback API URL is not configured in environment variables.");
+      return;
+    }
+
+    setRevokeLoading(true);
+    setRevokeError("");
+
+    try {
+      const apiUrl = `${ROLLBACK_AREA_API_URL}?client_id=${clientId}&plan=${planValue}&area=${revokeFormData.area}`;
+      console.log('Revoke API URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Revoke API Response:', data);
+
+      if (response.ok) {
+        toast.success(data.message || 'Acreage revoked successfully!');
+        handleCloseRevokeModal();
+        fetchManagers();
+      } else {
+        const errorMessage = data.message || data.error || 'Failed to revoke acreage';
+        setRevokeError(errorMessage);
+      }
+    } catch (err) {
+      console.error('Revoke Error:', err);
+      setRevokeError('Network error. Please try again.');
+    } finally {
+      setRevokeLoading(false);
+    }
+  };
+
+  return (
           m.full_name?.toLowerCase().includes(q) ||
           m.mobile_no?.includes(q) ||
           m.sub_admin_id?.toString().includes(q)
@@ -495,7 +599,7 @@ export default function SuperAdminDashboard({
                       <th style={{ minWidth: "135px" }}>1 Month Plan</th>
                       <th style={{ minWidth: "135px" }}>6 Months Plan</th>
                       <th style={{ minWidth: "135px" }}>12 Months Plan</th>
-                      <th style={{ minWidth: "220px", textAlign: "center" }}>Actions</th>
+                      <th style={{ minWidth: "300px", textAlign: "center" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -579,20 +683,31 @@ export default function SuperAdminDashboard({
 
                           {/* Actions */}
                           <td style={{ textAlign: "center" }}>
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "nowrap" }}>
+                            <div style={{ display: "flex", gap: "6px", justifyContent: "center", alignItems: "center", flexWrap: "nowrap" }}>
                               <button
                                 className="sa-action-btn"
                                 onClick={() => handleOpenAssignModal(manager)}
-                                style={{ padding: "7px 12px", fontSize: "12px" }}
+                                style={{ padding: "6px 10px", fontSize: "12px", whiteSpace: "nowrap" }}
+                                title="Assign Acreages"
                               >
                                 Assign Acreages
                               </button>
                               <button
-                                className="sa-action-btn"
-                                onClick={() => handleCardClick(manager)}
-                                style={{ padding: "7px 12px", fontSize: "12px" }}
+                                className="sa-action-btn btn-revoke"
+                                onClick={() => handleOpenRevokeModal(manager)}
+                                style={{ padding: "6px 10px", fontSize: "12px", whiteSpace: "nowrap" }}
+                                title="Revoke Acreage"
                               >
-                                <Eye size={14} />
+                                <RotateCcw size={13} />
+                                Revoke Acreage
+                              </button>
+                              <button
+                                className="sa-action-btn btn-view"
+                                onClick={() => handleCardClick(manager)}
+                                style={{ padding: "6px 10px", fontSize: "12px", whiteSpace: "nowrap" }}
+                                title="View Report"
+                              >
+                                <Eye size={13} />
                                 View Report
                               </button>
                             </div>
@@ -756,6 +871,243 @@ export default function SuperAdminDashboard({
                 >
                   {assignLoading ? 'Assigning...' : 'Submit'}
                 </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+{/* Revoke Acreage Modal */}
+      {revokeModalOpen && revokeManager && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '500px',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+          }}>
+            <div className="modal-head" style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #fee2e2',
+              backgroundColor: '#fef2f2',
+              borderTopLeftRadius: '12px',
+              borderTopRightRadius: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RotateCcw size={18} style={{ color: '#b91c1c' }} />
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#991b1b' }}>Revoke Acreage</h3>
+              </div>
+              <button
+                onClick={handleCloseRevokeModal}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#6b7280'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '20px' }}>
+              {revokeError && (
+                <div style={{
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  fontSize: '14px',
+                  border: '1px solid #fca5a5'
+                }}>
+                  {revokeError}
+                </div>
+              )}
+
+              {/* Manager Info */}
+              <div style={{
+                backgroundColor: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#9a3412', marginBottom: '8px' }}>
+                  Manager Details
+                </div>
+                <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #ffedd5' }}>
+                      <td style={{ padding: '6px 0', color: '#4b5563', width: '40%', fontWeight: '500' }}>Manager Name</td>
+                      <td style={{ padding: '6px 0', fontWeight: '600', color: '#1f2937' }}>
+                        {revokeManager.full_name}
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #ffedd5' }}>
+                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>Client ID</td>
+                      <td style={{ padding: '6px 0', fontWeight: '600', color: '#1f2937' }}>
+                        {revokeManager.sub_admin_id || revokeManager.client_id || 'N/A'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>Available to Revoke</td>
+                      <td style={{ padding: '6px 0', fontWeight: '700', color: '#b91c1c' }}>
+                        {(revokeManager.plan_acreages?.[revokeFormData.plan]?.available || 0).toFixed(2)} acres
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <form onSubmit={handleRevokeSubmit}>
+                {/* Plan Selection */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px', color: '#374151' }}>
+                    Select Plan *
+                  </label>
+                  <select
+                    name="plan"
+                    value={revokeFormData.plan}
+                    onChange={handleRevokeInputChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="1 month">
+                      1 Month (Available: {(revokeManager.plan_acreages?.['1 month']?.available || 0).toFixed(2)} acres)
+                    </option>
+                    <option value="6 months">
+                      6 Months (Available: {(revokeManager.plan_acreages?.['6 months']?.available || 0).toFixed(2)} acres)
+                    </option>
+                    <option value="12 months">
+                      12 Months (Available: {(revokeManager.plan_acreages?.['12 months']?.available || 0).toFixed(2)} acres)
+                    </option>
+                  </select>
+                </div>
+
+                {/* Area Input */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ fontWeight: '500', fontSize: '14px', color: '#374151' }}>
+                      Area to Revoke (acres) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const maxAvail = revokeManager.plan_acreages?.[revokeFormData.plan]?.available || 0;
+                        setRevokeFormData(prev => ({ ...prev, area: maxAvail > 0 ? String(maxAvail) : "" }));
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#b91c1c',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        padding: '0 4px',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Use Max
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    name="area"
+                    value={revokeFormData.area}
+                    onChange={handleRevokeInputChange}
+                    placeholder="Enter area in acres to revoke"
+                    min="0.01"
+                    step="any"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+                    This will deduct unused acreage from this manager and credit it back to the partner's account.
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={handleCloseRevokeModal}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#f3f4f6',
+                      color: '#374151',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={revokeLoading}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      border: 'none',
+                      backgroundColor: '#b91c1c',
+                      color: 'white',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: revokeLoading ? 'not-allowed' : 'pointer',
+                      opacity: revokeLoading ? 0.7 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {revokeLoading ? (
+                      'Revoking...'
+                    ) : (
+                      <>
+                        <RotateCcw size={16} />
+                        Revoke Acreage
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
           </div>

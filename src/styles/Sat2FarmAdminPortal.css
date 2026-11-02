@@ -1212,6 +1212,23 @@ textarea {
   box-shadow: 0 2px 6px rgba(21, 128, 61, 0.2);
 }
 
+.sa-action-btn.btn-revoke {
+  background: #b91c1c;
+}
+
+.sa-action-btn.btn-revoke:hover {
+  background: #991b1b;
+}
+
+.sa-action-btn.btn-view {
+  background: #15803d;
+}
+
+.sa-action-btn.btn-view:hover {
+  background: #166534;
+}
+
+
 /* Search Box & Controls */
 .sa-controls-bar {
   display: flex;
