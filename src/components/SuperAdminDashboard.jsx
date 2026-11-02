@@ -271,98 +271,7 @@ export default function SuperAdminDashboard({
       const q = searchTerm.toLowerCase();
 
       list = list.filter((m) => {
-        const handleOpenRevokeModal = (manager) => {
-    setRevokeManager(manager);
-    setRevokeFormData({
-      area: "",
-      plan: "1 month"
-    });
-    setRevokeError("");
-    setRevokeModalOpen(true);
-  };
-
-  const handleCloseRevokeModal = () => {
-    setRevokeModalOpen(false);
-    setRevokeManager(null);
-    setRevokeFormData({
-      area: "",
-      plan: "1 month"
-    });
-    setRevokeError("");
-  };
-
-  const handleRevokeInputChange = (e) => {
-    const { name, value } = e.target;
-    setRevokeFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleRevokeSubmit = async (e) => {
-    e.preventDefault();
-
-    const areaNum = parseFloat(revokeFormData.area);
-    if (!revokeFormData.area || isNaN(areaNum) || areaNum <= 0) {
-      setRevokeError("Please enter a valid area in acres");
-      return;
-    }
-
-    const clientId = revokeManager?.sub_admin_id || revokeManager?.client_id;
-    if (!clientId) {
-      setRevokeError("Client ID not available for this manager.");
-      return;
-    }
-
-    let planValue = '1';
-    const trimmedPlan = revokeFormData.plan.trim();
-    if (trimmedPlan === '1 month') planValue = '1';
-    else if (trimmedPlan === '6 months') planValue = '6';
-    else if (trimmedPlan === '12 months') planValue = '12';
-    else planValue = '1';
-
-    const availableArea = revokeManager?.plan_acreages?.[trimmedPlan]?.available || 0;
-    if (areaNum > availableArea) {
-      setRevokeError(`Requested area (${areaNum} acres) exceeds available area (${availableArea.toFixed(2)} acres) for the ${trimmedPlan} plan.`);
-      return;
-    }
-
-    if (!ROLLBACK_AREA_API_URL) {
-      setRevokeError("Rollback API URL is not configured in environment variables.");
-      return;
-    }
-
-    setRevokeLoading(true);
-    setRevokeError("");
-
-    try {
-      const apiUrl = `${ROLLBACK_AREA_API_URL}?client_id=${clientId}&plan=${planValue}&area=${revokeFormData.area}`;
-      console.log('Revoke API URL:', apiUrl);
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('Revoke API Response:', data);
-
-      if (response.ok) {
-        toast.success(data.message || 'Acreage revoked successfully!');
-        handleCloseRevokeModal();
-        fetchManagers();
-      } else {
-        const errorMessage = data.message || data.error || 'Failed to revoke acreage';
-        setRevokeError(errorMessage);
-      }
-    } catch (err) {
-      console.error('Revoke Error:', err);
-      setRevokeError('Network error. Please try again.');
-    } finally {
-      setRevokeLoading(false);
-    }
-  };
-
-  return (
+        return (
           m.full_name?.toLowerCase().includes(q) ||
           m.mobile_no?.includes(q) ||
           m.sub_admin_id?.toString().includes(q)
@@ -492,6 +401,97 @@ export default function SuperAdminDashboard({
       setAssignError('Network error. Please try again.');
     } finally {
       setAssignLoading(false);
+    }
+  };
+
+  const handleOpenRevokeModal = (manager) => {
+    setRevokeManager(manager);
+    setRevokeFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setRevokeError("");
+    setRevokeModalOpen(true);
+  };
+
+  const handleCloseRevokeModal = () => {
+    setRevokeModalOpen(false);
+    setRevokeManager(null);
+    setRevokeFormData({
+      area: "",
+      plan: "1 month"
+    });
+    setRevokeError("");
+  };
+
+  const handleRevokeInputChange = (e) => {
+    const { name, value } = e.target;
+    setRevokeFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRevokeSubmit = async (e) => {
+    e.preventDefault();
+
+    const areaNum = parseFloat(revokeFormData.area);
+    if (!revokeFormData.area || isNaN(areaNum) || areaNum <= 0) {
+      setRevokeError("Please enter a valid area in acres");
+      return;
+    }
+
+    const clientId = revokeManager?.sub_admin_id || revokeManager?.client_id;
+    if (!clientId) {
+      setRevokeError("Client ID not available for this manager.");
+      return;
+    }
+
+    let planValue = '1';
+    const trimmedPlan = revokeFormData.plan.trim();
+    if (trimmedPlan === '1 month') planValue = '1';
+    else if (trimmedPlan === '6 months') planValue = '6';
+    else if (trimmedPlan === '12 months') planValue = '12';
+    else planValue = '1';
+
+    const availableArea = revokeManager?.plan_acreages?.[trimmedPlan]?.available || 0;
+    if (areaNum > availableArea) {
+      setRevokeError(`Requested area (${areaNum} acres) exceeds available area (${availableArea.toFixed(2)} acres) for the ${trimmedPlan} plan.`);
+      return;
+    }
+
+    if (!ROLLBACK_AREA_API_URL) {
+      setRevokeError("Rollback API URL is not configured in environment variables.");
+      return;
+    }
+
+    setRevokeLoading(true);
+    setRevokeError("");
+
+    try {
+      const apiUrl = `${ROLLBACK_AREA_API_URL}?client_id=${clientId}&plan=${planValue}&area=${revokeFormData.area}`;
+      console.log('Revoke API URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Revoke API Response:', data);
+
+      if (response.ok) {
+        toast.success(data.message || 'Acreage revoked successfully!');
+        handleCloseRevokeModal();
+        fetchManagers();
+      } else {
+        const errorMessage = data.message || data.error || 'Failed to revoke acreage';
+        setRevokeError(errorMessage);
+      }
+    } catch (err) {
+      console.error('Revoke Error:', err);
+      setRevokeError('Network error. Please try again.');
+    } finally {
+      setRevokeLoading(false);
     }
   };
 
