@@ -1735,6 +1735,30 @@ export default function ProspectStatsCards({ user }) {
       </span>
     )
   });
+  const cPaymentReceivedTime = () => ({
+    label: 'Payment Received Time',
+    render: (r) => {
+      if (!r.payment_received_time) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>N/A</span>;
+      try {
+        const date = new Date(r.payment_received_time);
+        if (isNaN(date.getTime())) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.payment_received_time}</span>;
+        
+        const day = date.getDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return (
+          <span style={{ color: palette.inkSoft, fontSize: '12px' }} title={r.payment_received_time}>
+            {day} {month} {year} {hours}:{minutes}
+          </span>
+        );
+      } catch (error) {
+        return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.payment_received_time}</span>;
+      }
+    }
+  });
   const cMoneyWithCount = (label, amountKey, color, countText) => ({
     label,
     render: (o) => {
@@ -1806,7 +1830,7 @@ export default function ProspectStatsCards({ user }) {
   const totalPaidColumns = [
     cDealName(), cContactName(),
     cAmount(palette.growth), cProbability(false), cExpected('Expected Amount', false),
-    cStage('paid'), cOwner(), cClosing()
+    cStage('paid'), cOwner(), cClosing(), cPaymentReceivedTime()
   ];
 
   const overdueColumns = [
