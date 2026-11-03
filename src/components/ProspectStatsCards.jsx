@@ -412,18 +412,18 @@ export default function ProspectStatsCards({ user }) {
     return sortedData;
   };
 
-  // Function to get closing date history for a specific lead
-  const getLeadClosingDateHistory = (leadId) => {
-    if (!closingDateHistory || !leadId) return [];
-    return closingDateHistory.filter(item => String(item.lead_id) === String(leadId));
+  // Function to get closing date history for a specific deal
+  const getDealClosingDateHistory = (dealId) => {
+    if (!closingDateHistory || !dealId) return [];
+    return closingDateHistory.filter(item => String(item.deal_id) === String(dealId));
   };
 
   // Function to handle closing date click
   const handleClosingDateClick = (deal, dealName) => {
-    const lookupId = getHistoryLookupId(deal);
-    const history = getLeadClosingDateHistory(lookupId);
+    const dealId = deal.deal_id;
+    const history = getDealClosingDateHistory(dealId);
     if (history.length > 0) {
-      setCurrentDealHistory(history); // Set the filtered history for this specific lead
+      setCurrentDealHistory(history); // Set the filtered history for this specific deal
       setClosingDateHistoryDealName(dealName || deal.deal_name || 'Unknown Deal');
       setShowClosingDateHistory(true);
     }
