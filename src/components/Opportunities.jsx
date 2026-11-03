@@ -2173,7 +2173,8 @@ export default function Opportunities({ onPageChange }) {
       const dateFieldMap = {
         closing_date: 'deal_close_date',
         created_time: 'created_time',
-        modified_time: 'modified_time'
+        modified_time: 'modified_time',
+        payment_received_time: 'payment_received_time'
       };
 
       selectedSalesProperties.forEach(filter => {
@@ -2781,7 +2782,8 @@ export default function Opportunities({ onPageChange }) {
         account_name: deal.account_name || '',
         account_number: deal.account_number || '',
         created_time: deal.created_time || '',
-        created_by: deal.created_by || ''
+        created_by: deal.created_by || '',
+        payment_received_time: deal.payment_received_time || ''
       }));
 
       return { deals, total: totalCount, totalValue: totalVal };
@@ -3317,11 +3319,16 @@ export default function Opportunities({ onPageChange }) {
       deal_stage: deal.deal_stage || '',
       contact_owner: deal.deal_owner || '',
       probability: deal.deal_probability !== undefined && deal.deal_probability !== null && deal.deal_probability !== '' ? `${deal.deal_probability}%` : '-',
-      expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-',
+      expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' 
+        ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` 
+        : ((deal.deal_amount && deal.deal_probability !== undefined && deal.deal_probability !== null)
+            ? `₹${Math.round(parseFloat(deal.deal_amount) * (parseFloat(deal.deal_probability) / 100)).toLocaleString()}`
+            : '₹0'),
       account_name: deal.account_name || '',
       account_number: deal.account_number || '',
       created_time: deal.created_time || '',
-      created_by: deal.created_by || ''
+      created_by: deal.created_by || '',
+      payment_received_time: deal.payment_received_time || ''
     });
     setShowDealInfoModal(true);
   };
@@ -3853,24 +3860,82 @@ export default function Opportunities({ onPageChange }) {
           if (editingDealField === 'deal_probability') {
             updatedDeal.probability = `${valueToSave}%`;
             updatedDeal.deal_probability = valueToSave;
+            const amt = parseFloat(String(updatedDeal.amount || '0').replace(/[^\d.-]/g, '')) || 0;
+            const prob = parseFloat(valueToSave) || 0;
+            updatedDeal.expected_revenue = `₹${Math.round(amt * (prob / 100)).toLocaleString()}`;
+          }
+
+          if (editingDealField === 'deal_amount') {
+            const amt = parseFloat(valueToSave) || 0;
+            const prob = parseFloat(String(updatedDeal.probability || '0').replace(/[^\d.-]/g, '')) || 0;
+            updatedDeal.expected_revenue = `₹${Math.round(amt * (prob / 100)).toLocaleString()}`;
           }
 
           return updatedDeal;
         });
 
-        // Update kanbanDeals state
-        setKanbanDeals(prev => {
-          const updated = { ...prev };
-          for (const stage of Object.keys(updated)) {
-            updated[stage] = updated[stage].map(d => (d.deal_id === selectedDeal.deal_id || d.id === selectedDeal.id) ? {
-              ...d,
-              [editingDealField]: valueToSave,
-              [apiFieldName]: valueToSave,
-              description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (d.description || '')
-            } : d);
+        // Update kanbanDeals state safely without unintentional overwrite
+        const targetDealId = selectedDeal?.deal_id || selectedDeal?.id;
+        if (targetDealId) {
+          if (editingDealField === 'deal_stage' || apiFieldName === 'deal_stage') {
+            const newStage = valueToSave;
+            setKanbanDeals(prev => {
+              const updated = { ...prev };
+              let foundDeal = null;
+              for (const stage of Object.keys(updated)) {
+                if (Array.isArray(updated[stage])) {
+                  const remaining = [];
+                  for (const d of updated[stage]) {
+                    const dId = d.deal_id || d.id;
+                    if (dId && String(dId) === String(targetDealId)) {
+                      foundDeal = {
+                        ...d,
+                        deal_stage: newStage
+                      };
+                    } else {
+                      remaining.push(d);
+                    }
+                  }
+                  updated[stage] = remaining;
+                }
+              }
+              if (foundDeal && updated[newStage]) {
+                updated[newStage] = [foundDeal, ...updated[newStage]];
+              }
+              return updated;
+            });
+            setKanbanUpdateTimestamp(Date.now());
+            fetchAllKanbanDeals();
+          } else {
+            setKanbanDeals(prev => {
+              const updated = { ...prev };
+              for (const stage of Object.keys(updated)) {
+                if (Array.isArray(updated[stage])) {
+                  updated[stage] = updated[stage].map(d => {
+                    const dId = d.deal_id || d.id;
+                    if (dId && String(dId) === String(targetDealId)) {
+                      const updatedD = {
+                        ...d,
+                        [editingDealField]: valueToSave,
+                        [apiFieldName]: valueToSave,
+                        description: (editingDealField === 'description' || apiFieldName === 'description') ? valueToSave : (d.description || '')
+                      };
+                      if (editingDealField === 'deal_probability' || editingDealField === 'deal_amount') {
+                        const amt = parseFloat(editingDealField === 'deal_amount' ? valueToSave : (updatedD.deal_amount || 0)) || 0;
+                        const prob = parseFloat(editingDealField === 'deal_probability' ? valueToSave : (updatedD.deal_probability || 0)) || 0;
+                        updatedD.expected_revenue = amt * (prob / 100);
+                      }
+                      return updatedD;
+                    }
+                    return d;
+                  });
+                }
+              }
+              return updated;
+            });
+            setKanbanUpdateTimestamp(Date.now());
           }
-          return updated;
-        });
+        }
 
         setEditingDealField(null);
         setEditDealValue('');
@@ -7520,6 +7585,41 @@ export default function Opportunities({ onPageChange }) {
                                 )}
                               </div>
                             </th>
+                            <th
+                              onClick={() => handleDealSort('payment_received_time')}
+                              style={{
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: dealSortConfig.key === 'payment_received_time' ? '#1d4ed8' : '#333',
+                                whiteSpace: 'nowrap',
+                                minWidth: '175px',
+                                borderRight: '1px solid #eaeaea',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                background: dealSortConfig.key === 'payment_received_time' ? '#eff6ff' : 'transparent',
+                                transition: 'background-color 0.15s ease'
+                              }}
+                              title={
+                                dealSortConfig.key === 'payment_received_time'
+                                  ? dealSortConfig.direction === 'asc'
+                                    ? 'Currently: Ascending (Oldest First) • Click for Descending (Newest First)'
+                                    : 'Currently: Descending (Newest First) • Click to Reset'
+                                  : 'Click to sort by Payment Received Time (Oldest to Newest)'
+                              }
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span>Payment Received Time</span>
+                                {dealSortConfig.key === 'payment_received_time' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                    {dealSortConfig.direction === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+                                  </span>
+                                ) : (
+                                  <ArrowUpDown size={14} style={{ color: '#9ca3af', opacity: 0.6, flexShrink: 0 }} />
+                                )}
+                              </div>
+                            </th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Modified By</th>
                             <th
                               onClick={() => handleDealSort('modified_time')}
@@ -7561,8 +7661,8 @@ export default function Opportunities({ onPageChange }) {
                           {isDealsLoading ? (
                             Array.from({ length: 6 }).map((_, idx) => (
                               <tr key={`deal-skeleton-${idx}`} style={{ borderBottom: '1px solid #e0e0e0' }}>
-                                {Array.from({ length: isOperationRole ? 16 : 14 }).map((_, cIdx) => (
-                                  <td key={`col-skel-${cIdx}`} style={{ padding: '10px 14px', borderRight: cIdx < (isOperationRole ? 15 : 13) ? '1px solid #f0f0f0' : 'none' }}><div className="skeleton-shimmer" style={{ width: '70%', height: '16px' }} /></td>
+                                {Array.from({ length: isOperationRole ? 17 : 15 }).map((_, cIdx) => (
+                                  <td key={`col-skel-${cIdx}`} style={{ padding: '10px 14px', borderRight: cIdx < (isOperationRole ? 16 : 14) ? '1px solid #f0f0f0' : 'none' }}><div className="skeleton-shimmer" style={{ width: '70%', height: '16px' }} /></td>
                                 ))}
                               </tr>
                             ))
@@ -7588,11 +7688,16 @@ export default function Opportunities({ onPageChange }) {
                                         deal_stage: deal.deal_stage || '',
                                         contact_owner: deal.deal_owner || '',
                                         probability: deal.deal_probability !== undefined && deal.deal_probability !== null ? `${deal.deal_probability}%` : '-',
-                                        expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-',
+                                        expected_revenue: deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' 
+                                          ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` 
+                                          : ((deal.deal_amount && deal.deal_probability !== undefined && deal.deal_probability !== null)
+                                              ? `₹${Math.round(parseFloat(deal.deal_amount) * (parseFloat(deal.deal_probability) / 100)).toLocaleString()}`
+                                              : '₹0'),
                                         account_name: deal.account_name || '',
                                         account_number: deal.account_number || '',
                                         created_time: deal.created_time || '',
-                                        created_by: deal.created_by || ''
+                                        created_by: deal.created_by || '',
+                                        payment_received_time: deal.payment_received_time || ''
                                       });
                                       setShowDealInfoModal(true);
                                     }}>
@@ -7611,7 +7716,11 @@ export default function Opportunities({ onPageChange }) {
                                         {deal.deal_probability !== undefined && deal.deal_probability !== null && deal.deal_probability !== '' ? `${deal.deal_probability}%` : '-'}
                                       </td>
                                       <td style={{ padding: '10px 14px', fontSize: '13px', color: '#2563eb', fontWeight: '600', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
-                                        {deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` : '-'}
+                                        {deal.expected_revenue !== undefined && deal.expected_revenue !== null && deal.expected_revenue !== '' 
+                                          ? `₹${parseFloat(deal.expected_revenue).toLocaleString()}` 
+                                          : ((deal.deal_amount && deal.deal_probability !== undefined && deal.deal_probability !== null)
+                                              ? `₹${Math.round(parseFloat(deal.deal_amount) * (parseFloat(deal.deal_probability) / 100)).toLocaleString()}`
+                                              : '-')}
                                       </td>
                                     </>
                                   )}
@@ -7626,6 +7735,9 @@ export default function Opportunities({ onPageChange }) {
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.created_by || '-'}</td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
                                     {deal.created_time ? new Date(deal.created_time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#15803d', fontWeight: '500', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                    {deal.payment_received_time || '-'}
                                   </td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.modified_by || '-'}</td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap' }}>
@@ -8627,7 +8739,10 @@ export default function Opportunities({ onPageChange }) {
                             <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'separate', borderSpacing: '0', fontSize: '13px' }}>
                               <thead>
                                 <tr style={{ background: 'var(--gray-100)', borderBottom: '2px solid var(--border)' }}>
-                                  {['Deal Name', 'Amount', 'Stage', 'Probability', 'Closing Date'].map(h => (
+                                  {(isOperationRole
+                                    ? ['Deal Name', 'Amount', 'Stage', 'Probability', 'Closing Date']
+                                    : ['Deal Name', 'Amount', 'Stage', 'Closing Date']
+                                  ).map(h => (
                                     <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>{h}</th>
                                   ))}
                                 </tr>
@@ -8635,11 +8750,11 @@ export default function Opportunities({ onPageChange }) {
                               <tbody>
                                 {dealsLoading ? (
                                   <tr>
-                                    <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>Loading deals...</td>
+                                    <td colSpan={isOperationRole ? 5 : 4} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>Loading deals...</td>
                                   </tr>
                                 ) : dealsData.length === 0 ? (
                                   <tr>
-                                    <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No deals yet</td>
+                                    <td colSpan={isOperationRole ? 5 : 4} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>No deals yet</td>
                                   </tr>
                                 ) : (
                                   dealsData.map(deal => (
@@ -8677,7 +8792,9 @@ export default function Opportunities({ onPageChange }) {
                                           {deal.deal_stage}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{deal.deal_probability}%</td>
+                                      {isOperationRole && (
+                                        <td style={{ padding: '10px 8px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{deal.deal_probability}%</td>
+                                      )}
                                       <td style={{ padding: '10px 8px', color: 'var(--text-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                                         {deal.deal_close_date ? new Date(deal.deal_close_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                                       </td>
@@ -9110,17 +9227,7 @@ export default function Opportunities({ onPageChange }) {
 
                         {isOperationRole && (
                           <>
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Deal Probability</label>
-                              <div style={{
-                                padding: '8px 12px',
-                                background: 'var(--gray-100)',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--r)',
-                                fontSize: '12px',
-                                color: 'var(--text)'
-                              }}>{selectedDeal.probability ? selectedDeal.probability : '-'}</div>
-                            </div>
+                            <EditableDealField label="Deal Probability" required={true} value={selectedDeal.probability?.replace('%', '') || ''} fieldName="deal_probability" type="number" />
                             <div>
                               <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Expected Revenue</label>
                               <div style={{
@@ -9130,7 +9237,13 @@ export default function Opportunities({ onPageChange }) {
                                 borderRadius: 'var(--r)',
                                 fontSize: '12px',
                                 color: 'var(--text)'
-                              }}>{selectedDeal.expected_revenue ? selectedDeal.expected_revenue : '-'}</div>
+                              }}>
+                                {selectedDeal.expected_revenue && selectedDeal.expected_revenue !== '-' ? selectedDeal.expected_revenue : (() => {
+                                  const amt = parseFloat(String(selectedDeal.amount || '0').replace(/[^\d.-]/g, '')) || 0;
+                                  const prob = parseFloat(String(selectedDeal.probability || '0').replace(/[^\d.-]/g, '')) || 0;
+                                  return `₹${Math.round(amt * (prob / 100)).toLocaleString()}`;
+                                })()}
+                              </div>
                             </div>
                           </>
                         )}
@@ -9157,6 +9270,20 @@ export default function Opportunities({ onPageChange }) {
                             color: 'var(--text)'
                           }}>{selectedDeal.created_by || '-'}</div>
                         </div>
+
+                        {(selectedDeal.deal_stage === 'Paid' || selectedDeal.payment_received_time) && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Payment Received Time</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.payment_received_time || '-'}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

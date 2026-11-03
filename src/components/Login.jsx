@@ -22,6 +22,7 @@ export default function Login() {
     setError("");
 
     try {
+      localStorage.removeItem('currentPage');
       await login(formData.phone_number, formData.password);
       // AuthContext's login function handles storing user data
       // App.jsx will detect the user change and redirect based on role

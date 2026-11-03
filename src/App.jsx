@@ -225,6 +225,9 @@ useEffect(() => {
     const allowedClientPages = ['client-monthly-report', 'unlock-farm', 'register'];
     const allowedTechPages = ['green-team'];
     const allowedAccountsPages = ['invoice-info'];
+    const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search'];
+    const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar'];
+    const allowedMarketingPages = ['marketing-dashboard'];
 
     // After refresh — restore saved page (but check if it's appropriate for user role)
     if (savedPage) {
@@ -243,6 +246,15 @@ useEffect(() => {
       } else if (role === 'accounts' && !allowedAccountsPages.includes(savedPage)) {
         setCurrentPage('invoice-info');
         localStorage.setItem('currentPage', 'invoice-info');
+      } else if ((role === 'operation' || role === 'operations' || role === 'ops') && !allowedOperationsPages.includes(savedPage)) {
+        setCurrentPage('operation-dashboard');
+        localStorage.setItem('currentPage', 'operation-dashboard');
+      } else if (role === 'sales' && !allowedSalesPages.includes(savedPage)) {
+        setCurrentPage('sales-dashboard');
+        localStorage.setItem('currentPage', 'sales-dashboard');
+      } else if (role === 'marketing' && !allowedMarketingPages.includes(savedPage)) {
+        setCurrentPage('marketing-dashboard');
+        localStorage.setItem('currentPage', 'marketing-dashboard');
       } else {
         // Normal page restore
         setCurrentPage(savedPage);

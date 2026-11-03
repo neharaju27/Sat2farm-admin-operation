@@ -284,6 +284,29 @@ export default function SalesPipelineKanbanBoard({
                               ₹{parseFloat(deal.deal_amount || 0).toLocaleString()}
                             </span>
                           </div>
+                          {column.stage === 'Paid' && (
+                            <div
+                              style={{
+                                marginTop: '8px',
+                                padding: '4px 6px',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                color: '#15803d',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '4px'
+                              }}
+                              title={deal.payment_received_time ? `Payment Received: ${deal.payment_received_time}` : 'Payment Received'}
+                            >
+                              <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>Payment Received:</span>
+                              <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {deal.payment_received_time || '-'}
+                              </span>
+                            </div>
+                          )}
                         </KanbanDraggableCard>
                       ))
                     )}

@@ -3,6 +3,8 @@ import { Search, FileText, Building, User, Phone, Mail, Calendar, DollarSign, Ar
 import toast from 'react-hot-toast';
 
 const InvoiceInfo = ({ user, onPageChange }) => {
+  const userRole = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
+  const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -681,13 +683,13 @@ const InvoiceInfo = ({ user, onPageChange }) => {
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Deal Type:</span> {deal.deal_type}
                         </div>
                       )}
-                      {deal.deal_probability != null && (
+                      {isOperationRole && deal.deal_probability != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <ArrowRight size={16} style={{ color: 'var(--green-600)' }} />
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Probability:</span> {deal.deal_probability}%
                         </div>
                       )}
-                      {deal.expected_revenue != null && (
+                      {isOperationRole && deal.expected_revenue != null && (
                         <div style={{ padding: '12px', background: 'var(--gray-100)', borderRadius: 'var(--r)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)', fontSize: '13px', fontWeight: '500', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                           <span style={{ fontWeight: '600', color: 'var(--green-600)' }}>Expected Revenue:</span> ₹{deal.expected_revenue.toLocaleString()}
                         </div>

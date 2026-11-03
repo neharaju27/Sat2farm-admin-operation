@@ -46,6 +46,10 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'operations' && 
     role !== 'ops' &&
     role !== 'admin';
+
+  // Restrict super-admin-dashboard to only partner role
+  const isSuperAdminRestricted = currentPage === 'super-admin-dashboard' && 
+    role !== 'partner';
   
   // Restrict pricing to only operation and sales roles
   const isPricingRestricted = currentPage === 'pricing' && 
@@ -82,12 +86,16 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'sales' &&
     role !== 'admin';
   
-  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted || isCrmSalesRestricted || isUserSearchRestricted) {
+  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted || isCrmSalesRestricted || isSuperAdminRestricted || isUserSearchRestricted) {
     let descriptionText = "This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.";
     let alertTitle = "Login as Operations Required";
     let alertText = "To access this page, please log in with Operations credentials.";
 
-    if (isUserSearchRestricted) {
+    if (isSuperAdminRestricted) {
+      descriptionText = "The Super Admin Dashboard is only accessible to Partner users. Please contact your administrator if you believe you should have access.";
+      alertTitle = "Partner Access Required";
+      alertText = "To access this page, please log in with Partner credentials.";
+    } else if (isUserSearchRestricted) {
       descriptionText = "User Search is only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
       alertTitle = "Permission Required";
       alertText = "Your account role does not have permission to access User Search.";
