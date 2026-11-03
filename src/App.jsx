@@ -27,6 +27,7 @@ import Pricing from "./components/Pricing";
 import ProspectStatsCards from "./components/ProspectStatsCards";
 import TaskCalendar from "./components/TaskCalendar";
 import InvoiceInfo from "./components/InvoiceInfo";
+import UserSearch from "./components/UserSearch";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
@@ -387,6 +388,8 @@ useEffect(() => {
           return <TaskCalendar user={userDisplay} onPageChange={handlePageChange} />;
         case 'invoice-info':
           return <InvoiceInfo user={userDisplay} onPageChange={handlePageChange} />;
+        case 'user-search':
+          return <UserSearch user={userDisplay} />;
         default:
           return <OperationDashboard user={userDisplay} onPageChange={handlePageChange} />;
       }

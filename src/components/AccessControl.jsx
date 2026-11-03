@@ -73,13 +73,25 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'ops' && 
     role !== 'sales' &&
     role !== 'admin';
+
+  // Restrict User Search to only operation and sales roles
+  const isUserSearchRestricted = currentPage === 'user-search' && 
+    role !== 'operation' && 
+    role !== 'operations' && 
+    role !== 'ops' && 
+    role !== 'sales' &&
+    role !== 'admin';
   
-  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted || isCrmSalesRestricted) {
+  if (isSalesPageRestricted || isOperationDashboardRestricted || isPricingRestricted || isCrmSalesRestricted || isUserSearchRestricted) {
     let descriptionText = "This page is only accessible to Operations users. Please contact your administrator if you believe you should have access.";
     let alertTitle = "Login as Operations Required";
     let alertText = "To access this page, please log in with Operations credentials.";
 
-    if (isCrmSalesRestricted) {
+    if (isUserSearchRestricted) {
+      descriptionText = "User Search is only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
+      alertTitle = "Permission Required";
+      alertText = "Your account role does not have permission to access User Search.";
+    } else if (isCrmSalesRestricted) {
       descriptionText = "CRM and Sales data pages are only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
       alertTitle = "Permission Required";
       alertText = "Your account role does not have permission to access CRM or Sales data.";

@@ -222,7 +222,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -230,7 +230,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isSalesUser) {
       // Sales users can only access sales pages and unlock-farm
-      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar'];
+      const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar', 'user-search'];
       if (allowedSalesPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -462,6 +462,17 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                       {todayTasks.length}
                     </span>
                   )}
+                </div>
+                {/* User Search - For Operations and Sales Users */}
+                <div
+                  className={`sb-item ${currentPage === 'user-search' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('user-search')}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  User Search
                 </div>
               </div>
             )}
