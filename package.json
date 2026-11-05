@@ -17,6 +17,8 @@
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
     "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
+    "leaflet-geometryutil": "^0.11.0",
     "lucide-react": "^0.460.0",
     "maplibre-gl": "^5.24.0",
     "ol": "^10.9.0",
@@ -24,6 +26,7 @@
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-leaflet": "^5.0.0",
+    "react-leaflet-draw": "^0.21.0",
     "react-phone-input-2": "^2.15.1",
     "tiny-invariant": "^1.3.3",
     "xlsx": "^0.18.5"
