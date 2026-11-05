@@ -491,15 +491,29 @@ const StandaloneEditableDealField = React.memo(({
 
 // Helper to normalize user parameter for backend API
 const getApiUserName = (u) => {
-  const name = u?.name || u?.username || u?.phone_number || 'Operation';
-  if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
-    return 'Operation';
+  if (typeof u === 'string') return u.trim();
+  let name = u?.username || u?.user_name || u?.name || '';
+  if (!name) {
+    try {
+      const stored = localStorage.getItem('sat2farm_auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        name = parsed?.username || parsed?.user_name || parsed?.name || '';
+      }
+    } catch (e) {
+      // ignore
+    }
   }
-  return name;
+  if (!name) {
+    name = localStorage.getItem('username') || '';
+  }
+  return typeof name === 'string' ? name.trim() : String(name || '').trim();
 };
 
-export default function Opportunities({ onPageChange }) {
-  const { user } = useAuth();
+export default function Opportunities({ onPageChange, user: propUser }) {
+  const { user: authUser } = useAuth();
+  const user = propUser || authUser;
+  const currentUserName = getApiUserName(user);
   const userRole = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
   const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
   const [opportunities, setOpportunities] = useState([]);
@@ -556,9 +570,30 @@ export default function Opportunities({ onPageChange }) {
     'Paid'
   ]);
 
-  const [predefinedCountries, setPredefinedCountries] = useState([]);
-  const [predefinedStates, setPredefinedStates] = useState([]);
-  const [predefinedCities, setPredefinedCities] = useState([]);
+  const [predefinedCountries, setPredefinedCountries] = useState(() => {
+    try {
+      const saved = localStorage.getItem('opportunities_predefinedCountries');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [predefinedStates, setPredefinedStates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('opportunities_predefinedStates');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [predefinedCities, setPredefinedCities] = useState(() => {
+    try {
+      const saved = localStorage.getItem('opportunities_predefinedCities');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Save to localStorage when predefined values change
   useEffect(() => {
@@ -589,41 +624,63 @@ export default function Opportunities({ onPageChange }) {
     localStorage.setItem('opportunities_predefinedDealStages', JSON.stringify(predefinedDealStages));
   }, [predefinedDealStages]);
 
+  useEffect(() => {
+    if (predefinedCountries.length > 0) {
+      localStorage.setItem('opportunities_predefinedCountries', JSON.stringify(predefinedCountries));
+    }
+  }, [predefinedCountries]);
+
+  useEffect(() => {
+    if (predefinedStates.length > 0) {
+      localStorage.setItem('opportunities_predefinedStates', JSON.stringify(predefinedStates));
+    }
+  }, [predefinedStates]);
+
+  useEffect(() => {
+    if (predefinedCities.length > 0) {
+      localStorage.setItem('opportunities_predefinedCities', JSON.stringify(predefinedCities));
+    }
+  }, [predefinedCities]);
+
   // Fetch location dropdown options (country, state, city) dynamically from API on mount / user change
   useEffect(() => {
     let active = true;
 
     const fetchLocationOptions = async () => {
       const locationApiUrl = import.meta.env.VITE_LOCATIONS_API_URL;
-      if (!locationApiUrl) return;
-      const currentUserName = getApiUserName(user);
+      if (!locationApiUrl || !currentUserName) return;
       const locCategories = [
-        { loc_value: 'country', setter: setPredefinedCountries },
-        { loc_value: 'state', setter: setPredefinedStates },
-        { loc_value: 'city', setter: setPredefinedCities }
+        { loc_value: 'country', setter: setPredefinedCountries, cacheKey: 'opportunities_predefinedCountries' },
+        { loc_value: 'state', setter: setPredefinedStates, cacheKey: 'opportunities_predefinedStates' },
+        { loc_value: 'city', setter: setPredefinedCities, cacheKey: 'opportunities_predefinedCities' }
       ];
 
-      for (const cat of locCategories) {
-        try {
-          const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&loc_value=${cat.loc_value}`);
-          if (res.ok) {
-            const result = await res.json();
-            const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
-            if (active && Array.isArray(list) && list.length > 0) {
-              const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
-              cat.setter(cleaned);
+      await Promise.all(
+        locCategories.map(async (cat) => {
+          try {
+            const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&loc_value=${cat.loc_value}`);
+            if (res.ok) {
+              const result = await res.json();
+              const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
+              if (active && Array.isArray(list) && list.length > 0) {
+                const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
+                cat.setter(cleaned);
+                try {
+                  localStorage.setItem(cat.cacheKey, JSON.stringify(cleaned));
+                } catch (e) { }
+              }
             }
+          } catch (err) {
+            console.warn(`Error fetching location options for account ${cat.loc_value}:`, err);
           }
-        } catch (err) {
-          console.warn(`Error fetching location options for account ${cat.loc_value}:`, err);
-        }
-      }
+        })
+      );
     };
 
     fetchLocationOptions();
 
     return () => { active = false; };
-  }, [user]);
+  }, [currentUserName]);
 
   // Fetch dropdown options dynamically from backend API on mount
   useEffect(() => {
@@ -1133,7 +1190,7 @@ export default function Opportunities({ onPageChange }) {
       const defaults = (defaultsMap[property] || []).filter(v => v && String(v).trim() && String(v).toLowerCase() !== 'null' && String(v).toLowerCase() !== 'undefined');
 
       if (apiDropdownProps.includes(property) && defaults && defaults.length > 0) {
-        result[property] = [...new Set(defaults)];
+        result[property] = [...new Set(defaults)].sort((a, b) => a.localeCompare(b));
         continue;
       }
 

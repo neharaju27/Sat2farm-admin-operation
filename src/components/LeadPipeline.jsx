@@ -368,15 +368,29 @@ const StandaloneEditableLeadField = React.memo(({ label, value, fieldName, type 
 
 // Helper to normalize user parameter for backend API
 const getApiUserName = (u) => {
-  const name = u?.name || u?.username || u?.phone_number || 'Operation';
-  if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
-    return 'Operation';
+  if (typeof u === 'string') return u.trim();
+  let name = u?.username || u?.user_name || u?.name || '';
+  if (!name) {
+    try {
+      const stored = localStorage.getItem('sat2farm_auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        name = parsed?.username || parsed?.user_name || parsed?.name || '';
+      }
+    } catch (e) {
+      // ignore
+    }
   }
-  return name;
+  if (!name) {
+    name = localStorage.getItem('username') || '';
+  }
+  return typeof name === 'string' ? name.trim() : String(name || '').trim();
 };
 
-export default function LeadPipeline({ onPageChange }) {
-  const { user } = useAuth();
+export default function LeadPipeline({ onPageChange, user: propUser }) {
+  const { user: authUser } = useAuth();
+  const user = propUser || authUser;
+  const currentUserName = getApiUserName(user);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -438,9 +452,30 @@ export default function LeadPipeline({ onPageChange }) {
     return apiDefaults;
   });
 
-  const [predefinedCountries, setPredefinedCountries] = useState([]);
-  const [predefinedStates, setPredefinedStates] = useState([]);
-  const [predefinedCities, setPredefinedCities] = useState([]);
+  const [predefinedCountries, setPredefinedCountries] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lead_predefinedCountries');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [predefinedStates, setPredefinedStates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lead_predefinedStates');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [predefinedCities, setPredefinedCities] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lead_predefinedCities');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Save to localStorage when predefined values change
   useEffect(() => {
@@ -467,41 +502,63 @@ export default function LeadPipeline({ onPageChange }) {
     localStorage.setItem('predefinedContactOwners', JSON.stringify(predefinedContactOwners));
   }, [predefinedContactOwners]);
 
+  useEffect(() => {
+    if (predefinedCountries.length > 0) {
+      localStorage.setItem('lead_predefinedCountries', JSON.stringify(predefinedCountries));
+    }
+  }, [predefinedCountries]);
+
+  useEffect(() => {
+    if (predefinedStates.length > 0) {
+      localStorage.setItem('lead_predefinedStates', JSON.stringify(predefinedStates));
+    }
+  }, [predefinedStates]);
+
+  useEffect(() => {
+    if (predefinedCities.length > 0) {
+      localStorage.setItem('lead_predefinedCities', JSON.stringify(predefinedCities));
+    }
+  }, [predefinedCities]);
+
   // Fetch location dropdown options (country, state, city) dynamically from API on mount / user change
   useEffect(() => {
     let active = true;
 
     const fetchLocationOptions = async () => {
       const locationApiUrl = import.meta.env.VITE_LOCATIONS_API_URL;
-      if (!locationApiUrl) return;
-      const currentUserName = getApiUserName(user);
+      if (!locationApiUrl || !currentUserName) return;
       const locCategories = [
-        { loc_value: 'country', setter: setPredefinedCountries },
-        { loc_value: 'state', setter: setPredefinedStates },
-        { loc_value: 'city', setter: setPredefinedCities }
+        { loc_value: 'country', setter: setPredefinedCountries, cacheKey: 'lead_predefinedCountries' },
+        { loc_value: 'state', setter: setPredefinedStates, cacheKey: 'lead_predefinedStates' },
+        { loc_value: 'city', setter: setPredefinedCities, cacheKey: 'lead_predefinedCities' }
       ];
 
-      for (const cat of locCategories) {
-        try {
-          const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&loc_value=${cat.loc_value}`);
-          if (res.ok) {
-            const result = await res.json();
-            const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
-            if (active && Array.isArray(list) && list.length > 0) {
-              const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
-              cat.setter(cleaned);
+      await Promise.all(
+        locCategories.map(async (cat) => {
+          try {
+            const res = await fetch(`${locationApiUrl}?user=${encodeURIComponent(currentUserName)}&type=lead&loc_value=${cat.loc_value}`);
+            if (res.ok) {
+              const result = await res.json();
+              const list = result?.data?.[cat.loc_value] || (Array.isArray(result?.data) ? result.data : []);
+              if (active && Array.isArray(list) && list.length > 0) {
+                const cleaned = [...new Set(list.map(x => String(x || '').trim()).filter(x => x && x.toLowerCase() !== 'null' && x.toLowerCase() !== 'undefined'))].sort((a, b) => a.localeCompare(b));
+                cat.setter(cleaned);
+                try {
+                  localStorage.setItem(cat.cacheKey, JSON.stringify(cleaned));
+                } catch (e) { }
+              }
             }
+          } catch (err) {
+            console.warn(`Error fetching location options for lead ${cat.loc_value}:`, err);
           }
-        } catch (err) {
-          console.warn(`Error fetching location options for lead ${cat.loc_value}:`, err);
-        }
-      }
+        })
+      );
     };
 
     fetchLocationOptions();
 
     return () => { active = false; };
-  }, [user]);
+  }, [currentUserName]);
 
   // Fetch dropdown options dynamically from backend API on mount (GET - Available to All Roles)
   useEffect(() => {
@@ -1254,6 +1311,9 @@ export default function LeadPipeline({ onPageChange }) {
       const raw = item._raw || {};
 
       for (const [property, possibleFields] of Object.entries(propertyMap)) {
+        if (['mailing_country', 'country', 'mailing_state', 'state', 'mailing_city', 'city'].includes(property) && defaultsMap[property] && defaultsMap[property].length > 0) {
+          continue;
+        }
         const set = sets[property];
         if (property === 'tag' || property === 'tags') {
           const tagStr = item.tags || raw.tags || raw.tag || '';
