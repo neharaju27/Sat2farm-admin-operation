@@ -255,7 +255,10 @@ const StandaloneEditableDealField = React.memo(({
   }, [isEditing]);
 
   const handleSave = () => {
-    const val = inputRef.current ? inputRef.current.value : editDealValue;
+    let val = inputRef.current ? inputRef.current.value : editDealValue;
+    if (type === 'datetime-local' && val && typeof val === 'string' && val.includes('T')) {
+      val = val.replace('T', ' ') + (val.split(':').length === 2 ? ':00' : '');
+    }
     saveDealEdit(val);
   };
 
@@ -319,11 +322,46 @@ const StandaloneEditableDealField = React.memo(({
                   </div>
                 )}
               </div>
-            ) : type === 'date' ? (
+            ) : (type === 'date' || type === 'datetime-local') ? (
               <input
                 ref={inputRef}
-                type="date"
-                defaultValue={editDealValue || ''}
+                type={type}
+                defaultValue={(() => {
+                  if (!editDealValue) return '';
+                  if (type === 'datetime-local') {
+                    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(editDealValue)) return editDealValue.slice(0, 16);
+                    if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(editDealValue)) {
+                      return editDealValue.trim().replace(/\s+/, 'T').slice(0, 16);
+                    }
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(editDealValue)) {
+                      return `${editDealValue}T00:00`;
+                    }
+                    const d = new Date(editDealValue);
+                    if (!isNaN(d.getTime())) {
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const hh = String(d.getHours()).padStart(2, '0');
+                      const min = String(d.getMinutes()).padStart(2, '0');
+                      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+                    }
+                    return '';
+                  } else {
+                    if (/^\d{4}-\d{2}-\d{2}/.test(editDealValue)) return editDealValue.slice(0, 10);
+                    const d = new Date(editDealValue);
+                    if (!isNaN(d.getTime())) {
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      return `${yyyy}-${mm}-${dd}`;
+                    }
+                    return '';
+                  }
+                })()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') cancelDealEdit();
+                }}
                 style={{
                   flex: 1,
                   padding: '6px 8px',
@@ -439,7 +477,8 @@ const StandaloneEditableDealField = React.memo(({
               display: 'flex',
               alignItems: type === 'textarea' ? 'flex-start' : 'center',
               whiteSpace: type === 'textarea' ? 'pre-wrap' : 'normal',
-              wordWrap: type === 'textarea' ? 'break-word' : 'normal'
+              wordWrap: type === 'textarea' ? 'break-word' : 'normal',
+              cursor: 'pointer'
             }}
           >
             {value || '-'}
@@ -977,6 +1016,7 @@ export default function Opportunities({ onPageChange }) {
 
   // â”€â”€ Table / filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [searchTerm, setSearchTerm] = useState('');
+  const [isServerSearched, setIsServerSearched] = useState(false);
   const [searchInput, setSearchInput] = useState(''); // what user types • does NOT trigger API
   const [dealsSearchInput, setDealsSearchInput] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -1517,6 +1557,7 @@ export default function Opportunities({ onPageChange }) {
       try {
         setLoading(true);
         let response;
+        let serverSearched = false;
 
         // 1. If searching, call dedicated search endpoint: /search?user=...&type=account&query=...
         if (isSearching && searchApiUrl) {
@@ -1524,6 +1565,9 @@ export default function Opportunities({ onPageChange }) {
             lastFetchedUrlRef.current = ''; // Clear URL cache to prevent stale data after search is cleared
             const searchUrl = `${searchApiUrl}?user=${encodeURIComponent(currentUserName)}&type=account&query=${encodeURIComponent(searchTerm.trim())}&offset=${fetchOffset}&limit=${fetchLimit}`;
             response = await fetch(searchUrl);
+            if (response && response.ok) {
+              serverSearched = true;
+            }
           } catch (searchErr) {
             console.warn('Dedicated account search API failed:', searchErr);
           }
@@ -1613,6 +1657,9 @@ export default function Opportunities({ onPageChange }) {
           }
           lastFetchedUrlRef.current = requestUrl;
           response = await fetch(requestUrl);
+          if (response && response.ok && isSearching) {
+            serverSearched = true;
+          }
         }
 
         // 3. Fallback to main accounts API
@@ -1737,8 +1784,10 @@ export default function Opportunities({ onPageChange }) {
           };
         });
         setOpportunities(transformedOpportunities);
+        setIsServerSearched(serverSearched);
       } catch (err) {
         console.error('Error fetching opportunities:', err);
+        setIsServerSearched(false);
       } finally {
         setLoading(false);
       }
@@ -3759,6 +3808,9 @@ export default function Opportunities({ onPageChange }) {
     if (user?.role?.toLowerCase().trim() === 'sales' && (fieldName === 'deal_close_date' || fieldName === 'deal_probability')) {
       return;
     }
+    if (fieldName === 'created_time' && !isOperationRole) {
+      return;
+    }
     setEditingDealField(fieldName);
     setEditDealValue(currentValue || '');
   };
@@ -3780,9 +3832,19 @@ export default function Opportunities({ onPageChange }) {
           return;
         }
 
-        const valueToSave = overrideVal !== undefined ? overrideVal : editDealValue;
+        let valueToSave = overrideVal !== undefined ? overrideVal : editDealValue;
+        if (typeof valueToSave === 'string' && valueToSave.includes('T')) {
+          valueToSave = valueToSave.replace('T', ' ') + (valueToSave.split(':').length === 2 ? ':00' : '');
+        }
 
-        if (['deal_name', 'deal_close_date', 'deal_type', 'deal_stage', 'deal_probability'].includes(editingDealField) && (valueToSave === '' || valueToSave === null || valueToSave === undefined)) {
+        if (editingDealField === 'created_time' && !isOperationRole) {
+          toast.dismiss('deal-update-toast');
+          toast.error('Only operations role has permission to edit created time');
+          setIsUpdatingDeal(false);
+          return;
+        }
+
+        if (['deal_name', 'deal_close_date', 'deal_type', 'deal_stage', 'deal_probability', 'created_time'].includes(editingDealField) && (valueToSave === '' || valueToSave === null || valueToSave === undefined)) {
           toast.dismiss('deal-update-toast');
           toast.error('This field is mandatory');
           setIsUpdatingDeal(false);
@@ -3804,7 +3866,8 @@ export default function Opportunities({ onPageChange }) {
           'deal_owner': 'deal_owner',
           'contact_owner': 'deal_owner',
           'deal_probability': 'deal_probability',
-          'description': 'description'
+          'description': 'description',
+          'created_time': 'created_time'
         };
 
         const apiFieldName = fieldMapping[editingDealField] || editingDealField;
@@ -3871,12 +3934,28 @@ export default function Opportunities({ onPageChange }) {
             updatedDeal.expected_revenue = `₹${Math.round(amt * (prob / 100)).toLocaleString()}`;
           }
 
+          if (editingDealField === 'created_time') {
+            updatedDeal.created_time = valueToSave;
+          }
+
           return updatedDeal;
         });
 
         // Update kanbanDeals state safely without unintentional overwrite
         const targetDealId = selectedDeal?.deal_id || selectedDeal?.id;
         if (targetDealId) {
+          setDealsData(prev => (Array.isArray(prev) ? prev.map(d => {
+            const dId = d.deal_id || d.id;
+            if (dId && String(dId) === String(targetDealId)) {
+              return {
+                ...d,
+                [editingDealField]: valueToSave,
+                [apiFieldName]: valueToSave
+              };
+            }
+            return d;
+          }) : prev));
+
           if (editingDealField === 'deal_stage' || apiFieldName === 'deal_stage') {
             const newStage = valueToSave;
             setKanbanDeals(prev => {
@@ -3934,6 +4013,9 @@ export default function Opportunities({ onPageChange }) {
               return updated;
             });
             setKanbanUpdateTimestamp(Date.now());
+            if (editingDealField === 'created_time') {
+              fetchAllKanbanDeals();
+            }
           }
         }
 
@@ -4476,27 +4558,37 @@ export default function Opportunities({ onPageChange }) {
   const filteredOpportunities = opportunities.filter(opp => {
     let matchesSearch = true;
     if (isSearching) {
-      const q = searchTerm.trim().toLowerCase();
-      const nameMatch = (opp.contactName || '').toLowerCase().includes(q);
-      const phoneMatch = (opp.phoneNumber || '').includes(q) || (opp.alternateNumber || '').includes(q);
-      const emailMatch = (opp.email || '').toLowerCase().includes(q);
-      const companyMatch = (opp.companyName || '').toLowerCase().includes(q);
-      const accountNameMatch = (opp.accountName || '').toLowerCase().includes(q);
-      const accountNumberMatch = (opp.accountNumber || '').toLowerCase().includes(q);
-      const ownerMatch = (opp.contactOwner || '').toLowerCase().includes(q);
-      const cityMatch = (opp.city || '').toLowerCase().includes(q);
-      const stateMatch = (opp.state || '').toLowerCase().includes(q);
-      const countryMatch = (opp.country || '').toLowerCase().includes(q);
-      const tagsMatch = (opp.tags || '').toLowerCase().includes(q);
-      const descMatch = (opp.description || '').toLowerCase().includes(q);
-      const websiteMatch = (opp.website || '').toLowerCase().includes(q);
-      const accountTypeMatch = (opp.accountType || '').toLowerCase().includes(q);
-      const industryMatch = (opp.industry || '').toLowerCase().includes(q);
-      const leadSourceMatch = (opp.leadSource || '').toLowerCase().includes(q);
-      const createdByMatch = (opp.createdBy || '').toLowerCase().includes(q);
-      const modifiedByMatch = (opp.modifiedBy || '').toLowerCase().includes(q);
+      if (isServerSearched) {
+        // Authoritative server-side search already verified and returned this record
+        matchesSearch = true;
+      } else {
+        const q = searchTerm.trim().toLowerCase();
+        const idMatch = String(opp.id || '').toLowerCase().includes(q);
+        const nameMatch = (opp.contactName || '').toLowerCase().includes(q);
+        const phoneMatch = (opp.phoneNumber || '').includes(q) || (opp.alternateNumber || '').includes(q);
+        const emailMatch = (opp.email || '').toLowerCase().includes(q);
+        const companyMatch = (opp.companyName || '').toLowerCase().includes(q);
+        const accountNameMatch = (opp.accountName || '').toLowerCase().includes(q);
+        const accountNumberMatch = (opp.accountNumber || '').toLowerCase().includes(q);
+        const ownerMatch = (opp.contactOwner || '').toLowerCase().includes(q);
+        const cityMatch = (opp.city || '').toLowerCase().includes(q);
+        const stateMatch = (opp.state || '').toLowerCase().includes(q);
+        const countryMatch = (opp.country || '').toLowerCase().includes(q);
+        const statusMatch = (opp.leadStatus || '').toLowerCase().includes(q);
+        const tagsMatch = (opp.tags || '').toLowerCase().includes(q);
+        const descMatch = (opp.description || '').toLowerCase().includes(q);
+        const websiteMatch = (opp.website || '').toLowerCase().includes(q);
+        const accountTypeMatch = (opp.accountType || '').toLowerCase().includes(q);
+        const industryMatch = (opp.industry || '').toLowerCase().includes(q);
+        const leadSourceMatch = (opp.leadSource || '').toLowerCase().includes(q);
+        const createdByMatch = (opp.createdBy || '').toLowerCase().includes(q);
+        const modifiedByMatch = (opp.modifiedBy || '').toLowerCase().includes(q);
+        const anyFieldMatch = Object.values(opp).some(val =>
+          typeof val === 'string' ? val.toLowerCase().includes(q) : (typeof val === 'number' ? String(val).includes(q) : false)
+        );
 
-      matchesSearch = nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || tagsMatch || descMatch || websiteMatch || accountTypeMatch || industryMatch || leadSourceMatch || createdByMatch || modifiedByMatch;
+        matchesSearch = idMatch || nameMatch || phoneMatch || emailMatch || companyMatch || accountNameMatch || accountNumberMatch || ownerMatch || cityMatch || stateMatch || countryMatch || statusMatch || tagsMatch || descMatch || websiteMatch || accountTypeMatch || industryMatch || leadSourceMatch || createdByMatch || modifiedByMatch || anyFieldMatch;
+      }
     }
 
     let isNewThisWeek = true;
@@ -9248,17 +9340,21 @@ export default function Opportunities({ onPageChange }) {
                           </>
                         )}
 
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
-                          <div style={{
-                            padding: '8px 12px',
-                            background: 'var(--gray-100)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--r)',
-                            fontSize: '12px',
-                            color: 'var(--text)'
-                          }}>{selectedDeal.created_time || '-'}</div>
-                        </div>
+                        {isOperationRole ? (
+                          <EditableDealField label="Created Time" value={selectedDeal.created_time || ''} fieldName="created_time" type="datetime-local" />
+                        ) : (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created Time</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.created_time || '-'}</div>
+                          </div>
+                        )}
                         <div>
                           <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Created By</label>
                           <div style={{
