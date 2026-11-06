@@ -30,9 +30,10 @@ export default function OperationDashboard({ user, onPageChange }) {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showFilter, setShowFilter] = useState(false);
-  const [filterType, setFilterType] = useState('month'); // 'month', 'year', 'custom'
+  const [filterType, setFilterType] = useState('month'); // 'month', 'financial_year', 'custom'
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [filterFinancialYear, setFilterFinancialYear] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [availableYears, setAvailableYears] = useState([]);
@@ -107,6 +108,9 @@ export default function OperationDashboard({ user, onPageChange }) {
       }
       if (filterParams.year) {
         url += `&year=${filterParams.year}`;
+      }
+      if (filterParams.financialYear) {
+        url += `&financial_year=${filterParams.financialYear}`;
       }
       if (filterParams.startDate && filterParams.endDate) {
         // Convert date format from YYYY-MM-DD to MM/DD/YYYY
@@ -549,12 +553,12 @@ export default function OperationDashboard({ user, onPageChange }) {
                   Month
                 </button>
                 <button
-                  onClick={() => setFilterType('year')}
+                  onClick={() => setFilterType('financial_year')}
                   style={{
                     padding: '8px 12px',
-                    border: `1px solid ${filterType === 'year' ? palette.pine : palette.border}`,
-                    backgroundColor: filterType === 'year' ? `${palette.pine}15` : palette.surface,
-                    color: filterType === 'year' ? palette.pine : palette.ink,
+                    border: `1px solid ${filterType === 'financial_year' ? palette.pine : palette.border}`,
+                    backgroundColor: filterType === 'financial_year' ? `${palette.pine}15` : palette.surface,
+                    color: filterType === 'financial_year' ? palette.pine : palette.ink,
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '13px',
@@ -563,7 +567,7 @@ export default function OperationDashboard({ user, onPageChange }) {
                     flex: 1
                   }}
                 >
-                  Year
+                  Financial Year
                 </button>
                 <button
                   onClick={() => setFilterType('custom')}
@@ -663,7 +667,7 @@ export default function OperationDashboard({ user, onPageChange }) {
               </div>
             )}
 
-            {filterType === 'year' && (
+            {filterType === 'financial_year' && (
               <div>
                 <label style={{
                   fontSize: '13px',
@@ -672,11 +676,11 @@ export default function OperationDashboard({ user, onPageChange }) {
                   marginBottom: '8px',
                   display: 'block'
                 }}>
-                  Year
+                  Financial Year
                 </label>
                 <select
-                  value={filterYear}
-                  onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                  value={filterFinancialYear}
+                  onChange={(e) => setFilterFinancialYear(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -689,12 +693,15 @@ export default function OperationDashboard({ user, onPageChange }) {
                     cursor: 'pointer'
                   }}
                 >
+                  <option value="">Select Financial Year</option>
                   {availableYears.length > 0 ? (
                     availableYears.map((year) => (
-                      <option key={year} value={year}>{year}</option>
+                      <option key={year} value={`${year}-${year + 1}`}>{year}-{year + 1}</option>
                     ))
                   ) : (
-                    <option value={filterYear}>{filterYear}</option>
+                    <option value={`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`}>
+                      {new Date().getFullYear()}-{new Date().getFullYear() + 1}
+                    </option>
                   )}
                 </select>
               </div>
@@ -783,9 +790,14 @@ export default function OperationDashboard({ user, onPageChange }) {
                       month: monthNames[filterMonth],
                       year: filterYear
                     };
-                  } else if (filterType === 'year') {
+                  } else if (filterType === 'financial_year') {
+                    // Convert financial year to date range (April 1 to March 31)
+                    const [startYear, endYear] = filterFinancialYear.split('-').map(Number);
+                    const startDate = `${startYear}-04-01`;
+                    const endDate = `${endYear}-03-31`;
                     filterParams = {
-                      year: filterYear
+                      startDate,
+                      endDate
                     };
                   } else if (filterType === 'custom') {
                     filterParams = {
