@@ -391,6 +391,23 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
   const { user: authUser } = useAuth();
   const user = propUser || authUser;
   const currentUserName = getApiUserName(user);
+  const userRole = (() => {
+    let r = user?.role || user?.user_role || user?.type || '';
+    if (!r) {
+      try {
+        const stored = localStorage.getItem('sat2farm_auth');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          r = parsed?.role || parsed?.user_role || parsed?.type || '';
+        }
+      } catch (e) {}
+    }
+    if (!r) {
+      r = localStorage.getItem('role') || localStorage.getItem('user_role') || '';
+    }
+    return String(r || '').toLowerCase().trim();
+  })();
+  const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -582,8 +599,42 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
           const res = await fetch(`${apiUrl}?category=${encodeURIComponent(cat.name)}`);
           if (res.ok) {
             const result = await res.json();
-            if (active && result && result.status && Array.isArray(result.data) && result.data.length > 0) {
-              cat.setter(result.data);
+            if (active && result) {
+              let list = [];
+              if (Array.isArray(result)) {
+                list = result;
+              } else if (Array.isArray(result.data)) {
+                list = result.data;
+              } else if (Array.isArray(result.options)) {
+                list = result.options;
+              } else if (Array.isArray(result.result)) {
+                list = result.result;
+              }
+              const cleaned = list.map(item => {
+                if (typeof item === 'string') return item.trim();
+                if (item && typeof item === 'object') {
+                  return (item.option_name || item.option || item.name || item.value || item.status || '').trim();
+                }
+                return String(item || '').trim();
+              }).filter(Boolean);
+
+              if (cleaned.length > 0) {
+                const uniqueList = Array.from(new Set(cleaned));
+                if (cat.name === 'lead_status') {
+                  setPredefinedLeadStatuses(uniqueList);
+                  setStatusConfig(prev => {
+                    const updated = { ...prev };
+                    uniqueList.forEach(st => {
+                      if (!updated[st]) {
+                        updated[st] = { color: '#6b7280', label: st };
+                      }
+                    });
+                    return updated;
+                  });
+                } else {
+                  cat.setter(uniqueList);
+                }
+              }
             }
           }
         } catch (err) {
@@ -597,8 +648,12 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
     return () => { active = false; };
   }, []);
 
-  // Save custom dropdown option to backend API (POST)
+  // Save custom dropdown option to backend API (POST) - only operation can add lead_status
   const saveCustomDropdownOption = async (category, optionName) => {
+    if (category === 'lead_status' && !isOperationRole) {
+      toast.error('Only operations role has permission to add new lead status');
+      return;
+    }
     const apiUrl = import.meta.env.VITE_DROPDOWN_OPTIONS_API_URL;
     if (!apiUrl || !category || !optionName?.trim()) return;
 
@@ -644,6 +699,16 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
   const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
   const [customIndustry, setCustomIndustry] = useState('');
   const [showCustomIndustryInput, setShowCustomIndustryInput] = useState(false);
+  const [showAddLeadCustomStatus, setShowAddLeadCustomStatus] = useState(false);
+  const [addLeadCustomStatusValue, setAddLeadCustomStatusValue] = useState('');
+  const [selectedAddLeadStatus, setSelectedAddLeadStatus] = useState('');
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setShowAddLeadCustomStatus(false);
+    setAddLeadCustomStatusValue('');
+    setSelectedAddLeadStatus('');
+  };
 
   // ── Edit dialog state ─────────────────────────────────────────────────────────
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -701,7 +766,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
   // ── Get predefined options for field ───────────────────────────────────────────
   const getFieldOptions = (fieldName) => {
     const optionMap = {
-      'leadStatus': Object.keys(statusConfig),
+      'leadStatus': predefinedLeadStatuses,
       'industry': predefinedIndustries,
       'contactOwner': getContactOwnerOptions(),
       'leadSource': predefinedLeadSources,
@@ -764,8 +829,14 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
           setPredefinedTags([...predefinedTags, valueToSave.trim()]);
           saveCustomDropdownOption('tags', valueToSave.trim());
         } else if (editDialogField === 'leadStatus' || editDialogField === 'lead_status') {
-          setPredefinedLeadStatuses([...predefinedLeadStatuses, valueToSave.trim()]);
-          saveCustomDropdownOption('lead_status', valueToSave.trim());
+          if (!isOperationRole) {
+            toast.error('Only operations role has permission to add new lead status');
+            return;
+          }
+          const trimmedVal = valueToSave.trim();
+          setPredefinedLeadStatuses(prev => Array.from(new Set([...prev, trimmedVal])));
+          setStatusConfig(prev => ({ ...prev, [trimmedVal]: { color: '#6b7280', label: trimmedVal } }));
+          saveCustomDropdownOption('lead_status', trimmedVal);
         }
       }
 
@@ -1894,8 +1965,8 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
   };
 
   const [statusConfig, setStatusConfig] = useState(() => {
-    const saved = localStorage.getItem('statusConfig');
-    return saved ? JSON.parse(saved) : {
+    const defaultStatusMap = {
+      'New': { color: '#3b82f6', label: 'New' },
       'Yet to Contact': { color: '#3b82f6', label: 'Yet to Contact' },
       'Attempted to Contact': { color: '#f59e0b', label: 'Attempted to Contact' },
       'Contacted': { color: '#8b5cf6', label: 'Contacted' },
@@ -1906,8 +1977,17 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
       'Follow-up 2': { color: '#06b6d4', label: 'Follow-up 2' },
       'In Discussion': { color: '#8b5cf6', label: 'In Discussion' },
       'Interested': { color: '#10b981', label: 'Interested' },
-      'Junk': { color: '#ef4444', label: 'Junk' }
+      'Junk': { color: '#ef4444', label: 'Junk' },
+      'Demo Scheduled': { color: '#f97316', label: 'Demo Scheduled' }
     };
+    const saved = localStorage.getItem('statusConfig');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...defaultStatusMap, ...parsed };
+      } catch (e) { }
+    }
+    return defaultStatusMap;
   });
 
   // Save to localStorage when statusConfig changes
@@ -2592,7 +2672,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
       if (result.success || result.message || response.ok) {
         // Refresh the leads list
         fetchLeads();
-        setShowAddModal(false);
+        closeAddModal();
         toast.dismiss('create-lead');
         toast.success('Lead created successfully!');
       } else {
@@ -3055,7 +3135,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                     >
                       Update Fields
                     </button>
-                    {user?.role === 'operation' && (
+                    {isOperationRole && (
                       <button
                         onClick={() => {
                           setShowMoreDropdown(false);
@@ -6592,7 +6672,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                 </button>
                               ))}
 
-                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                              {isOperationRole && (
                                 <button
                                   onClick={() => {
                                     setShowCustomIndustryInput(true);
@@ -6795,9 +6875,11 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                               borderRadius: 'var(--r)',
                               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                               zIndex: 10,
-                              marginTop: '4px'
+                              marginTop: '4px',
+                              maxHeight: '220px',
+                              overflowY: 'auto'
                             }}>
-                              {Object.keys(statusConfig).map(status => (
+                              {predefinedLeadStatuses.map(status => (
                                 <button
                                   key={status}
                                   onClick={() => {
@@ -6816,17 +6898,17 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                     borderBottom: '1px solid var(--border-soft)'
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = statusConfig[status].color + '15';
+                                    e.currentTarget.style.background = (statusConfig[status]?.color || '#6b7280') + '15';
                                   }}
                                   onMouseLeave={(e) => {
                                     e.currentTarget.style.background = 'none';
                                   }}
                                 >
-                                  {statusConfig[status].label}
+                                  {statusConfig[status]?.label || status}
                                 </button>
                               ))}
 
-                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                              {isOperationRole && (
                                 <button
                                   onClick={() => {
                                     setShowCustomStatusInput(true);
@@ -6884,11 +6966,16 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                 />
                                 <button
                                   onClick={() => {
+                                    if (!isOperationRole) {
+                                      toast.error('Only operations role has permission to add new lead status');
+                                      return;
+                                    }
                                     if (customStatus.trim()) {
-                                      handleFieldUpdate(selectedUser.id, 'leadStatus', customStatus.trim());
-                                      setStatusConfig({ ...statusConfig, [customStatus.trim()]: { color: '#6b7280', label: customStatus.trim() } });
-                                      setPredefinedLeadStatuses([...predefinedLeadStatuses, customStatus.trim()]);
-                                      saveCustomDropdownOption('lead_status', customStatus.trim());
+                                      const newStatus = customStatus.trim();
+                                      handleFieldUpdate(selectedUser.id, 'leadStatus', newStatus);
+                                      setStatusConfig({ ...statusConfig, [newStatus]: { color: '#6b7280', label: newStatus } });
+                                      setPredefinedLeadStatuses(prev => Array.from(new Set([...prev, newStatus])));
+                                      saveCustomDropdownOption('lead_status', newStatus);
                                       setCustomStatus('');
                                       setShowCustomStatusInput(false);
                                     }
@@ -7006,7 +7093,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                 </button>
                               ))}
 
-                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                              {isOperationRole && (
                                 <button
                                   onClick={() => {
                                     setShowCustomOwnerInput(true);
@@ -7184,7 +7271,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                 </button>
                               ))}
 
-                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                              {isOperationRole && (
                                 <button
                                   onClick={() => {
                                     setShowCustomLeadSourceInput(true);
@@ -7362,7 +7449,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                                 </button>
                               ))}
 
-                              {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                              {isOperationRole && (
                                 <button
                                   onClick={() => {
                                     setShowCustomTagsInput(true);
@@ -8137,13 +8224,9 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="New">New</option>
-                      <option value="Contacted">Contacted</option>
-                      <option value="Qualified">Qualified</option>
-                      <option value="Proposal">Proposal</option>
-                      <option value="Negotiation">Negotiation</option>
-                      <option value="Closed Won">Closed Won</option>
-                      <option value="Closed Lost">Closed Lost</option>
+                      {predefinedLeadStatuses.map(status => (
+                        <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -8263,7 +8346,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h2 style={{ margin: 0, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Add New Lead</h2>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -8480,23 +8563,103 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                   <h3 style={{ margin: '0 0 12px 0', color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>Lead Details</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
-                      <select
-                        name="leadStatus"
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--r)',
-                          color: 'var(--text)',
-                          fontSize: '14px'
-                        }}
-                      >
-                        {predefinedLeadStatuses.map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label style={{ color: 'var(--text-3)', fontSize: '12px' }}>Lead Status</label>
+                        {isOperationRole && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAddLeadCustomStatus(prev => !prev)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--green-600)',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          >
+                            {showAddLeadCustomStatus ? 'Select Existing' : '+ Add Status'}
+                          </button>
+                        )}
+                      </div>
+                      {showAddLeadCustomStatus && isOperationRole ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            value={addLeadCustomStatusValue}
+                            onChange={(e) => setAddLeadCustomStatusValue(e.target.value)}
+                            placeholder="Enter new lead status"
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--green-300)',
+                              borderRadius: 'var(--r)',
+                              color: 'var(--text)',
+                              fontSize: '14px'
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = addLeadCustomStatusValue.trim();
+                              if (val) {
+                                if (!predefinedLeadStatuses.includes(val)) {
+                                  setPredefinedLeadStatuses(prev => [...prev, val]);
+                                }
+                                setStatusConfig(prev => ({ ...prev, [val]: { color: '#6b7280', label: val } }));
+                                saveCustomDropdownOption('lead_status', val);
+                                setSelectedAddLeadStatus(val);
+                                setShowAddLeadCustomStatus(false);
+                                setAddLeadCustomStatusValue('');
+                                toast.success(`Lead status "${val}" added!`);
+                              }
+                            }}
+                            style={{
+                              padding: '10px 14px',
+                              background: 'var(--green-600)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          name="leadStatus"
+                          value={selectedAddLeadStatus || (predefinedLeadStatuses[0] || 'New')}
+                          onChange={(e) => {
+                            if (e.target.value === '__add_custom_lead_status__' && isOperationRole) {
+                              setShowAddLeadCustomStatus(true);
+                            } else {
+                              setSelectedAddLeadStatus(e.target.value);
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r)',
+                            color: 'var(--text)',
+                            fontSize: '14px'
+                          }}
+                        >
+                          {predefinedLeadStatuses.map(status => (
+                            <option key={status} value={status}>{statusConfig[status]?.label || status}</option>
+                          ))}
+                          {isOperationRole && (
+                            <option value="__add_custom_lead_status__">+ Add new status...</option>
+                          )}
+                        </select>
+                      )}
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Industry</label>
@@ -8679,6 +8842,15 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                     }
 
                     const formData = new FormData(form);
+                    const resolvedStatus = (showAddLeadCustomStatus && addLeadCustomStatusValue.trim()) || selectedAddLeadStatus || formData.get('leadStatus') || (predefinedLeadStatuses[0] || 'New');
+                    if (showAddLeadCustomStatus && addLeadCustomStatusValue.trim() && isOperationRole) {
+                      const val = addLeadCustomStatusValue.trim();
+                      if (!predefinedLeadStatuses.includes(val)) {
+                        setPredefinedLeadStatuses(prev => [...prev, val]);
+                      }
+                      setStatusConfig(prev => ({ ...prev, [val]: { color: '#6b7280', label: val } }));
+                      saveCustomDropdownOption('lead_status', val);
+                    }
                     const leadData = {
                       full_name: formData.get('fullName') || '',
                       phone: formData.get('phone') || '',
@@ -8689,7 +8861,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                       city: formData.get('city') || '',
                       state: formData.get('state') || '',
                       country: formData.get('country') || 'IN',
-                      status: formData.get('leadStatus') || 'New',
+                      status: resolvedStatus,
                       tags: formData.get('tags') || '',
                       lead_source: formData.get('leadSource') || '',
                       description: formData.get('description') || '',
@@ -8732,7 +8904,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                   {isCreatingLead ? 'Adding Lead...' : 'Add Lead'}
                 </button>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   style={{
                     padding: '10px 20px',
                     background: '#1e293b',
@@ -9371,7 +9543,7 @@ export default function LeadPipeline({ onPageChange, user: propUser }) {
                           {editDialogField === 'leadStatus' ? statusConfig[option]?.label || option : option}
                         </button>
                       ))}
-                      {(user?.role?.toLowerCase().trim() === 'operation' || user?.role?.toLowerCase().trim() === 'operations') && (
+                      {isOperationRole && (
                         <button
                           onClick={handleEditDialogCustomInput}
                           style={{
