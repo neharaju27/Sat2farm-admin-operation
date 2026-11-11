@@ -27,7 +27,7 @@ import Pricing from "./components/Pricing";
 import ProspectStatsCards from "./components/ProspectStatsCards";
 import TaskCalendar from "./components/TaskCalendar";
 import InvoiceInfo from "./components/InvoiceInfo";
-import PaymentApproval from "./components/PaymentApproval";
+
 import UserSearch from "./components/UserSearch";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
