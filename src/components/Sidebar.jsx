@@ -23,6 +23,10 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [todayGreenTeamAssignments, setTodayGreenTeamAssignments] = useState([]);
   const [loadingGreenTeamAssignments, setLoadingGreenTeamAssignments] = useState(false);
+  const [pendingPaymentApprovals, setPendingPaymentApprovals] = useState([]);
+  const [loadingPaymentApprovals, setLoadingPaymentApprovals] = useState(false);
+  const [accountsPendingPaymentApprovals, setAccountsPendingPaymentApprovals] = useState([]);
+  const [loadingAccountsPaymentApprovals, setLoadingAccountsPaymentApprovals] = useState(false);
 
   // Helper to normalize user parameter for backend API
   const getApiUserName = (u) => {
@@ -156,7 +160,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       try {
         setLoadingGreenTeamAssignments(true);
         const greenTeamApiUrl = import.meta.env.VITE_GREEN_TEAM_GET_ASSIGNMENTS_URL;
-        
+
         if (!greenTeamApiUrl) {
           console.error('Green Team API URL not configured');
           setTodayGreenTeamAssignments([]);
@@ -169,29 +173,29 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             'Authorization': `Bearer ${user?.jwt || user?.token || ''}`
           }
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        
+
         let assignmentsData = result;
-        
+
         // Handle nested API response structure
         if (result && result.assignment && typeof result.assignment === 'object') {
           assignmentsData = [result.assignment];
         } else if (result && result.assignments && Array.isArray(result.assignments)) {
           assignmentsData = result.assignments;
         }
-        
+
         if (assignmentsData && Array.isArray(assignmentsData)) {
           const today = new Date();
           const todaysAssignments = assignmentsData.filter(assignment => {
             const assignedDate = parseDateRobust(assignment.created_at || assignment.assigned_date);
             return assignedDate && assignedDate.toDateString() === today.toDateString();
           });
-          
+
           setTodayGreenTeamAssignments(todaysAssignments);
         } else {
           setTodayGreenTeamAssignments([]);
@@ -206,7 +210,111 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
 
     fetchTodayGreenTeamAssignments();
   }, [isOperationsUser, isTechDepartmentUser, user]);
-  
+
+  // Fetch pending payment approvals for Operations users
+  useEffect(() => {
+    if (!isOperationsUser) return;
+
+    const fetchPendingPaymentApprovals = async () => {
+      try {
+        setLoadingPaymentApprovals(true);
+        const approvalUrl = import.meta.env.VITE_PAYMENT_RECEIVED_APPROVAL_API_URL;
+
+        if (!approvalUrl) {
+          console.error('Payment Received Approval API URL not configured');
+          setPendingPaymentApprovals([]);
+          return;
+        }
+
+        const currentUserName = getApiUserName(user);
+        const response = await fetch(`${approvalUrl}?status=pending&user=${encodeURIComponent(currentUserName)}`);
+
+        if (!response.ok) {
+          console.warn('Payment approval API returned error:', response.status);
+          setPendingPaymentApprovals([]);
+          return;
+        }
+
+        const result = await response.json();
+        // Handle nested data structure: { data: { data: [...] } }
+        const dealsList = Array.isArray(result) ? result :
+          (Array.isArray(result.data) ? result.data :
+            (result.data && Array.isArray(result.data.data) ? result.data.data :
+              (Array.isArray(result.results) ? result.results :
+                (Array.isArray(result.deals) ? result.deals :
+                  (Array.isArray(result.approvals) ? result.approvals : [])))));
+
+        setPendingPaymentApprovals(dealsList);
+      } catch (err) {
+        console.error('Error fetching pending payment approvals:', err);
+        setPendingPaymentApprovals([]);
+      } finally {
+        setLoadingPaymentApprovals(false);
+      }
+    };
+
+    // Initial fetch
+    fetchPendingPaymentApprovals();
+
+    // Poll every 30 seconds to get real-time updates
+    const intervalId = setInterval(fetchPendingPaymentApprovals, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, [isOperationsUser, user]);
+
+  // Fetch pending payment approvals for Accounts users
+  useEffect(() => {
+    if (!isAccountsUser) return;
+
+    const fetchAccountsPendingPaymentApprovals = async () => {
+      try {
+        setLoadingAccountsPaymentApprovals(true);
+        const approvalUrl = import.meta.env.VITE_PAYMENT_RECEIVED_APPROVAL_API_URL;
+
+        if (!approvalUrl) {
+          console.error('Payment Received Approval API URL not configured');
+          setAccountsPendingPaymentApprovals([]);
+          return;
+        }
+
+        const currentUserName = getApiUserName(user);
+        const response = await fetch(`${approvalUrl}?status=pending&user=${encodeURIComponent(currentUserName)}`);
+
+        if (!response.ok) {
+          console.warn('Payment approval API returned error:', response.status);
+          setAccountsPendingPaymentApprovals([]);
+          return;
+        }
+
+        const result = await response.json();
+        // Handle nested data structure: { data: { data: [...] } }
+        const dealsList = Array.isArray(result) ? result :
+          (Array.isArray(result.data) ? result.data :
+            (result.data && Array.isArray(result.data.data) ? result.data.data :
+              (Array.isArray(result.results) ? result.results :
+                (Array.isArray(result.deals) ? result.deals :
+                  (Array.isArray(result.approvals) ? result.approvals : [])))));
+
+        setAccountsPendingPaymentApprovals(dealsList);
+      } catch (err) {
+        console.error('Error fetching pending payment approvals:', err);
+        setAccountsPendingPaymentApprovals([]);
+      } finally {
+        setLoadingAccountsPaymentApprovals(false);
+      }
+    };
+
+    // Initial fetch
+    fetchAccountsPendingPaymentApprovals();
+
+    // Poll every 30 seconds to get real-time updates
+    const intervalId = setInterval(fetchAccountsPendingPaymentApprovals, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, [isAccountsUser, user]);
+
   // Page activity states
   const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
@@ -215,7 +323,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isPartnerActive = currentPage === 'super-admin-dashboard' || currentPage === 'unlock-farm' || currentPage === 'register';
   const isMarketingActive = currentPage === 'marketing-dashboard';
   const isSatyuktCrmActive = currentPage === 'lead-pipeline' || currentPage === 'opportunities' || currentPage === 'green-team' || currentPage === 'prospect-stats' || currentPage === 'task-calendar';
-  const isAccountsActive = currentPage === 'invoice-info';
+  const isAccountsActive = currentPage === 'invoice-info' || currentPage === 'payment-approval';
   
   // Handle navigation with role-based access control
   const handleNavigationClick = (page) => {
@@ -270,7 +378,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isAccountsUser) {
       // Accounts users can only access specific pages
-      const allowedAccountsPages = ['invoice-info'];
+      const allowedAccountsPages = ['invoice-info', 'payment-approval'];
       if (allowedAccountsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -359,6 +467,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <div
                       className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
                       onClick={() => handleNavigationClick('opportunities')}
+                      style={{ position: 'relative' }}
                     >
                       <svg className="ic" viewBox="0 0 16 16" fill="none">
                         <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -367,6 +476,28 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                         <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                       </svg>
                       Opportunities
+                      {(isOperationsUser || isAccountsUser) && pendingPaymentApprovals.length > 0 && (
+                        <span style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: '#8b5cf6',
+                          color: 'white',
+                          fontSize: '10px',
+                          fontWeight: '600',
+                          minWidth: '18px',
+                          height: '18px',
+                          borderRadius: '9px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 6px',
+                          boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+                        }}>
+                          {pendingPaymentApprovals.length}
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -614,7 +745,40 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               Invoice Info
-              <span className="sb-dot"></span>
+            </div>
+            <div
+              className={`sb-item ${currentPage === 'payment-approval' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('payment-approval')}
+              style={{ position: 'relative' }}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="4" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <circle cx="12" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+              </svg>
+              Payment Approval
+              {accountsPendingPaymentApprovals.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#8b5cf6',
+                  color: 'white',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  minWidth: '18px',
+                  height: '18px',
+                  borderRadius: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 6px',
+                  boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+                }}>
+                  {accountsPendingPaymentApprovals.length}
+                </span>
+              )}
             </div>
           </>
         )}
