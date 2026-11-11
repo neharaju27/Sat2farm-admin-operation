@@ -12,7 +12,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const isPartnerUser = userRole === 'partner';
   const isMarketingUser = userRole === 'marketing';
   const isTechDepartmentUser = userRole?.includes('tech') || userRole === 'tech department' || userRole === 'tech-department' || userRole === 'tech';
- 
+  const isAccountsUser = userRole === 'accounts';
 
   const [operationsOpen, setOperationsOpen] = useState(true);
   const [salesOpen, setSalesOpen] = useState(false);
