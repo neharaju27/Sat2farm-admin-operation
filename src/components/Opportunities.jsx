@@ -107,6 +107,26 @@ const formatDateSafe = (dateStr, options = { day: 'numeric', month: 'short', yea
   }
 };
 
+// Convert date to Indian Standard Time (IST) format: YYYY-MM-DD HH:mm:ss
+const toIndianStandardTime = (date) => {
+  if (!date) return '';
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
+
+  // Convert to IST (UTC+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+  const istDate = new Date(d.getTime() + istOffset + (d.getTimezoneOffset() * 60 * 1000));
+
+  const year = istDate.getFullYear();
+  const month = String(istDate.getMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getDate()).padStart(2, '0');
+  const hours = String(istDate.getHours()).padStart(2, '0');
+  const minutes = String(istDate.getMinutes()).padStart(2, '0');
+  const seconds = String(istDate.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 // Top-level Standalone EditableAccountField component to keep DOM input alive across parent state updates (prevents cursor jumping)
 const StandaloneEditableAccountField = React.memo(({ label, value, fieldName, type = 'text', required = false, isEditing, editValue, startEditing, saveEdit, cancelEdit }) => {
   const containerRef = React.useRef(null);
@@ -1128,6 +1148,219 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
   const [isFetchingFilterOptions, setIsFetchingFilterOptions] = useState(true);
   const [filterFetchProgress, setFilterFetchProgress] = useState(0);
+
+  // Payment Approval Sidebar State
+  const [paymentApprovalSidebarOpen, setPaymentApprovalSidebarOpen] = useState(false);
+  const [pendingPaymentApprovals, setPendingPaymentApprovals] = useState([]);
+  const [loadingPaymentApprovals, setLoadingPaymentApprovals] = useState(false);
+
+  // Fetch pending payment approvals on mount for operation users
+  useEffect(() => {
+    if (isOperationRole) {
+      fetchPendingPaymentApprovals();
+    }
+  }, [isOperationRole, kanbanUpdateTimestamp]);
+
+  // Fetch pending payment received approvals
+  const fetchPendingPaymentApprovals = async () => {
+    if (!isOperationRole) return;
+
+    try {
+      setLoadingPaymentApprovals(true);
+      const approvalUrl = import.meta.env.VITE_PAYMENT_RECEIVED_APPROVAL_API_URL;
+
+      if (!approvalUrl) {
+        console.error('Payment Received Approval API URL not configured');
+        setPendingPaymentApprovals([]);
+        return;
+      }
+
+      const currentUserName = getApiUserName(user);
+      const response = await fetch(`${approvalUrl}?status=pending&user=${encodeURIComponent(currentUserName)}`);
+
+      if (!response.ok) {
+        console.warn('Payment approval API returned error:', response.status);
+        setPendingPaymentApprovals([]);
+        return;
+      }
+
+      const result = await response.json();
+      // Handle nested data structure: { data: { data: [...] } }
+      const dealsList = Array.isArray(result) ? result :
+        (Array.isArray(result.data) ? result.data :
+          (result.data && Array.isArray(result.data.data) ? result.data.data :
+            (Array.isArray(result.results) ? result.results :
+              (Array.isArray(result.deals) ? result.deals :
+                (Array.isArray(result.approvals) ? result.approvals : [])))));
+
+      const transformedDeals = dealsList.map(deal => {
+        // Use previous_stage if available (from kanban move), otherwise use actual deal_stage
+        // Only show null if deal was created with Paid stage intent (no previous_stage and deal was never in another stage)
+        const hasPreviousStage = deal.previous_stage && deal.previous_stage !== '';
+        const hasPaymentTime = deal.payment_received_time && deal.payment_received_time !== '';
+        const isInvoicedStage = deal.deal_stage === 'Invoiced';
+        const hasInvoiceTime = deal.invoice_received_time && deal.invoice_received_time !== '';
+        // Show null only if: has payment time, is in Invoiced, has NO invoice time (created directly as Paid), and no previous_stage
+        const shouldShowNullCurrentStage = hasPaymentTime && isInvoicedStage && !hasInvoiceTime && !hasPreviousStage;
+
+        return {
+          ...deal,
+          account_name: deal.account_name || '',
+          account_number: deal.account_number || '',
+          created_time: deal.created_time || '',
+          created_by: deal.created_by || '',
+          payment_received_time: deal.payment_received_time || '',
+          invoice_received_time: deal.invoice_received_time || '',
+          current_stage: hasPreviousStage ? deal.previous_stage : (shouldShowNullCurrentStage ? null : (deal.current_stage || deal.deal_stage || 'Invoiced')),
+          requested_stage: deal.requested_stage || 'Paid'
+        };
+      });
+
+      setPendingPaymentApprovals(transformedDeals);
+    } catch (err) {
+      console.error('Error fetching pending payment approvals:', err);
+      setPendingPaymentApprovals([]);
+    } finally {
+      setLoadingPaymentApprovals(false);
+    }
+  };
+
+  // Approve payment received (move to Paid stage)
+  const handleApprovePayment = async (dealId) => {
+    try {
+      toast.loading('Approving payment received...', { id: 'approve-payment-toast' });
+
+      const currentUserName = getApiUserName(user);
+      const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+      if (!apiUrl) {
+        toast.dismiss('approve-payment-toast');
+        toast.error('Update Deal API URL not configured');
+        return;
+      }
+
+      // Move deal to Paid stage
+      const stageUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&deal_stage=Paid&user=${encodeURIComponent(currentUserName)}`;
+
+      const stageResponse = await fetch(stageUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deal_id: dealId,
+          id: dealId,
+          deal_stage: 'Paid',
+          user: currentUserName,
+        }),
+      });
+
+      if (!stageResponse.ok) {
+        throw new Error(`HTTP error! status: ${stageResponse.status}`);
+      }
+
+      const stageResult = await stageResponse.json();
+      console.log('Stage update response:', stageResult);
+
+      toast.dismiss('approve-payment-toast');
+      if (stageResult.success || stageResult.message) {
+        toast.success('Payment approved and deal moved to Paid stage');
+        fetchPendingPaymentApprovals();
+        fetchAllKanbanDeals();
+      } else {
+        toast.error('Failed to approve payment');
+      }
+    } catch (err) {
+      console.error('Error approving payment:', err);
+      toast.dismiss('approve-payment-toast');
+      toast.error('Failed to approve payment');
+    }
+  };
+
+  // Decline payment received (keep deal in previous stage and nullify payment time)
+  const handleDeclinePayment = async (dealId, previousStage) => {
+    try {
+      toast.loading('Declining payment received...', { id: 'decline-payment-toast' });
+
+      const currentUserName = getApiUserName(user);
+      const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
+
+      // First, set payment_received_time to null
+      if (paymentTimeUrl) {
+        const paymentRequestBody = {
+          deal_id: dealId,
+          payment_received_time: null,
+          changed_by: currentUserName
+        };
+
+        console.log('Nullifying payment-time API:', paymentRequestBody);
+
+        const paymentResponse = await fetch(paymentTimeUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(paymentRequestBody),
+        });
+
+        if (paymentResponse.ok) {
+          const paymentResult = await paymentResponse.json();
+          console.log('Payment time nullified API response:', paymentResult);
+          if (paymentResult.error) {
+            console.error('API returned error:', paymentResult.error);
+          }
+        } else {
+          const errorText = await paymentResponse.text();
+          console.error('Failed to nullify payment time:', paymentResponse.status, errorText);
+        }
+      } else {
+        console.error('Payment Received Time API URL not configured');
+      }
+
+      // Then, move deal back to previous stage
+      const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+      if (!apiUrl) {
+        toast.dismiss('decline-payment-toast');
+        toast.error('Update Deal API URL not configured');
+        return;
+      }
+
+      const targetStage = previousStage || 'Invoiced';
+      const stageUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&deal_stage=${encodeURIComponent(targetStage)}&user=${encodeURIComponent(currentUserName)}`;
+
+      const stageResponse = await fetch(stageUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deal_id: dealId,
+          id: dealId,
+          deal_stage: targetStage,
+          user: currentUserName,
+        }),
+      });
+
+      if (!stageResponse.ok) {
+        throw new Error(`HTTP error! status: ${stageResponse.status}`);
+      }
+
+      const stageResult = await stageResponse.json();
+      console.log('Stage update response:', stageResult);
+
+      toast.dismiss('decline-payment-toast');
+      if (stageResult.success || stageResult.message) {
+        toast.success(`Payment declined, time nullified, and deal moved back to ${targetStage} stage`);
+        fetchPendingPaymentApprovals();
+        fetchAllKanbanDeals();
+      } else {
+        toast.error('Failed to decline payment');
+      }
+    } catch (err) {
+      console.error('Error declining payment:', err);
+      toast.dismiss('decline-payment-toast');
+      toast.error('Failed to decline payment');
+    }
+  };
 
   // Optimized: parallel batch fetching "” all remaining batches fire simultaneously
   // after first response reveals total count. Reduces N<X size={12} />RTT to ~2<X size={12} />RTT.
@@ -2889,7 +3122,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
         account_number: deal.account_number || '',
         created_time: deal.created_time || '',
         created_by: deal.created_by || '',
-        payment_received_time: deal.payment_received_time || ''
+        payment_received_time: deal.payment_received_time || '',
+        invoice_received_time: deal.invoice_received_time || ''
       }));
 
       return { deals, total: totalCount, totalValue: totalVal };
@@ -3329,6 +3563,74 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       return;
     }
 
+    // Prevent moving to Paid if payment time is already captured and deal is pending approval
+    if (newStage === 'Paid') {
+      // Find the deal in the current column
+      const sourceDeals = kanbanDeals[oldStage] || [];
+      const deal = sourceDeals.find(d => (d.deal_id || d.id).toString() === dealId.toString());
+
+      if (deal && deal.payment_received_time && deal.payment_received_time !== '') {
+        toast.error('Payment has already been recorded and is pending approval. Cannot move to Paid again.');
+        fetchAllKanbanDeals();
+        return;
+      }
+    }
+
+    // When moving to Paid stage, capture payment received time only (deal stays in current stage)
+    if (newStage === 'Paid') {
+      // Capture payment received time with previous stage
+      try {
+        toast.loading('Capturing payment received time...', { id: 'payment-time-toast' });
+
+        const currentUserName = getApiUserName(user);
+        const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
+
+        if (paymentTimeUrl) {
+          const now = new Date();
+          const paymentTime = toIndianStandardTime(now);
+
+          const paymentRequestBody = {
+            deal_id: dealId,
+            payment_received_time: paymentTime,
+            previous_stage: oldStage,
+            changed_by: currentUserName
+          };
+
+          console.log('Calling payment-time API:', paymentRequestBody);
+
+          const paymentResponse = await fetch(paymentTimeUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(paymentRequestBody),
+          });
+
+          if (paymentResponse.ok) {
+            const paymentResult = await paymentResponse.json();
+            console.log('Payment time API response:', paymentResult);
+            toast.dismiss('payment-time-toast');
+            toast.success('Payment received time captured. Deal now pending approval.');
+            fetchPendingPaymentApprovals();
+          } else {
+            toast.dismiss('payment-time-toast');
+            toast.error('Failed to capture payment received time');
+          }
+        } else {
+          toast.dismiss('payment-time-toast');
+          toast.error('Payment Received Time API URL not configured');
+        }
+      } catch (paymentError) {
+        console.error('Error capturing payment received time:', paymentError);
+        toast.dismiss('payment-time-toast');
+        toast.error('Failed to capture payment received time');
+      }
+
+      // Revert the visual change since we're not actually moving the deal
+      fetchAllKanbanDeals();
+      return;
+    }
+
     const updatedKanbanDeals = { ...kanbanDeals };
     const sourceDeals = [...updatedKanbanDeals[oldStage]];
     const [movedDeal] = sourceDeals.splice(sourceIndex, 1);
@@ -3368,17 +3670,19 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
       const stageUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&deal_stage=${encodeURIComponent(newStage)}&user=${encodeURIComponent(currentUserName)}`;
 
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        deal_stage: newStage,
+        user: currentUserName,
+      };
+
       const response = await fetch(stageUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          deal_id: dealId,
-          id: dealId,
-          deal_stage: newStage,
-          user: currentUserName,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('Stage update API response status:', response.status);
@@ -3390,6 +3694,39 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       const result = await response.json();
       console.log('Stage update API response data:', result);
 
+      // Call invoice-time API when stage is changed to Invoiced
+      if (newStage === 'Invoiced' && (result.success || result.message)) {
+        try {
+          const invoiceTimeUrl = 'https://api.sat2farm.com/time/invoice-time';
+          const now = new Date();
+          const invoiceTime = toIndianStandardTime(now);
+
+          const invoiceRequestBody = {
+            deal_id: dealId,
+            invoice_received_time: invoiceTime,
+            changed_by: currentUserName
+          };
+
+          console.log('Calling invoice-time API:', invoiceRequestBody);
+
+          const invoiceResponse = await fetch(invoiceTimeUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(invoiceRequestBody),
+          });
+
+          if (invoiceResponse.ok) {
+            const invoiceResult = await invoiceResponse.json();
+            console.log('Invoice time API response:', invoiceResult);
+          } else {
+            console.error('Failed to update invoice time:', invoiceResponse.status);
+          }
+        } catch (invoiceError) {
+          console.error('Error calling invoice-time API:', invoiceError);
+        }
+      }
 
       toast.dismiss();
       if (result.success || result.message) {
@@ -3434,7 +3771,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       account_number: deal.account_number || '',
       created_time: deal.created_time || '',
       created_by: deal.created_by || '',
-      payment_received_time: deal.payment_received_time || ''
+      payment_received_time: deal.payment_received_time || '',
+      invoice_received_time: deal.invoice_received_time || ''
     });
     setShowDealInfoModal(true);
   };
@@ -3928,11 +4266,75 @@ export default function Opportunities({ onPageChange, user: propUser }) {
         };
 
         const apiFieldName = fieldMapping[editingDealField] || editingDealField;
+
+        // When changing stage to Paid, capture payment received time only (deal stays in current stage)
+        if (apiFieldName === 'deal_stage' && valueToSave === 'Paid') {
+          try {
+            // Call payment received time API to capture the timestamp with previous stage
+            const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
+            if (!paymentTimeUrl) {
+              toast.dismiss('deal-update-toast');
+              toast.error('Payment Received Time API URL not configured');
+              setIsUpdatingDeal(false);
+              return;
+            }
+
+            const now = new Date();
+            const paymentTime = toIndianStandardTime(now);
+            const previousStage = selectedDeal?.deal_stage || 'Invoiced';
+
+            const paymentRequestBody = {
+              deal_id: selectedDeal.deal_id || selectedDeal.id,
+              payment_received_time: paymentTime,
+              previous_stage: previousStage,
+              changed_by: currentUserName
+            };
+
+            console.log('Calling payment-time API:', paymentRequestBody);
+
+            const paymentResponse = await fetch(paymentTimeUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(paymentRequestBody),
+            });
+
+            if (paymentResponse.ok) {
+              const paymentResult = await paymentResponse.json();
+              console.log('Payment time API response:', paymentResult);
+              toast.dismiss('deal-update-toast');
+              toast.success('Payment received time captured. Deal now pending approval.');
+              fetchPendingPaymentApprovals();
+
+              // Update local state to show payment received time immediately
+              setSelectedDeal(prev => ({
+                ...prev,
+                payment_received_time: paymentTime
+              }));
+
+              setIsUpdatingDeal(false);
+              return;
+            } else {
+              console.error('Failed to update payment time:', paymentResponse.status);
+              toast.dismiss('deal-update-toast');
+              toast.error('Failed to capture payment received time');
+              setIsUpdatingDeal(false);
+              return;
+            }
+          } catch (paymentError) {
+            console.error('Error capturing payment received time:', paymentError);
+            toast.dismiss('deal-update-toast');
+            toast.error('Failed to capture payment received time');
+            setIsUpdatingDeal(false);
+            return;
+          }
+        }
+
         if (apiFieldName) {
           requestBody[apiFieldName] = valueToSave;
         }
 
-        const dealId = selectedDeal.deal_id || selectedDeal.id;
         const dealUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&${encodeURIComponent(apiFieldName)}=${encodeURIComponent(valueToSave)}`;
 
         const response = await fetch(dealUrl, {
@@ -3950,6 +4352,40 @@ export default function Opportunities({ onPageChange, user: propUser }) {
         }
 
         const result = await response.json();
+
+        // Call invoice-time API when stage is changed to Invoiced
+        if (apiFieldName === 'deal_stage' && valueToSave === 'Invoiced') {
+          try {
+            const invoiceTimeUrl = 'https://api.sat2farm.com/time/invoice-time';
+            const now = new Date();
+            const invoiceTime = toIndianStandardTime(now);
+
+            const invoiceRequestBody = {
+              deal_id: dealId,
+              invoice_received_time: invoiceTime,
+              changed_by: currentUserName
+            };
+
+            console.log('Calling invoice-time API:', invoiceRequestBody);
+
+            const invoiceResponse = await fetch(invoiceTimeUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(invoiceRequestBody),
+            });
+
+            if (invoiceResponse.ok) {
+              const invoiceResult = await invoiceResponse.json();
+              console.log('Invoice time API response:', invoiceResult);
+            } else {
+              console.error('Failed to update invoice time:', invoiceResponse.status);
+            }
+          } catch (invoiceError) {
+            console.error('Error calling invoice-time API:', invoiceError);
+          }
+        }
 
         toast.dismiss('deal-update-toast');
         toast.success('Deal updated successfully');
@@ -4720,6 +5156,40 @@ export default function Opportunities({ onPageChange, user: propUser }) {
               {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
               {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
             </button>
+
+            {isOperationRole && (
+              <button
+                onClick={() => {
+                  setPaymentApprovalSidebarOpen(!paymentApprovalSidebarOpen);
+                  if (!paymentApprovalSidebarOpen) {
+                    fetchPendingPaymentApprovals();
+                  }
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: paymentApprovalSidebarOpen ? '#dc2626' : '#8b5cf6', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500', position: 'relative' }}
+              >
+                <span style={{ fontSize: '16px', fontWeight: 'bold' }}>₹</span>
+                Payment Approvals
+                {pendingPaymentApprovals.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold'
+                  }}>
+                    {pendingPaymentApprovals.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             {viewMode === 'table' && (
               <button
@@ -7769,6 +8239,41 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                                 )}
                               </div>
                             </th>
+                            <th
+                              onClick={() => handleDealSort('invoice_received_time')}
+                              style={{
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: dealSortConfig.key === 'invoice_received_time' ? '#1d4ed8' : '#333',
+                                whiteSpace: 'nowrap',
+                                minWidth: '175px',
+                                borderRight: '1px solid #eaeaea',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                background: dealSortConfig.key === 'invoice_received_time' ? '#eff6ff' : 'transparent',
+                                transition: 'background-color 0.15s ease'
+                              }}
+                              title={
+                                dealSortConfig.key === 'invoice_received_time'
+                                  ? dealSortConfig.direction === 'asc'
+                                    ? 'Currently: Ascending (Oldest First) • Click for Descending (Newest First)'
+                                    : 'Currently: Descending (Newest First) • Click to Reset'
+                                  : 'Click to sort by Invoice Received Time (Oldest to Newest)'
+                              }
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span>Invoice Received Time</span>
+                                {dealSortConfig.key === 'invoice_received_time' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                    {dealSortConfig.direction === 'asc' ? 'ASC ↑' : 'DESC ↓'}
+                                  </span>
+                                ) : (
+                                  <ArrowUpDown size={14} style={{ color: '#9ca3af', opacity: 0.6, flexShrink: 0 }} />
+                                )}
+                              </div>
+                            </th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#333', whiteSpace: 'nowrap', minWidth: '130px', borderRight: '1px solid #eaeaea' }}>Modified By</th>
                             <th
                               onClick={() => handleDealSort('modified_time')}
@@ -7846,7 +8351,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                                         account_number: deal.account_number || '',
                                         created_time: deal.created_time || '',
                                         created_by: deal.created_by || '',
-                                        payment_received_time: deal.payment_received_time || ''
+                                        payment_received_time: deal.payment_received_time || '',
+                                        invoice_received_time: deal.invoice_received_time || ''
                                       });
                                       setShowDealInfoModal(true);
                                     }}>
@@ -7887,6 +8393,9 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                                   </td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#15803d', fontWeight: '500', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
                                     {deal.payment_received_time || '-'}
+                                  </td>
+                                  <td style={{ padding: '10px 14px', fontSize: '13px', color: '#0d9488', fontWeight: '500', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>
+                                    {deal.invoice_received_time || '-'}
                                   </td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap', borderRight: '1px solid #f0f0f0' }}>{deal.modified_by || '-'}</td>
                                   <td style={{ padding: '10px 14px', fontSize: '13px', color: '#666', whiteSpace: 'nowrap' }}>
@@ -8721,12 +9230,17 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                                       {(() => {
                                         const hasOld = item.old_value !== null && item.old_value !== undefined && String(item.old_value).trim() !== '';
                                         const hasNew = item.new_value !== null && item.new_value !== undefined && String(item.new_value).trim() !== '';
+                                        const isNewValueNull = item.new_value === null;
 
                                         if (item.activity_type === 'deal_deleted') {
                                           return <span>&lsquo;{item.old_value || item.new_value}&rsquo;</span>;
                                         }
                                         if (item.field === 'note' || item.field === 'task') {
                                           return <span>&lsquo;{item.new_value || item.old_value}&rsquo;</span>;
+                                        }
+                                        // If new_value is explicitly null, display "NULL"
+                                        if (isNewValueNull) {
+                                          return <span>&lsquo;<strong>NULL</strong>&rsquo;</span>;
                                         }
                                         if (hasOld && hasNew && String(item.old_value).trim() !== String(item.new_value).trim()) {
                                           return <span>From &lsquo;<strong>{item.old_value}</strong>&rsquo; to &lsquo;<strong>{item.new_value}</strong>&rsquo;</span>;
@@ -9068,12 +9582,16 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                             return;
                           }
 
+                          // If user selects Paid stage, create with Invoiced stage instead
+                          // and capture payment time for approval workflow
+                          const actualDealStage = dealStage === 'Paid' ? 'Invoiced' : dealStage;
+
                           const requestBody = {
                             account_id: selectedUser?.id?.toString() || '',
                             deal_name: dealName,
                             deal_amount: dealAmount || '0',
                             deal_probability: dealProbability || '0',
-                            deal_stage: dealStage,
+                            deal_stage: actualDealStage,
                             deal_close_date: dealClosingDate || '',
                             deal_type: dealType || 'New Business',
                             description: dealDescription || '',
@@ -9098,6 +9616,83 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
                           const result = await response.json();
 
+                          // Call invoice-time API when deal is created with Invoiced stage
+                          if (dealStage === 'Invoiced' && (result.success || result.message || result.deal_id)) {
+                            try {
+                              const invoiceTimeUrl = 'https://api.sat2farm.com/time/invoice-time';
+                              const now = new Date();
+                              const invoiceTime = toIndianStandardTime(now);
+                              const createdDealId = result.deal_id || result.id;
+
+                              const invoiceRequestBody = {
+                                deal_id: createdDealId,
+                                invoice_received_time: invoiceTime,
+                                changed_by: currentUserName
+                              };
+
+                              console.log('Calling invoice-time API for new deal:', invoiceRequestBody);
+
+                              const invoiceResponse = await fetch(invoiceTimeUrl, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(invoiceRequestBody),
+                              });
+
+                              if (invoiceResponse.ok) {
+                                const invoiceResult = await invoiceResponse.json();
+                                console.log('Invoice time API response for new deal:', invoiceResult);
+                              } else {
+                                console.error('Failed to update invoice time for new deal:', invoiceResponse.status);
+                              }
+                            } catch (invoiceError) {
+                              console.error('Error calling invoice-time API for new deal:', invoiceError);
+                            }
+                          }
+
+                          // Call payment-time API when user selected Paid stage (deal created as Invoiced)
+                          if (dealStage === 'Paid' && (result.success || result.message || result.deal_id)) {
+                            try {
+                              const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
+                              if (paymentTimeUrl) {
+                                const now = new Date();
+                                const paymentTime = toIndianStandardTime(now);
+                                const createdDealId = result.deal_id || result.id;
+
+                                const paymentRequestBody = {
+                                  deal_id: createdDealId,
+                                  payment_received_time: paymentTime,
+                                  changed_by: currentUserName
+                                };
+
+                                console.log('Calling payment-time API for new deal (user selected Paid):', paymentRequestBody);
+
+                                const paymentResponse = await fetch(paymentTimeUrl, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify(paymentRequestBody),
+                                });
+
+                                if (paymentResponse.ok) {
+                                  const paymentResult = await paymentResponse.json();
+                                  console.log('Payment time API response for new deal:', paymentResult);
+                                  toast.dismiss();
+                                  toast.success('Deal created with Invoiced stage. Payment time captured for approval.');
+                                } else {
+                                  console.error('Failed to update payment time for new deal:', paymentResponse.status);
+                                  toast.dismiss();
+                                  toast.success('Deal created successfully');
+                                }
+                              }
+                            } catch (paymentError) {
+                              console.error('Error calling payment-time API for new deal:', paymentError);
+                              toast.dismiss();
+                              toast.success('Deal created successfully');
+                            }
+                          }
 
                           toast.dismiss();
                           toast.success('Deal created successfully');
@@ -9435,6 +10030,20 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                               fontSize: '12px',
                               color: 'var(--text)'
                             }}>{selectedDeal.payment_received_time || '-'}</div>
+                          </div>
+                        )}
+
+                        {(selectedDeal.deal_stage === 'Invoiced' || selectedDeal.deal_stage === 'Paid' || selectedDeal.invoice_received_time) && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Invoice Received Time</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.invoice_received_time || '-'}</div>
                           </div>
                         )}
                       </div>
@@ -13167,6 +13776,202 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Approval Sidebar */}
+      {paymentApprovalSidebarOpen && isOperationRole && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.25)',
+              zIndex: 990
+            }}
+            onClick={() => setPaymentApprovalSidebarOpen(false)}
+          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '400px',
+            maxWidth: '100vw',
+            background: 'var(--surface)',
+            borderLeft: '1px solid var(--border)',
+            zIndex: 995,
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid var(--border)',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '18px', fontWeight: '600' }}>
+                  Payment Approvals
+                </h3>
+                <button
+                  onClick={() => setPaymentApprovalSidebarOpen(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    borderRadius: '50%'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p style={{ margin: '8px 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>
+                {pendingPaymentApprovals.length} payment(s) pending approval
+              </p>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {loadingPaymentApprovals ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    border: '3px solid #8b5cf6',
+                    borderTopColor: 'transparent',
+                    borderRadius: '50%',
+                    animation: 'spin 0.7s linear infinite',
+                    margin: '0 auto 16px'
+                  }} />
+                  <p style={{ color: 'var(--text-3)', fontSize: '14px' }}>Loading pending payment approvals...</p>
+                </div>
+              ) : pendingPaymentApprovals.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px 20px',
+                  background: 'var(--gray-50)',
+                  borderRadius: '12px',
+                  border: '1px dashed var(--border)'
+                }}>
+                  <span style={{ fontSize: '48px', color: '#10b981', marginBottom: '12px', display: 'block' }}>₹</span>
+                  <p style={{ color: 'var(--text-3)', fontSize: '14px', margin: 0 }}>
+                    No pending payment approvals
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {pendingPaymentApprovals.map((deal) => (
+                    <div
+                      key={deal.deal_id || deal.id}
+                      style={{
+                        background: 'white',
+                        border: '1px solid var(--border)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '600', color: 'var(--text)' }}>
+                          {deal.deal_name || 'Unnamed Deal'}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-3)' }}>
+                          {deal.account_number || 'No Account Number'}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px', fontSize: '13px' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>Current Stage:</span>
+                          <span style={{ color: deal.current_stage === null ? '#6b7280' : 'var(--text)', fontWeight: '500', marginLeft: '4px' }}>
+                            {deal.current_stage === null ? 'null' : (deal.current_stage || 'Invoiced')}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>Requested Stage:</span>
+                          <span style={{ color: '#10b981', fontWeight: '500', marginLeft: '4px' }}>
+                            {deal.requested_stage || 'Paid'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px', fontSize: '13px' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>Amount:</span>
+                          <span style={{ color: 'var(--text)', fontWeight: '500', marginLeft: '4px' }}>
+                            {deal.deal_amount ? `₹${deal.deal_amount}` : '-'}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>Deal Owner:</span>
+                          <span style={{ color: 'var(--text)', fontWeight: '500', marginLeft: '4px' }}>
+                            {deal.deal_owner || '-'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '12px', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--text-3)', fontSize: '12px' }}>Payment Time:</span>
+                        <span style={{ color: 'var(--text)', fontWeight: '500', marginLeft: '4px' }}>
+                          {deal.payment_received_time || '-'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => handleApprovePayment(deal.deal_id || deal.id)}
+                          style={{
+                            flex: 1,
+                            padding: '10px 16px',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Check size={16} /> Approve
+                        </button>
+                        <button
+                          onClick={() => handleDeclinePayment(deal.deal_id || deal.id, deal.current_stage)}
+                          style={{
+                            flex: 1,
+                            padding: '10px 16px',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <X size={16} /> Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
