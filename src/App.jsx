@@ -27,6 +27,7 @@ import Pricing from "./components/Pricing";
 import ProspectStatsCards from "./components/ProspectStatsCards";
 import TaskCalendar from "./components/TaskCalendar";
 import InvoiceInfo from "./components/InvoiceInfo";
+import PaymentApproval from "./components/PaymentApproval";
 import UserSearch from "./components/UserSearch";
 import { useAuth } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
@@ -224,7 +225,7 @@ useEffect(() => {
     const allowedManagerPages = ['unlock-farm', 'register', 'manager-monthly-report'];
     const allowedClientPages = ['client-monthly-report', 'unlock-farm', 'register'];
     const allowedTechPages = ['green-team'];
-    const allowedAccountsPages = ['invoice-info'];
+    const allowedAccountsPages = ['invoice-info', 'payment-approval'];
     const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search'];
     const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar'];
     const allowedMarketingPages = ['marketing-dashboard'];
@@ -244,8 +245,8 @@ useEffect(() => {
         setCurrentPage('client-monthly-report');
         localStorage.setItem('currentPage', 'client-monthly-report');
       } else if (role === 'accounts' && !allowedAccountsPages.includes(savedPage)) {
-        setCurrentPage('invoice-info');
-        localStorage.setItem('currentPage', 'invoice-info');
+        setCurrentPage('payment-approval');
+        localStorage.setItem('currentPage', 'payment-approval');
       } else if ((role === 'operation' || role === 'operations' || role === 'ops') && !allowedOperationsPages.includes(savedPage)) {
         setCurrentPage('operation-dashboard');
         localStorage.setItem('currentPage', 'operation-dashboard');
@@ -277,8 +278,8 @@ useEffect(() => {
       setCurrentPage('client-monthly-report');
       localStorage.setItem('currentPage', 'client-monthly-report');
     } else if (role === 'accounts') {
-      setCurrentPage('invoice-info');
-      localStorage.setItem('currentPage', 'invoice-info');
+      setCurrentPage('payment-approval');
+      localStorage.setItem('currentPage', 'payment-approval');
     } else if (role.includes('tech')) {
       setCurrentPage('green-team');
       localStorage.setItem('currentPage', 'green-team');
@@ -400,6 +401,8 @@ useEffect(() => {
           return <TaskCalendar user={userDisplay} onPageChange={handlePageChange} />;
         case 'invoice-info':
           return <InvoiceInfo user={userDisplay} onPageChange={handlePageChange} />;
+        case 'payment-approval':
+          return <PaymentApproval user={userDisplay} />;
         case 'user-search':
           return <UserSearch user={userDisplay} />;
         default:
