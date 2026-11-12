@@ -239,76 +239,139 @@ export default function SalesPipelineKanbanBoard({
                         <KanbanSkeletonCard />
                       </>
                     ) : (
-                      deals.map((deal) => (
-                        <KanbanDraggableCard
-                          key={deal.deal_id || deal.id}
-                          dealId={deal.deal_id || deal.id}
-                          columnId={column.id}
-                          style={{ ...cardStyle, overflow: 'hidden' }}
-                          onClick={() => onDealClick(deal)}
-                        >
-                          <div
+                      deals.map((deal) => {
+                        // Check for pending approvals
+                        const hasPendingPaymentApproval = deal.payment_received_time && deal.payment_received_time !== '' && column.stage !== 'Paid';
+                        const hasPendingInvoiceApproval = deal.invoice_received_time && deal.invoice_received_time !== '' && column.stage !== 'Invoiced' && column.stage !== 'Paid';
+
+                        // Determine card style based on pending approvals
+                        let cardBackgroundColor = 'white';
+                        let cardBorderColor = '#e0e0e0';
+
+                        if (hasPendingPaymentApproval) {
+                          cardBackgroundColor = '#f0fdf4';
+                          cardBorderColor = '#22c55e';
+                        } else if (hasPendingInvoiceApproval) {
+                          cardBackgroundColor = '#eff6ff';
+                          cardBorderColor = '#3b82f6';
+                        }
+
+                        return (
+                          <KanbanDraggableCard
+                            key={deal.deal_id || deal.id}
+                            dealId={deal.deal_id || deal.id}
+                            columnId={column.id}
                             style={{
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              color: '#333',
-                              marginBottom: '6px',
+                              ...cardStyle,
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              wordBreak: 'break-word'
+                              background: cardBackgroundColor,
+                              border: `2px solid ${cardBorderColor}`,
                             }}
-                            title={deal.deal_name}
+                            onClick={() => onDealClick(deal)}
                           >
-                            {deal.deal_name}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {deal.deal_type}
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <span style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.deal_owner}</span>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                color: '#14B474',
-                                fontWeight: '600',
-                                flexShrink: 0
-                              }}
-                            >
-                              ₹{parseFloat(deal.deal_amount || 0).toLocaleString()}
-                            </span>
-                          </div>
-                          {column.stage === 'Paid' && (
                             <div
                               style={{
-                                marginTop: '8px',
-                                padding: '4px 6px',
-                                background: '#f0fdf4',
-                                border: '1px solid #bbf7d0',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                color: '#15803d',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '4px'
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: '#333',
+                                marginBottom: '6px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                wordBreak: 'break-word'
                               }}
-                              title={deal.payment_received_time ? `Payment Received: ${deal.payment_received_time}` : 'Payment Received'}
+                              title={deal.deal_name}
                             >
-                              <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>Payment Received:</span>
-                              <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {deal.payment_received_time || '-'}
+                              {deal.deal_name}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {deal.deal_type}
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <span style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.deal_owner}</span>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  color: '#14B474',
+                                  fontWeight: '600',
+                                  flexShrink: 0
+                                }}
+                              >
+                                ₹{parseFloat(deal.deal_amount || 0).toLocaleString()}
                               </span>
                             </div>
-                          )}
-                        </KanbanDraggableCard>
-                      ))
+                            {hasPendingPaymentApproval && (
+                              <div
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '4px 6px',
+                                  background: '#dcfce7',
+                                  border: '1px solid #22c55e',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  color: '#15803d',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '4px'
+                                }}
+                                title={`Pending Payment Date Approval: ${deal.payment_received_time}`}
+                              >
+                                <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>Pending Payment Date Approval</span>
+                              </div>
+                            )}
+                            {hasPendingInvoiceApproval && (
+                              <div
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '4px 6px',
+                                  background: '#dbeafe',
+                                  border: '1px solid #3b82f6',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  color: '#1e40af',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '4px'
+                                }}
+                                title={`Pending Invoice Date Approval: ${deal.invoice_received_time}`}
+                              >
+                                <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>Pending Invoice Date Approval</span>
+                              </div>
+                            )}
+                            {column.stage === 'Paid' && !hasPendingPaymentApproval && (
+                              <div
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '4px 6px',
+                                  background: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  color: '#15803d',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '4px'
+                                }}
+                                title={deal.payment_received_time ? `Payment Date: ${deal.payment_received_time}` : 'Payment Date'}
+                              >
+                                <span style={{ fontWeight: '600', whiteSpace: 'nowrap' }}>Payment Date:</span>
+                                <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {deal.payment_received_time || '-'}
+                                </span>
+                              </div>
+                            )}
+                          </KanbanDraggableCard>
+                        );
+                      })
                     )}
                     {!isFilteringOrSearching && loadingMoreStages[column.stage] && (
                       <div style={{ textAlign: 'center', padding: '8px', fontSize: '12px', color: '#6b7280' }}>

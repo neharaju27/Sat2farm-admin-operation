@@ -27,6 +27,8 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   const [loadingPaymentApprovals, setLoadingPaymentApprovals] = useState(false);
   const [accountsPendingPaymentApprovals, setAccountsPendingPaymentApprovals] = useState([]);
   const [loadingAccountsPaymentApprovals, setLoadingAccountsPaymentApprovals] = useState(false);
+  const [pendingInvoiceApprovals, setPendingInvoiceApprovals] = useState([]);
+  const [loadingInvoiceApprovals, setLoadingInvoiceApprovals] = useState(false);
 
   // Helper to normalize user parameter for backend API
   const getApiUserName = (u) => {
@@ -315,6 +317,58 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     return () => clearInterval(intervalId);
   }, [isAccountsUser, user]);
 
+  // Fetch pending invoice approvals for Operation and Accounts users
+  useEffect(() => {
+    if (!isOperationsUser && !isAccountsUser) return;
+
+    const fetchPendingInvoiceApprovals = async () => {
+      try {
+        setLoadingInvoiceApprovals(true);
+        const approvalUrl = import.meta.env.VITE_INVOICE_RECEIVED_APPROVAL_API_URL;
+
+        if (!approvalUrl) {
+          console.error('Invoice Approval API URL not configured');
+          setPendingInvoiceApprovals([]);
+          return;
+        }
+
+        // For invoice approvals, don't filter by user to show all pending invoices
+        const response = await fetch(`${approvalUrl}?status=pending`);
+
+        if (!response.ok) {
+          console.warn('Invoice approval API returned error:', response.status);
+          setPendingInvoiceApprovals([]);
+          return;
+        }
+
+        const result = await response.json();
+        // Handle nested data structure: { data: { data: [...] } }
+        const dealsList = Array.isArray(result) ? result :
+          (Array.isArray(result.data) ? result.data :
+            (result.data && Array.isArray(result.data.data) ? result.data.data :
+              (Array.isArray(result.results) ? result.results :
+                (Array.isArray(result.deals) ? result.deals :
+                  (Array.isArray(result.approvals) ? result.approvals : [])))));
+
+        setPendingInvoiceApprovals(dealsList);
+      } catch (err) {
+        console.error('Error fetching pending invoice approvals:', err);
+        setPendingInvoiceApprovals([]);
+      } finally {
+        setLoadingInvoiceApprovals(false);
+      }
+    };
+
+    // Initial fetch
+    fetchPendingInvoiceApprovals();
+
+    // Poll every 30 seconds to get real-time updates
+    const intervalId = setInterval(fetchPendingInvoiceApprovals, 30000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, [isOperationsUser, isAccountsUser, user]);
+
   // Page activity states
   const isOperationsActive = currentPage === 'operation-dashboard' || currentPage === 'operation-portal' || currentPage === 'unlock-farm' || currentPage === 'assign-acreages' || currentPage === 'monthly-acreages' || currentPage === 'register';
   const isSalesActive = currentPage === 'sales-acreage' || currentPage === 'sales-clients' || currentPage === 'assign-acreages' || currentPage === 'lead-pipeline';
@@ -330,7 +384,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
     // Check if user has access to this page
     if (isOperationsUser) {
       // Operations users can only access specific pages
-      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search'];
+      const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search', 'payment-approval'];
       if (allowedOperationsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -476,7 +530,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                         <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                       </svg>
                       Opportunities
-                      {(isOperationsUser || isAccountsUser) && pendingPaymentApprovals.length > 0 && (
+                      {(isOperationsUser || isAccountsUser) && (pendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
                         <span style={{
                           position: 'absolute',
                           right: '8px',
@@ -495,7 +549,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                           padding: '0 6px',
                           boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
                         }}>
-                          {pendingPaymentApprovals.length}
+                          {pendingPaymentApprovals.length + pendingInvoiceApprovals.length}
                         </span>
                       )}
                     </div>
@@ -725,6 +779,40 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
                   Invoice Info
+                </div>
+                <div
+                  className={`sb-item ${currentPage === 'payment-approval' ? 'active' : ''}`}
+                  onClick={() => handleNavigationClick('payment-approval')}
+                  style={{ position: 'relative' }}
+                >
+                  <svg className="ic" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="4" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                    <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    <circle cx="12" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                  </svg>
+                  Payment Approval
+                  {(pendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
+                    <span style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: '#8b5cf6',
+                      color: 'white',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      minWidth: '18px',
+                      height: '18px',
+                      borderRadius: '9px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 6px',
+                      boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+                    }}>
+                      {pendingPaymentApprovals.length + pendingInvoiceApprovals.length}
+                    </span>
+                  )}
                 </div>
               </div>
             )}

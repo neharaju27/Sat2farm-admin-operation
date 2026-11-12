@@ -281,6 +281,22 @@ export default function ProspectStatsCards({ user }) {
   const [editingClosingDateDeal, setEditingClosingDateDeal] = useState(null);
   const [newClosingDate, setNewClosingDate] = useState('');
   const [isUpdatingClosingDate, setIsUpdatingClosingDate] = useState(false);
+  const [showCreatedTimeEditModal, setShowCreatedTimeEditModal] = useState(false);
+  const [editingCreatedTimeDeal, setEditingCreatedTimeDeal] = useState(null);
+  const [newCreatedTime, setNewCreatedTime] = useState('');
+  const [isUpdatingCreatedTime, setIsUpdatingCreatedTime] = useState(false);
+  const [showInvoiceReceivedTimeEditModal, setShowInvoiceReceivedTimeEditModal] = useState(false);
+  const [editingInvoiceReceivedTimeDeal, setEditingInvoiceReceivedTimeDeal] = useState(null);
+  const [newInvoiceReceivedTime, setNewInvoiceReceivedTime] = useState('');
+  const [isUpdatingInvoiceReceivedTime, setIsUpdatingInvoiceReceivedTime] = useState(false);
+  const [showPaymentReceivedTimeEditModal, setShowPaymentReceivedTimeEditModal] = useState(false);
+  const [editingPaymentReceivedTimeDeal, setEditingPaymentReceivedTimeDeal] = useState(null);
+  const [newPaymentReceivedTime, setNewPaymentReceivedTime] = useState('');
+  const [isUpdatingPaymentReceivedTime, setIsUpdatingPaymentReceivedTime] = useState(false);
+  const [showAmountEditModal, setShowAmountEditModal] = useState(false);
+  const [editingAmountDeal, setEditingAmountDeal] = useState(null);
+  const [newAmount, setNewAmount] = useState('');
+  const [isUpdatingAmount, setIsUpdatingAmount] = useState(false);
 
   // Validate user prop
   if (!user) {
@@ -1300,6 +1316,414 @@ export default function ProspectStatsCards({ user }) {
   };
 
   // ============================================================
+  // UPDATE CREATED TIME
+  // ============================================================
+  const handleCreatedTimeEdit = (deal) => {
+    setEditingCreatedTimeDeal(deal);
+    // Convert deal_created_time to YYYY-MM-DD HH:MM format for datetime input
+    let formattedDateTime = '';
+    if (deal.deal_created_time) {
+      try {
+        const date = new Date(deal.deal_created_time);
+        if (!isNaN(date.getTime())) {
+          formattedDateTime = date.toISOString().slice(0, 16);
+        }
+      } catch (error) {
+        console.error('Error formatting datetime:', error);
+      }
+    }
+    setNewCreatedTime(formattedDateTime);
+    setShowCreatedTimeEditModal(true);
+  };
+
+  const handleCreatedTimeUpdate = async () => {
+    if (!editingCreatedTimeDeal || !newCreatedTime) {
+      toast.error('Please select a created time');
+      return;
+    }
+
+    try {
+      setIsUpdatingCreatedTime(true);
+      toast.loading('Updating created time...', { id: 'created-time-update-toast' });
+
+      const updateDealUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+
+      if (!updateDealUrl) {
+        toast.dismiss('created-time-update-toast');
+        toast.error('Update Deal API URL not configured');
+        return;
+      }
+
+      const dealId = editingCreatedTimeDeal.deal_id || editingCreatedTimeDeal.id;
+      const currentUserName = user?.name || user?.fullName || user?.first_name || 'Operation User';
+
+      // Extract date part from datetime (YYYY-MM-DD format)
+      const createdDate = newCreatedTime.split('T')[0];
+
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        created_time: createdDate,
+        user: currentUserName
+      };
+
+      console.log('UPDATING CREATED TIME:', requestBody);
+
+      // Construct URL with query parameters (matching provided API format)
+      const dealUrl = `${updateDealUrl}?created_time=${encodeURIComponent(createdDate)}&deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}`;
+
+      const response = await fetch(dealUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('CREATED TIME UPDATE RESPONSE STATUS:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('CREATED TIME UPDATE RESPONSE:', result);
+
+      toast.dismiss('created-time-update-toast');
+      toast.success('Created time updated successfully');
+
+      // Refresh the data to show updated created time
+      if (showDealDetails) {
+        await fetchDealDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showInvoicedDetails) {
+        await fetchInvoicedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showPaymentReceivedDetails) {
+        await fetchPaymentReceivedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalPaidDetails) {
+        await fetchTotalPaidDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showOverdueDetails) {
+        await fetchOverdueDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalDealAmountDetails) {
+        await fetchTotalDealAmountDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showExpectedRevenueDetails) {
+        await fetchExpectedRevenueDetails(selectedMonth, { forceRefresh: true });
+      }
+
+      setShowCreatedTimeEditModal(false);
+      setEditingCreatedTimeDeal(null);
+      setNewCreatedTime('');
+    } catch (error) {
+      console.error('Error updating created time:', error);
+      toast.dismiss('created-time-update-toast');
+      toast.error('Failed to update created time');
+    } finally {
+      setIsUpdatingCreatedTime(false);
+    }
+  };
+
+  // ============================================================
+  // UPDATE INVOICE RECEIVED TIME
+  // ============================================================
+  const handleInvoiceReceivedTimeEdit = (deal) => {
+    setEditingInvoiceReceivedTimeDeal(deal);
+    // Convert invoice_received_time to YYYY-MM-DD HH:MM format for datetime input
+    let formattedDateTime = '';
+    if (deal.invoice_received_time) {
+      try {
+        const date = new Date(deal.invoice_received_time);
+        if (!isNaN(date.getTime())) {
+          formattedDateTime = date.toISOString().slice(0, 16);
+        }
+      } catch (error) {
+        console.error('Error formatting datetime:', error);
+      }
+    }
+    setNewInvoiceReceivedTime(formattedDateTime);
+    setShowInvoiceReceivedTimeEditModal(true);
+  };
+
+  const handleInvoiceReceivedTimeUpdate = async () => {
+    if (!editingInvoiceReceivedTimeDeal || !newInvoiceReceivedTime) {
+      toast.error('Please select an invoice received date');
+      return;
+    }
+
+    try {
+      setIsUpdatingInvoiceReceivedTime(true);
+      toast.loading('Updating invoice received date...', { id: 'invoice-received-time-update-toast' });
+
+      const updateDealUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL;
+
+      if (!updateDealUrl) {
+        toast.dismiss('invoice-received-time-update-toast');
+        toast.error('Invoice Date API URL not configured');
+        return;
+      }
+
+      const dealId = editingInvoiceReceivedTimeDeal.deal_id || editingInvoiceReceivedTimeDeal.id;
+      const currentUserName = user?.name || user?.fullName || user?.first_name || 'Operation User';
+
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        invoice_received_time: newInvoiceReceivedTime,
+        user: currentUserName
+      };
+
+      console.log('UPDATING INVOICE RECEIVED TIME:', requestBody);
+
+      // Construct URL with query parameters (matching Opportunities component pattern)
+      const dealUrl = `${updateDealUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&invoice_received_time=${encodeURIComponent(newInvoiceReceivedTime)}`;
+
+      const response = await fetch(dealUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('INVOICE RECEIVED TIME UPDATE RESPONSE STATUS:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('INVOICE RECEIVED TIME UPDATE RESPONSE:', result);
+
+      toast.dismiss('invoice-received-time-update-toast');
+      toast.success('Invoice received date updated successfully');
+
+      // Refresh the data to show updated invoice received date
+      if (showInvoicedDetails) {
+        await fetchInvoicedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showPaymentReceivedDetails) {
+        await fetchPaymentReceivedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalPaidDetails) {
+        await fetchTotalPaidDetails(selectedMonth, { forceRefresh: true });
+      }
+
+      setShowInvoiceReceivedTimeEditModal(false);
+      setEditingInvoiceReceivedTimeDeal(null);
+      setNewInvoiceReceivedTime('');
+    } catch (error) {
+      console.error('Error updating invoice received date:', error);
+      toast.dismiss('invoice-received-time-update-toast');
+      toast.error('Failed to update invoice received date');
+    } finally {
+      setIsUpdatingInvoiceReceivedTime(false);
+    }
+  };
+
+  // ============================================================
+  // UPDATE PAYMENT RECEIVED TIME
+  // ============================================================
+  const handlePaymentReceivedTimeEdit = (deal) => {
+    setEditingPaymentReceivedTimeDeal(deal);
+    // Convert payment_received_time to YYYY-MM-DD HH:MM format for datetime input
+    let formattedDateTime = '';
+    if (deal.payment_received_time) {
+      try {
+        const date = new Date(deal.payment_received_time);
+        if (!isNaN(date.getTime())) {
+          formattedDateTime = date.toISOString().slice(0, 16);
+        }
+      } catch (error) {
+        console.error('Error formatting datetime:', error);
+      }
+    }
+    setNewPaymentReceivedTime(formattedDateTime);
+    setShowPaymentReceivedTimeEditModal(true);
+  };
+
+  const handlePaymentReceivedTimeUpdate = async () => {
+    if (!editingPaymentReceivedTimeDeal || !newPaymentReceivedTime) {
+      toast.error('Please select a payment received date');
+      return;
+    }
+
+    try {
+      setIsUpdatingPaymentReceivedTime(true);
+      toast.loading('Updating payment received date...', { id: 'payment-received-time-update-toast' });
+
+      const updateDealUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
+
+      if (!updateDealUrl) {
+        toast.dismiss('payment-received-time-update-toast');
+        toast.error('Payment Date API URL not configured');
+        return;
+      }
+
+      const dealId = editingPaymentReceivedTimeDeal.deal_id || editingPaymentReceivedTimeDeal.id;
+      const currentUserName = user?.name || user?.fullName || user?.first_name || 'Operation User';
+
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        payment_received_time: newPaymentReceivedTime,
+        user: currentUserName
+      };
+
+      console.log('UPDATING PAYMENT RECEIVED TIME:', requestBody);
+
+      // Construct URL with query parameters (matching Opportunities component pattern)
+      const dealUrl = `${updateDealUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&payment_received_time=${encodeURIComponent(newPaymentReceivedTime)}`;
+
+      const response = await fetch(dealUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('PAYMENT RECEIVED TIME UPDATE RESPONSE STATUS:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('PAYMENT RECEIVED TIME UPDATE RESPONSE:', result);
+
+      toast.dismiss('payment-received-time-update-toast');
+      toast.success('Payment received date updated successfully');
+
+      // Refresh the data to show updated payment received date
+      if (showPaymentReceivedDetails) {
+        await fetchPaymentReceivedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalPaidDetails) {
+        await fetchTotalPaidDetails(selectedMonth, { forceRefresh: true });
+      }
+
+      setShowPaymentReceivedTimeEditModal(false);
+      setEditingPaymentReceivedTimeDeal(null);
+      setNewPaymentReceivedTime('');
+    } catch (error) {
+      console.error('Error updating payment received time:', error);
+      toast.dismiss('payment-received-time-update-toast');
+      toast.error('Failed to update payment received time');
+    } finally {
+      setIsUpdatingPaymentReceivedTime(false);
+    }
+  };
+
+  // ============================================================
+  // UPDATE AMOUNT
+  // ============================================================
+  const handleAmountEdit = (deal) => {
+    setEditingAmountDeal(deal);
+    setNewAmount(deal.amount || '');
+    setShowAmountEditModal(true);
+  };
+
+  const handleAmountUpdate = async () => {
+    if (!editingAmountDeal || newAmount === '') {
+      toast.error('Please enter an amount');
+      return;
+    }
+
+    try {
+      setIsUpdatingAmount(true);
+      toast.loading('Updating amount...', { id: 'amount-update-toast' });
+
+      const updateDealUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
+
+      if (!updateDealUrl) {
+        toast.dismiss('amount-update-toast');
+        toast.error('Update Deal API URL not configured');
+        return;
+      }
+
+      const dealId = editingAmountDeal.deal_id || editingAmountDeal.id;
+      const currentUserName = user?.name || user?.fullName || user?.first_name || 'Operation User';
+
+      const requestBody = {
+        deal_id: dealId,
+        id: dealId,
+        amount: parseFloat(newAmount),
+        user: currentUserName
+      };
+
+      console.log('UPDATING AMOUNT:', requestBody);
+
+      // Construct URL with query parameters (matching Opportunities component pattern)
+      const dealUrl = `${updateDealUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&amount=${encodeURIComponent(newAmount)}`;
+
+      const response = await fetch(dealUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('AMOUNT UPDATE RESPONSE STATUS:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('HTTP Error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('AMOUNT UPDATE RESPONSE:', result);
+
+      toast.dismiss('amount-update-toast');
+      toast.success('Amount updated successfully');
+
+      // Refresh the data to show updated amount
+      if (showDealDetails) {
+        await fetchDealDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showInvoicedDetails) {
+        await fetchInvoicedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showPaymentReceivedDetails) {
+        await fetchPaymentReceivedDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalPaidDetails) {
+        await fetchTotalPaidDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showOverdueDetails) {
+        await fetchOverdueDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showTotalDealAmountDetails) {
+        await fetchTotalDealAmountDetails(selectedMonth, { forceRefresh: true });
+      }
+      if (showExpectedRevenueDetails) {
+        await fetchExpectedRevenueDetails(selectedMonth, { forceRefresh: true });
+      }
+
+      setShowAmountEditModal(false);
+      setEditingAmountDeal(null);
+      setNewAmount('');
+    } catch (error) {
+      console.error('Error updating amount:', error);
+      toast.dismiss('amount-update-toast');
+      toast.error('Failed to update amount');
+    } finally {
+      setIsUpdatingAmount(false);
+    }
+  };
+
+  // ============================================================
   // INITIAL LOAD + FILTER/MONTH/OWNER REFRESH
   // ============================================================
   useEffect(() => {
@@ -1648,8 +2072,16 @@ export default function ProspectStatsCards({ user }) {
   const cAmount = (color) => ({
     label: 'Amount',
     render: (r) => (
-      <span style={{ fontSize: '14px', fontWeight: 700, color }} title={formatCurrency(r.amount || 0)}>
-        {formatCurrency(r.amount || 0)}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ fontSize: '14px', fontWeight: 700, color }} title={formatCurrency(r.amount || 0)}>
+          {formatCurrency(r.amount || 0)}
+        </span>
+        <Edit
+          size={14}
+          style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+          onClick={() => handleAmountEdit(r)}
+          title="Edit Amount"
+        />
       </span>
     )
   });
@@ -1736,26 +2168,106 @@ export default function ProspectStatsCards({ user }) {
     )
   });
   const cPaymentReceivedTime = () => ({
-    label: 'Payment Received Time',
+    label: 'Payment Date',
     render: (r) => {
       if (!r.payment_received_time) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>N/A</span>;
       try {
         const date = new Date(r.payment_received_time);
         if (isNaN(date.getTime())) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.payment_received_time}</span>;
-        
+
         const day = date.getDate();
         const month = date.toLocaleString('default', { month: 'short' });
         const year = date.getFullYear();
         const hours = date.getHours().toString().padStart(2, '0');
         const minutes = date.getMinutes().toString().padStart(2, '0');
-        
+
         return (
-          <span style={{ color: palette.inkSoft, fontSize: '12px' }} title={r.payment_received_time}>
-            {day} {month} {year} {hours}:{minutes}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: palette.inkSoft, fontSize: '12px' }} title={r.payment_received_time}>
+              {day} {month} {year} {hours}:{minutes}
+            </span>
+            {userRole === 'operation' && (
+              <Edit
+                size={14}
+                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                onClick={() => handlePaymentReceivedTimeEdit(r)}
+                title="Edit Payment Date"
+              />
+            )}
           </span>
         );
       } catch (error) {
         return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.payment_received_time}</span>;
+      }
+    }
+  });
+
+  const cCreatedTime = () => ({
+    label: 'Created Time',
+    render: (r) => {
+      if (!r.deal_created_time) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>N/A</span>;
+      try {
+        const date = new Date(r.deal_created_time);
+        if (isNaN(date.getTime())) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.deal_created_time}</span>;
+
+        const day = date.getDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: palette.inkSoft, fontSize: '12px' }} title={r.deal_created_time}>
+              {day} {month} {year} {hours}:{minutes}
+            </span>
+            {userRole === 'operation' && (
+              <Edit
+                size={14}
+                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                onClick={() => handleCreatedTimeEdit(r)}
+                title="Edit Created Time"
+              />
+            )}
+          </span>
+        );
+      } catch (error) {
+        return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.deal_created_time}</span>;
+      }
+    }
+  });
+
+  const cInvoiceReceivedTime = () => ({
+    label: 'Invoice Date',
+    render: (r) => {
+      if (!r.invoice_received_time) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>N/A</span>;
+      try {
+        const date = new Date(r.invoice_received_time);
+        if (isNaN(date.getTime())) return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.invoice_received_time}</span>;
+
+        const day = date.getDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: palette.inkSoft, fontSize: '12px' }} title={r.invoice_received_time}>
+              {day} {month} {year} {hours}:{minutes}
+            </span>
+            {userRole === 'operation' && (
+              <Edit
+                size={14}
+                style={{ cursor: 'pointer', color: palette.inkSoft, flexShrink: 0 }}
+                onClick={() => handleInvoiceReceivedTimeEdit(r)}
+                title="Edit Invoice Date"
+              />
+            )}
+          </span>
+        );
+      } catch (error) {
+        return <span style={{ color: palette.inkSoft, fontSize: '12px' }}>{r.invoice_received_time}</span>;
       }
     }
   });
@@ -1812,19 +2324,19 @@ export default function ProspectStatsCards({ user }) {
   const dealColumns = [
     cDealName(), cAccountName(), cAccountNumber(), cContactName(),
     cAmount(palette.growth), cProbability(false), cExpected('Expected Amount', false),
-    cStage('basic'), cOwner(), cClosing()
+    cStage('basic'), cOwner(), cClosing(), cCreatedTime()
   ];
 
   const invoicedColumns = [
     cDealName(), cContactName(),
     cAmount(palette.amberDeep), cProbability(false), cExpected('Expected Amount', false),
-    cStage('invoiced'), cOwner(), cClosing()
+    cStage('invoiced'), cOwner(), cClosing(), cInvoiceReceivedTime()
   ];
 
   const paymentColumns = [
     cDealName(), cContactName(),
     cAmount(palette.teal), cProbability(false), cExpected('Expected Amount', false),
-    cStage('paid'), cOwner(), cClosing()
+    cStage('paid'), cOwner(), cClosing(), cInvoiceReceivedTime(), cPaymentReceivedTime()
   ];
 
   const totalPaidColumns = [
@@ -1842,13 +2354,13 @@ export default function ProspectStatsCards({ user }) {
   const totalDealAmountColumns = [
     cDealName(), cAccountName(), cAccountNumber(), cContactName(),
     cAmount(palette.growth), cProbability(false), cExpected('Expected Amount', false),
-    cStage('full'), cOwner(), cClosing()
+    cStage('full'), cOwner(), cClosing(), cCreatedTime()
   ];
 
   const expectedRevenueColumns = [
     cDealName(), cAccountName(), cAccountNumber(), cContactName(),
     cAmount(palette.growth), cProbability(true), cExpected('Expected Revenue', true),
-    cStage('full'), cOwner(), cClosing()
+    cStage('full'), cOwner(), cClosing(), cCreatedTime()
   ];
 
   const historyColumns = [
@@ -2941,6 +3453,572 @@ export default function ProspectStatsCards({ user }) {
                     onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
                   >
                     {isUpdatingClosingDate ? 'Updating...' : 'Update Closing Date'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Created Time Edit Modal */}
+          {showCreatedTimeEditModal && (
+            <div
+              className="pt-modal-overlay"
+              style={{ backdropFilter: 'blur(2px)', zIndex: 99999 }}
+              onClick={() => setShowCreatedTimeEditModal(false)}
+            >
+              <div
+                className="pt-modal pt-modal-edit"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="pt-modal-head">
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      className="fr-display"
+                      style={{ fontSize: '18px', fontWeight: 500, color: palette.ink, margin: 0 }}
+                    >
+                      Edit Created Time
+                    </h3>
+                    <p
+                      className="fr-body"
+                      style={{ fontSize: '13px', color: palette.inkSoft, margin: '4px 0 0 0', overflowWrap: 'anywhere' }}
+                    >
+                      Deal: {editingCreatedTimeDeal?.deal_name || 'Unknown Deal'}
+                    </p>
+                  </div>
+                  <button
+                    className="pt-icon-btn"
+                    onClick={() => setShowCreatedTimeEditModal(false)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="pt-modal-body" style={{ padding: '24px' }}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      Current Created Time
+                    </label>
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: palette.canvas,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: palette.inkSoft
+                      }}
+                    >
+                      {formatDate(editingCreatedTimeDeal?.deal_created_time) || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      New Created Time <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newCreatedTime}
+                      onChange={(e) => setNewCreatedTime(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 0.15s'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                      onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-modal-foot">
+                  <button
+                    onClick={() => setShowCreatedTimeEditModal(false)}
+                    disabled={isUpdatingCreatedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingCreatedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingCreatedTime && (e.currentTarget.style.background = palette.canvas)}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.surface}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreatedTimeUpdate}
+                    disabled={isUpdatingCreatedTime || !newCreatedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: isUpdatingCreatedTime || !newCreatedTime ? palette.inkSoft : palette.growth,
+                      color: palette.surface,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingCreatedTime || !newCreatedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingCreatedTime && newCreatedTime && (e.currentTarget.style.background = '#2A4A2E')}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
+                  >
+                    {isUpdatingCreatedTime ? 'Updating...' : 'Update Created Time'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Date Edit Modal */}
+          {showInvoiceReceivedTimeEditModal && (
+            <div
+              className="pt-modal-overlay"
+              style={{ backdropFilter: 'blur(2px)', zIndex: 99999 }}
+              onClick={() => setShowInvoiceReceivedTimeEditModal(false)}
+            >
+              <div
+                className="pt-modal pt-modal-edit"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="pt-modal-head">
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      className="fr-display"
+                      style={{ fontSize: '18px', fontWeight: 500, color: palette.ink, margin: 0 }}
+                    >
+                      Edit Invoice Date
+                    </h3>
+                    <p
+                      className="fr-body"
+                      style={{ fontSize: '13px', color: palette.inkSoft, margin: '4px 0 0 0', overflowWrap: 'anywhere' }}
+                    >
+                      Deal: {editingInvoiceReceivedTimeDeal?.deal_name || 'Unknown Deal'}
+                    </p>
+                  </div>
+                  <button
+                    className="pt-icon-btn"
+                    onClick={() => setShowInvoiceReceivedTimeEditModal(false)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="pt-modal-body" style={{ padding: '24px' }}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      Current Invoice Date
+                    </label>
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: palette.canvas,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: palette.inkSoft
+                      }}
+                    >
+                      {formatDate(editingInvoiceReceivedTimeDeal?.invoice_received_time) || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      New Invoice Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newInvoiceReceivedTime}
+                      onChange={(e) => setNewInvoiceReceivedTime(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 0.15s'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                      onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-modal-foot">
+                  <button
+                    onClick={() => setShowInvoiceReceivedTimeEditModal(false)}
+                    disabled={isUpdatingInvoiceReceivedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingInvoiceReceivedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingInvoiceReceivedTime && (e.currentTarget.style.background = palette.canvas)}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.surface}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleInvoiceReceivedTimeUpdate}
+                    disabled={isUpdatingInvoiceReceivedTime || !newInvoiceReceivedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: isUpdatingInvoiceReceivedTime || !newInvoiceReceivedTime ? palette.inkSoft : palette.growth,
+                      color: palette.surface,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingInvoiceReceivedTime || !newInvoiceReceivedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingInvoiceReceivedTime && newInvoiceReceivedTime && (e.currentTarget.style.background = '#2A4A2E')}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
+                  >
+                    {isUpdatingInvoiceReceivedTime ? 'Updating...' : 'Update Invoice Date'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Date Edit Modal */}
+          {showPaymentReceivedTimeEditModal && (
+            <div
+              className="pt-modal-overlay"
+              style={{ backdropFilter: 'blur(2px)', zIndex: 99999 }}
+              onClick={() => setShowPaymentReceivedTimeEditModal(false)}
+            >
+              <div
+                className="pt-modal pt-modal-edit"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="pt-modal-head">
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      className="fr-display"
+                      style={{ fontSize: '18px', fontWeight: 500, color: palette.ink, margin: 0 }}
+                    >
+                      Edit Payment Date
+                    </h3>
+                    <p
+                      className="fr-body"
+                      style={{ fontSize: '13px', color: palette.inkSoft, margin: '4px 0 0 0', overflowWrap: 'anywhere' }}
+                    >
+                      Deal: {editingPaymentReceivedTimeDeal?.deal_name || 'Unknown Deal'}
+                    </p>
+                  </div>
+                  <button
+                    className="pt-icon-btn"
+                    onClick={() => setShowPaymentReceivedTimeEditModal(false)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="pt-modal-body" style={{ padding: '24px' }}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      Current Payment Date
+                    </label>
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: palette.canvas,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: palette.inkSoft
+                      }}
+                    >
+                      {formatDate(editingPaymentReceivedTimeDeal?.payment_received_time) || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      New Payment Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newPaymentReceivedTime}
+                      onChange={(e) => setNewPaymentReceivedTime(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 0.15s'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                      onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-modal-foot">
+                  <button
+                    onClick={() => setShowPaymentReceivedTimeEditModal(false)}
+                    disabled={isUpdatingPaymentReceivedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingPaymentReceivedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingPaymentReceivedTime && (e.currentTarget.style.background = palette.canvas)}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.surface}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePaymentReceivedTimeUpdate}
+                    disabled={isUpdatingPaymentReceivedTime || !newPaymentReceivedTime}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: isUpdatingPaymentReceivedTime || !newPaymentReceivedTime ? palette.inkSoft : palette.growth,
+                      color: palette.surface,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingPaymentReceivedTime || !newPaymentReceivedTime ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingPaymentReceivedTime && newPaymentReceivedTime && (e.currentTarget.style.background = '#2A4A2E')}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
+                  >
+                    {isUpdatingPaymentReceivedTime ? 'Updating...' : 'Update Payment Date'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Amount Edit Modal */}
+          {showAmountEditModal && (
+            <div
+              className="pt-modal-overlay"
+              style={{ backdropFilter: 'blur(2px)', zIndex: 99999 }}
+              onClick={() => setShowAmountEditModal(false)}
+            >
+              <div
+                className="pt-modal pt-modal-edit"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="pt-modal-head">
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      className="fr-display"
+                      style={{ fontSize: '18px', fontWeight: 500, color: palette.ink, margin: 0 }}
+                    >
+                      Edit Amount
+                    </h3>
+                    <p
+                      className="fr-body"
+                      style={{ fontSize: '13px', color: palette.inkSoft, margin: '4px 0 0 0', overflowWrap: 'anywhere' }}
+                    >
+                      Deal: {editingAmountDeal?.deal_name || 'Unknown Deal'}
+                    </p>
+                  </div>
+                  <button
+                    className="pt-icon-btn"
+                    onClick={() => setShowAmountEditModal(false)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = palette.canvas}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <X size={20} color={palette.inkSoft} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="pt-modal-body" style={{ padding: '24px' }}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      Current Amount
+                    </label>
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: palette.canvas,
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: palette.inkSoft
+                      }}
+                    >
+                      {formatCurrency(editingAmountDeal?.amount || 0)}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: palette.ink
+                      }}
+                    >
+                      New Amount <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newAmount}
+                      onChange={(e) => setNewAmount(e.target.value)}
+                      placeholder="Enter amount"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'border-color 0.15s'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = palette.growth}
+                      onBlur={(e) => e.currentTarget.style.borderColor = palette.border}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-modal-foot">
+                  <button
+                    onClick={() => setShowAmountEditModal(false)}
+                    disabled={isUpdatingAmount}
+                    style={{
+                      padding: '10px 20px',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: palette.surface,
+                      color: palette.ink,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingAmount ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingAmount && (e.currentTarget.style.background = palette.canvas)}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.surface}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAmountUpdate}
+                    disabled={isUpdatingAmount || newAmount === ''}
+                    style={{
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: isUpdatingAmount || newAmount === '' ? palette.inkSoft : palette.growth,
+                      color: palette.surface,
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: isUpdatingAmount || newAmount === '' ? 'not-allowed' : 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => !isUpdatingAmount && newAmount !== '' && (e.currentTarget.style.background = '#2A4A2E')}
+                    onMouseLeave={(e) => e.currentTarget.style.background = palette.growth}
+                  >
+                    {isUpdatingAmount ? 'Updating...' : 'Update Amount'}
                   </button>
                 </div>
               </div>

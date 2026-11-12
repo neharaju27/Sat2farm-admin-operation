@@ -226,7 +226,7 @@ useEffect(() => {
     const allowedClientPages = ['client-monthly-report', 'unlock-farm', 'register'];
     const allowedTechPages = ['green-team'];
     const allowedAccountsPages = ['invoice-info', 'payment-approval'];
-    const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search'];
+    const allowedOperationsPages = ['operation-dashboard', 'monthly-acreages', 'unlock-farm', 'register', 'assign-acreages', 'lead-pipeline', 'opportunities', 'all-sales-data', 'pricing', 'green-team', 'prospect-stats', 'task-calendar', 'invoice-info', 'user-search', 'payment-approval'];
     const allowedSalesPages = ['sales-dashboard', 'sales-acreage', 'sales-clients', 'assign-acreages', 'lead-pipeline', 'unlock-farm', 'opportunities', 'pricing', 'task-calendar'];
     const allowedMarketingPages = ['marketing-dashboard'];
 
