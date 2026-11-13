@@ -3875,6 +3875,17 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
     // When moving to Paid stage, show payment details dialog
     if (newStage === 'Paid') {
+      // Find the deal to check for invoice date
+      const sourceDeals = kanbanDeals[oldStage] || [];
+      const deal = sourceDeals.find(d => (d.deal_id || d.id).toString() === dealId.toString());
+
+      // Check if invoice date is present before allowing move to Paid
+      if (!deal || !deal.invoice_received_time || deal.invoice_received_time === '') {
+        toast.error('Cannot move to Paid stage: Invoice date is required. Please move the deal to Invoiced stage first and provide the invoice date.');
+        fetchAllKanbanDeals();
+        return;
+      }
+
       // Revert the visual change and show dialog
       fetchAllKanbanDeals();
       openPaymentDialog(dealId, oldStage);
@@ -4843,6 +4854,13 @@ export default function Opportunities({ onPageChange, user: propUser }) {
           if (selectedDeal?.payment_received_time && selectedDeal.payment_received_time !== '') {
             toast.dismiss('deal-update-toast');
             toast.error('Payment has already been recorded and is pending approval. Cannot change to Paid stage again.');
+            setIsUpdatingDeal(false);
+            return;
+          }
+          // Prevent changing to Paid if invoice date is not present
+          if (!selectedDeal?.invoice_received_time || selectedDeal.invoice_received_time === '') {
+            toast.dismiss('deal-update-toast');
+            toast.error('Cannot change to Paid stage: Invoice date is required. Please change the stage to Invoiced first and provide the invoice date.');
             setIsUpdatingDeal(false);
             return;
           }
