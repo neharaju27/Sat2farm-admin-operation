@@ -1397,7 +1397,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
         console.log('Nullifying payment-date API:', paymentRequestBody);
 
-        const paymentResponse = await fetch(paymentTimeUrl, {
+        const paymentResponse = await fetch(`${paymentTimeUrl}?deal_id=${encodeURIComponent(dealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -1554,7 +1554,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
         console.log('Nullifying invoice-date API:', invoiceRequestBody);
 
-        const invoiceResponse = await fetch(invoiceTimeUrl, {
+        const invoiceResponse = await fetch(`${invoiceTimeUrl}?deal_id=${encodeURIComponent(dealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -4107,7 +4107,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
       console.log('Calling invoice-date API:', invoiceRequestBody);
 
-      const invoiceResponse = await fetch(invoiceTimeUrl, {
+      const invoiceResponse = await fetch(`${invoiceTimeUrl}?deal_id=${encodeURIComponent(invoiceDialogDealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4245,7 +4245,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
       console.log('Calling payment-date API:', paymentRequestBody);
 
-      const paymentResponse = await fetch(paymentTimeUrl, {
+      const paymentResponse = await fetch(`${paymentTimeUrl}?deal_id=${encodeURIComponent(paymentDialogDealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4798,9 +4798,10 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             deal_id: dealId,
             id: dealId,
             payment_received_time: valueToSave,
-            user: currentUserName
+            user: currentUserName,
+            changed_by: currentUserName
           };
-          const paymentUrl = `${paymentTimeUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&payment_received_time=${encodeURIComponent(valueToSave)}`;
+          const paymentUrl = `${paymentTimeUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&payment_received_time=${encodeURIComponent(valueToSave)}&changed_by=${encodeURIComponent(currentUserName)}`;
           const response = await fetch(paymentUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -4832,9 +4833,10 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             deal_id: dealId,
             id: dealId,
             invoice_received_time: valueToSave,
-            user: currentUserName
+            user: currentUserName,
+            changed_by: currentUserName
           };
-          const invoiceUrl = `${invoiceTimeUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&invoice_received_time=${encodeURIComponent(valueToSave)}`;
+          const invoiceUrl = `${invoiceTimeUrl}?deal_id=${encodeURIComponent(dealId)}&user=${encodeURIComponent(currentUserName)}&invoice_received_time=${encodeURIComponent(valueToSave)}&changed_by=${encodeURIComponent(currentUserName)}`;
           const response = await fetch(invoiceUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
