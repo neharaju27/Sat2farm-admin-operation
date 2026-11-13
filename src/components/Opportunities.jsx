@@ -3875,13 +3875,19 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
     // When moving to Paid stage, show payment details dialog
     if (newStage === 'Paid') {
-      // Find the deal to check for invoice date
+      // Find the deal to check for invoice date and current stage
       const sourceDeals = kanbanDeals[oldStage] || [];
       const deal = sourceDeals.find(d => (d.deal_id || d.id).toString() === dealId.toString());
 
-      // Check if invoice date is present before allowing move to Paid
-      if (!deal || !deal.invoice_received_time || deal.invoice_received_time === '') {
-        toast.error('Cannot move to Paid stage: Invoice date is required. Please move the deal to Invoiced stage first and provide the invoice date.');
+      // Check if deal is in Invoiced stage and has invoice date before allowing move to Paid
+      if (!deal || oldStage !== 'Invoiced') {
+        toast.error('Cannot move to Paid stage: Deal must be in Invoiced stage first.');
+        fetchAllKanbanDeals();
+        return;
+      }
+
+      if (!deal.invoice_received_time || deal.invoice_received_time === '') {
+        toast.error('Cannot move to Paid stage: Invoice date is required. Please provide the invoice date while in Invoiced stage.');
         fetchAllKanbanDeals();
         return;
       }
@@ -4857,10 +4863,17 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             setIsUpdatingDeal(false);
             return;
           }
+          // Prevent changing to Paid if deal is not in Invoiced stage
+          if (selectedDeal?.deal_stage !== 'Invoiced') {
+            toast.dismiss('deal-update-toast');
+            toast.error('Cannot change to Paid stage: Deal must be in Invoiced stage first.');
+            setIsUpdatingDeal(false);
+            return;
+          }
           // Prevent changing to Paid if invoice date is not present
           if (!selectedDeal?.invoice_received_time || selectedDeal.invoice_received_time === '') {
             toast.dismiss('deal-update-toast');
-            toast.error('Cannot change to Paid stage: Invoice date is required. Please change the stage to Invoiced first and provide the invoice date.');
+            toast.error('Cannot change to Paid stage: Invoice date is required. Please provide the invoice date while in Invoiced stage.');
             setIsUpdatingDeal(false);
             return;
           }
