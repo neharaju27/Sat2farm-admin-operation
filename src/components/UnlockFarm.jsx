@@ -1175,7 +1175,7 @@ const parseCsvCoordinatePairs = (content) => {
           area: farm.area !== undefined && farm.area !== null ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          clientId: farm.farmer_client_id || farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
           status: farm.farm_status || farm.status || farm.lockstatus || 'N/A',
           farmerDetails: extractFarmerDetails(farm)
         }));
@@ -1191,7 +1191,7 @@ const parseCsvCoordinatePairs = (content) => {
           area: farm.area !== undefined && farm.area !== null ? `${farm.area} acre` : 'N/A',
           createdTime: farm.created_time || farm.createdTime || farm.added_time || 'N/A',
           plan: farm.plan || 'N/A',
-          clientId: farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
+          clientId: farm.farmer_client_id || farm.client_id || farm.clientId || farm.user_id || farm.userId || undefined,
           status: farm.farm_status || farm.status || farm.lockstatus || 'N/A',
           farmerDetails: extractFarmerDetails(farm)
         }));
@@ -2040,7 +2040,7 @@ const parseCsvCoordinatePairs = (content) => {
             region: farmInfo.district || 'N/A',
             cropType: farmInfo.croptype || 'N/A',
             status: farmInfo.farm_status || 'N/A',
-            clientId: farmInfo.client_id || undefined,
+            clientId: farmInfo.farmer_client_id || farmInfo.client_id || farmInfo.clientId || farmInfo.user_id || farmInfo.userId || undefined,
             createdTime: farmInfo.created_time || 'N/A',
             state: farmInfo.state || 'N/A',
             country: farmInfo.country || 'N/A',
@@ -4392,7 +4392,7 @@ const parseCsvCoordinatePairs = (content) => {
                               <tr key={startIdx + index} style={{borderBottom: '1px solid var(--border)'}}>
                                 <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.farmId}</td>
                                 <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.farmName}</td>
-                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.clientId || farm.client_id || 'N/A'}</td>
+                                <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{farm.clientId || farm.farmer_client_id || farm.client_id || farm.user_id || farm.userId || 'N/A'}</td>
                                 <td style={{padding: '10px 16px', color: 'var(--text-1)', fontSize: '14px', minWidth: '150px'}}>
                                   {farm.farmerDetails && typeof farm.farmerDetails === 'object' ? (
                                     <div>
@@ -4484,7 +4484,7 @@ const parseCsvCoordinatePairs = (content) => {
                                                 if ((data.status === 'Success' || data.success) && data.data) {
                                                   const farmArray = Array.isArray(data.data) ? data.data : [data.data];
                                                   const farmInfo = farmArray[0] || {};
-                                                  setFeatureClientId(farmInfo.client_id || farm.clientId || undefined);
+                                                  setFeatureClientId(farmInfo.farmer_client_id || farmInfo.client_id || farmInfo.clientId || farm.clientId || undefined);
                                                   setFeatureFarmCategory(farmInfo.category || farmInfo.Category || '');
                                                   // Extract plan duration from plan field
                                                   const plan = farmInfo.plan || '';
