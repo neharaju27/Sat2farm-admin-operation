@@ -79,6 +79,7 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
   const [drawing, setDrawing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [hasFarm, setHasFarm] = useState(false);
+  const [vertexCount, setVertexCount] = useState(0);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [name, setName] = useState("");
@@ -175,6 +176,15 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
         setTimeout(() => nameInputRef.current?.focus(), 100);
       } else {
         // For other categories (polygon), compute area
+        const latlngs = e.layer.getLatLngs()[0];
+        console.log('Polygon coordinates count:', latlngs.length);
+        if (latlngs.length < 3) {
+          console.warn('Polygon has fewer than 3 points, not accepting');
+          drawn.current.clearLayers();
+          setHasFarm(false);
+          setDrawing(false);
+          return;
+        }
         computeArea(e.layer);
         setHasFarm(true);
         setDrawing(false);
@@ -182,7 +192,24 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
         setTimeout(() => nameInputRef.current?.focus(), 100);
       }
     });
-    m.on(L.Draw.Event.DRAWSTOP, () => setDrawing(false));
+
+    // Track vertex count to show finish button
+    m.on('draw:vertex', (e) => {
+      if (drawHandler.current && drawHandler.current._markers) {
+        const markers = drawHandler.current._markers;
+        setVertexCount(markers.length);
+        console.log('Vertex count:', markers.length);
+      }
+    });
+
+    m.on(L.Draw.Event.DRAWSTART, () => {
+      setVertexCount(0);
+    });
+
+    m.on(L.Draw.Event.DRAWSTOP, () => {
+      setDrawing(false);
+      setVertexCount(0);
+    });
     m.on(L.Draw.Event.EDITVERTEX, (e) => computeArea(e.poly));
 
     return () => m.remove();
@@ -237,7 +264,10 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
         shapeOptions: { color: "#ffd400", weight: 4, fillColor: "#ffd400", fillOpacity: 0.1 },
         metric: false,
         repeatMode: false,
-        guideLayers: true,
+        guideLayers: false,
+        finishOnDoubleClick: false,
+        snapDistance: 0,
+        finishOn: 'click',
       });
     }
     drawHandler.current.enable();
@@ -263,6 +293,13 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     setAreaM2(0);
     setEditing(false);
     setDrawing(false);
+    setVertexCount(0);
+  };
+
+  const finishDrawing = () => {
+    if (drawHandler.current) {
+      drawHandler.current.completeShape();
+    }
   };
 
   const toggleLabels = () => {
@@ -468,6 +505,20 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
           <button style={styles.toolBtn(!labels)} title="Toggle labels" onClick={toggleLabels}>👁</button>
           <button style={styles.toolBtn(false)} title="My location" onClick={locateMe}>📍</button>
           <button style={styles.toolBtn(false)} title="Zoom to farm" onClick={zoomToFarm}>🔍</button>
+          {drawing && vertexCount >= 3 && (
+            <button
+              style={{
+                ...styles.toolBtn(false),
+                background: '#0d7a3e',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}
+              title="Finish Drawing"
+              onClick={finishDrawing}
+            >
+              ✓ Finish
+            </button>
+          )}
         </div>
 
         {/* Farm Details Form - matching Farm Details UI */}

@@ -214,18 +214,19 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
 
     let polygonCoordinates = [...validCoordinates];
 
-    // Close polygon if needed
+    // Close polygon if needed (only if not already closed)
     const first = polygonCoordinates[0];
     const last = polygonCoordinates[polygonCoordinates.length - 1];
 
-    if (
-      first[0] !== last[0] ||
-      first[1] !== last[1]
-    ) {
+    // Only close if first and last coordinates are different
+    if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
       polygonCoordinates.push(first);
     }
 
     console.log('Polygon coordinates count:', polygonCoordinates.length);
+    console.log('First coord:', first);
+    console.log('Last coord:', last);
+    console.log('Is closed:', first[0] === last[0] && first[1] === last[1]);
 
     map.addSource('farm-polygon', {
       type: 'geojson',
