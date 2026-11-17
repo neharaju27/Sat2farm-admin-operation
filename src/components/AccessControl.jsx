@@ -78,6 +78,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
     role !== 'operations' && 
     role !== 'ops' && 
     role !== 'sales' &&
+    role !== 'accounts' &&
     role !== 'admin';
 
   // Restrict User Search to only operation and sales roles
@@ -102,7 +103,7 @@ export default function AccessControl({ user, currentPage, onPageChange, childre
       alertTitle = "Permission Required";
       alertText = "Your account role does not have permission to access User Search.";
     } else if (isCrmSalesRestricted) {
-      descriptionText = "CRM and Sales data pages are only accessible to Operations and Sales users. Please contact your administrator if you believe you should have access.";
+      descriptionText = "CRM and Sales data pages are only accessible to Operations, Sales, and Accounts users. Please contact your administrator if you believe you should have access.";
       alertTitle = "Permission Required";
       alertText = "Your account role does not have permission to access CRM or Sales data.";
     } else if (isPricingRestricted) {

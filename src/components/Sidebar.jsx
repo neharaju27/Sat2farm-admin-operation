@@ -33,6 +33,16 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
   // Helper to normalize user parameter for backend API
   const getApiUserName = (u) => {
     const name = u?.name || u?.username || u?.phone_number || 'Operation';
+    const role = u?.role || u?.user_role || u?.type || '';
+
+    // Check if user is accounts role
+    const isAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
+
+    // If accounts user, return 'Operation' to see same data as operations
+    if (isAccountsUser) {
+      return 'Operation';
+    }
+
     if (!name || name.toLowerCase() === 'operation' || name === '8970095700' || name === 'admin') {
       return 'Operation';
     }
@@ -432,7 +442,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
       }
     } else if (isAccountsUser) {
       // Accounts users can only access specific pages
-      const allowedAccountsPages = ['invoice-info', 'payment-approval'];
+      const allowedAccountsPages = ['invoice-info', 'payment-approval', 'opportunities'];
       if (allowedAccountsPages.includes(page)) {
         onPageChange(page);
       } else {
@@ -845,7 +855,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <circle cx="12" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
               </svg>
               Payment Approval
-              {accountsPendingPaymentApprovals.length > 0 && (
+              {(accountsPendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
                 <span style={{
                   position: 'absolute',
                   right: '8px',
@@ -864,9 +874,22 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   padding: '0 6px',
                   boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
                 }}>
-                  {accountsPendingPaymentApprovals.length}
+                  {accountsPendingPaymentApprovals.length + pendingInvoiceApprovals.length}
                 </span>
               )}
+            </div>
+            <div
+              className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
+              onClick={() => handleNavigationClick('opportunities')}
+              style={{ position: 'relative' }}
+            >
+              <svg className="ic" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v6M5 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+                <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              </svg>
+              Deal Pipeline
             </div>
           </>
         )}

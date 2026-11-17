@@ -510,9 +510,49 @@ const StandaloneEditableDealField = React.memo(({
 });
 
 // Helper to normalize user parameter for backend API
+// Returns 'Operation' for accounts users to see same data as operations in sales pipeline
 const getApiUserName = (u) => {
   if (typeof u === 'string') return u.trim();
   let name = u?.username || u?.user_name || u?.name || '';
+  let role = u?.role || u?.user_role || u?.type || '';
+
+  // Check if user is accounts role
+  const isAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
+
+  // If accounts user, return 'Operation' to see same data as operations
+  if (isAccountsUser) {
+    return 'Operation';
+  }
+
+  if (!name) {
+    try {
+      const stored = localStorage.getItem('sat2farm_auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        name = parsed?.username || parsed?.user_name || parsed?.name || '';
+        role = parsed?.role || parsed?.user_role || parsed?.type || '';
+        // Check again from stored auth
+        const storedIsAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
+        if (storedIsAccountsUser) {
+          return 'Operation';
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  if (!name) {
+    name = localStorage.getItem('username') || '';
+  }
+  return typeof name === 'string' ? name.trim() : String(name || '').trim();
+};
+
+// Helper to get actual logged-in username (for audit trail, approvals, etc.)
+// Returns the real username without any role-based overrides
+const getActualUserName = (u) => {
+  if (typeof u === 'string') return u.trim();
+  let name = u?.username || u?.user_name || u?.name || '';
+
   if (!name) {
     try {
       const stored = localStorage.getItem('sat2farm_auth');
@@ -536,6 +576,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const currentUserName = getApiUserName(user);
   const userRole = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
   const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
+  const isAccountsUser = userRole === 'accounts';
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1157,25 +1198,25 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const [loadingInvoiceApprovals, setLoadingInvoiceApprovals] = useState(false);
   const [approvalActiveTab, setApprovalActiveTab] = useState('payment');
 
-  // Fetch pending payment approvals on mount for operation users
+  // Fetch pending payment approvals on mount for operation and accounts users
   useEffect(() => {
-    if (isOperationRole) {
+    if (isOperationRole || isAccountsUser) {
       fetchPendingPaymentApprovals();
       fetchPendingInvoiceApprovals();
     }
-  }, [isOperationRole, kanbanUpdateTimestamp]);
+  }, [isOperationRole, isAccountsUser, kanbanUpdateTimestamp]);
 
   // Fetch pending approvals when sidebar opens
   useEffect(() => {
-    if (paymentApprovalSidebarOpen && isOperationRole) {
+    if (paymentApprovalSidebarOpen && (isOperationRole || isAccountsUser)) {
       fetchPendingPaymentApprovals();
       fetchPendingInvoiceApprovals();
     }
-  }, [paymentApprovalSidebarOpen, isOperationRole]);
+  }, [paymentApprovalSidebarOpen, isOperationRole, isAccountsUser]);
 
   // Auto-refresh pending approvals every 30 seconds when sidebar is open
   useEffect(() => {
-    if (!paymentApprovalSidebarOpen || !isOperationRole) return;
+    if (!paymentApprovalSidebarOpen || (!isOperationRole && !isAccountsUser)) return;
 
     const interval = setInterval(() => {
       fetchPendingPaymentApprovals();
@@ -1183,11 +1224,11 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [paymentApprovalSidebarOpen, isOperationRole]);
+  }, [paymentApprovalSidebarOpen, isOperationRole, isAccountsUser]);
 
   // Fetch pending payment received approvals
   const fetchPendingPaymentApprovals = async () => {
-    if (!isOperationRole) return;
+    if (!isOperationRole && !isAccountsUser) return;
 
     try {
       setLoadingPaymentApprovals(true);
@@ -1250,7 +1291,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
   // Fetch pending invoice approvals
   const fetchPendingInvoiceApprovals = async () => {
-    if (!isOperationRole) return;
+    if (!isOperationRole && !isAccountsUser) return;
 
     try {
       setLoadingInvoiceApprovals(true);
@@ -1313,7 +1354,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Approving payment received...', { id: 'approve-payment-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-payment-toast');
@@ -1384,7 +1425,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Declining payment received...', { id: 'decline-payment-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
 
       // First, set payment_received_time to null
@@ -1471,7 +1512,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Approving invoice...', { id: 'approve-invoice-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-invoice-toast');
@@ -1541,7 +1582,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Declining invoice...', { id: 'decline-invoice-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const invoiceTimeUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL;
 
       // First, set invoice_received_time to null
@@ -1984,6 +2025,13 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editNoteInput, setEditNoteInput] = useState('');
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'kanban'
+
+  // Set initial view mode based on user role
+  useEffect(() => {
+    if (isAccountsUser) {
+      setViewMode('kanban');
+    }
+  }, [isAccountsUser]);
   const [collapsedStages, setCollapsedStages] = useState({}); // Track collapsed stages
   const [columnWidths, setColumnWidths] = useState({}); // Track column widths for resize
   const [timelineData, setTimelineData] = useState([]); // Timeline data
@@ -3418,6 +3466,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
       const currentUser = getApiUserName(user);
+      console.log('Fetching kanban deals for user:', currentUser, 'User role:', user?.role);
 
       const [results, dealStageAmountRes] = await Promise.all([
         Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50))),
@@ -4695,6 +4744,11 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   };
 
   const startDealEditing = (fieldName, currentValue) => {
+    // Accounts users cannot edit anything
+    if (isAccountsUser) {
+      toast.error('Accounts users have read-only access');
+      return;
+    }
     if (user?.role?.toLowerCase().trim() === 'sales' && (fieldName === 'deal_close_date' || fieldName === 'deal_probability')) {
       return;
     }
@@ -5082,6 +5136,14 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
   const handleDeleteDeal = async () => {
     if (!dealToDelete) return;
+
+    // Accounts users cannot delete deals
+    if (isAccountsUser) {
+      toast.error('Accounts users have read-only access and cannot delete deals');
+      setShowDeleteDealModal(false);
+      setDealToDelete(null);
+      return;
+    }
 
     try {
       toast.loading('Deleting deal...');
@@ -5701,13 +5763,15 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>Manage and track sales opportunities through the pipeline</p>
           </div>
           <div className="responsive-toolbar">
-            <button
-              onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
-            >
-              {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
-              {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
-            </button>
+            {!isAccountsUser && (
+              <button
+                onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+              >
+                {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
+                {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
+              </button>
+            )}
 
             {isOperationRole && (
               <button
@@ -9018,7 +9082,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     setCollapsedStages={setCollapsedStages}
                     columnWidths={columnWidths}
                     setColumnWidths={setColumnWidths}
-                    onDealMove={handleKanbanDealMove}
+                    onDealMove={isAccountsUser ? () => {} : handleKanbanDealMove}
                     onDealClick={handleKanbanDealClick}
                     stageTotals={stageTotals}
                     stageValues={stageValues}
@@ -9027,6 +9091,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     onLoadMoreStage={handleLoadMoreStageDeals}
                     loadingMoreStages={loadingMoreStages}
                     isDealsLoading={isDealsLoading}
+                    disableDrag={isAccountsUser}
                   />
                 )}
               </div>
@@ -10314,6 +10379,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                         )}
                       </button>
                     )}
+                    {!isAccountsUser && (
+                      <>
                     <style>{`
                       @keyframes spin {
                         0% { transform: rotate(0deg); }
@@ -10335,6 +10402,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     >
                       Delete Deal
                     </button>
+                      </>
+                    )}
                     <button
                       onClick={() => { setShowDealInfoModal(false); setSelectedDeal(null); setEditingDealField(null); setEditDealValue(''); }}
                       style={{
@@ -14729,7 +14798,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     </div>
 
       {/* Payment Approval Sidebar with Tabs - UPDATED */}
-      {paymentApprovalSidebarOpen && isOperationRole && (
+      {paymentApprovalSidebarOpen && (isOperationRole || isAccountsUser) && (
         <>
           <div
             style={{
