@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+	<name>sample.kml</name>
+	<coordinates>
+        77.028512,11.072905, 77.029108,11.073489, 77.029726,11.072915, 77.029131,11.072336, 77.028512,11.072905
+	</coordinates>
+</Document>
+</kml>
+
