@@ -4,7 +4,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useKanbanDnd } from './KanbanDndContext';
 
-export default function KanbanDraggableCard({ dealId, columnId, children, style, onClick, disableDrag = false }) {
+export default function KanbanDraggableCard({ dealId, columnId, children, style, onClick }) {
   const ref = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [wasDragging, setWasDragging] = useState(false);
@@ -13,7 +13,7 @@ export default function KanbanDraggableCard({ dealId, columnId, children, style,
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || disableDrag) {
+    if (!element) {
       return undefined;
     }
 
@@ -47,7 +47,7 @@ export default function KanbanDraggableCard({ dealId, columnId, children, style,
           source.data.type === 'card' && source.data.instanceId === instanceId,
       }),
     );
-  }, [columnId, instanceId, itemId, disableDrag]);
+  }, [columnId, instanceId, itemId]);
 
   const handleClick = (e) => {
     if (!wasDragging && onClick) {
@@ -62,7 +62,7 @@ export default function KanbanDraggableCard({ dealId, columnId, children, style,
       onClick={handleClick}
       style={{
         ...style,
-        cursor: disableDrag ? 'pointer' : (isDragging ? 'grabbing' : 'grab'),
+        cursor: isDragging ? 'grabbing' : 'pointer',
         boxShadow: isDragging
           ? '0 8px 20px rgba(0,0,0,0.15)'
           : style?.boxShadow || '0 1px 2px rgba(0,0,0,0.05)',

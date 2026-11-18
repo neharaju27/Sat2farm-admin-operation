@@ -50,8 +50,7 @@ export default function SalesPipelineKanbanBoard({
   salesFiltersApplied = false,
   onLoadMoreStage,
   loadingMoreStages = {},
-  isDealsLoading = false,
-  disableDrag = false
+  isDealsLoading = false
 }) {
   const getDealsForColumn = useCallback(
     (columnId) => {
@@ -232,7 +231,6 @@ export default function SalesPipelineKanbanBoard({
                     columnId={column.id}
                     style={dropZoneStyle}
                     onScroll={(e) => handleColumnScroll(column.stage, e)}
-                    disableDrag={disableDrag}
                   >
                     {isDealsLoading ? (
                       <>
@@ -270,7 +268,6 @@ export default function SalesPipelineKanbanBoard({
                               border: `2px solid ${cardBorderColor}`,
                             }}
                             onClick={() => onDealClick(deal)}
-                            disableDrag={disableDrag}
                           >
                             <div
                               style={{

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, Eye, Phone, Mail, Calendar, MapPin, TrendingUp, Users, DollarSign, Receipt, Activity, ChevronDown, ChevronRight, ChevronLeft, X, Check, Clock, AlertCircle, FileText, Upload, Building2, User, GripVertical, Tag, Briefcase, Globe, Map, CreditCard, MessageSquare, FileEdit, UserCheck, Building, List, ThumbsUp, ThumbsDown, CheckCircle, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SalesPipelineKanbanBoard from './kanban/SalesPipelineKanbanBoard';
 
@@ -510,49 +510,9 @@ const StandaloneEditableDealField = React.memo(({
 });
 
 // Helper to normalize user parameter for backend API
-// Returns 'Operation' for accounts users to see same data as operations in sales pipeline
 const getApiUserName = (u) => {
   if (typeof u === 'string') return u.trim();
   let name = u?.username || u?.user_name || u?.name || '';
-  let role = u?.role || u?.user_role || u?.type || '';
-
-  // Check if user is accounts role
-  const isAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
-
-  // If accounts user, return 'Operation' to see same data as operations
-  if (isAccountsUser) {
-    return 'Operation';
-  }
-
-  if (!name) {
-    try {
-      const stored = localStorage.getItem('sat2farm_auth');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        name = parsed?.username || parsed?.user_name || parsed?.name || '';
-        role = parsed?.role || parsed?.user_role || parsed?.type || '';
-        // Check again from stored auth
-        const storedIsAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
-        if (storedIsAccountsUser) {
-          return 'Operation';
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-  if (!name) {
-    name = localStorage.getItem('username') || '';
-  }
-  return typeof name === 'string' ? name.trim() : String(name || '').trim();
-};
-
-// Helper to get actual logged-in username (for audit trail, approvals, etc.)
-// Returns the real username without any role-based overrides
-const getActualUserName = (u) => {
-  if (typeof u === 'string') return u.trim();
-  let name = u?.username || u?.user_name || u?.name || '';
-
   if (!name) {
     try {
       const stored = localStorage.getItem('sat2farm_auth');
@@ -576,7 +536,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const currentUserName = getApiUserName(user);
   const userRole = (user?.role || user?.user_role || user?.type || '').toLowerCase().trim();
   const isOperationRole = userRole === 'operation' || userRole === 'operations' || userRole === 'ops';
-  const isAccountsUser = userRole === 'accounts';
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1198,25 +1157,25 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const [loadingInvoiceApprovals, setLoadingInvoiceApprovals] = useState(false);
   const [approvalActiveTab, setApprovalActiveTab] = useState('payment');
 
-  // Fetch pending payment approvals on mount for operation and accounts users
+  // Fetch pending payment approvals on mount for operation users
   useEffect(() => {
-    if (isOperationRole || isAccountsUser) {
+    if (isOperationRole) {
       fetchPendingPaymentApprovals();
       fetchPendingInvoiceApprovals();
     }
-  }, [isOperationRole, isAccountsUser, kanbanUpdateTimestamp]);
+  }, [isOperationRole, kanbanUpdateTimestamp]);
 
   // Fetch pending approvals when sidebar opens
   useEffect(() => {
-    if (paymentApprovalSidebarOpen && (isOperationRole || isAccountsUser)) {
+    if (paymentApprovalSidebarOpen && isOperationRole) {
       fetchPendingPaymentApprovals();
       fetchPendingInvoiceApprovals();
     }
-  }, [paymentApprovalSidebarOpen, isOperationRole, isAccountsUser]);
+  }, [paymentApprovalSidebarOpen, isOperationRole]);
 
   // Auto-refresh pending approvals every 30 seconds when sidebar is open
   useEffect(() => {
-    if (!paymentApprovalSidebarOpen || (!isOperationRole && !isAccountsUser)) return;
+    if (!paymentApprovalSidebarOpen || !isOperationRole) return;
 
     const interval = setInterval(() => {
       fetchPendingPaymentApprovals();
@@ -1224,11 +1183,11 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [paymentApprovalSidebarOpen, isOperationRole, isAccountsUser]);
+  }, [paymentApprovalSidebarOpen, isOperationRole]);
 
   // Fetch pending payment received approvals
   const fetchPendingPaymentApprovals = async () => {
-    if (!isOperationRole && !isAccountsUser) return;
+    if (!isOperationRole) return;
 
     try {
       setLoadingPaymentApprovals(true);
@@ -1291,7 +1250,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
   // Fetch pending invoice approvals
   const fetchPendingInvoiceApprovals = async () => {
-    if (!isOperationRole && !isAccountsUser) return;
+    if (!isOperationRole) return;
 
     try {
       setLoadingInvoiceApprovals(true);
@@ -1354,7 +1313,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Approving payment received...', { id: 'approve-payment-toast' });
 
-      const currentUserName = getActualUserName(user);
+      const currentUserName = getApiUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-payment-toast');
@@ -1425,7 +1384,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Declining payment received...', { id: 'decline-payment-toast' });
 
-      const currentUserName = getActualUserName(user);
+      const currentUserName = getApiUserName(user);
       const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
 
       // First, set payment_received_time to null
@@ -1512,7 +1471,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Approving invoice...', { id: 'approve-invoice-toast' });
 
-      const currentUserName = getActualUserName(user);
+      const currentUserName = getApiUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-invoice-toast');
@@ -1582,7 +1541,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       toast.loading('Declining invoice...', { id: 'decline-invoice-toast' });
 
-      const currentUserName = getActualUserName(user);
+      const currentUserName = getApiUserName(user);
       const invoiceTimeUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL;
 
       // First, set invoice_received_time to null
@@ -2025,13 +1984,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editNoteInput, setEditNoteInput] = useState('');
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'kanban'
-
-  // Set initial view mode based on user role
-  useEffect(() => {
-    if (isAccountsUser) {
-      setViewMode('kanban');
-    }
-  }, [isAccountsUser]);
   const [collapsedStages, setCollapsedStages] = useState({}); // Track collapsed stages
   const [columnWidths, setColumnWidths] = useState({}); // Track column widths for resize
   const [timelineData, setTimelineData] = useState([]); // Timeline data
@@ -2097,6 +2049,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const [invoiceDialogDealId, setInvoiceDialogDealId] = useState(null);
   const [invoiceDialogOldStage, setInvoiceDialogOldStage] = useState(null);
   const [invoiceReceivedTime, setInvoiceReceivedTime] = useState('');
+  const [invoiceTaxAmount, setInvoiceTaxAmount] = useState('');
+  const [currentTaxAmount, setCurrentTaxAmount] = useState('');
   const [editInvoiceAmount, setEditInvoiceAmount] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [currentInvoiceAmount, setCurrentInvoiceAmount] = useState('');
@@ -3466,7 +3420,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     try {
       const dealStageAmountApiUrl = import.meta.env.VITE_DEAL_STAGE_AMOUNT_API_URL;
       const currentUser = getApiUserName(user);
-      console.log('Fetching kanban deals for user:', currentUser, 'User role:', user?.role);
 
       const [results, dealStageAmountRes] = await Promise.all([
         Promise.all(stages.map(stage => fetchDealsByStage(stage, 0, 50))),
@@ -3904,10 +3857,11 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
     // When moving to Invoiced stage, show invoice details dialog
     if (newStage === 'Invoiced') {
-      // Find the deal to get current amount
+      // Find the deal to get current amount and tax amount
       const sourceDeals = kanbanDeals[oldStage] || [];
       const deal = sourceDeals.find(d => (d.deal_id || d.id).toString() === dealId.toString());
       const currentAmount = deal?.deal_amount || '';
+      const currentTax = deal?.tax_amount || '';
 
       // Prevent moving to Invoiced if invoice date is already captured and deal is pending approval
       if (deal && deal.invoice_received_time && deal.invoice_received_time !== '') {
@@ -3918,7 +3872,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
       // Revert the visual change and show dialog
       fetchAllKanbanDeals();
-      openInvoiceDialog(dealId, oldStage, currentAmount);
+      openInvoiceDialog(dealId, oldStage, currentAmount, currentTax);
       return;
     }
 
@@ -4054,18 +4008,21 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       created_time: deal.created_time || '',
       created_by: deal.created_by || '',
       payment_received_time: deal.payment_received_time || '',
-      invoice_received_time: deal.invoice_received_time || ''
+      invoice_received_time: deal.invoice_received_time || '',
+      tax_amount: deal.tax_amount || ''
     });
     setShowDealInfoModal(true);
   };
 
   // Invoice Dialog Handlers
-  const openInvoiceDialog = (dealId, oldStage, currentAmount = '') => {
+  const openInvoiceDialog = (dealId, oldStage, currentAmount = '', currentTax = '') => {
     setInvoiceDialogDealId(dealId);
     setInvoiceDialogOldStage(oldStage);
     setCurrentInvoiceAmount(currentAmount);
     // Leave invoice received date empty for user to manually enter
     setInvoiceReceivedTime('');
+    setInvoiceTaxAmount(currentTax && parseFloat(currentTax) > 0 ? String(parseFloat(currentTax)) : '');
+    setCurrentTaxAmount(currentTax || '');
     setEditInvoiceAmount(false);
     setInvoiceAmount(currentAmount);
     setShowInvoiceDialog(true);
@@ -4076,6 +4033,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     setInvoiceDialogDealId(null);
     setInvoiceDialogOldStage(null);
     setInvoiceReceivedTime('');
+    setInvoiceTaxAmount('');
+    setCurrentTaxAmount('');
     setEditInvoiceAmount(false);
     setInvoiceAmount('');
     setCurrentInvoiceAmount('');
@@ -4084,6 +4043,16 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   const handleInvoiceDialogSubmit = async () => {
     if (!invoiceReceivedTime) {
       toast.error('Please enter invoice received date');
+      return;
+    }
+
+    if (invoiceTaxAmount === '' || invoiceTaxAmount === null || invoiceTaxAmount === undefined || String(invoiceTaxAmount).trim() === '') {
+      toast.error('Please enter tax amount');
+      return;
+    }
+
+    if (isNaN(Number(invoiceTaxAmount)) || Number(invoiceTaxAmount) < 0) {
+      toast.error('Please enter a valid tax amount');
       return;
     }
 
@@ -4146,7 +4115,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       }
 
       // Update invoice received date (deal stays in current stage until approved)
-      const invoiceTimeUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL || 'https://api.sat2farm.com/time/invoice-time';
+      const invoiceTimeUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL;
       const invoiceRequestBody = {
         deal_id: invoiceDialogDealId,
         invoice_received_time: formattedInvoiceReceivedTime,
@@ -4156,19 +4125,79 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
       console.log('Calling invoice-date API:', invoiceRequestBody);
 
-      const invoiceResponse = await fetch(`${invoiceTimeUrl}?deal_id=${encodeURIComponent(invoiceDialogDealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(invoiceRequestBody),
-      });
+      if (invoiceTimeUrl) {
+        const invoiceResponse = await fetch(`${invoiceTimeUrl}?deal_id=${encodeURIComponent(invoiceDialogDealId)}&changed_by=${encodeURIComponent(currentUserName)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(invoiceRequestBody),
+        });
 
-      if (invoiceResponse.ok) {
-        const invoiceResult = await invoiceResponse.json();
-        console.log('Invoice date API response:', invoiceResult);
-      } else {
-        console.error('Failed to update invoice date:', invoiceResponse.status);
+        if (invoiceResponse.ok) {
+          const invoiceResult = await invoiceResponse.json();
+          console.log('Invoice date API response:', invoiceResult);
+        } else {
+          console.error('Failed to update invoice date:', invoiceResponse.status);
+        }
+      }
+
+      // Update tax amount (mandatory)
+      // 1. Save tax_amount directly to the deal record
+      const taxDealUpdateUrl = `${apiUrl}?deal_id=${encodeURIComponent(invoiceDialogDealId)}&tax_amount=${encodeURIComponent(invoiceTaxAmount)}&user=${encodeURIComponent(currentUserName)}`;
+      try {
+        const taxDealResponse = await fetch(taxDealUpdateUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deal_id: invoiceDialogDealId,
+            id: invoiceDialogDealId,
+            tax_amount: invoiceTaxAmount,
+            user: currentUserName,
+          }),
+        });
+        if (taxDealResponse.ok) {
+          console.log('Tax amount saved to deal successfully');
+        } else {
+          console.warn('Failed to save tax amount via update-deal:', taxDealResponse.status);
+        }
+      } catch (dealErr) {
+        console.warn('Error saving tax amount to deal:', dealErr);
+      }
+
+      // 2. Also invoke the dedicated tax_amount endpoint
+      const taxAmountApiUrl = import.meta.env.VITE_TAX_AMOUNT_API_URL;
+      if (taxAmountApiUrl) {
+        const taxUpdateUrl = `${taxAmountApiUrl}?deal_id=${encodeURIComponent(invoiceDialogDealId)}&tax_amount=${encodeURIComponent(invoiceTaxAmount)}&user=${encodeURIComponent(currentUserName)}`;
+        const taxRequestBody = {
+          deal_id: invoiceDialogDealId,
+          tax_amount: Number(invoiceTaxAmount),
+          user: currentUserName,
+        };
+
+        console.log('Calling tax_amount API:', taxUpdateUrl, taxRequestBody);
+
+        try {
+          const taxResponse = await fetch(taxUpdateUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(taxRequestBody),
+          });
+
+          if (taxResponse.ok) {
+            const taxResult = await taxResponse.json();
+            console.log('Tax amount update response:', taxResult);
+          } else {
+            const errData = await taxResponse.json().catch(() => ({}));
+            console.warn('Tax amount API notice:', taxResponse.status, errData);
+          }
+        } catch (taxErr) {
+          console.warn('Tax amount API call notice:', taxErr);
+        }
       }
 
       // If user wants to edit invoice amount, update it
@@ -4202,7 +4231,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
       fetchAllKanbanDeals();
     } catch (err) {
       console.error('Error submitting invoice details:', err);
-      toast.error('Failed to submit invoice details');
+      toast.error(err.message || 'Failed to submit invoice details');
     } finally {
       setIsSubmittingInvoice(false);
     }
@@ -4744,11 +4773,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
   };
 
   const startDealEditing = (fieldName, currentValue) => {
-    // Accounts users cannot edit anything
-    if (isAccountsUser) {
-      toast.error('Accounts users have read-only access');
-      return;
-    }
     if (user?.role?.toLowerCase().trim() === 'sales' && (fieldName === 'deal_close_date' || fieldName === 'deal_probability')) {
       return;
     }
@@ -4948,7 +4972,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             setIsUpdatingDeal(false);
             return;
           }
-          const currentAmount = selectedDeal?.amount?.replace(/₹|,/g, '') || '';
+          const currentAmount = selectedDeal?.amount?.replace(/₹|,/g, '') || selectedDeal?.deal_amount || '';
+          const currentTax = selectedDeal?.tax_amount || '';
           const oldStage = selectedDeal?.deal_stage || '';
           // Update previous_stage before showing invoice dialog
           const updatePreviousStageUrl = `${apiUrl}?deal_id=${encodeURIComponent(dealId)}&previous_stage=${encodeURIComponent(oldStage)}&user=${encodeURIComponent(currentUserName)}`;
@@ -4966,7 +4991,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
           }).catch(err => console.warn('Failed to update previous_stage:', err));
           setIsUpdatingDeal(false);
           setShowDealInfoModal(false);
-          openInvoiceDialog(dealId, oldStage, currentAmount);
+          openInvoiceDialog(dealId, oldStage, currentAmount, currentTax);
           return;
         }
 
@@ -5136,14 +5161,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
 
   const handleDeleteDeal = async () => {
     if (!dealToDelete) return;
-
-    // Accounts users cannot delete deals
-    if (isAccountsUser) {
-      toast.error('Accounts users have read-only access and cannot delete deals');
-      setShowDeleteDealModal(false);
-      setDealToDelete(null);
-      return;
-    }
 
     try {
       toast.loading('Deleting deal...');
@@ -5763,15 +5780,13 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>Manage and track sales opportunities through the pipeline</p>
           </div>
           <div className="responsive-toolbar">
-            {!isAccountsUser && (
-              <button
-                onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
-              >
-                {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
-                {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
-              </button>
-            )}
+            <button
+              onClick={() => setViewMode(viewMode === 'table' ? 'kanban' : 'table')}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: viewMode === 'table' ? '#3b82f6' : '#10b981', color: 'white', border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+            >
+              {viewMode === 'table' ? <TrendingUp size={16} /> : <Activity size={16} />}
+              {viewMode === 'table' ? 'Deal Pipeline' : 'Table View'}
+            </button>
 
             {isOperationRole && (
               <button
@@ -9082,7 +9097,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     setCollapsedStages={setCollapsedStages}
                     columnWidths={columnWidths}
                     setColumnWidths={setColumnWidths}
-                    onDealMove={isAccountsUser ? () => {} : handleKanbanDealMove}
+                    onDealMove={handleKanbanDealMove}
                     onDealClick={handleKanbanDealClick}
                     stageTotals={stageTotals}
                     stageValues={stageValues}
@@ -9091,7 +9106,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     onLoadMoreStage={handleLoadMoreStageDeals}
                     loadingMoreStages={loadingMoreStages}
                     isDealsLoading={isDealsLoading}
-                    disableDrag={isAccountsUser}
                   />
                 )}
               </div>
@@ -10379,8 +10393,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                         )}
                       </button>
                     )}
-                    {!isAccountsUser && (
-                      <>
                     <style>{`
                       @keyframes spin {
                         0% { transform: rotate(0deg); }
@@ -10402,8 +10414,6 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                     >
                       Delete Deal
                     </button>
-                      </>
-                    )}
                     <button
                       onClick={() => { setShowDealInfoModal(false); setSelectedDeal(null); setEditingDealField(null); setEditDealValue(''); }}
                       style={{
@@ -10595,6 +10605,20 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                               }}>{selectedDeal.invoice_received_time || '-'}</div>
                             </div>
                           )
+                        )}
+
+                        {(selectedDeal.deal_stage === 'Invoiced' || selectedDeal.deal_stage === 'Paid' || selectedDeal.tax_amount) && (
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '4px', color: 'var(--text-3)', fontSize: '12px' }}>Tax Amount</label>
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--r)',
+                              fontSize: '12px',
+                              color: 'var(--text)'
+                            }}>{selectedDeal.tax_amount ? `₹${parseFloat(selectedDeal.tax_amount).toLocaleString('en-IN')}` : '-'}</div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -14432,6 +14456,49 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                 </div>
               </div>
 
+              {/* Tax Amount */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#334155', fontSize: '14px', fontWeight: '600' }}>
+                  <Receipt size={16} style={{ color: '#10b981' }} />
+                  Tax Amount <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute',
+                    left: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#64748b',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    pointerEvents: 'none'
+                  }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={invoiceTaxAmount}
+                    onChange={(e) => setInvoiceTaxAmount(e.target.value)}
+                    placeholder="Enter tax amount"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px 12px 36px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      background: '#ffffff',
+                      color: '#1e293b',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)'; }}
+                  />
+                </div>
+              </div>
+
               {/* Edit Invoice Amount Checkbox */}
               <div style={{
                 padding: '16px',
@@ -14798,7 +14865,7 @@ export default function Opportunities({ onPageChange, user: propUser }) {
     </div>
 
       {/* Payment Approval Sidebar with Tabs - UPDATED */}
-      {paymentApprovalSidebarOpen && (isOperationRole || isAccountsUser) && (
+      {paymentApprovalSidebarOpen && isOperationRole && (
         <>
           <div
             style={{
