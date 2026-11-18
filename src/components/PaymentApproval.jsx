@@ -15,9 +15,49 @@ const PaymentApproval = ({ user }) => {
   const [activeTab, setActiveTab] = useState('payment');
 
   // Helper to normalize user parameter for backend API
+  // Returns 'Operation' for accounts users to see same data as operations
   const getApiUserName = (u) => {
     if (typeof u === 'string') return u.trim();
     let name = u?.username || u?.user_name || u?.name || '';
+    let role = u?.role || u?.user_role || u?.type || '';
+
+    // Check if user is accounts role
+    const isAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
+
+    // If accounts user, return 'Operation' to see same data as operations
+    if (isAccountsUser) {
+      return 'Operation';
+    }
+
+    if (!name) {
+      try {
+        const stored = localStorage.getItem('sat2farm_auth');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          name = parsed?.username || parsed?.user_name || parsed?.name || '';
+          role = parsed?.role || parsed?.user_role || parsed?.type || '';
+          // Check again from stored auth
+          const storedIsAccountsUser = role && typeof role === 'string' && role.toLowerCase().trim() === 'accounts';
+          if (storedIsAccountsUser) {
+            return 'Operation';
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (!name) {
+      name = localStorage.getItem('username') || '';
+    }
+    return typeof name === 'string' ? name.trim() : String(name || '').trim();
+  };
+
+  // Helper to get actual logged-in username (for audit trail, approvals, etc.)
+  // Returns the real username without any role-based overrides
+  const getActualUserName = (u) => {
+    if (typeof u === 'string') return u.trim();
+    let name = u?.username || u?.user_name || u?.name || '';
+
     if (!name) {
       try {
         const stored = localStorage.getItem('sat2farm_auth');
@@ -58,6 +98,19 @@ const PaymentApproval = ({ user }) => {
       fetchPendingPaymentApprovals();
       fetchPendingInvoiceApprovals();
     }
+  }, [canApprove]);
+
+  // Auto-refresh pending approvals every 30 seconds
+  useEffect(() => {
+    if (!canApprove) return;
+
+    const intervalId = setInterval(() => {
+      fetchPendingPaymentApprovals();
+      fetchPendingInvoiceApprovals();
+    }, 30000); // Refresh every 30 seconds
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
   }, [canApprove]);
 
   // Fetch pending payment received approvals
@@ -200,7 +253,7 @@ const PaymentApproval = ({ user }) => {
     try {
       toast.loading('Approving payment received...', { id: 'approve-payment-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-payment-toast');
@@ -252,7 +305,7 @@ const PaymentApproval = ({ user }) => {
     try {
       toast.loading('Declining payment received...', { id: 'decline-payment-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const paymentTimeUrl = import.meta.env.VITE_PAYMENT_RECEIVED_TIME_API_URL;
 
       // First, set payment_received_time to null
@@ -339,7 +392,7 @@ const PaymentApproval = ({ user }) => {
     try {
       toast.loading('Approving invoice...', { id: 'approve-invoice-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const apiUrl = import.meta.env.VITE_UPDATE_DEAL_API_URL;
       if (!apiUrl) {
         toast.dismiss('approve-invoice-toast');
@@ -410,7 +463,7 @@ const PaymentApproval = ({ user }) => {
     try {
       toast.loading('Declining invoice...', { id: 'decline-invoice-toast' });
 
-      const currentUserName = getApiUserName(user);
+      const currentUserName = getActualUserName(user);
       const invoiceTimeUrl = import.meta.env.VITE_INVOICE_RECEIVED_TIME_API_URL;
 
       // First, set invoice_received_time to null

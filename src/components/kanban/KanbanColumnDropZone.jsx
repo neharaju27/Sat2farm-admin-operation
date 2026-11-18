@@ -2,14 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { useKanbanDnd } from './KanbanDndContext';
 
-export default function KanbanColumnDropZone({ columnId, style, children, onScroll }) {
+export default function KanbanColumnDropZone({ columnId, style, children, onScroll, disableDrag = false }) {
   const ref = useRef(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const { instanceId } = useKanbanDnd();
 
   useEffect(() => {
     const element = ref.current;
-    if (!element) {
+    if (!element || disableDrag) {
       return undefined;
     }
 
@@ -22,7 +22,7 @@ export default function KanbanColumnDropZone({ columnId, style, children, onScro
       onDragLeave: () => setIsDraggingOver(false),
       onDrop: () => setIsDraggingOver(false),
     });
-  }, [columnId, instanceId]);
+  }, [columnId, instanceId, disableDrag]);
 
   return (
     <div
