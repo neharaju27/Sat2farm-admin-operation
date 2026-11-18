@@ -20,6 +20,25 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+// ---- Polygon closes ONLY when the first point is clicked ----
+L.Draw.Polyline.prototype._showErrorTooltip = function () {};
+L.Draw.Polygon.prototype._showErrorTooltip = function () {};
+
+// Attach the "finish" click handler to the FIRST marker only
+// (default Leaflet.draw also attaches it to the last marker)
+L.Draw.Polygon.prototype._updateFinishHandler = function () {
+  if (this._markers.length === 1) {
+    this._markers[0].on("click", this._finishShape, this);
+  }
+};
+
+// Ignore finish attempts until there are at least 3 points
+const _origFinishShape = L.Draw.Polyline.prototype._finishShape;
+L.Draw.Polygon.prototype._finishShape = function () {
+  if (this._markers.length < 3) return;
+  return _origFinishShape.call(this);
+};
+
 const GREEN = "#16a34a";
 const CROPS = ["Paddy", "Wheat", "Maize", "Sugarcane", "Cotton", "Groundnut", "Banana", "Coconut", "Other"];
 
@@ -144,7 +163,7 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
 
   // ---------- init map ----------
   useEffect(() => {
-    const m = L.map(mapEl.current, { center: initialCenter, zoom: initialZoom, zoomControl: false, maxZoom: 22 });
+    const m = L.map(mapEl.current, { center: initialCenter, zoom: initialZoom, zoomControl: false, maxZoom: 22, doubleClickZoom: false });
     setTimeout(() => m.invalidateSize(), 200);
     map.current = m;
 
@@ -266,21 +285,16 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     } else {
       // For other categories, use polygon
       drawHandler.current = new L.Draw.Polygon(map.current, {
-        allowIntersection: false,
+        allowIntersection: true,
         showArea: false,
         shapeOptions: {
           color: "#ffd400",
           weight: 4,
           fillColor: "#ffd400",
-          fillOpacity: 0.1
+          fillOpacity: 0.1,
         },
         metric: false,
         repeatMode: false,
-        guideLayers: false,
-        finishOnDoubleClick: false,
-        snapDistance: 0,
-        snapVertex: false,
-        finishOn: 'click',
       });
     }
     drawHandler.current.enable();
@@ -496,6 +510,14 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
         /* Style vertex markers as circles */
         .leaflet-marker-icon {
           border-radius: 50% !important;
+        }
+        /* Make the first point easier to hit */
+        .leaflet-draw-tooltip + .leaflet-marker-icon,
+        .leaflet-marker-icon.leaflet-div-icon.leaflet-editing-icon {
+          width: 16px !important;
+          height: 16px !important;
+          margin-left: -8px !important;
+          margin-top: -8px !important;
         }
         .leaflet-div-icon {
           background: #ffd400;
