@@ -89,6 +89,9 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
   const [irrigation, setIrrigation] = useState("");
   const [labels, setLabels] = useState(true);
   const labelLayer = useRef(null);
+  const [showLatLongSearch, setShowLatLongSearch] = useState(false);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   // API-related state
   const [cropsList, setCropsList] = useState([]);
@@ -156,50 +159,47 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     drawn.current.addTo(m);
 
     m.on(L.Draw.Event.CREATED, (e) => {
-      drawn.current.clearLayers(); // one farm at a time
+      drawn.current.clearLayers();
       drawn.current.addLayer(e.layer);
 
-      // Check polygonCategory dynamically at event time
-      const currentPolygonCategory = polygonCategory?.toLowerCase() === 'terrace garden' || polygonCategory?.toLowerCase() === 'garden';
+      const currentPolygonCategory =
+        polygonCategory?.toLowerCase() === "terrace garden" ||
+        polygonCategory?.toLowerCase() === "garden";
 
-      console.log('DRAW CREATED - polygonCategory:', polygonCategory);
-      console.log('DRAW CREATED - isTerraceGarden:', currentPolygonCategory);
-      console.log('DRAW CREATED - layer type:', e.layer instanceof L.Marker ? 'Marker' : 'Polygon');
-
+      // Terrace garden and garden use a single marker.
       if (currentPolygonCategory || e.layer instanceof L.Marker) {
-        // For terrace garden (marker), set fixed area
-        console.log('Setting area to 40.4686 (0.01 acres) for terrace garden');
-        setAreaM2(40.4686); // 0.01 acres in sq meters
+        setAreaM2(40.4686);
         setHasFarm(true);
         setDrawing(false);
-        // Auto-focus name input immediately after placing point
+
         setTimeout(() => nameInputRef.current?.focus(), 100);
-      } else {
-        // For other categories (polygon), compute area
-        const latlngs = e.layer.getLatLngs()[0];
-        console.log('Polygon coordinates count:', latlngs.length);
-        if (latlngs.length < 3) {
-          console.warn('Polygon has fewer than 3 points, not accepting');
-          drawn.current.clearLayers();
-          setHasFarm(false);
-          setDrawing(false);
-          return;
-        }
-        computeArea(e.layer);
-        setHasFarm(true);
-        setDrawing(false);
-        // Auto-focus name input when polygon is closed
-        setTimeout(() => nameInputRef.current?.focus(), 100);
+        return;
       }
+
+      // Normal farm polygon
+      const latlngs = e.layer.getLatLngs()[0];
+
+      if (latlngs.length < 3) {
+        alert("At least 3 coordinates are mandatory.");
+        drawn.current.clearLayers();
+        setHasFarm(false);
+        setDrawing(false);
+        return;
+      }
+
+      computeArea(e.layer);
+      setHasFarm(true);
+      setDrawing(false);
+
+      setTimeout(() => nameInputRef.current?.focus(), 100);
     });
 
-    // Track vertex count to show finish button
-    m.on('draw:vertex', (e) => {
-      if (drawHandler.current && drawHandler.current._markers) {
-        const markers = drawHandler.current._markers;
-        setVertexCount(markers.length);
-        console.log('Vertex count:', markers.length);
-      }
+    // Track vertices after each point is placed
+    m.on(L.Draw.Event.DRAWVERTEX, (e) => {
+      const count = e.layers?.getLayers().length || 0;
+
+      setVertexCount(count);
+      console.log("Vertex count:", count);
     });
 
     m.on(L.Draw.Event.DRAWSTART, () => {
@@ -231,6 +231,13 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     }
   }, [polygonCategory, hasFarm]);
 
+  // Auto-set crop to 'pasture' for pasture category
+  useEffect(() => {
+    if (polygonCategory?.toLowerCase() === 'pasture') {
+      setCrop('pasture');
+    }
+  }, [polygonCategory]);
+
   // ---------- toolbar actions ----------
   const startDraw = () => {
     if (drawing) {
@@ -244,7 +251,7 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     const isTerraceGarden = polygonCategory?.toLowerCase() === 'terrace garden' || polygonCategory?.toLowerCase() === 'garden';
 
     if (isTerraceGarden) {
-      // For terrace garden, use marker (single point)
+      // For terrace garden and garden, use marker (single point)
       drawHandler.current = new L.Draw.Marker(map.current, {
         icon: L.icon({
           iconUrl: markerIcon,
@@ -261,12 +268,18 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
       drawHandler.current = new L.Draw.Polygon(map.current, {
         allowIntersection: false,
         showArea: false,
-        shapeOptions: { color: "#ffd400", weight: 4, fillColor: "#ffd400", fillOpacity: 0.1 },
+        shapeOptions: {
+          color: "#ffd400",
+          weight: 4,
+          fillColor: "#ffd400",
+          fillOpacity: 0.1
+        },
         metric: false,
         repeatMode: false,
         guideLayers: false,
         finishOnDoubleClick: false,
         snapDistance: 0,
+        snapVertex: false,
         finishOn: 'click',
       });
     }
@@ -294,12 +307,6 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     setEditing(false);
     setDrawing(false);
     setVertexCount(0);
-  };
-
-  const finishDrawing = () => {
-    if (drawHandler.current) {
-      drawHandler.current.completeShape();
-    }
   };
 
   const toggleLabels = () => {
@@ -342,21 +349,73 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     setQuery(r.display_name.split(",")[0]);
   };
 
+  // ---------- latitude/longitude search ----------
+  const searchByLatLong = () => {
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lon)) {
+      alert("Please enter valid latitude and longitude values.");
+      return;
+    }
+
+    if (lat < -90 || lat > 90) {
+      alert("Latitude must be between -90 and 90.");
+      return;
+    }
+
+    if (lon < -180 || lon > 180) {
+      alert("Longitude must be between -180 and 180.");
+      return;
+    }
+
+    // Clear existing markers
+    if (markerRef.current) {
+      map.current.removeLayer(markerRef.current);
+    }
+
+    // Create a marker at the specified coordinates
+    const marker = L.marker([lat, lon], {
+      icon: L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="
+          width: 16px;
+          height: 16px;
+          background: rgba(0, 0, 0, 0.8);
+          border: 2px solid rgba(255, 255, 255, 0.8);
+          border-radius: 50%;
+        "></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      })
+    }).addTo(map.current);
+
+    markerRef.current = marker;
+
+    // Center the map view on the specified coordinates
+    map.current.setView([lat, lon], 15);
+
+    // Hide the search box and clear inputs after searching
+    setShowLatLongSearch(false);
+    setLatitude("");
+    setLongitude("");
+  };
+
   // ---------- submit ----------
   const handleSubmit = () => {
     if (!hasFarm) return alert("Please draw the farm boundary first.");
     if (!name.trim()) return alert("Please enter the farm name.");
-    // Variety is optional for aquaculture, farm, polyhouse, and terrace garden
-    const optionalVarietyCategories = ['aquaculture', 'farm', 'polyhouse', 'terrace garden', 'garden'];
+    // Variety is optional for aquaculture, farm, polyhouse, terrace garden, garden, and pasture
+    const optionalVarietyCategories = ['aquaculture', 'farm', 'polyhouse', 'terrace garden', 'garden', 'pasture'];
     if (!optionalVarietyCategories.includes(polygonCategory?.toLowerCase()) && !variety.trim()) {
       return alert("Please enter the variety.");
     }
-    // Sowing date is optional for aquaculture
-    if (polygonCategory?.toLowerCase() !== 'aquaculture' && !sowingDate) {
+    // Sowing date is optional for aquaculture and pasture
+    if (polygonCategory?.toLowerCase() !== 'aquaculture' && polygonCategory?.toLowerCase() !== 'pasture' && !sowingDate) {
       return alert("Please enter the sowing date.");
     }
-    // Irrigation is optional for aquaculture
-    if (polygonCategory?.toLowerCase() !== 'aquaculture' && !irrigation) {
+    // Irrigation is optional for aquaculture and pasture
+    if (polygonCategory?.toLowerCase() !== 'aquaculture' && polygonCategory?.toLowerCase() !== 'pasture' && !irrigation) {
       return alert("Please select the irrigation type.");
     }
     const layer = drawn.current.getLayers()[0];
@@ -364,7 +423,7 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
     const isTerraceGarden = polygonCategory?.toLowerCase() === 'terrace garden' || polygonCategory?.toLowerCase() === 'garden';
 
     if (isTerraceGarden) {
-      // Terrace garden uses marker (single point)
+      // Terrace garden and garden use marker (single point)
       const latlng = layer.getLatLng();
       if (!latlng) {
         return alert("Please select at least 1 point for terrace garden.");
@@ -504,22 +563,90 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
           <button style={styles.toolBtn(false)} title="Redraw boundary" onClick={startDraw}>⬠</button>
           <button style={styles.toolBtn(!labels)} title="Toggle labels" onClick={toggleLabels}>👁</button>
           <button style={styles.toolBtn(false)} title="My location" onClick={locateMe}>📍</button>
-          <button style={styles.toolBtn(false)} title="Zoom to farm" onClick={zoomToFarm}>🔍</button>
-          {drawing && vertexCount >= 3 && (
-            <button
-              style={{
-                ...styles.toolBtn(false),
-                background: '#0d7a3e',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}
-              title="Finish Drawing"
-              onClick={finishDrawing}
-            >
-              ✓ Finish
-            </button>
-          )}
+          <button style={styles.toolBtn(false)} title="Zoom to farm" onClick={() => setShowLatLongSearch(!showLatLongSearch)}>🔍</button>
         </div>
+
+        {/* latitude/longitude search box */}
+        {showLatLongSearch && (
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            right: 60,
+            zIndex: 1000,
+            background: '#fff',
+            padding: '12px',
+            borderRadius: 4,
+            boxShadow: '0 1px 4px rgba(0,0,0,.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            minWidth: '200px'
+          }}>
+            <div style={{fontSize: '12px', fontWeight: '600', color: '#333'}}>Search by Lat/Long</div>
+            <input
+              type="number"
+              step="any"
+              placeholder="Latitude"
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: 3,
+                fontSize: 13
+              }}
+            />
+            <input
+              type="number"
+              step="any"
+              placeholder="Longitude"
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: 3,
+                fontSize: 13
+              }}
+            />
+            <div style={{display: 'flex', gap: '8px'}}>
+              <button
+                onClick={searchByLatLong}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  background: GREEN,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  fontSize: 13
+                }}
+              >
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  setShowLatLongSearch(false);
+                  setLatitude("");
+                  setLongitude("");
+                }}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  background: '#666',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  fontSize: 13
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Farm Details Form - matching Farm Details UI */}
         {hasFarm && (
@@ -549,6 +676,8 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
                   ? 'Polyhouse Name'
                   : polygonCategory.toLowerCase() === 'terrace garden'
                   ? 'Garden Name'
+                  : polygonCategory.toLowerCase() === 'posture'
+                  ? 'Posture Name'
                   : 'Farm Name'}
               </label>
               {farmerInfo && (
@@ -561,11 +690,13 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
                 style={{padding: '9px 10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px'}}
                 placeholder={
                   polygonCategory.toLowerCase() === 'aquaculture' 
-                    ? 'Enter aquaculture name' 
+                    ? 'Enter aquaculture name'
                     : polygonCategory.toLowerCase() === 'polyhouse'
                     ? 'Enter polyhouse name'
                     : polygonCategory.toLowerCase() === 'terrace garden'
                     ? 'Enter garden name'
+                    : polygonCategory.toLowerCase() === 'posture'
+                    ? 'Enter posture name'
                     : 'Enter farm name'
                 }
                 value={name} 
@@ -585,24 +716,33 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
 
             {polygonCategory.toLowerCase() !== 'aquaculture' && (
               <>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</label>
-                  <select 
-                    style={{padding: '9px 10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px'}}
-                    value={crop} 
-                    onChange={(e) => handleCropTypeChange(e.target.value)}
-                    disabled={loadingCrops}
-                  >
-                    <option value="">
-                      {loadingCrops ? 'Loading crops...' : 'Select crop type'}
-                    </option>
-                    {cropsList.map((cropItem) => (
-                      <option key={cropItem} value={cropItem}>
-                        {cropItem.replace(/_/g, ' ')}
+                {polygonCategory.toLowerCase() === 'pasture' ? (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</label>
+                    <div style={{padding: '9px 10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px', backgroundColor: 'var(--bg-2)'}}>
+                      pasture
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</label>
+                    <select
+                      style={{padding: '9px 10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px'}}
+                      value={crop}
+                      onChange={(e) => handleCropTypeChange(e.target.value)}
+                      disabled={loadingCrops}
+                    >
+                      <option value="">
+                        {loadingCrops ? 'Loading crops...' : 'Select crop type'}
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {cropsList.map((cropItem) => (
+                        <option key={cropItem} value={cropItem}>
+                          {cropItem.replace(/_/g, ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                   <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Variety</label>
@@ -640,31 +780,33 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
                   />
                 </div>
 
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Irrigation</label>
-                  <div style={{display: 'flex', gap: '16px', marginTop: '8px'}}>
-                    <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
-                      <input
-                        type="radio"
-                        name="irrigation"
-                        value="rainfed"
-                        checked={irrigation === 'rainfed'}
-                        onChange={(e) => setIrrigation(e.target.value)}
-                      />
-                      <span>Rainfed</span>
-                    </label>
-                    <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
-                      <input
-                        type="radio"
-                        name="irrigation"
-                        value="irrigated"
-                        checked={irrigation === 'irrigated'}
-                        onChange={(e) => setIrrigation(e.target.value)}
-                      />
-                      <span>Irrigated</span>
-                    </label>
+                {polygonCategory.toLowerCase() !== 'aquaculture' && polygonCategory.toLowerCase() !== 'pasture' && (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)'}}>Irrigation</label>
+                    <div style={{display: 'flex', gap: '16px', marginTop: '8px'}}>
+                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                        <input
+                          type="radio"
+                          name="irrigation"
+                          value="rainfed"
+                          checked={irrigation === 'rainfed'}
+                          onChange={(e) => setIrrigation(e.target.value)}
+                        />
+                        <span>Rainfed</span>
+                      </label>
+                      <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+                        <input
+                          type="radio"
+                          name="irrigation"
+                          value="irrigated"
+                          checked={irrigation === 'irrigated'}
+                          onChange={(e) => setIrrigation(e.target.value)}
+                        />
+                        <span>Irrigated</span>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
 

@@ -1,23 +1,42 @@
 import { useState, useEffect } from 'react';
-import { X, ArrowLeft, Info } from 'lucide-react';
+import { X, ArrowLeft, Info, Calendar, Download } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import axios from 'axios';
 
-export default function CropHealth({ onClose, onBack, farmId, clientId }) {
+export default function CropHealth({ onClose, onBack, farmId, clientId, farmCategory }) {
   const [satelliteData, setSatelliteData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [ndviData, setNdviData] = useState(null);
+
+  const isPastureCategory = String(farmCategory || '').toLowerCase() === 'pasture';
 
   useEffect(() => {
     if (farmId && clientId) {
-      fetchSatelliteData();
+      isPastureCategory ? fetchPastureData() : fetchSatelliteData();
     } else if (farmId && !clientId) {
       setError('Data will be available soon');
     }
-  }, [farmId, clientId]);
+  }, [farmId, clientId, farmCategory]);
+
+  // Shared by pasture + non-pasture
+  const processSatelliteData = async (data) => {
+    const sortedData = [...data].sort((a, b) => b.Date - a.Date);
+    setSatelliteData(sortedData);
+
+    const validData = sortedData.filter(item =>
+      item.zonalStats?.ndvi && item.zonalStats.ndvi !== 'None' &&
+      item.png?.ndvi && item.png.ndvi !== 'None'
+    );
+    const pngOnlyData = sortedData.filter(item => item.png?.ndvi && item.png.ndvi !== 'None');
+
+    if (pngOnlyData.length > 0) setSelectedDate(pngOnlyData[0]);
+    if (validData.length > 0) await fetchChartData(validData);
+    return sortedData.length > 0;
+  };
 
   const fetchSatelliteData = async () => {
     setLoading(true);
@@ -27,32 +46,90 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
         params: { client_id: clientId }
       });
       const apiKey = keyResponse.data.api_key;
-
       const response = await axios.get(import.meta.env.VITE_SATELLITE_REPORT_API_URL, {
         params: { key: apiKey, farm_id: farmId }
       });
+      await processSatelliteData(response.data);
+    } catch (err) {
+      setError('Data will be available soon');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const data = response.data;
-      const sortedData = [...data].sort((a, b) => b.Date - a.Date);
-      setSatelliteData(sortedData);
-      
-      const validData = sortedData.filter(item => 
-        item.zonalStats && item.zonalStats.ndvi && item.zonalStats.ndvi !== 'None' &&
-        item.png && item.png.ndvi && item.png.ndvi !== 'None'
-      );
-      
-      const pngOnlyData = sortedData.filter(item => 
-        item.png && item.png.ndvi && item.png.ndvi !== 'None'
-      );
-      
-      if (pngOnlyData.length > 0) {
-        setSelectedDate(pngOnlyData[0]);
+  const fetchPastureData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const keyResponse = await axios.get(import.meta.env.VITE_FETCH_FARMER_KEY_API_URL, {
+        params: { client_id: clientId }
+      });
+      const apiKey = keyResponse.data.api_key;
+      console.log('Pasture - API Key:', apiKey);
+
+      const [satRes, avgRes] = await Promise.allSettled([
+        axios.get(import.meta.env.VITE_SATELLITE_REPORT_API_URL, {
+          params: { key: apiKey, farm_id: farmId }
+        }),
+        axios.get(import.meta.env.VITE_MEAN_NDVI_DATA_API_URL, {
+          params: { api_key: apiKey, farm_id: farmId }
+        })
+      ]);
+
+      console.log('Pasture - Satellite API Response:', satRes);
+      console.log('Pasture - NDVI API Response:', avgRes);
+
+      let hasData = false;
+      let hasSatelliteData = false;
+
+      // Process NDVI data (5-year average)
+      if (avgRes.status === 'fulfilled' && avgRes.value.data?.status && avgRes.value.data?.data) {
+        console.log('Pasture - Setting NDVI data:', avgRes.value.data.data);
+        setNdviData(avgRes.value.data.data);
+        hasData = true;
+      } else {
+        console.log('Pasture - NDVI API failed or no data:', avgRes.status === 'fulfilled' ? avgRes.value.data : avgRes.reason);
       }
-      
-      if (validData.length > 0) {
-        await fetchChartData(validData);
+
+      // Process satellite data (for PNG images and current season chart)
+      if (satRes.status === 'fulfilled' && Array.isArray(satRes.value.data)) {
+        console.log('Pasture - Processing satellite data, array length:', satRes.value.data.length);
+        const ok = await processSatelliteData(satRes.value.data);
+        hasData = hasData || ok;
+        hasSatelliteData = ok;
+      } else {
+        console.log('Pasture - Satellite API failed or not array:', satRes.status === 'fulfilled' ? satRes.value.data : satRes.reason);
+        // If satellite data is being processed, set a flag to show appropriate message
+        if (satRes.status === 'fulfilled' && satRes.value.data?.message) {
+          console.log('Pasture - Satellite data processing message:', satRes.value.data.message);
+        }
+      }
+
+      // If we have NDVI data but no satellite data, create chart data from NDVI timeseries
+      if (hasData && !hasSatelliteData && ndviData?.timeseries_data) {
+        console.log('Pasture - Creating chart data from NDVI timeseries');
+        const baseYear = new Date().getFullYear();
+        const chartFromNdvi = ndviData.timeseries_data
+          .filter(item => item.ndvi !== null && item.ndvi !== undefined)
+          .map(item => {
+            const d = new Date(baseYear, 0);
+            d.setDate(item.year_day);
+            return {
+              date: d.getTime(),
+              mean: item.ndvi
+            };
+          })
+          .sort((a, b) => a.date - b.date);
+        console.log('Pasture - Chart data from NDVI:', chartFromNdvi);
+        setChartData(chartFromNdvi);
+      }
+
+      if (!hasData) {
+        console.log('Pasture - No data available from either API');
+        setError('Data will be available soon');
       }
     } catch (err) {
+      console.error('Pasture - Fetch error:', err);
       setError('Data will be available soon');
     } finally {
       setLoading(false);
@@ -61,7 +138,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
 
   const fetchChartData = async (data) => {
     const chartPoints = [];
-    
+
     for (const item of data) {
       if (item.zonalStats && item.zonalStats.ndvi && item.zonalStats.ndvi !== 'None') {
         try {
@@ -77,7 +154,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
         }
       }
     }
-    
+
     chartPoints.sort((a, b) => a.date - b.date);
     setChartData(chartPoints);
   };
@@ -98,23 +175,117 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
     return formatDate(nextDate.getTime());
   };
 
-  const validSatelliteData = satelliteData.filter(item => 
+  const validSatelliteData = satelliteData.filter(item =>
     item.zonalStats && item.zonalStats.ndvi && item.zonalStats.ndvi !== 'None' &&
     item.png && item.png.ndvi && item.png.ndvi !== 'None'
   );
 
   // For last PNG date, only check for PNG data (not zonal stats)
-  const pngData = satelliteData.filter(item => 
+  const pngData = satelliteData.filter(item =>
     item.png && item.png.ndvi && item.png.ndvi !== 'None'
   );
-  
+
   const lastPngDate = pngData.length > 0 ? pngData[0].Date : null;
   const nextReportDate = calculateNextReportDate(lastPngDate);
 
-  const chartOption = chartData && chartData.length > 0 ? {
+  // Pasture chart helpers
+  const dateFromYearDay = (yearDay, year) => {
+    const d = new Date(year, 0);
+    d.setDate(yearDay);
+    return d;
+  };
+  const fmtShort = (ts) => {
+    const d = new Date(ts);
+    const yy = String(d.getFullYear()).slice(2);
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${yy}`;
+  };
+
+  // Chart 1: current season with value labels
+  const pastureTrendOption = chartData.length > 0 ? {
+    grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: chartData.map(d => fmtShort(d.date)),
+      axisLabel: { rotate: 40, fontSize: 10, color: '#444' }
+    },
+    yAxis: {
+      type: 'value', min: 0, max: 0.9, interval: 0.1,
+      axisLabel: { fontSize: 10, color: '#444' },
+      splitLine: { lineStyle: { color: '#ddd' } }
+    },
+    series: [{
+      name: 'NDVI',
+      type: 'line',
+      smooth: true,
+      data: chartData.map(d => Number(d.mean.toFixed(2))),
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: '#fff', borderColor: '#2f8fc9', borderWidth: 2 },
+      lineStyle: { color: '#3b9ad9', width: 2.5 },
+      label: { show: true, position: 'top', fontSize: 10, color: '#333' }
+    }]
+  } : null;
+
+  // Chart 2: current vs 5-year average (aligned to the current season start)
+  const pastureCompareOption = (() => {
+    if (chartData.length === 0 || !ndviData?.timeseries_data) return null;
+    const startTs = chartData[0].date;
+    const baseYear = new Date(startTs).getFullYear();
+
+    const avgSeries = ndviData.timeseries_data
+      .map(item => {
+        let d = dateFromYearDay(item.year_day, baseYear);
+        if (d.getTime() < startTs - 15 * 86400000) d = dateFromYearDay(item.year_day, baseYear + 1);
+        return [d.getTime(), item.ndvi];
+      })
+      .sort((a, b) => a[0] - b[0]);
+
+    const currentSeries = chartData.map(d => [d.date, d.mean]);
+
+    return {
+      grid: { left: 8, right: 16, top: 16, bottom: 36, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        valueFormatter: (v) => (typeof v === 'number' ? v.toFixed(2) : v)
+      },
+      legend: {
+        bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10 },
+        data: ['5-Year Average', 'Current Data']
+      },
+      xAxis: {
+        type: 'time',
+        axisLabel: { rotate: 40, fontSize: 10, color: '#444', formatter: (v) => fmtShort(v) },
+        splitLine: { show: true, lineStyle: { color: '#ddd' } }
+      },
+      yAxis: {
+        type: 'value', min: 0.1, max: 0.8, interval: 0.1,
+        axisLabel: { fontSize: 10, color: '#444' },
+        splitLine: { lineStyle: { color: '#ddd' } }
+      },
+      series: [
+        {
+          name: '5-Year Average', type: 'line', smooth: true, showSymbol: false,
+          data: avgSeries,
+          lineStyle: { color: '#888', width: 2, type: 'dashed' },
+          itemStyle: { color: '#888' }
+        },
+        {
+          name: 'Current Data', type: 'line', smooth: true, showSymbol: false,
+          data: currentSeries,
+          lineStyle: { color: '#0000ee', width: 2.5 },
+          itemStyle: { color: '#0000ee' }
+        }
+      ]
+    };
+  })();
+
+  // Use pasture data for pasture category, otherwise use regular chart data
+  const chartDataToUse = isPastureCategory ? chartData : chartData;
+  const chartOption = chartDataToUse && chartDataToUse.length > 0 ? {
     backgroundColor: '#ffffff',
     title: {
-      text: 'NDVI Graph',
+      text: 'NDVI Trend',
       left: 'center',
       textStyle: {
         fontSize: 16,
@@ -126,7 +297,8 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
       trigger: 'axis',
       formatter: (params) => {
         const item = params[0];
-        return `Date: ${item.name}<br/>Mean Value of NDVI: ${item.value.toFixed(4)}`;
+        const value = isPastureCategory ? item.value : item.value;
+        return `Date: ${item.name}<br/>NDVI: ${value.toFixed(4)}`;
       }
     },
     grid: {
@@ -138,7 +310,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
     },
     xAxis: {
       type: 'category',
-      data: chartData.map(d => formatDate(d.date)),
+      data: chartDataToUse.map(d => d.date),
       axisLabel: {
         color: '#64748b',
         rotate: -30,
@@ -154,7 +326,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
     },
     yAxis: {
       type: 'value',
-      name: 'Mean Value of NDVI',
+      name: 'NDVI Value',
       nameTextStyle: {
         color: '#64748b',
         fontWeight: 600
@@ -180,7 +352,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
       }
     },
     series: [{
-      data: chartData.map(d => d.mean),
+      data: chartDataToUse.map(d => isPastureCategory ? d.ndvi : d.mean),
       type: 'line',
       smooth: true,
       smoothMonotone: 'x',
@@ -223,14 +395,14 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{width: '1200px', maxWidth: '95vw', maxHeight: '90vh'}}>
+      <div className="modal" style={{width: isPastureCategory ? '1000px' : '1200px', maxWidth: '95vw', maxHeight: '90vh'}}>
         <div className="modal-head">
           <button className="btn btn-ghost btn-sm" onClick={onBack || onClose}>
             <ArrowLeft className="ic-xs" />
           </button>
-          <h3>Crop Health</h3>
-          <button 
-            className="btn btn-ghost btn-sm" 
+          <h3>{isPastureCategory ? 'Crop Health (Pasture)' : 'Crop Health'}</h3>
+          <button
+            className="btn btn-ghost btn-sm"
             onClick={() => setShowDisclaimer(true)}
             style={{marginRight: '8px'}}
             title="Disclaimer"
@@ -250,14 +422,98 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
             <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
               {error}
             </div>
+          ) : isPastureCategory ? (
+            <div style={{ maxWidth: 960, margin: '0 auto' }}>
+              <div style={{
+                background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+                padding: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+              }}>
+                {/* Header: date + download */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Calendar size={26} color="#c0392b" />
+                  <select
+                    value={selectedDate?.Date || ''}
+                    onChange={(e) => setSelectedDate(pngData.find(d => d.Date === parseInt(e.target.value)))}
+                    style={{ border: 'none', background: 'transparent', fontSize: 13, fontWeight: 500, flex: 1 }}
+                  >
+                    {pngData.map(item => (
+                      <option key={item.Date} value={item.Date}>{formatDate(item.Date).replaceAll('-', '/')}</option>
+                    ))}
+                  </select>
+                  {selectedDate?.png?.ndvi && (
+                    <a href={selectedDate.png.ndvi} download target="_blank" rel="noreferrer" title="Download">
+                      <Download size={20} color="#111" />
+                    </a>
+                  )}
+                </div>
+
+                {/* NDVI map and Chart side by side */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+                  {/* NDVI map */}
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700 }}>Normalized Difference Vegetation Index</div>
+                    {selectedDate?.png?.ndvi ? (
+                      <img src={selectedDate.png.ndvi} alt="NDVI"
+                           style={{ width: '100%', height: 250, objectFit: 'contain' }} />
+                    ) : (
+                      <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13 }}>
+                        No image available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chart */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#1a9850', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Chart</div>
+                    {pastureTrendOption ? (
+                      <ReactECharts option={pastureTrendOption} style={{ width: '100%', height: 250 }} />
+                    ) : (
+                      <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13 }}>
+                        No graph data available
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, color: '#444', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                      <span style={{ width: 8, height: 8, background: '#3b9ad9', display: 'inline-block' }} /> NDVI
+                    </div>
+                  </div>
+                </div>
+
+                {nextReportDate && (
+                  <div style={{ textAlign: 'center', color: '#2f8fc9', fontWeight: 700, fontSize: 13, padding: '6px 0',
+                                marginTop: 12, borderBottom: '1px solid #ccc' }}>
+                    *Next data will be available soon.
+                  </div>
+                )}
+
+                {/* Compared to 5-year average */}
+                <div style={{ color: '#1a9850', fontWeight: 700, fontSize: 13, margin: '12px 0 4px' }}>
+                  Compared to 5-Year Historical Average
+                </div>
+                {pastureCompareOption ? (
+                  <ReactECharts option={pastureCompareOption} style={{ width: '100%', height: 240 }} />
+                ) : (
+                  <div style={{ padding: 20, color: '#64748b', fontSize: 13 }}>No comparison data available</div>
+                )}
+
+                {/* Disclaimer link */}
+                <div style={{ textAlign: 'right' }}>
+                  <button
+                    onClick={() => setShowDisclaimer(true)}
+                    style={{ background: 'none', border: 'none', color: '#b03a00', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                  >
+                    ⓘ Disclaimer
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <div style={{marginBottom: '20px'}}>
                 <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)', marginRight: '12px'}}>
                   Select Date:
                 </label>
-                <select 
-                  value={selectedDate?.Date || ''} 
+                <select
+                  value={selectedDate?.Date || ''}
                   onChange={(e) => {
                     const selected = pngData.find(d => d.Date === parseInt(e.target.value));
                     setSelectedDate(selected);
@@ -294,9 +550,9 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
                     NDVI Image
                   </h5>
                   {selectedDate && selectedDate.png && selectedDate.png.ndvi && selectedDate.png.ndvi !== 'None' ? (
-                    <img 
-                      src={selectedDate.png.ndvi} 
-                      alt="NDVI" 
+                    <img
+                      src={selectedDate.png.ndvi}
+                      alt="NDVI"
                       style={{
                         width: '100%',
                         height: '300px',
@@ -380,10 +636,13 @@ export default function CropHealth({ onClose, onBack, farmId, clientId }) {
             <div className="modal-body">
               <div style={{padding: '20px'}}>
                 <h5 style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                  Crop Health
+                  {isPastureCategory ? 'Crop Health (Pasture)' : 'Crop Health'}
                 </h5>
                 <p style={{fontSize: '14px', color: 'var(--text-1)', lineHeight: '1.6'}}>
-                  NDVI is a normalized difference vegetation index and is a proxy for the greenness and canopy structure. It helps in identifying the growth of a crop compared to a standard crop. However, a few issues can not be identified by NDVI e.g. impact only on the grains. NDVI data is subjected to available satellite passes and cloud free environment.
+                  {isPastureCategory
+                    ? 'NDVI is a normalized difference vegetation index and is a proxy for the greenness and canopy structure. It helps in identifying the growth of pasture compared to a standard pasture. However, a few issues can not be identified by NDVI e.g. impact only on the grass quality. NDVI data is subjected to available satellite passes and cloud free environment.'
+                    : 'NDVI is a normalized difference vegetation index and is a proxy for the greenness and canopy structure. It helps in identifying the growth of a crop compared to a standard crop. However, a few issues can not be identified by NDVI e.g. impact only on the grains. NDVI data is subjected to available satellite passes and cloud free environment.'
+                  }
                 </p>
               </div>
             </div>

@@ -376,6 +376,13 @@ export default function UnlockFarm({ user, onPageChange }) {
     setVarietiesList(varieties);
   };
 
+  // Auto-set crop to 'pasture' for pasture category
+  useEffect(() => {
+    if (selectedPolygonCategory?.toLowerCase() === 'pasture') {
+      setCropType('pasture');
+    }
+  }, [selectedPolygonCategory]);
+
   const fetchFarmerApiKey = async (farmer) => {
     const farmerId = getSelectedFarmerId(farmer);
     if (!farmerId) {
@@ -711,7 +718,7 @@ const parseCsvCoordinatePairs = (content) => {
     }
     
     // For garden/terrace garden, return only the first coordinate point as JSON array [[lng,lat]]
-    if (polygonCategory && 
+    if (polygonCategory &&
       (polygonCategory.toLowerCase() === 'terrace garden' || polygonCategory.toLowerCase() === 'garden')) {
       if (Array.isArray(kmlPairs) && kmlPairs.length > 0) {
         const [lng, lat] = kmlPairs[0];
@@ -917,8 +924,8 @@ const parseCsvCoordinatePairs = (content) => {
         const pairs = parseKmlCoordinatePairs(coordinates);
         
         // Check if this is for terrace garden (single point)
-        const isTerraceGarden = selectedPolygonCategory && 
-          (selectedPolygonCategory.toLowerCase() === 'terrace garden' || 
+        const isTerraceGarden = selectedPolygonCategory &&
+          (selectedPolygonCategory.toLowerCase() === 'terrace garden' ||
            selectedPolygonCategory.toLowerCase() === 'garden');
         
         const payload = toCoordinatePayload(pairs, isTerraceGarden);
@@ -3290,6 +3297,17 @@ const parseCsvCoordinatePairs = (content) => {
                       </div>
                     </div>
                   </button>
+                  <button
+                    style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px', backgroundColor: '#f3f4f6', color: '#1f2937', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', width: '100%', fontSize: '14px'}}
+                    onClick={() => { setSelectedPolygonCategory('Pasture'); setAddFarmModalStep(2); }}
+                  >
+                    <div>
+                      <strong>Pasture</strong>
+                      <div style={{fontSize: '12px', color: '#6b7280', marginTop: '4px'}}>
+                        {selectedPolygonCategory === 'Pasture' ? '✓ Selected' : 'Select Pasture category'}
+                      </div>
+                    </div>
+                  </button>
                 </div>
               )}
 
@@ -3635,23 +3653,32 @@ const parseCsvCoordinatePairs = (content) => {
 
                   {selectedPolygonCategory.toLowerCase() !== 'aquaculture' && (
                     <>
-                      <div className="form-group">
-                        <label>Crop Type</label>
-                        <select
-                          value={cropType}
-                          onChange={(e) => handleCropTypeChange(e.target.value)}
-                          disabled={loadingCrops}
-                        >
-                          <option value="">
-                            {loadingCrops ? 'Loading crops...' : 'Select crop type'}
-                          </option>
-                          {cropsList.map((crop) => (
-                            <option key={crop} value={crop}>
-                              {crop.replace(/_/g, ' ')}
+                      {selectedPolygonCategory.toLowerCase() === 'pasture' ? (
+                        <div className="form-group">
+                          <label>Crop Type</label>
+                          <div style={{padding: '9px 10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px', backgroundColor: 'var(--bg-2)'}}>
+                            pasture
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="form-group">
+                          <label>Crop Type</label>
+                          <select
+                            value={cropType}
+                            onChange={(e) => handleCropTypeChange(e.target.value)}
+                            disabled={loadingCrops}
+                          >
+                            <option value="">
+                              {loadingCrops ? 'Loading crops...' : 'Select crop type'}
                             </option>
-                          ))}
-                        </select>
-                      </div>
+                            {cropsList.map((crop) => (
+                              <option key={crop} value={crop}>
+                                {crop.replace(/_/g, ' ')}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
                       <div className="form-group">
                         <label>Variety</label>
@@ -4599,7 +4626,7 @@ const parseCsvCoordinatePairs = (content) => {
       {featureModalOpen === 'Crop Calendar' && <CropCalendar onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Pest and Disease' && <PestAndDisease onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Soil Moisture' && <SoilMoisture onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Crop Health' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'Crop Health' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmCategory={featureFarmCategory} />}
       {featureModalOpen === 'LSWI' && <LSWI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
       {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); setFeatureFarmPlan(null); setFeatureFarmUnlockDate(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmPlan={featureFarmPlan} farmUnlockDate={featureFarmUnlockDate} />}

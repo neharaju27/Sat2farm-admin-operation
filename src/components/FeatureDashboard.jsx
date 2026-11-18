@@ -17,6 +17,8 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
   const isFarmCategory = String(farmCategory || '').toLowerCase() === 'farm';
   // Check if farm category is garden
   const isGardenCategory = String(farmCategory || '').toLowerCase() === 'garden';
+  // Check if farm category is pasture
+  const isPastureCategory = String(farmCategory || '').toLowerCase() === 'pasture';
 
   // Show locked popup when farm is locked
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Real-time weather data and forecasts for your farm locations',
       status: featureStatus,
       icon: '🌤️',
-      visibleFor: ['polyhouse', 'garden', 'farm','tank']
+      visibleFor: ['polyhouse', 'garden', 'farm', 'tank', 'pasture']
     },
     {
       id: 12,
@@ -96,7 +98,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Soil moisture levels and irrigation recommendations',
       status: featureStatus,
       icon: '💧',
-      visibleFor: ['farm']
+      visibleFor: ['farm', 'pasture']
     },
     {
       id: 6,
@@ -104,7 +106,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Crop health monitoring and growth analysis',
       status: featureStatus,
       icon: '🌱',
-      visibleFor: ['farm']
+      visibleFor: ['farm', 'pasture']
     },
     {
       id: 7,
@@ -136,7 +138,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Detailed soil analysis and nutrient recommendations for your farms',
       status: featureStatus,
       icon: '🌍',
-      visibleFor: ['farm']
+      visibleFor: ['farm', 'pasture']
     }
   ];
 
@@ -144,7 +146,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
   const visibleFeatures = features.filter(feature => {
     const visibleFor = feature.visibleFor;
     const categories = Array.isArray(visibleFor) ? visibleFor : [visibleFor];
-    
+
     if (isTankCategory) {
       // For tank category, show tank-specific features and features marked as 'all'
       return categories.includes('tank') || categories.includes('all');
@@ -154,6 +156,9 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
     } else if (isGardenCategory) {
       // For garden category, show garden-specific features and features marked as 'all'
       return categories.includes('garden') || categories.includes('all');
+    } else if (isPastureCategory) {
+      // For pasture category, show pasture-specific features and features marked as 'all'
+      return categories.includes('pasture') || categories.includes('all');
     } else if (isFarmCategory) {
       // For farm category, show farm-specific features and features marked as 'all'
       return categories.includes('farm') || categories.includes('all');
