@@ -621,16 +621,16 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                   Crop Name
                 </label>
                 <select
-                  value={editForm.crop_type}
+                  value={farmData?.category?.toLowerCase() === 'pasture' ? 'Pasture' : editForm.crop_type}
                   onChange={(e) => handleCropTypeChange(e.target.value)}
-                  disabled={loadingCrops}
+                  disabled={loadingCrops || farmData?.category?.toLowerCase() === 'pasture'}
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     border: '1px solid var(--border)',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    backgroundColor: '#fff'
+                    backgroundColor: farmData?.category?.toLowerCase() === 'pasture' ? '#f3f4f6' : '#fff'
                   }}
                 >
                   <option value="">Select crop</option>
@@ -639,9 +639,15 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                       {crop.replace(/_/g, ' ')}
                     </option>
                   ))}
+                  {farmData?.category?.toLowerCase() === 'pasture' && (
+                    <option value="Pasture">Pasture</option>
+                  )}
                 </select>
                 {loadingCrops && (
                   <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>Loading crops...</div>
+                )}
+                {farmData?.category?.toLowerCase() === 'pasture' && (
+                  <div style={{fontSize: '12px', color: 'var(--text-2)', marginTop: '4px'}}>Crop editing is disabled for pasture</div>
                 )}
               </div>
               <div style={{marginBottom: '16px'}}>
@@ -652,13 +658,14 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                   <select
                     value={editForm.crop_variety}
                     onChange={(e) => setEditForm({...editForm, crop_variety: e.target.value})}
+                    disabled={farmData?.category?.toLowerCase() === 'pasture'}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
                       border: '1px solid var(--border)',
                       borderRadius: '8px',
                       fontSize: '14px',
-                      backgroundColor: '#fff'
+                      backgroundColor: farmData?.category?.toLowerCase() === 'pasture' ? '#f3f4f6' : '#fff'
                     }}
                   >
                     <option value="">Select variety</option>
@@ -673,12 +680,14 @@ export default function FarmMap({ onClose, onBack, farmId, clientId }) {
                     type="text"
                     value={editForm.crop_variety}
                     onChange={(e) => setEditForm({...editForm, crop_variety: e.target.value})}
+                    disabled={farmData?.category?.toLowerCase() === 'pasture'}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
                       border: '1px solid var(--border)',
                       borderRadius: '8px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      backgroundColor: farmData?.category?.toLowerCase() === 'pasture' ? '#f3f4f6' : '#fff'
                     }}
                     placeholder="Enter crop variety"
                   />

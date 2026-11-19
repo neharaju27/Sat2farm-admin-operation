@@ -90,7 +90,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Pest detection and disease monitoring for crop protection',
       status: featureStatus,
       icon: '🐛',
-      visibleFor: ['polyhouse', 'garden', 'farm']
+      visibleFor: ['polyhouse', 'garden', 'farm', 'pasture']
     },
     {
       id: 5,
@@ -114,7 +114,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Land Surface Water Index for vegetation water content analysis',
       status: featureStatus,
       icon: '💧',
-      visibleFor: ['farm']
+      visibleFor: ['farm', 'pasture']
     },
     {
       id: 8,
@@ -122,7 +122,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Satellite imagery and aerial photos for farm analysis',
       status: featureStatus,
       icon: '🖼️',
-      visibleFor: ['polyhouse', 'garden', 'farm']
+      visibleFor: ['polyhouse', 'garden', 'farm', 'pasture']
     },
     {
       id: 9,
@@ -130,7 +130,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
       description: 'Smart irrigation recommendations based on crop needs and weather',
       status: featureStatus,
       icon: '🚿',
-      visibleFor: ['farm']
+      visibleFor: ['farm', 'pasture']
     },
     {
       id: 10,
