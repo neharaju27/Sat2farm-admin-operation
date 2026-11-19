@@ -482,6 +482,12 @@ export default function UnlockFarm({ user, onPageChange }) {
       const result = await response.json();
       console.log('API Response:', result);
 
+      // Check if user is already registered
+      if (result?.Message === 'User already registered' || result?.message === 'User already registered') {
+        toast.error('User already registered');
+        return;
+      }
+
       // Check for various possible success indicators
       if (result && (result.success === true || result.status === 'success' || result.message?.toLowerCase().includes('success') || result.user_id || result.id || result.data?.user_id || result.data?.id || result['Client ID'])) {
         toast.success('Farmer registered successfully!');
@@ -877,7 +883,9 @@ const parseCsvCoordinatePairs = (content) => {
 
       console.log('Farm add API response:', result);
       setShowAddFarmModal(false);
-      setAddFarmModalStep(1);
+      setShowDrawFarm(false);
+      setDrawnFarmData(null);
+      setAddFarmModalStep(0);
       setSelectedPolygonCategory('');
       setSelectedUploadMethod('');
       setUploadedFile(null);
@@ -3318,7 +3326,9 @@ const parseCsvCoordinatePairs = (content) => {
                     style={{justifyContent: 'flex-start', textAlign: 'left', padding: '16px', backgroundColor: '#f3f4f6', color: '#1f2937', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', width: '100%', fontSize: '14px'}}
                     onClick={() => {
                       setSelectedUploadMethod('Draw');
-                      setTimeout(() => setShowDrawFarm(true), 100);
+                      setAddFarmModalStep(4);
+                      setShowAddFarmModal(false);
+                      setShowDrawFarm(true);
                     }}
                   >
                     <div>

@@ -579,13 +579,13 @@ export default function DrawFarm({ onSubmit, onClose, initialCenter = [15.43, 76
 
         {/* right toolbar */}
         <div style={styles.toolbar}>
-          <button style={styles.toolBtn(false)} title="Delete boundary" onClick={clearAll}>🗑</button>
+          <button style={styles.toolBtn(false)} title="Delete boundary" onClick={clearAll} onTouchEnd={clearAll}>🗑</button>
           <button style={styles.toolBtn(drawing || editing)} title="Draw / edit boundary"
-            onClick={() => (hasFarm ? toggleEdit() : startDraw())}>✎</button>
-          <button style={styles.toolBtn(false)} title="Redraw boundary" onClick={startDraw}>⬠</button>
-          <button style={styles.toolBtn(!labels)} title="Toggle labels" onClick={toggleLabels}>👁</button>
-          <button style={styles.toolBtn(false)} title="My location" onClick={locateMe}>📍</button>
-          <button style={styles.toolBtn(false)} title="Zoom to farm" onClick={() => setShowLatLongSearch(!showLatLongSearch)}>🔍</button>
+            onClick={() => (hasFarm ? toggleEdit() : startDraw())} onTouchEnd={() => (hasFarm ? toggleEdit() : startDraw())}>✎</button>
+          <button style={styles.toolBtn(false)} title="Redraw boundary" onClick={startDraw} onTouchEnd={startDraw}>⬠</button>
+          <button style={styles.toolBtn(!labels)} title="Toggle labels" onClick={toggleLabels} onTouchEnd={toggleLabels}>👁</button>
+          <button style={styles.toolBtn(false)} title="My location" onClick={locateMe} onTouchEnd={locateMe}>📍</button>
+          <button style={styles.toolBtn(false)} title="Zoom to farm" onClick={() => setShowLatLongSearch(!showLatLongSearch)} onTouchEnd={() => setShowLatLongSearch(!showLatLongSearch)}>🔍</button>
         </div>
 
         {/* latitude/longitude search box */}
