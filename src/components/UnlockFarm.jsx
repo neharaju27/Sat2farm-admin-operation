@@ -485,6 +485,8 @@ export default function UnlockFarm({ user, onPageChange }) {
       // Check if user is already registered
       if (result?.Message === 'User already registered' || result?.message === 'User already registered') {
         toast.error('User already registered');
+        // Refresh the page to update the farmer list
+        setTimeout(() => window.location.reload(), 1000);
         return;
       }
 
@@ -492,16 +494,19 @@ export default function UnlockFarm({ user, onPageChange }) {
       if (result && (result.success === true || result.status === 'success' || result.message?.toLowerCase().includes('success') || result.user_id || result.id || result.data?.user_id || result.data?.id || result['Client ID'])) {
         toast.success('Farmer registered successfully!');
 
-        // Extract farmer ID from response
+        // Extract farmer ID and user_key from response
         const farmerId = result.user_id || result.id || result.data?.user_id || result.data?.id || result['Client ID'];
+        const userKey = result.User_key || result.user_key || result.data?.user_key || '';
 
         // Create farmer object with the registered data
         const newFarmerObj = {
           id: farmerId,
+          user_id: farmerId,
           name: `${newFarmer.firstName} ${newFarmer.lastName}`,
           phone: newFarmer.phoneNumber,
           email: newFarmer.email,
-          registeredDate: new Date().toISOString().split('T')[0]
+          registeredDate: new Date().toISOString().split('T')[0],
+          user_key: userKey
         };
 
         // Reset form
@@ -513,15 +518,20 @@ export default function UnlockFarm({ user, onPageChange }) {
         });
         setShowNewFarmerForm(false);
 
-        // Set the newly registered farmer as selected
-        setSelectedFarmer(newFarmerObj);
+        // Refresh the farmer list
+        await fetchFarmerDetailsList();
 
-        // Fetch the API key for the new farmer
-        const apiKey = await fetchFarmerApiKey(newFarmerObj);
-        if (apiKey) {
-          // Go to polygon category selection
-          setAddFarmModalStep(1);
-        }
+        // Add the newly registered farmer to the list if not already present
+        setFarmersList(prevFarmers => {
+          const farmerExists = prevFarmers.some(f => f.id === farmerId);
+          if (!farmerExists) {
+            return [...prevFarmers, newFarmerObj].sort((a, b) => a.name.localeCompare(b.name));
+          }
+          return prevFarmers;
+        });
+
+        // Show the farmer list
+        setAddFarmModalStep(0);
       } else {
         console.log('Registration check failed. Result:', result);
         throw new Error(result?.Message || result?.message || result?.error || 'Registration failed');
@@ -806,6 +816,7 @@ const parseCsvCoordinatePairs = (content) => {
 
     try {
       setIsAddFarmSubmitting(true);
+      toast.loading('Adding farm, please wait...');
 
       const isTerraceGarden =
         polygonCategoryToUse.toLowerCase() === 'terrace garden' ||
@@ -837,6 +848,7 @@ const parseCsvCoordinatePairs = (content) => {
           throw new Error(result?.message || 'Failed to add terrace garden');
         }
 
+        toast.dismiss();
         toast.success(`${polygonCategoryToUse} added successfully!`);
 
       } else {
@@ -878,6 +890,7 @@ const parseCsvCoordinatePairs = (content) => {
           throw new Error(result?.message || 'Failed to add farm');
         }
 
+        toast.dismiss();
         toast.success(`${polygonCategoryToUse} farm added successfully!`);
       }
 
@@ -911,6 +924,7 @@ const parseCsvCoordinatePairs = (content) => {
       }
     } catch (error) {
       console.error('Error adding farm:', error);
+      toast.dismiss();
       toast.error(`Failed to add farm: ${error.message}`);
     } finally {
       setIsAddFarmSubmitting(false);
