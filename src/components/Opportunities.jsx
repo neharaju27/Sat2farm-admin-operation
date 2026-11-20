@@ -2941,6 +2941,48 @@ export default function Opportunities({ onPageChange, user: propUser }) {
             urlParams.push(`last_unit=${unitMap[filter.period] || 'days'}`);
           }
         }
+
+        // ── Invoice Received Time & Payment Received Time ──
+        else if (filter.property === 'invoice_received_time' || filter.property === 'payment_received_time') {
+          const prefix = filter.property === 'invoice_received_time' ? 'invoice' : 'payment';
+          const op = filter.dateOperator || 'on';
+
+          if (op === 'on' && filter.value) {
+            urlParams.push(`${prefix}_date_type=On`);
+            urlParams.push(`${prefix}_date=${encodeURIComponent(filter.value)}`);
+          } else if (op === 'before' && filter.value) {
+            urlParams.push(`${prefix}_date_type=Before`);
+            urlParams.push(`${prefix}_date=${encodeURIComponent(filter.value)}`);
+          } else if (op === 'after' && filter.value) {
+            urlParams.push(`${prefix}_date_type=After`);
+            urlParams.push(`${prefix}_date=${encodeURIComponent(filter.value)}`);
+          } else if (op === 'between' && (filter.fromDate || filter.value) && (filter.toDate || filter.value2)) {
+            const from = filter.fromDate || filter.value;
+            const to = filter.toDate || filter.value2;
+            urlParams.push(`${prefix}_date_type=Between`);
+            urlParams.push(`${prefix}_from=${encodeURIComponent(from)}`);
+            urlParams.push(`${prefix}_to=${encodeURIComponent(to)}`);
+          } else if (op === 'in_last_30_days') {
+            urlParams.push(`${prefix}_date_type=In_Last`);
+            urlParams.push(`${prefix}_last_count=30`);
+            urlParams.push(`${prefix}_last_unit=days`);
+          } else if (op === 'in_last_2_weeks') {
+            urlParams.push(`${prefix}_date_type=In_Last`);
+            urlParams.push(`${prefix}_last_count=2`);
+            urlParams.push(`${prefix}_last_unit=weeks`);
+          } else if (op === 'in_last_6_months') {
+            urlParams.push(`${prefix}_date_type=In_Last`);
+            urlParams.push(`${prefix}_last_count=6`);
+            urlParams.push(`${prefix}_last_unit=months`);
+          } else if (op === 'in_the_last' && filter.period) {
+            const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+            const countMap = { day: 1, week: 7, month: 30 };
+            const count = filter.count ? parseInt(filter.count) : (countMap[filter.period] || 1);
+            urlParams.push(`${prefix}_date_type=In_Last`);
+            urlParams.push(`${prefix}_last_count=${count}`);
+            urlParams.push(`${prefix}_last_unit=${unitMap[filter.period] || 'days'}`);
+          }
+        }
       });
 
       let response;
@@ -5545,6 +5587,45 @@ export default function Opportunities({ onPageChange, user: propUser }) {
               params.append('last_count', count.toString());
               params.append('last_unit', unitMap[filter.period] || 'days');
             }
+          } else if (filter.property === 'invoice_received_time' || filter.property === 'payment_received_time') {
+            const prefix = filter.property === 'invoice_received_time' ? 'invoice' : 'payment';
+            const op = filter.dateOperator || 'on';
+
+            if (op === 'on' && filter.value) {
+              params.append(`${prefix}_date_type`, 'On');
+              params.append(`${prefix}_date`, filter.value);
+            } else if (op === 'before' && filter.value) {
+              params.append(`${prefix}_date_type`, 'Before');
+              params.append(`${prefix}_date`, filter.value);
+            } else if (op === 'after' && filter.value) {
+              params.append(`${prefix}_date_type`, 'After');
+              params.append(`${prefix}_date`, filter.value);
+            } else if (op === 'between' && (filter.fromDate || filter.value) && (filter.toDate || filter.value2)) {
+              const from = filter.fromDate || filter.value;
+              const to = filter.toDate || filter.value2;
+              params.append(`${prefix}_date_type`, 'Between');
+              params.append(`${prefix}_from`, from);
+              params.append(`${prefix}_to`, to);
+            } else if (op === 'in_last_30_days') {
+              params.append(`${prefix}_date_type`, 'In_Last');
+              params.append(`${prefix}_last_count`, '30');
+              params.append(`${prefix}_last_unit`, 'days');
+            } else if (op === 'in_last_2_weeks') {
+              params.append(`${prefix}_date_type`, 'In_Last');
+              params.append(`${prefix}_last_count`, '2');
+              params.append(`${prefix}_last_unit`, 'weeks');
+            } else if (op === 'in_last_6_months') {
+              params.append(`${prefix}_date_type`, 'In_Last');
+              params.append(`${prefix}_last_count`, '6');
+              params.append(`${prefix}_last_unit`, 'months');
+            } else if (op === 'in_the_last' && filter.period) {
+              const unitMap = { day: 'days', week: 'weeks', month: 'months' };
+              const countMap = { day: 1, week: 7, month: 30 };
+              const count = filter.count ? parseInt(filter.count) : (countMap[filter.period] || 1);
+              params.append(`${prefix}_date_type`, 'In_Last');
+              params.append(`${prefix}_last_count`, count.toString());
+              params.append(`${prefix}_last_unit`, unitMap[filter.period] || 'days');
+            }
           }
         });
       }
@@ -6775,6 +6856,8 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                           <option value="created_time">Created Time</option>
                           <option value="modified_by">Modified By</option>
                           <option value="modified_time">Modified Time</option>
+                          <option value="invoice_received_time">Invoice Received Time</option>
+                          <option value="payment_received_time">Payment Received Time</option>
                         </select>
                       </div>
 
@@ -6788,7 +6871,9 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                             marginBottom: '8px'
                           }}>
                             <label style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '500' }}>
-                              {prop.property.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {prop.property === 'invoice_received_time' ? 'Invoice Received Time' :
+                               prop.property === 'payment_received_time' ? 'Payment Received Time' :
+                               prop.property.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </label>
                             <button
                               onClick={() => {
@@ -8612,6 +8697,123 @@ export default function Opportunities({ onPageChange, user: propUser }) {
                                       color: 'var(--text)'
                                     }}
                                   />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Invoice Received Time & Payment Received Time */}
+                          {(prop.property === 'invoice_received_time' || prop.property === 'payment_received_time') && (
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <select
+                                  value={prop.dateOperator || 'on'}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].dateOperator = e.target.value;
+                                    updated[index].value = '';
+                                    updated[index].fromDate = '';
+                                    updated[index].toDate = '';
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                >
+                                  <option value="on">On</option>
+                                  <option value="before">Before</option>
+                                  <option value="after">After</option>
+                                  <option value="between">Between</option>
+                                  <option value="in_last_30_days">In Last 30 Days</option>
+                                  <option value="in_last_2_weeks">In Last 2 Weeks</option>
+                                  <option value="in_last_6_months">In Last 6 Months</option>
+                                </select>
+                              </div>
+                              {['on', 'before', 'after'].includes(prop.dateOperator || 'on') && (
+                                <input
+                                  type="date"
+                                  value={prop.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...selectedSalesProperties];
+                                    updated[index].value = e.target.value;
+                                    setSelectedSalesProperties(updated);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r)',
+                                    fontSize: '13px',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text)'
+                                  }}
+                                />
+                              )}
+                              {prop.dateOperator === 'between' && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>From</label>
+                                    <input
+                                      type="date"
+                                      value={prop.fromDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].fromDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: 'var(--text-3)' }}>To</label>
+                                    <input
+                                      type="date"
+                                      value={prop.toDate || ''}
+                                      onChange={(e) => {
+                                        const updated = [...selectedSalesProperties];
+                                        updated[index].toDate = e.target.value;
+                                        setSelectedSalesProperties(updated);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 'var(--r)',
+                                        fontSize: '13px',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text)'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {['in_last_30_days', 'in_last_2_weeks', 'in_last_6_months'].includes(prop.dateOperator) && (
+                                <div style={{
+                                  padding: '8px 12px',
+                                  background: 'rgba(59, 130, 246, 0.08)',
+                                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                                  borderRadius: 'var(--r)',
+                                  fontSize: '12px',
+                                  color: '#1d4ed8',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  <span>Relative period: <strong>{prop.dateOperator === 'in_last_30_days' ? 'Last 30 Days' : prop.dateOperator === 'in_last_2_weeks' ? 'Last 2 Weeks' : 'Last 6 Months'}</strong></span>
                                 </div>
                               )}
                             </div>
