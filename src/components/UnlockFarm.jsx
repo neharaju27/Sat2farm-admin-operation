@@ -138,6 +138,12 @@ export default function UnlockFarm({ user, onPageChange }) {
   const [isFetchingFarmerApiKey, setIsFetchingFarmerApiKey] = useState(false);
   const [isAddFarmSubmitting, setIsAddFarmSubmitting] = useState(false);
 
+  // State for manager selection (for partner role)
+  const [managerSearchQuery, setManagerSearchQuery] = useState('');
+  const [selectedManager, setSelectedManager] = useState(null);
+  const [managersList, setManagersList] = useState([]);
+  const [managersListLoading, setManagersListLoading] = useState(false);
+
   // State for new farmer registration
   const [showNewFarmerForm, setShowNewFarmerForm] = useState(false);
   const [newFarmer, setNewFarmer] = useState({
@@ -279,7 +285,7 @@ export default function UnlockFarm({ user, onPageChange }) {
       const apiUrl = `${farmFilterBaseUrl}?key=${encodeURIComponent(adminApiKey)}`;
       console.log('Fetching farmers from:', apiUrl);
       console.log('Admin key:', adminApiKey);
-      
+
       const response = await fetch(apiUrl, { method: 'GET' });
 
       if (!response.ok) {
@@ -288,11 +294,11 @@ export default function UnlockFarm({ user, onPageChange }) {
 
       const result = await response.json();
       console.log('API Response:', result);
-      
+
       // Handle both array response and object with data property
       const rawList = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
       console.log('Raw farmers list:', rawList);
-      
+
       const farmerMap = new Map();
 
       rawList.forEach((item) => {
@@ -318,6 +324,134 @@ export default function UnlockFarm({ user, onPageChange }) {
     } catch (error) {
       console.error('Error fetching farmer details list:', error);
       toast.error('Failed to fetch farmer details');
+      setFarmersList([]);
+    } finally {
+      setFarmersListLoading(false);
+    }
+  };
+
+  const fetchManagerDetailsList = async () => {
+    const farmFilterBaseUrl = import.meta.env.VITE_FARM_FILTER_DETAILS_API_URL;
+    if (!farmFilterBaseUrl) {
+      toast.error('Farm filter details API URL is missing in .env');
+      return;
+    }
+
+    const adminApiKey = getAdminApiKey() || (await fetchAdminApiKey());
+    if (!adminApiKey) {
+      return;
+    }
+
+    try {
+      setManagersListLoading(true);
+      const apiUrl = `${farmFilterBaseUrl}?key=${encodeURIComponent(adminApiKey)}`;
+      console.log('Fetching managers from:', apiUrl);
+      console.log('Admin key:', adminApiKey);
+
+      const response = await fetch(apiUrl, { method: 'GET' });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('API Response:', result);
+
+      // Handle both array response and object with data property
+      const rawList = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
+      console.log('Raw managers list:', rawList);
+
+      const managerMap = new Map();
+
+      rawList.forEach((item) => {
+        // Map API field names to expected field names
+        const userId = item?.sub_admin_id || item?.user_id;
+        if (!userId || managerMap.has(userId)) return;
+
+        managerMap.set(userId, {
+          id: userId,
+          user_id: userId,
+          name: item.full_name || item.user_name || '',
+          phone: item.mobile_no || item.phone_number || '',
+          registeredDate: item.reg_date || item.date_of_registration || '',
+          user_key: item.sub_admin_api_key || item.user_key || ''
+        });
+      });
+
+      const uniqueManagers = Array.from(managerMap.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+      console.log('Final managers list:', uniqueManagers);
+      setManagersList(uniqueManagers);
+    } catch (error) {
+      console.error('Error fetching manager details list:', error);
+      toast.error('Failed to fetch manager details');
+      setManagersList([]);
+    } finally {
+      setManagersListLoading(false);
+    }
+  };
+
+  const fetchFarmersUnderManager = async (manager) => {
+    const farmFilterBaseUrl = import.meta.env.VITE_FARM_FILTER_DETAILS_API_URL;
+    if (!farmFilterBaseUrl) {
+      toast.error('Farm filter details API URL is missing in .env');
+      return;
+    }
+
+    // Use the selected manager's API key instead of admin API key
+    const managerApiKey = manager.user_key;
+    if (!managerApiKey) {
+      toast.error('Manager API key is missing');
+      return;
+    }
+
+    try {
+      setFarmersListLoading(true);
+      // Call the API with the manager's API key
+      const apiUrl = `${farmFilterBaseUrl}?key=${encodeURIComponent(managerApiKey)}`;
+      console.log('Fetching farmers from admininfo API:', apiUrl);
+      console.log('Manager API key:', managerApiKey);
+      console.log('Selected Manager:', manager);
+
+      const response = await fetch(apiUrl, { method: 'GET' });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('API Response:', result);
+
+      // Handle both array response and object with data property
+      const rawList = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
+      console.log('Raw farmers list:', rawList);
+
+      const farmerMap = new Map();
+
+      rawList.forEach((item) => {
+        // Map API field names to expected field names
+        const userId = item?.sub_admin_id || item?.user_id;
+        if (!userId || farmerMap.has(userId)) return;
+
+        farmerMap.set(userId, {
+          id: userId,
+          user_id: userId,
+          name: item.full_name || item.user_name || '',
+          phone: item.mobile_no || item.phone_number || '',
+          registeredDate: item.reg_date || item.date_of_registration || '',
+          user_key: item.sub_admin_api_key || item.user_key || ''
+        });
+      });
+
+      const uniqueFarmers = Array.from(farmerMap.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+      console.log('Final farmers list:', uniqueFarmers);
+      setFarmersList(uniqueFarmers);
+    } catch (error) {
+      console.error('Error fetching farmers:', error);
+      toast.error('Failed to fetch farmers');
       setFarmersList([]);
     } finally {
       setFarmersListLoading(false);
@@ -2565,12 +2699,16 @@ const parseCsvCoordinatePairs = (content) => {
     }
   }, [currentRole]);
 
-  // Fetch farmers list when entering Step 0 (Select Farmer)
+  // Fetch farmers/managers list when entering Step 0
   useEffect(() => {
     if (addFarmModalStep === 0) {
-      fetchFarmerDetailsList();
+      if (currentRole === 'partner') {
+        fetchManagerDetailsList();
+      } else {
+        fetchFarmerDetailsList();
+      }
     }
-  }, [addFarmModalStep]);
+  }, [addFarmModalStep, currentRole]);
 
   return (
     <div className="content-area" style={{backgroundColor: '#ffffff', padding: '0', overflow: 'auto', height: '100vh', width: '100%'}}>
@@ -3101,20 +3239,193 @@ const parseCsvCoordinatePairs = (content) => {
           <div className="modal" style={{width: addFarmModalStep === 3 ? '600px' : '550px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column'}}>
             <div className="modal-head">
               <h3>
-                {addFarmModalStep === 0 && 'Select Farmer'}
+                {addFarmModalStep === 0 && (currentRole === 'partner' ? 'Select Manager' : 'Select Farmer')}
+                {addFarmModalStep === 0.5 && 'Select Farmer'}
                 {addFarmModalStep === 1 && 'Choose Polygon Category'}
                 {addFarmModalStep === 2 && 'Choose Upload Method'}
                 {addFarmModalStep === 3 && `Upload using ${selectedUploadMethod} file - ${selectedPolygonCategory}`}
                 {addFarmModalStep === 4 && 'Farm Details'}
               </h3>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(0); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setUploadedFile(null); setFarmName(''); setCropType(''); setVariety(''); setSowingDate(''); setIrrigation(''); setSelectedFarmer(null); setFarmerSearchQuery(''); }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(0); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setUploadedFile(null); setFarmName(''); setCropType(''); setVariety(''); setSowingDate(''); setIrrigation(''); setSelectedFarmer(null); setFarmerSearchQuery(''); setSelectedManager(null); setManagerSearchQuery(''); }}>
                 <X className="ic-xs" />
               </button>
             </div>
             <div className="modal-body" style={{flex: 1, overflow: 'auto'}}>
-              {/* Step 0: Select Farmer */}
+              {/* Step 0: Select Manager (Partner) or Select Farmer (Other Roles) */}
               {addFarmModalStep === 0 && (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                  {currentRole === 'partner' ? (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Search manager by name or ID..."
+                        value={managerSearchQuery}
+                        onChange={(e) => setManagerSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--bg-2)',
+                          color: 'var(--text-1)',
+                          fontSize: '14px'
+                        }}
+                      />
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflow: 'auto'}}>
+                        {managersListLoading && (
+                          <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>Loading managers...</div>
+                        )}
+                        {!managersListLoading && managersList.length === 0 && (
+                          <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>No managers found.</div>
+                        )}
+                        {managersList
+                          .filter(manager =>
+                            manager.name.toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
+                            String(manager.id).includes(managerSearchQuery)
+                          )
+                          .map(manager => (
+                            <div
+                              key={manager.id}
+                              onClick={async () => {
+                                setSelectedManager(manager);
+                                await fetchFarmersUnderManager(manager);
+                                setAddFarmModalStep(0.5);
+                              }}
+                              style={{
+                                padding: '16px',
+                                backgroundColor: 'var(--bg-2)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseOver={(e) => e.target.style.borderColor = 'var(--primary)'}
+                              onMouseOut={(e) => e.target.style.borderColor = 'var(--border)'}
+                            >
+                              <div style={{fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
+                                {manager.name}
+                              </div>
+                              <div style={{borderTop: '1px solid var(--border)', paddingTop: '8px'}}>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
+                                  <strong>ID:</strong> {manager.id}
+                                </div>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
+                                  <strong>Phone:</strong> {manager.phone}
+                                </div>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
+                                  <strong>Registered Date:</strong> {manager.registeredDate}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Search farmer by name or ID..."
+                        value={farmerSearchQuery}
+                        onChange={(e) => setFarmerSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border)',
+                          backgroundColor: 'var(--bg-2)',
+                          color: 'var(--text-1)',
+                          fontSize: '14px'
+                        }}
+                      />
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflow: 'auto'}}>
+                        {farmersListLoading && (
+                          <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>Loading farmers...</div>
+                        )}
+                        {!farmersListLoading && farmersList.length === 0 && (
+                          <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>No farmers found.</div>
+                        )}
+                        {farmersList
+                          .filter(farmer =>
+                            farmer.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) ||
+                            String(farmer.id).includes(farmerSearchQuery)
+                          )
+                          .map(farmer => (
+                            <div
+                              key={farmer.id}
+                              onClick={async () => {
+                                setSelectedFarmer(farmer);
+                                const key = await fetchFarmerApiKey(farmer);
+                                if (key) {
+                                  // If we have drawn farm data, directly add the farm
+                                  if (drawnFarmData) {
+                                    await handleAddFarmSubmit();
+                                  } else {
+                                    // Otherwise go to polygon category selection
+                                    setAddFarmModalStep(1);
+                                  }
+                                }
+                              }}
+                              style={{
+                                padding: '16px',
+                                backgroundColor: 'var(--bg-2)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseOver={(e) => e.target.style.borderColor = 'var(--primary)'}
+                              onMouseOut={(e) => e.target.style.borderColor = 'var(--border)'}
+                            >
+                              <div style={{fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
+                                {farmer.name}
+                              </div>
+                              <div style={{borderTop: '1px solid var(--border)', paddingTop: '8px'}}>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
+                                  <strong>ID:</strong> {farmer.id}
+                                </div>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>
+                                  <strong>Phone:</strong> {farmer.phone}
+                                </div>
+                                <div style={{fontSize: '12px', color: 'var(--text-2)'}}>
+                                  <strong>Registered Date:</strong> {farmer.registeredDate}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                      <div style={{marginTop: '12px', textAlign: 'center'}}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{color: 'var(--primary)', fontSize: '14px', padding: '8px 16px'}}
+                          onClick={() => setShowNewFarmerForm(true)}
+                        >
+                          + Add new farmer
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Step 0.5: Select Farmer (After Manager Selection for Partner) */}
+              {addFarmModalStep === 0.5 && (
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px'}}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setAddFarmModalStep(0);
+                        setSelectedManager(null);
+                        setFarmersList([]);
+                      }}
+                      style={{padding: '4px 8px'}}
+                    >
+                      ← Back
+                    </button>
+                    <span style={{fontSize: '14px', color: 'var(--text-2)'}}>
+                      Selected Manager: <strong>{selectedManager?.name}</strong>
+                    </span>
+                  </div>
                   <input
                     type="text"
                     placeholder="Search farmer by name or ID..."
@@ -3135,7 +3446,7 @@ const parseCsvCoordinatePairs = (content) => {
                       <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>Loading farmers...</div>
                     )}
                     {!farmersListLoading && farmersList.length === 0 && (
-                      <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>No farmers found.</div>
+                      <div style={{padding: '12px', color: 'var(--text-2)', fontSize: '13px'}}>No farmers found under this manager.</div>
                     )}
                     {farmersList
                       .filter(farmer =>
@@ -3185,15 +3496,6 @@ const parseCsvCoordinatePairs = (content) => {
                           </div>
                         </div>
                       ))}
-                  </div>
-                  <div style={{marginTop: '12px', textAlign: 'center'}}>
-                    <button
-                      className="btn btn-ghost"
-                      style={{color: 'var(--primary)', fontSize: '14px', padding: '8px 16px'}}
-                      onClick={() => setShowNewFarmerForm(true)}
-                    >
-                      + Add new farmer
-                    </button>
                   </div>
                 </div>
               )}
