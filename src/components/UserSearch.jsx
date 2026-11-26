@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 
 const USER_SEARCH_API_URL = import.meta.env.VITE_USER_SEARCH_API_URL;
 const REFERRED_ACCOUNT_API_URL = import.meta.env.VITE_USER_SEARCH_ACCOUNTS_API_URL || 'https://api.sat2farm.com/search/accounts';
+const AVAILABLE_AREA_API_URL = import.meta.env.VITE_AVAILABLE_AREA_API_URL;
+const SUPERADMIN_AREA_API_URL = import.meta.env.VITE_FETCH_SUPERADMIN_AREA_API_URL;
 
 export default function UserSearch({ user }) {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -14,6 +16,12 @@ export default function UserSearch({ user }) {
   const [copiedField, setCopiedField] = useState(null);
   const [referredAccountDetails, setReferredAccountDetails] = useState(null);
   const [loadingReferred, setLoadingReferred] = useState(false);
+  const [planAcreages, setPlanAcreages] = useState({
+    '1 month': { total: 0, used: 0, available: 0 },
+    '6 months': { total: 0, used: 0, available: 0 },
+    '12 months': { total: 0, used: 0, available: 0 }
+  });
+  const [acreageLoading, setAcreageLoading] = useState(false);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -56,6 +64,9 @@ export default function UserSearch({ user }) {
         };
         setSearchResult(transformedData);
         toast.success('User found successfully');
+        // Fetch plan acreages for the searched phone number
+        const accountType = result.account?.user_credentials?.account_type || result.account?.admin_portal_details?.role || '';
+        fetchPlanAcreages(phoneNumber.trim(), accountType);
       } else {
         setError(result.message || 'User not found with this phone number');
         toast.error('User not found');
@@ -73,6 +84,11 @@ export default function UserSearch({ user }) {
     setPhoneNumber('');
     setSearchResult(null);
     setError('');
+    setPlanAcreages({
+      '1 month': { total: 0, used: 0, available: 0 },
+      '6 months': { total: 0, used: 0, available: 0 },
+      '12 months': { total: 0, used: 0, available: 0 }
+    });
   };
 
   const handleSearchChange = (e) => {
@@ -83,6 +99,11 @@ export default function UserSearch({ user }) {
     if (!value.trim()) {
       setSearchResult(null);
       setError('');
+      setPlanAcreages({
+        '1 month': { total: 0, used: 0, available: 0 },
+        '6 months': { total: 0, used: 0, available: 0 },
+        '12 months': { total: 0, used: 0, available: 0 }
+      });
     }
   };
 
@@ -164,6 +185,78 @@ export default function UserSearch({ user }) {
       month: 'short',
       year: 'numeric'
     });
+  };
+
+  const fetchPlanAcreages = async (mobileNo, accountType) => {
+    try {
+      setAcreageLoading(true);
+      if (!mobileNo) {
+        console.log('No mobile number found for acreage fetch');
+        setAcreageLoading(false);
+        return;
+      }
+
+      // Use superadmin API for superadmin/partner/subadmin accounts
+      const isSuperAdminOrPartner = accountType?.toLowerCase().includes('superadmin') || accountType?.toLowerCase().includes('partner') || accountType?.toLowerCase().includes('subadmin');
+      const apiUrl = isSuperAdminOrPartner 
+        ? `${SUPERADMIN_AREA_API_URL}?mobile_no=${encodeURIComponent(mobileNo)}`
+        : (AVAILABLE_AREA_API_URL ? `${AVAILABLE_AREA_API_URL}?mobile_no=${encodeURIComponent(mobileNo)}` : null);
+
+      if (!apiUrl) {
+        console.log('API URL not configured');
+        setAcreageLoading(false);
+        return;
+      }
+
+      console.log('Fetching acreages for account type:', accountType);
+      console.log('Is superadmin/partner/subadmin:', isSuperAdminOrPartner);
+      console.log('Fetching acreages:', apiUrl);
+
+      const response = await fetch(apiUrl, { method: 'GET' });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Acreages API response:', data);
+
+      // Handle new API response structure with plan-specific data
+      if (data.data['1_month'] || data.data['6_month'] || data.data['12_month']) {
+        setPlanAcreages({
+          '1 month': {
+            total: Number(data.data['1_month']?.total_area || 0),
+            used: Number(data.data['1_month']?.used_area || 0),
+            available: Number(data.data['1_month']?.available_area || 0)
+          },
+          '6 months': {
+            total: Number(data.data['6_month']?.total_area || 0),
+            used: Number(data.data['6_month']?.used_area || 0),
+            available: Number(data.data['6_month']?.available_area || 0)
+          },
+          '12 months': {
+            total: Number(data.data['12_month']?.total_area || 0),
+            used: Number(data.data['12_month']?.used_area || 0),
+            available: Number(data.data['12_month']?.available_area || 0)
+          }
+        });
+      } else {
+        // Fallback for old API structure
+        setPlanAcreages({
+          '1 month': { total: 0, used: 0, available: 0 },
+          '6 months': { total: 0, used: 0, available: 0 },
+          '12 months': { total: 0, used: 0, available: 0 }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching plan acreages:', error);
+      setPlanAcreages({
+        '1 month': { total: 0, used: 0, available: 0 },
+        '6 months': { total: 0, used: 0, available: 0 },
+        '12 months': { total: 0, used: 0, available: 0 }
+      });
+    } finally {
+      setAcreageLoading(false);
+    }
   };
 
   const hasUserCredentials = searchResult?.user_credentials;
@@ -637,6 +730,171 @@ export default function UserSearch({ user }) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Plan Acreages Cards - 1 Month, 6 Months, 12 Months */}
+          <div style={{ padding: '20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+            <h3 style={{ color: 'var(--text)', fontSize: '16px', fontWeight: '600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MapPin size={20} />
+              Plan Acreages
+            </h3>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              {/* 1 Month Plan Card */}
+              <div 
+                style={{
+                  flex: '1 1 300px', 
+                  minWidth: '280px', 
+                  maxWidth: '460px',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                  cursor: 'pointer',
+                  borderLeft: '4px solid #16a34a',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  border: '1px solid #bbf7d0'
+                }} 
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    backgroundColor: (planAcreages['1 month'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
+                    color: (planAcreages['1 month'].total || 0) > 0 ? '#059669' : '#6b7280'
+                  }}>
+                    {(planAcreages['1 month'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                  </span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {(planAcreages['1 month'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {(planAcreages['1 month'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {(planAcreages['1 month'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6 Months Plan Card */}
+              <div 
+                style={{
+                  flex: '1 1 300px', 
+                  minWidth: '280px', 
+                  maxWidth: '460px',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                  cursor: 'pointer',
+                  borderLeft: '4px solid #16a34a',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  border: '1px solid #bbf7d0'
+                }} 
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    backgroundColor: (planAcreages['6 months'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
+                    color: (planAcreages['6 months'].total || 0) > 0 ? '#059669' : '#6b7280'
+                  }}>
+                    {(planAcreages['6 months'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                  </span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {(planAcreages['6 months'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {(planAcreages['6 months'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {(planAcreages['6 months'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 12 Months Plan Card */}
+              <div 
+                style={{
+                  flex: '1 1 300px', 
+                  minWidth: '280px', 
+                  maxWidth: '460px',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease', 
+                  cursor: 'pointer',
+                  borderLeft: '4px solid #16a34a',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  border: '1px solid #bbf7d0'
+                }} 
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; }} 
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
+                  <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    backgroundColor: (planAcreages['12 months'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
+                    color: (planAcreages['12 months'].total || 0) > 0 ? '#059669' : '#6b7280'
+                  }}>
+                    {(planAcreages['12 months'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                  </span>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
+                      {(planAcreages['12 months'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
+                      {(planAcreages['12 months'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                    <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
+                      {(planAcreages['12 months'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

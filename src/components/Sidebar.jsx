@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock } from 'lucide-react';
+import { Home, BarChart3, TrendingUp, ClipboardList, Users, Search, Phone, Calendar, Package, FileText, HelpCircle, Puzzle, Wrench, FolderOpen, Target, MessageSquare, Mic, ChevronDown, Settings, LogOut, Lock, Globe } from 'lucide-react';
 import sat2farmLogo from '../assets/satyukt.webp';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
+  const { language, setLanguage, t, canChangeLanguage } = useLanguage();
   // Check user role with more flexible matching
   const userRole = user?.role?.toLowerCase().trim();
   const isOperationsUser = userRole === 'operation' || userRole === 'operations';
@@ -484,7 +486,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         </div>
         <div className="sb-logo-sub">ADMIN PORTAL · v2.4</div>
       </div>
-      <div className="sb-role">Viewing as: <span>{
+      <div className="sb-role">{t('viewingAs')}: <span>{
         user?.role?.toLowerCase().includes('sales') ? 'Sales' :
         user?.role?.toLowerCase().includes('client') ? 'Client' :
         user?.role?.toLowerCase().includes('manager') ? 'Manager' :
@@ -494,6 +496,43 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         user?.role?.toLowerCase().includes('accounts') ? 'Accounts' :
         'Operations'
       }</span></div>
+
+      {/* Language Selector - Only for Manager and Partner */}
+      {canChangeLanguage && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.7)',
+            marginBottom: '8px'
+          }}>
+            <Globe size={14} />
+            <span>{t('language')}</span>
+          </div>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.9)',
+              fontSize: '12px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="english" style={{ background: '#1e293b', color: '#fff' }}>English</option>
+            <option value="spanish" style={{ background: '#1e293b', color: '#fff' }}>Spanish</option>
+            
+          </select>
+        </div>
+      )}
       
       {/* Navigation */}
       <div className="sb-nav">
@@ -505,7 +544,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               onClick={() => setSatyuktCrmOpen(!satyuktCrmOpen)}
               style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
-              Satyukt CRM
+              {t('satyuktCrm')}
               <ChevronDown 
                 size={16} 
                 style={{transform: satyuktCrmOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
@@ -526,7 +565,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                         <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                         <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                       </svg>
-                      Lead Pipeline
+                      {t('leadPipeline')}
                     </div>
                     <div
                       className={`sb-item ${currentPage === 'opportunities' ? 'active' : ''}`}
@@ -539,7 +578,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                         <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                         <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                       </svg>
-                      Opportunities
+                      {t('opportunities')}
                       {(isOperationsUser || isAccountsUser) && (pendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
                         <span style={{
                           position: 'absolute',
@@ -579,7 +618,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                       <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                       <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Green Team
+                    {t('greenTeam')}
                     {todayGreenTeamAssignments.length > 0 && (
                       <span style={{
                         position: 'absolute',
@@ -616,7 +655,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                       <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                       <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                     </svg>
-                    Prospect Stats
+                    {t('prospectStats')}
                   </div>
                 )}
                 {/* Task Calendar - For Operations and Sales Users */}
@@ -634,7 +673,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <circle cx="8" cy="9" r="1" fill="currentColor"/>
                     <circle cx="11" cy="9" r="1" fill="currentColor"/>
                   </svg>
-                  Task Calendar
+                  {t('taskCalendar')}
                   {isSalesUser && todayTasks.length > 0 && (
                     <span style={{
                       position: 'absolute',
@@ -667,7 +706,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  User Search
+                  {t('userSearch')}
                 </div>
               </div>
             )}
@@ -681,7 +720,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               onClick={() => setOperationsOpen(!operationsOpen)}
               style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
-              Operations
+              {t('operations')}
               <ChevronDown 
                 size={16} 
                 style={{transform: operationsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
@@ -697,7 +736,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  Dashboard
+                  {t('dashboard')}
                   <span className="sb-dot"></span>
                 </div>
                 <div 
@@ -710,7 +749,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
                     <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
                   </svg>
-                  Monthly Acreage
+                  {t('monthlyAcreage')}
                   <span className="sb-dot"></span>
                 </div>
                 <div 
@@ -721,7 +760,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
                   </svg>
-                  Farms
+                  {t('farms')}
                   <span className="sb-dot"></span>
                 </div>
                 <div 
@@ -733,7 +772,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  New Registration
+                  {t('newRegistration')}
                   <span className="sb-dot"></span>
                 </div>
                 <div
@@ -743,7 +782,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                   <svg className="ic" viewBox="0 0 16 16" fill="none">
                     <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Assign Acreages
+                  {t('assignAcreages')}
                   <span className="sb-dot"></span>
                 </div>
                 <div
@@ -755,7 +794,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  Pricing
+                  {t('pricing')}
                   <span className="sb-dot"></span>
                 </div>
               </div>
@@ -771,7 +810,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               onClick={() => setAccountsOpen(!accountsOpen)}
               style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}
             >
-              Accounts
+              {t('accounts')}
               <ChevronDown
                 size={16}
                 style={{transform: accountsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}
@@ -788,7 +827,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                     <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  Invoice Info
+                  {t('invoiceInfo')}
                 </div>
                 <div
                   className={`sb-item ${currentPage === 'payment-approval' ? 'active' : ''}`}
@@ -800,7 +839,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                     <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                     <circle cx="12" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                   </svg>
-                  Payment Approval
+                  {t('paymentApproval')}
                   {(pendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
                     <span style={{
                       position: 'absolute',
@@ -832,7 +871,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Accounts User Only Section */}
         {isAccountsUser && (
           <>
-            <div className="sb-section">Accounts</div>
+            <div className="sb-section">{t('accounts')}</div>
             <div
               className={`sb-item ${currentPage === 'invoice-info' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('invoice-info')}
@@ -842,7 +881,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Invoice Info
+              {t('invoiceInfo')}
             </div>
             <div
               className={`sb-item ${currentPage === 'payment-approval' ? 'active' : ''}`}
@@ -854,7 +893,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 <circle cx="12" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
               </svg>
-              Payment Approval
+              {t('paymentApproval')}
               {(accountsPendingPaymentApprovals.length > 0 || pendingInvoiceApprovals.length > 0) && (
                 <span style={{
                   position: 'absolute',
@@ -889,7 +928,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
               </svg>
-              Deal Pipeline
+              {t('dealPipeline')}
             </div>
           </>
         )}
@@ -897,7 +936,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Tech Department Section - Only for Tech Department Users */}
         {isTechDepartmentUser && (
           <>
-            <div className="sb-section">Tech Department</div>
+            <div className="sb-section">{t('techDepartment')}</div>
             <div
               className={`sb-item ${currentPage === 'green-team' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('green-team')}
@@ -910,7 +949,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.2"/>
                 <path d="M3 13l3-3 2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Green Team
+              {t('greenTeam')}
               {todayGreenTeamAssignments.length > 0 && (
                 <span style={{
                   position: 'absolute',
@@ -940,7 +979,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* CRM Section - Only for Sales Users */}
         {isSalesUser && (
           <>
-            <div className="sb-section">CRM</div>
+            <div className="sb-section">{t('satyuktCrm')}</div>
 
             <div
               className={`sb-item ${currentPage === 'sales-dashboard' ? 'active' : ''}`}
@@ -950,7 +989,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 6h6M5 8h4M5 10h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Dashboard
+              {t('dashboard')}
               <span className="sb-dot"></span>
             </div>
 
@@ -961,7 +1000,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
               <svg className="ic" viewBox="0 0 16 16" fill="none">
                 <path d="M2 12l4-5 3 3 2-4 3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Assign Acreage
+              {t('assignAcreages')}
             </div>
             
             <div 
@@ -972,7 +1011,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
               </svg>
-              Farms
+              {t('farms')}
               <span className="sb-dot"></span>
             </div>
             <div
@@ -984,7 +1023,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Pricing
+              {t('pricing')}
               <span className="sb-dot"></span>
             </div>
           </>
@@ -993,7 +1032,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Client Section - Only for Client Users */}
         {isClientUser && (
           <>
-            <div className="sb-section">Client</div>
+            <div className="sb-section">{t('client')}</div>
             <div 
               className={`sb-item ${currentPage === 'client-monthly-report' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('client-monthly-report')}
@@ -1002,7 +1041,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 6h6M5 8h6M5 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Monthly Report
+              {t('monthlyReport')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1013,7 +1052,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
               </svg>
-              Farms
+              {t('farms')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1025,7 +1064,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              New Registration
+              {t('newRegistration')}
               <span className="sb-dot"></span>
             </div>
           </>
@@ -1034,7 +1073,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Manager Section - Only for Manager Users */}
         {isManagerUser && (
           <>
-            <div className="sb-section">Manager</div>
+            <div className="sb-section">{t('manager')}</div>
             <div 
               className={`sb-item ${currentPage === 'manager-monthly-report' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('manager-monthly-report')}
@@ -1043,7 +1082,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 6h6M5 8h6M5 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Monthly Report
+              {t('monthlyReport')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1054,7 +1093,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
               </svg>
-              Farms
+              {t('farms')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1066,7 +1105,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              New Registration
+              {t('newRegistration')}
               <span className="sb-dot"></span>
             </div>
           </>
@@ -1075,7 +1114,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Partner Section - Only for Partner Users */}
         {isPartnerUser && (
           <>
-            <div className="sb-section">Partner</div>
+            <div className="sb-section">{t('partner')}</div>
             <div 
               className={`sb-item ${currentPage === 'super-admin-dashboard' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('super-admin-dashboard')}
@@ -1084,7 +1123,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 6h6M5 8h6M5 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Dashboard
+              {t('dashboard')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1095,7 +1134,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="4" y="7" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5.5 7V5a2.5 2.5 0 015 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.6"/>
               </svg>
-              Farms
+              {t('farms')}
               <span className="sb-dot"></span>
             </div>
             <div 
@@ -1107,7 +1146,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="8" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              New Registration
+              {t('newRegistration')}
               <span className="sb-dot"></span>
             </div>
           </>
@@ -1116,7 +1155,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         {/* Marketing Section - Only for Marketing Users */}
         {isMarketingUser && (
           <>
-            <div className="sb-section">Marketing</div>
+            <div className="sb-section">{t('marketing')}</div>
             <div 
               className={`sb-item ${currentPage === 'marketing-dashboard' ? 'active' : ''}`}
               onClick={() => handleNavigationClick('marketing-dashboard')}
@@ -1125,7 +1164,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
                 <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
                 <path d="M5 6h6M5 8h6M5 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              Dashboard
+              {t('dashboard')}
               <span className="sb-dot"></span>
             </div>
           </>
@@ -1137,7 +1176,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
         <div className="sb-user">
           <div className="sb-avatar">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</div>
           <div>
-            <div className="sb-uname">{user?.name || 'Unknown User'}</div>
+            <div className="sb-uname">{user?.name || t('unknownUser')}</div>
             <div style={{fontSize: '9px', color: 'rgba(255,255,255,0.25)'}}>{user?.role || 'User'}</div>
           </div>
         </div>
@@ -1151,7 +1190,7 @@ export default function Sidebar({ onLogout, user, onPageChange, currentPage }) {
             <path d="M11 5l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M14 8H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          Logout
+          {t('logout')}
         </button>
       </div>
     </div>

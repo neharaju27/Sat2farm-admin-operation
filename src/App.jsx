@@ -30,6 +30,7 @@ import InvoiceInfo from "./components/InvoiceInfo";
 import PaymentApproval from "./components/PaymentApproval";
 import UserSearch from "./components/UserSearch";
 import { useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { Toaster } from 'react-hot-toast';
 import EarlyAccessBanner from './components/EarlyAccessBanner';
 
@@ -441,13 +442,14 @@ useEffect(() => {
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      width: '100vw',
-      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-      position: 'relative'
-    }}>
+    <LanguageProvider role={user?.role || user?.user_role || user?.type || ''}>
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        width: '100vw',
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        position: 'relative'
+      }}>
       {/* Sidebar Backdrop Overlay on Mobile */}
       {isMobile && isSidebarOpen && (
         <div 
@@ -589,6 +591,7 @@ useEffect(() => {
         }}
       />
     </div>
+    </LanguageProvider>
   );
 }
 

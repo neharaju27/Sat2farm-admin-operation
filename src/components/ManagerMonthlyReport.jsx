@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Download, Calendar, FileText, TrendingUp, BarChart3, Users, MapPin, Phone, Mail, Search, Filter, Eye, Edit, Lock, Unlock, AlertCircle, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
 import '../styles/Sat2FarmAdminPortal.css';
 import { toast } from 'react-hot-toast';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ManagerMonthlyReport({ user, onPageChange, selectedMobile })  {
+  const { t } = useLanguage();
   const [selectedMonth, setSelectedMonth] = useState('');
   const [monthlyData, setMonthlyData] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -80,12 +82,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
 
   const handleDownloadSixMonthReport = async () => {
     if (!loggedInMobile) {
-      toast.error('Logged-in user mobile number not found.');
+      toast.error(t('loggedInMobileNotFound'));
       return;
     }
 
     const url = `${import.meta.env.VITE_BUSINESS_REPORT_SIX_MONTH_API_URL}?mobile_no=${encodeURIComponent(loggedInMobile)}`;
-    const loadingToastId = toast.loading('Fetching 6-month business report...');
+    const loadingToastId = toast.loading(t('fetching6MonthReport'));
 
     try {
       const response = await fetch(url);
@@ -106,7 +108,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
         } else if (data.status === 'error' && data.error) {
           toast.error(data.error);
         } else {
-          toast.error('No report data found.');
+          toast.error(t('noReportDataFound'));
         }
       } catch (e) {
         // Not JSON - it's a file (CSV/blob). Trigger the file download
@@ -131,12 +133,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
         window.URL.revokeObjectURL(blobUrl);
         
         toast.dismiss(loadingToastId);
-        toast.success('Report downloaded successfully!');
+        toast.success(t('reportDownloadedSuccessfully'));
       }
     } catch (error) {
       console.error('Error fetching report:', error);
       toast.dismiss(loadingToastId);
-      toast.error('Failed to download report. Please try again.');
+      toast.error(t('failedToDownloadReport'));
     }
   };
 
@@ -346,7 +348,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
         window.URL.revokeObjectURL(url);
       } catch (error) {
         console.error('Error downloading file:', error);
-        setReportError('Failed to download report file. Generating fallback CSV.');
+        setReportError(t('failedToDownloadReportFile'));
         generateFallbackCSV();
       } finally {
         setLoadingReport(false);
@@ -409,7 +411,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          toast.success('Report CSV exported successfully!');
+          toast.success(t('reportCSVExportedSuccessfully'));
         } else {
           // Treat as a backend error message (even if status is 404 or 500)
           const errorMsg = jsonData.message || jsonData.error || `Server returned status: ${response.status}`;
@@ -432,12 +434,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
-        toast.success('Report CSV exported successfully!');
+        toast.success(t('reportCSVExportedSuccessfully'));
       }
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      setReportError(`Failed to export CSV: ${error.message}`);
-      toast.error(`Export failed: ${error.message}`);
+      setReportError(`${t('exportFailed')} ${error.message}`);
+      toast.error(`${t('exportFailed')} ${error.message}`);
     } finally {
       setLoadingReport(false);
     }
@@ -488,12 +490,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                   }}
                 >
                   <ArrowLeft size={16} />
-                  Back
+                  {t('back')}
                 </button>
               )}
               <div>
-                <div className="tb-page">Manager Monthly Report</div>
-                <div className="tb-sub">Manager · Reporting</div>
+                <div className="tb-page">{t('monthlyReport')}</div>
+                <div className="tb-sub">{t('managerReporting')}</div>
               </div>
             </div>
           </div>
@@ -506,27 +508,27 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
           {loadingMonths && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-2)' }}>
               <div style={{ fontSize: '24px', marginBottom: '16px' }}>⏳</div>
-              <div>Loading monthly reports...</div>
+              <div>{t('loading')}</div>
             </div>
           )}
 
           {loadingMetrics && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-2)' }}>
               <div style={{ fontSize: '24px', marginBottom: '16px' }}>⏳</div>
-              <div>Loading metrics data...</div>
+              <div>{t('loadingMetricsData')}</div>
             </div>
           )}
 
           {loadingReport && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-2)' }}>
               <div style={{ fontSize: '24px', marginBottom: '16px' }}>⏳</div>
-              <div>Downloading report...</div>
+              <div>{t('downloadingReport')}</div>
             </div>
           )}
 
           {reportError && (
             <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '6px' }}>
-              <strong>Error:</strong> {reportError}
+              <strong>{t('error')}</strong> {reportError}
             </div>
           )}
 
@@ -535,7 +537,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
             <>
               {/* Month Selection */}
               <div className="section-head">
-                <div className="section-title">Monthly Report Overview</div>
+                <div className="section-title">{t('monthlyReport')}</div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 </div>
               </div>
@@ -594,7 +596,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                       </div>
                     ))
                   ) : (
-                    <div style={{ color: 'var(--text-2)', fontSize: '14px' }}>No monthly reports available</div>
+                    <div style={{ color: 'var(--text-2)', fontSize: '14px' }}>{t('noData')}</div>
                   )}
                 </div>
 
@@ -603,13 +605,13 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                   className="month-chip active monthly-report-download-btn"
                 >
                   <Download className="w-3.5 h-3.5" style={{ display: 'inline-block' }} />
-                  Download Last 6 Month Report
+                  {t('downloadLast6MonthReport')}
                 </button>
               </div>
 
               <div className="section-head">
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button className="btn btn-sm" onClick={() => handleExportCSV()}>Export CSV</button>
+                  <button className="btn btn-sm" onClick={() => handleExportCSV()}>{t('exportCSV')}</button>
                 </div>
               </div>
 
@@ -619,15 +621,15 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                   {/* Total Added Area Table */}
                   <div className="card" style={{ flex: 1 }}>
                     <div className="card-head">
-                      <span className="card-title">Total Added Area</span>
+                      <span className="card-title">{t('totalAddedArea')}</span>
                       <div className="month-chip">{selectedMonth}</div>
                     </div>
                     <div className="card-body">
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>State</th>
-                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>Area</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>{t('state')}</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>{t('area')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -641,12 +643,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                           ) : (
                             <tr>
                               <td colSpan="2" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)' }}>
-                                No state data available
+                                {t('noStateDataAvailable')}
                               </td>
                             </tr>
                           )}
                           <tr style={{ fontWeight: '600' }}>
-                            <td style={{ padding: '12px', color: 'var(--text-1)' }}>Total</td>
+                            <td style={{ padding: '12px', color: 'var(--text-1)' }}>{t('total')}</td>
                             <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-1)' }}>{apiMetrics.total_added_area || 0}</td>
                           </tr>
                         </tbody>
@@ -657,15 +659,15 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                   {/* Total Unlocked Area Table */}
                   <div className="card" style={{ flex: 1 }}>
                     <div className="card-head">
-                      <span className="card-title">Total Unlocked Area</span>
+                      <span className="card-title">{t('totalUnlockedArea')}</span>
                       <div className="month-chip">{selectedMonth}</div>
                     </div>
                     <div className="card-body">
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>State</th>
-                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>Area</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>{t('state')}</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>{t('area')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -679,12 +681,12 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                           ) : (
                             <tr>
                               <td colSpan="2" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)' }}>
-                                No state data available
+                                {t('noStateDataAvailable')}
                               </td>
                             </tr>
                           )}
                           <tr style={{ fontWeight: '600' }}>
-                            <td style={{ padding: '12px', color: 'var(--text-1)' }}>Total</td>
+                            <td style={{ padding: '12px', color: 'var(--text-1)' }}>{t('total')}</td>
                             <td style={{ padding: '12px', textAlign: 'right', color: 'var(--text-1)' }}>{apiMetrics.total_unlocked_area || 0}</td>
                           </tr>
                         </tbody>
@@ -697,17 +699,17 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
               {/* Plan Wise Summary Table */}
               <div className="card">
                 <div className="card-head">
-                  <span className="card-title">Plan Wise Summary</span>
+                  <span className="card-title">{t('planWiseSummary')}</span>
                   <div className="month-chip">{selectedMonth}</div>
                 </div>
                 <div className="card-body">
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>State</th>
-                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>Month Plan</th>
-                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>6 Months Plan</th>
-                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>12 Months Plan</th>
+                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)' }}>{t('state')}</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>{t('monthPlan')}</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>{t('sixMonthsPlan')}</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: 'var(--text-1)' }}>{t('twelveMonthsPlan')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -725,7 +727,7 @@ export default function ManagerMonthlyReport({ user, onPageChange, selectedMobil
                       ) : (
                         <tr>
                           <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)' }}>
-                            No plan data available
+                            {t('noPlanDataAvailable')}
                           </td>
                         </tr>
                       )}
