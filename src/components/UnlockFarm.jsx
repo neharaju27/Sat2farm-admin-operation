@@ -3,6 +3,7 @@ import { X, MoreVertical, RefreshCw, AlertCircle } from 'lucide-react';
 import { normalizeUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { useLanguage } from '../context/LanguageContext';
 import FeatureDashboard from './FeatureDashboard';
 import FarmMap from './features/FarmMap';
 import Weather from './features/Weather';
@@ -21,6 +22,7 @@ import Guideline from './features/Guideline';
 import DrawFarm from './DrawFarm';
 
 export default function UnlockFarm({ user, onPageChange }) {
+  const { t } = useLanguage();
   // Set currentRole based on actual user role
   const [currentRole, setCurrentRole] = useState(() => normalizeUserRole(user));
   const [modalOpen, setModalOpen] = useState(null);
@@ -2716,7 +2718,7 @@ const parseCsvCoordinatePairs = (content) => {
       <div className="topbar" style={{marginBottom: '16px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
         <div className="tb-left">
           <div>
-            <div className="tb-page">Farms</div>
+            <div className="tb-page">{t('farms')}</div>
             <div className="tb-sub">
               {currentRole === 'ops' ? 'Operations · Access Control' : 
                currentRole === 'sales' ? 'Sales · Access Control' : 
@@ -2731,10 +2733,10 @@ const parseCsvCoordinatePairs = (content) => {
       {/* Section Header */}
       <div className="section-head" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px'}}>
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-          <div className="section-title">Farm requests</div>
+          <div className="section-title">{t('farmRequests')}</div>
         </div>
         {(currentRole === 'manager' || currentRole === 'client' || currentRole === 'partner') && (
-          <button className="btn btn-primary btn-sm" onClick={openAddFarmModal}>+ Add Farms</button>
+          <button className="btn btn-primary btn-sm" onClick={openAddFarmModal}>+ {t('addFarms')}</button>
         )}
       </div>
 
@@ -2761,9 +2763,9 @@ const parseCsvCoordinatePairs = (content) => {
             >
               <div style={{display: 'flex', alignItems: 'center', gap: '10px', color: '#16a34a', fontWeight: '600', fontSize: '14px'}}>
                 <RefreshCw style={{width: '18px', height: '18px', animation: 'spin 1s linear infinite'}} />
-                <span>Fetching acreage plans...</span>
+                <span>{t('fetchingAcreagePlans')}</span>
               </div>
-              <div style={{fontSize: '12px', color: '#64748b'}}>Retrieving acreage allocation data from server</div>
+              <div style={{fontSize: '12px', color: '#64748b'}}>{t('retrievingAcreageData')}</div>
             </div>
           ) : acreageError ? (
             <div 
@@ -2784,7 +2786,7 @@ const parseCsvCoordinatePairs = (content) => {
             >
               <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: '600', fontSize: '14px'}}>
                 <AlertCircle style={{width: '18px', height: '18px'}} />
-                <span>Failed to fetch acreage data</span>
+                <span>{t('failedFetchAcreage')}</span>
               </div>
               <div style={{fontSize: '12px', color: '#7f1d1d'}}>{acreageError}</div>
               <button 
@@ -2815,7 +2817,7 @@ const parseCsvCoordinatePairs = (content) => {
                 >
                   <div className="card-body" style={{padding: '16px 20px'}}>
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>1 Month Plan</span>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>{t('oneMonthPlan')}</span>
                       <span style={{
                         fontSize: '11px',
                         fontWeight: '500',
@@ -2824,24 +2826,24 @@ const parseCsvCoordinatePairs = (content) => {
                         backgroundColor: (planAcreages['1 month'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
                         color: (planAcreages['1 month'].total || 0) > 0 ? '#059669' : '#6b7280'
                       }}>
-                        {(planAcreages['1 month'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                        {(planAcreages['1 month'].total || 0) > 0 ? t('activePlan') : t('inactivePlan')}
                       </span>
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('total')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
                           {(planAcreages['1 month'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('used')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
                           {(planAcreages['1 month'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('available')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
                           {(planAcreages['1 month'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
@@ -2868,7 +2870,7 @@ const parseCsvCoordinatePairs = (content) => {
                 >
                   <div className="card-body" style={{padding: '16px 20px'}}>
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>6 Months Plan</span>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>{t('sixMonthsPlan')}</span>
                       <span style={{
                         fontSize: '11px',
                         fontWeight: '500',
@@ -2877,24 +2879,24 @@ const parseCsvCoordinatePairs = (content) => {
                         backgroundColor: (planAcreages['6 months'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
                         color: (planAcreages['6 months'].total || 0) > 0 ? '#059669' : '#6b7280'
                       }}>
-                        {(planAcreages['6 months'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                        {(planAcreages['6 months'].total || 0) > 0 ? t('activePlan') : t('inactivePlan')}
                       </span>
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('total')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
                           {(planAcreages['6 months'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('used')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
                           {(planAcreages['6 months'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('available')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
                           {(planAcreages['6 months'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
@@ -2921,7 +2923,7 @@ const parseCsvCoordinatePairs = (content) => {
                 >
                   <div className="card-body" style={{padding: '16px 20px'}}>
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px'}}>
-                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>12 Months Plan</span>
+                      <span style={{fontSize: '14px', fontWeight: '600', color: '#111827'}}>{t('twelveMonthsPlan')}</span>
                       <span style={{
                         fontSize: '11px',
                         fontWeight: '500',
@@ -2930,24 +2932,24 @@ const parseCsvCoordinatePairs = (content) => {
                         backgroundColor: (planAcreages['12 months'].total || 0) > 0 ? '#ecfdf5' : '#f3f4f6',
                         color: (planAcreages['12 months'].total || 0) > 0 ? '#059669' : '#6b7280'
                       }}>
-                        {(planAcreages['12 months'].total || 0) > 0 ? 'Active Plan' : 'Inactive Plan'}
+                        {(planAcreages['12 months'].total || 0) > 0 ? t('activePlan') : t('inactivePlan')}
                       </span>
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center', paddingTop: '10px', borderTop: '1px solid #f1f5f9'}}>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>TOTAL</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('total')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#0f172a'}}>
                           {(planAcreages['12 months'].total || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div style={{borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9'}}>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>USED</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('used')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#d97706'}}>
                           {(planAcreages['12 months'].used || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
                       </div>
                       <div>
-                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>AVAILABLE</div>
+                        <div style={{fontSize: '11px', color: '#64748b', fontWeight: '600', letterSpacing: '0.04em', marginBottom: '2px'}}>{t('available')}</div>
                         <div style={{fontSize: '15px', fontWeight: '700', color: '#16a34a'}}>
                           {(planAcreages['12 months'].available || 0).toFixed(2)} <span style={{fontSize: '11px', fontWeight: '400', color: '#64748b'}}>ac</span>
                         </div>
@@ -2966,7 +2968,7 @@ const parseCsvCoordinatePairs = (content) => {
         <div className="modal-overlay">
           <div className="modal" style={{width: '420px', maxWidth: '90vw'}}>
             <div className="modal-head">
-              <h3>Quick actions</h3>
+              <h3>{t('quickActions')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={closeModal}>
                 <X className="ic-xs" />
               </button>
@@ -2977,24 +2979,24 @@ const parseCsvCoordinatePairs = (content) => {
                   // Client and Manager user options
                   <>
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('register'); }}>
-                      <span style={{marginRight: '8px'}}>+</span> New registration
+                      <span style={{marginRight: '8px'}}>+</span> {t('newRegistration')}
                     </button>
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
-                      <span style={{marginRight: '8px'}}>+</span> Unlock farm
+                      <span style={{marginRight: '8px'}}>+</span> {t('unlockFarmBtn')}
                     </button>
                   </>
                 ) : (
                   // Sales/Operations user options
                   <>
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('assign-acreages'); }}>
-                      <span style={{marginRight: '8px'}}>+</span> Assign acreage to client
+                      <span style={{marginRight: '8px'}}>+</span> {t('assignAcreageToClient')}
                     </button>
                     
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('unlock-farm'); }}>
-                      <span style={{marginRight: '8px'}}>+</span> Unlock farm
+                      <span style={{marginRight: '8px'}}>+</span> {t('unlockFarmBtn')}
                     </button>
                     <button className="btn" style={{justifyContent: 'flex-start', textAlign: 'left'}} onClick={() => { closeModal(); onPageChange('monthly-acreages'); openModal('add-registration-modal'); }}>
-                      <span style={{marginRight: '8px'}}>+</span> Add new registration
+                      <span style={{marginRight: '8px'}}>+</span> {t('addNewRegistration')}
                     </button>
                   </>
                 )}
@@ -3009,7 +3011,7 @@ const parseCsvCoordinatePairs = (content) => {
         <div className="modal-overlay">
           <div className="modal" style={{width: '420px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto'}}>
             <div className="modal-head">
-              <h3>Select Unlock Plan</h3>
+              <h3>{t('selectUnlockPlan')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowPlanModal(false)}>
                 <X className="ic-xs" />
               </button>
@@ -3018,13 +3020,13 @@ const parseCsvCoordinatePairs = (content) => {
               <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                 <div>
                   <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
-                    Farm ID: <span style={{fontWeight: '600', color: 'var(--primary)'}}>{selectedFarmId}</span>
+                    {t('farmId')}: <span style={{fontWeight: '600', color: 'var(--primary)'}}>{selectedFarmId}</span>
                   </label>
                 </div>
                 
                 <div>
                   <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-1)'}}>
-                    Select Plan Duration
+                    {t('selectPlanDuration')}
                   </label>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                     <button 
@@ -3094,14 +3096,14 @@ const parseCsvCoordinatePairs = (content) => {
                     onClick={() => setShowPlanModal(false)}
                     disabled={planLoading}
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button 
                     className="btn btn-primary" 
                     onClick={unlockFarmWithPlan}
                     disabled={planLoading || !selectedPlan}
                   >
-                    {planLoading ? 'Processing...' : 'Unlock Farm'}
+                    {planLoading ? t('processing') : t('unlockFarm')}
                   </button>
                 </div>
               </div>
@@ -3239,12 +3241,12 @@ const parseCsvCoordinatePairs = (content) => {
           <div className="modal" style={{width: addFarmModalStep === 3 ? '600px' : '550px', maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column'}}>
             <div className="modal-head">
               <h3>
-                {addFarmModalStep === 0 && (currentRole === 'partner' ? 'Select Manager' : 'Select Farmer')}
-                {addFarmModalStep === 0.5 && 'Select Farmer'}
-                {addFarmModalStep === 1 && 'Choose Polygon Category'}
-                {addFarmModalStep === 2 && 'Choose Upload Method'}
-                {addFarmModalStep === 3 && `Upload using ${selectedUploadMethod} file - ${selectedPolygonCategory}`}
-                {addFarmModalStep === 4 && 'Farm Details'}
+                {addFarmModalStep === 0 && (currentRole === 'partner' ? t('selectManager') : t('selectFarmer'))}
+                {addFarmModalStep === 0.5 && t('selectFarmer')}
+                {addFarmModalStep === 1 && t('choosePolygonCategory')}
+                {addFarmModalStep === 2 && t('chooseUploadMethod')}
+                {addFarmModalStep === 3 && `${t('uploadUsing')} ${selectedUploadMethod} ${t('file')} - ${selectedPolygonCategory}`}
+                {addFarmModalStep === 4 && t('farmDetails')}
               </h3>
               <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddFarmModal(false); setAddFarmModalStep(0); setSelectedPolygonCategory(''); setSelectedUploadMethod(''); setUploadedFile(null); setFarmName(''); setCropType(''); setVariety(''); setSowingDate(''); setIrrigation(''); setSelectedFarmer(null); setFarmerSearchQuery(''); setSelectedManager(null); setManagerSearchQuery(''); }}>
                 <X className="ic-xs" />
@@ -3258,7 +3260,7 @@ const parseCsvCoordinatePairs = (content) => {
                     <>
                       <input
                         type="text"
-                        placeholder="Search manager by name or ID..."
+                        placeholder={t('searchManager')}
                         value={managerSearchQuery}
                         onChange={(e) => setManagerSearchQuery(e.target.value)}
                         style={{
@@ -3324,7 +3326,7 @@ const parseCsvCoordinatePairs = (content) => {
                     <>
                       <input
                         type="text"
-                        placeholder="Search farmer by name or ID..."
+                        placeholder={t('searchFarmer')}
                         value={farmerSearchQuery}
                         onChange={(e) => setFarmerSearchQuery(e.target.value)}
                         style={{
@@ -3428,7 +3430,7 @@ const parseCsvCoordinatePairs = (content) => {
                   </div>
                   <input
                     type="text"
-                    placeholder="Search farmer by name or ID..."
+                    placeholder={t('searchFarmer')}
                     value={farmerSearchQuery}
                     onChange={(e) => setFarmerSearchQuery(e.target.value)}
                     style={{
@@ -4147,7 +4149,7 @@ const parseCsvCoordinatePairs = (content) => {
                   type="text"
                   value={farmId}
                   onChange={(e) => setFarmId(e.target.value)}
-                  placeholder="Enter Farm ID"
+                  placeholder={t('enterFarmId')}
                 />
               </div>
               <div className="form-group">
@@ -4235,20 +4237,20 @@ const parseCsvCoordinatePairs = (content) => {
       {farmDetails && farmId.trim() && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
-            <span className="card-title">Farm Details</span>
+            <span className="card-title">{t('farmDetails')}</span>
           </div>
           <div className="card-body">
             <div style={{overflowX: 'auto'}}>
               <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
                 <thead>
                   <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Farm ID</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Crop Type</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Area</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>District</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>State</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Country</th>
-                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>Time of Registration</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('farmId')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('cropType')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('area')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('district')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('state')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('country')}</th>
+                    <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)'}}>{t('timeOfRegistration')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4290,12 +4292,12 @@ const parseCsvCoordinatePairs = (content) => {
       {currentRole === 'ops' && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
-            <span className="card-title">50 Recently Added Farm</span>
+            <span className="card-title">{t('recentlyAddedFarm')}</span>
           </div>
           <div className="card-body">
             {opsRecentFarmsLoading && (
               <div style={{textAlign: 'center', padding: '24px'}}>
-                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recently added farms...</p>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>{t('loadingRecentFarms')}</p>
               </div>
             )}
             {opsRecentFarmsError && (
@@ -4322,16 +4324,16 @@ const parseCsvCoordinatePairs = (content) => {
                         <table style={{width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '14px'}}>
                           <thead>
                             <tr style={{backgroundColor: 'var(--bg-1)', borderBottom: '1px solid var(--border)'}}>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farm ID</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farm Name</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Client ID</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Farmer Details</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Region</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Area</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Plan</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Added Time</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Status</th>
-                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>Actions</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('farmId')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('farmName')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('clientId')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('farmerDetails')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('region')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('area')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('plan')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('addedTime')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('status')}</th>
+                              <th style={{padding: '12px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap'}}>{t('action')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4367,7 +4369,7 @@ const parseCsvCoordinatePairs = (content) => {
                                       className="btn btn-primary btn-sm"
                                       style={{fontSize: '12px', padding: '6px 12px', height: '32px', cursor: formLoading ? 'not-allowed' : 'pointer'}}
                                     >
-                                      Unlock
+                                      {formLoading ? '...' : t('unlock')}
                                     </button>
                                   ) : (
                                     <button
@@ -4376,7 +4378,7 @@ const parseCsvCoordinatePairs = (content) => {
                                       className="btn btn-danger btn-sm"
                                       style={{fontSize: '12px', padding: '6px 12px', height: '32px', cursor: formLoading ? 'not-allowed' : 'pointer'}}
                                     >
-                                      Lock
+                                      {formLoading ? '...' : t('lock')}
                                     </button>
                                   )}
                                 </td>
@@ -4417,7 +4419,7 @@ const parseCsvCoordinatePairs = (content) => {
             )}
             {!opsRecentFarmsLoading && !opsRecentFarmsError && opsRecentFarms.length === 0 && (
               <div style={{textAlign: 'center', padding: '24px'}}>
-                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>No recently added farms found</p>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>{t('noRecentlyAddedFarms')}</p>
               </div>
             )}
           </div>
@@ -4428,13 +4430,13 @@ const parseCsvCoordinatePairs = (content) => {
       {(currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head">
-            <span className="card-title">Search Farm</span>
+            <span className="card-title">{t('searchFarm')}</span>
           </div>
           <div className="card-body" style={{padding: '16px'}}>
             <div style={{display: 'flex', gap: '8px'}}>
               <input
                 type="text"
-                placeholder="Enter Farm ID"
+                placeholder={t('enterFarmId')}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -4458,7 +4460,7 @@ const parseCsvCoordinatePairs = (content) => {
                 className="btn btn-primary"
                 style={{padding: '8px 16px'}}
               >
-                {searchLoading ? `${searchProgress}%` : 'Search'}
+                {searchLoading ? `${searchProgress}%` : t('search')}
               </button>
             </div>
 
@@ -4466,7 +4468,7 @@ const parseCsvCoordinatePairs = (content) => {
             {searchLoading && (
               <div style={{marginTop: '16px'}}>
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                  <span style={{fontSize: '13px', color: 'var(--text-2)'}}>Searching farm...</span>
+                  <span style={{fontSize: '13px', color: 'var(--text-2)'}}>{t('searchingFarm')}</span>
                   <span style={{fontSize: '13px', fontWeight: '600', color: 'var(--text-1)'}}>{searchProgress}%</span>
                 </div>
                 <div style={{
@@ -4493,15 +4495,15 @@ const parseCsvCoordinatePairs = (content) => {
                 <table style={{width: '100%', minWidth: '950px', borderCollapse: 'collapse', fontSize: '16px'}}>
                   <thead>
                     <tr style={{borderBottom: '1px solid var(--border)'}}>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm ID</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm Name</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farmer Details</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Region</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Area</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Plan</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Crop Type</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Status</th>
-                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px', whiteSpace: 'nowrap'}}>Action</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmId')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmName')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmerDetails')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('region')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('area')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('plan')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('cropType')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('status')}</th>
+                      <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', width: '100px', whiteSpace: 'nowrap'}}>{t('action')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4569,7 +4571,7 @@ const parseCsvCoordinatePairs = (content) => {
                             className="btn btn-danger btn-sm"
                             style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (formLoading || (searchResult.status && String(searchResult.status).toLowerCase() === 'unlocked')) ? 'not-allowed' : 'pointer'}}
                           >
-                            Delete
+                            {t('delete')}
                           </button>
                           {(currentRole === 'partner' || currentRole === 'manager') && (
                             <button
@@ -4650,7 +4652,7 @@ const parseCsvCoordinatePairs = (content) => {
       {(currentRole === 'client' || currentRole === 'manager' || currentRole === 'partner') && (
         <div className="card" style={{marginBottom: '16px', marginLeft: '24px', marginRight: '24px'}}>
           <div className="card-head" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-            <span className="card-title">Top 50 Farms</span>
+            <span className="card-title">{t('top50Farms')}</span>
             <div style={{display: 'flex', gap: '8px'}}>
               <button
                 className={`btn btn-sm ${selectedView === 'added' ? 'btn-primary' : 'btn-outline'}`}
@@ -4660,7 +4662,7 @@ const parseCsvCoordinatePairs = (content) => {
                 }}
                 style={{flex: 1, padding: '4px 12px', fontSize: '12px'}}
               >
-                Added Farms
+                {t('addedFarms')}
               </button>
               <button
                 className={`btn btn-sm ${selectedView === 'expiring' ? 'btn-primary' : 'btn-outline'}`}
@@ -4670,20 +4672,20 @@ const parseCsvCoordinatePairs = (content) => {
                 }}
                 style={{flex: 1, padding: '4px 12px', fontSize: '12px'}}
               >
-                Expiring Farms
+                {t('expiringFarms')}
               </button>
             </div>
           </div>
           <div className="card-body" style={{padding: '16px'}}>
             {selectedView === 'added' && recentFarmsLoading && (
               <div style={{textAlign: 'center', padding: '24px'}}>
-                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading recent farms...</p>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>{t('loadingRecentFarms')}</p>
               </div>
             )}
             
             {selectedView === 'expiring' && expiringFarmsLoading && (
               <div style={{textAlign: 'center', padding: '24px'}}>
-                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>Loading expiring farms...</p>
+                <p style={{color: 'var(--text-2)', fontSize: '14px'}}>{t('loadingExpiringFarms')}</p>
               </div>
             )}
             
@@ -4721,22 +4723,22 @@ const parseCsvCoordinatePairs = (content) => {
                         <table style={{width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '14px'}}>
                           <thead>
                             <tr style={{borderBottom: '1px solid var(--border)'}}>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm ID</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farm Name</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Client ID</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Farmer Details</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Region</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Area</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Plan</th>
-                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{selectedView === 'added' ? 'Added Time' : 'Expiry Time'}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmId')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmName')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('clientId')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('farmerDetails')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('region')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('area')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('plan')}</th>
+                              <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{selectedView === 'added' ? t('addedTime') : t('expiryTime')}</th>
                               {selectedView === 'added' && (
-                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Status</th>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('status')}</th>
                               )}
                               {currentRole === 'partner' && (
-                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>Admin Name</th>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap'}}>{t('adminName')}</th>
                               )}
                               {selectedView === 'added' && (
-                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap', minWidth: '220px'}}>Action</th>
+                                <th style={{padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-1)', fontSize: '14px', whiteSpace: 'nowrap', minWidth: '220px'}}>{t('action')}</th>
                               )}
                             </tr>
                           </thead>
@@ -4790,7 +4792,7 @@ const parseCsvCoordinatePairs = (content) => {
                                           className="btn btn-primary btn-sm"
                                           style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px'}}
                                         >
-                                          {formLoading ? '...' : 'Unlock'}
+                                          {formLoading ? '...' : t('unlock')}
                                         </button>
                                       ) : (
                                         <button
@@ -4802,7 +4804,7 @@ const parseCsvCoordinatePairs = (content) => {
                                           className="btn btn-danger btn-sm"
                                           style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', fontWeight: 'bold'}}
                                         >
-                                          {formLoading ? '...' : 'Lock'}
+                                          {formLoading ? '...' : t('lock')}
                                         </button>
                                       )}
                                       <button
@@ -4814,7 +4816,7 @@ const parseCsvCoordinatePairs = (content) => {
                                         className="btn btn-danger btn-sm"
                                         style={{fontSize: '12px', padding: '6px 12px', height: '32px', width: '80px', cursor: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 'not-allowed' : 'pointer', opacity: (currentRole === 'manager' && String(farm.status).toLowerCase() === 'unlocked') ? 0.5 : 1}}
                                       >
-                                        Delete
+                                        {t('delete')}
                                       </button>
                                       {(currentRole === 'partner' || currentRole === 'manager') && (
                                         <button

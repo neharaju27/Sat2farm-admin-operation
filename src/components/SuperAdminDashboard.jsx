@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import toast from 'react-hot-toast';
 import "../styles/Sat2FarmAdminPortal.css";
+import { useLanguage } from '../context/LanguageContext';
 
 const GET_ADMIN_KEY_API_URL =
   import.meta.env.VITE_GET_ADMIN_KEY_API_URL;
@@ -29,6 +30,7 @@ export default function SuperAdminDashboard({
   user,
   onPageChange,
 }) {
+  const { t } = useLanguage();
   const [adminInfo, setAdminInfo] = useState([]);
   const [areaData, setAreaData] = useState(null);
   const [superAdminKey, setSuperAdminKey] = useState(null);
@@ -500,11 +502,11 @@ export default function SuperAdminDashboard({
       {/* Header */}
       <div className="topbar">
         <div className="tb-left">
-          <div className="tb-page">Super Admin Dashboard</div>
+          <div className="tb-page">{t('dashboard')}</div>
         </div>
 
         <div className="tb-right">
-          <div className="badge badge-green">Overview</div>
+          <div className="badge badge-green">{t('overview')}</div>
         </div>
       </div>
 
@@ -514,14 +516,14 @@ export default function SuperAdminDashboard({
           <div className="sa-welcome">
             <div>
               <h1 className="sa-welcome-title">
-                Welcome back,
+                {t('welcomeBack')},
                 <span className="sa-company-name">
                   {" "}
                   {displayName}
                 </span>
               </h1>
               <p className="sa-welcome-subtitle">
-                Manage and monitor all your managers from one place.
+                {t('manageMonitor')}
               </p>
             </div>
 
@@ -531,7 +533,7 @@ export default function SuperAdminDashboard({
                 <Search size={16} className="sa-search-icon" />
                 <input
                   type="text"
-                  placeholder="Search managers..."
+                  placeholder={t('searchManagers')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="sa-search-input"
@@ -556,8 +558,8 @@ export default function SuperAdminDashboard({
                   onChange={(e) => setSortBy(e.target.value)}
                   aria-label="Sort managers"
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
+                  <option value="newest">{t('newestFirst')}</option>
+                  <option value="oldest">{t('oldestFirst')}</option>
                 </select>
               </div>
             </div>
@@ -566,7 +568,7 @@ export default function SuperAdminDashboard({
           {/* ================= Loading ================= */}
           {loading && (
             <div className="sa-empty">
-              Loading managers...
+              {t('loading')}
             </div>
           )}
 
@@ -581,7 +583,7 @@ export default function SuperAdminDashboard({
           {!loading && !error && filteredManagers.length > 0 && (
             <div className="sa-scroll-hint-banner">
               <span>↔</span>
-              <span>Scroll horizontally to view all manager columns & plans</span>
+              <span>{t('scrollHorizontally')}</span>
             </div>
           )}
 
@@ -592,14 +594,14 @@ export default function SuperAdminDashboard({
                 <table className="sa-table">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: "190px" }}>Manager</th>
-                      <th style={{ minWidth: "110px" }}>Manager ID</th>
-                      <th style={{ minWidth: "130px" }}>Phone Number</th>
-                      <th style={{ minWidth: "130px" }}>Registered Date</th>
-                      <th style={{ minWidth: "135px" }}>1 Month Plan</th>
-                      <th style={{ minWidth: "135px" }}>6 Months Plan</th>
-                      <th style={{ minWidth: "135px" }}>12 Months Plan</th>
-                      <th style={{ minWidth: "300px", textAlign: "center" }}>Actions</th>
+                      <th style={{ minWidth: "190px" }}>{t('manager')}</th>
+                      <th style={{ minWidth: "110px" }}>{t('managerId')}</th>
+                      <th style={{ minWidth: "130px" }}>{t('phoneNumber')}</th>
+                      <th style={{ minWidth: "130px" }}>{t('registeredDate')}</th>
+                      <th style={{ minWidth: "135px" }}>{t('oneMonthPlan')}</th>
+                      <th style={{ minWidth: "135px" }}>{t('sixMonthPlan')}</th>
+                      <th style={{ minWidth: "135px" }}>{t('twelveMonthPlan')}</th>
+                      <th style={{ minWidth: "300px", textAlign: "center" }}>{t('actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -613,7 +615,7 @@ export default function SuperAdminDashboard({
                             color: "#64748b",
                           }}
                         >
-                          No managers found.
+                          {t('noManagersFound')}
                         </td>
                       </tr>
                     ) : (
@@ -635,7 +637,7 @@ export default function SuperAdminDashboard({
                                   {manager.full_name}
                                 </div>
                                 <div className="sa-manager-role">
-                                  Manager
+                                  {t('manager')}
                                 </div>
                               </div>
                             </div>
@@ -657,27 +659,27 @@ export default function SuperAdminDashboard({
                           {/* 1 Month Plan */}
                           <td>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['1 month']?.total || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['1 month']?.used || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['1 month']?.available || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('total')}:</span> <strong>{(manager.plan_acreages?.['1 month']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('used')}:</span> <strong>{(manager.plan_acreages?.['1 month']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('available')}:</span> <strong>{(manager.plan_acreages?.['1 month']?.available || 0).toFixed(2)}</strong></div>
                             </div>
                           </td>
 
                           {/* 6 Months Plan */}
                           <td>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['6 months']?.total || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['6 months']?.used || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['6 months']?.available || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('total')}:</span> <strong>{(manager.plan_acreages?.['6 months']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('used')}:</span> <strong>{(manager.plan_acreages?.['6 months']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('available')}:</span> <strong>{(manager.plan_acreages?.['6 months']?.available || 0).toFixed(2)}</strong></div>
                             </div>
                           </td>
 
                           {/* 12 Months Plan */}
                           <td>
                             <div style={{display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px'}}>
-                              <div><span style={{color: '#666'}}>Total:</span> <strong>{(manager.plan_acreages?.['12 months']?.total || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Used:</span> <strong>{(manager.plan_acreages?.['12 months']?.used || 0).toFixed(2)}</strong></div>
-                              <div><span style={{color: '#666'}}>Available:</span> <strong>{(manager.plan_acreages?.['12 months']?.available || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('total')}:</span> <strong>{(manager.plan_acreages?.['12 months']?.total || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('used')}:</span> <strong>{(manager.plan_acreages?.['12 months']?.used || 0).toFixed(2)}</strong></div>
+                              <div><span style={{color: '#666'}}>{t('available')}:</span> <strong>{(manager.plan_acreages?.['12 months']?.available || 0).toFixed(2)}</strong></div>
                             </div>
                           </td>
 
@@ -690,7 +692,7 @@ export default function SuperAdminDashboard({
                                 style={{ padding: "6px 10px", fontSize: "12px", whiteSpace: "nowrap" }}
                                 title="Assign Acreages"
                               >
-                                Assign Acreages
+                                {t('assignAcreages')}
                               </button>
                               <button
                                 className="sa-action-btn btn-revoke"
@@ -699,7 +701,7 @@ export default function SuperAdminDashboard({
                                 title="Revoke Acreage"
                               >
                                 <RotateCcw size={13} />
-                                Revoke Acreage
+                                {t('revoke')}
                               </button>
                               <button
                                 className="sa-action-btn btn-view"
@@ -708,7 +710,7 @@ export default function SuperAdminDashboard({
                                 title="View Report"
                               >
                                 <Eye size={13} />
-                                View Report
+                                {t('viewReport')}
                               </button>
                             </div>
                           </td>
@@ -755,7 +757,7 @@ export default function SuperAdminDashboard({
               padding: '16px 20px',
               borderBottom: '1px solid #e5e7eb'
             }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Assign Acreage</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>{t('assignAcreage')}</h3>
               <button 
                 onClick={handleCloseAssignModal}
                 style={{
@@ -792,18 +794,18 @@ export default function SuperAdminDashboard({
                 marginBottom: '20px'
               }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>
-                  Manager Details
+                  {t('managerDetails')}
                 </div>
                 <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid #bbf7d0' }}>
-                      <td style={{ padding: '8px 0', color: '#374151', width: '40%', fontWeight: '500' }}>Manager Name</td>
+                      <td style={{ padding: '8px 0', color: '#374151', width: '40%', fontWeight: '500' }}>{t('managerName')}</td>
                       <td style={{ padding: '8px 0', fontWeight: '600', color: '#1f2937' }}>
                         {selectedManager.full_name}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: '8px 0', color: '#374151', fontWeight: '500' }}>Client ID</td>
+                      <td style={{ padding: '8px 0', color: '#374151', fontWeight: '500' }}>{t('clientId')}</td>
                       <td style={{ padding: '8px 0', fontWeight: '600', color: '#1f2937' }}>
                         {selectedManager.sub_admin_id || selectedManager.client_id || 'N/A'}
                       </td>
@@ -816,14 +818,14 @@ export default function SuperAdminDashboard({
                 {/* Area Input */}
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
-                    Area to Add (acres) *
+                    {t('areaToAdd')} *
                   </label>
                   <input
                     type="number"
                     name="area"
                     value={assignFormData.area}
                     onChange={handleAssignInputChange}
-                    placeholder="Enter area in acres"
+                    placeholder={t('enterAreaAcres')}
                     required
                     style={{
                       width: '100%',
@@ -839,7 +841,7 @@ export default function SuperAdminDashboard({
                 {/* Plan Selection */}
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
-                    Plan *
+                    {t('plan')} *
                   </label>
                   <select
                     name="plan"
@@ -856,9 +858,9 @@ export default function SuperAdminDashboard({
                       backgroundColor: 'white'
                     }}
                   >
-                    <option value="1 month">1 Month</option>
-                    <option value="6 months">6 Months</option>
-                    <option value="12 months">12 Months</option>
+                    <option value="1 month">{t('oneMonthPlan')}</option>
+                    <option value="6 months">{t('sixMonthPlan')}</option>
+                    <option value="12 months">{t('twelveMonthPlan')}</option>
                   </select>
                 </div>
 
@@ -869,7 +871,7 @@ export default function SuperAdminDashboard({
                   className="btn btn-primary"
                   style={{ width: '100%' }}
                 >
-                  {assignLoading ? 'Assigning...' : 'Submit'}
+                  {assignLoading ? t('assigning') : t('submit')}
                 </button>
               </form>
             </div>
@@ -911,7 +913,7 @@ export default function SuperAdminDashboard({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <RotateCcw size={18} style={{ color: '#b91c1c' }} />
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#991b1b' }}>Revoke Acreage</h3>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#991b1b' }}>{t('revokeAcreage')}</h3>
               </div>
               <button
                 onClick={handleCloseRevokeModal}
@@ -951,24 +953,24 @@ export default function SuperAdminDashboard({
                 marginBottom: '20px'
               }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#9a3412', marginBottom: '8px' }}>
-                  Manager Details
+                  {t('managerDetails')}
                 </div>
                 <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid #ffedd5' }}>
-                      <td style={{ padding: '6px 0', color: '#4b5563', width: '40%', fontWeight: '500' }}>Manager Name</td>
+                      <td style={{ padding: '6px 0', color: '#4b5563', width: '40%', fontWeight: '500' }}>{t('managerName')}</td>
                       <td style={{ padding: '6px 0', fontWeight: '600', color: '#1f2937' }}>
                         {revokeManager.full_name}
                       </td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #ffedd5' }}>
-                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>Client ID</td>
+                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>{t('clientId')}</td>
                       <td style={{ padding: '6px 0', fontWeight: '600', color: '#1f2937' }}>
                         {revokeManager.sub_admin_id || revokeManager.client_id || 'N/A'}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>Available to Revoke</td>
+                      <td style={{ padding: '6px 0', color: '#4b5563', fontWeight: '500' }}>{t('availableToRevoke')}</td>
                       <td style={{ padding: '6px 0', fontWeight: '700', color: '#b91c1c' }}>
                         {(revokeManager.plan_acreages?.[revokeFormData.plan]?.available || 0).toFixed(2)} acres
                       </td>
@@ -999,13 +1001,13 @@ export default function SuperAdminDashboard({
                     }}
                   >
                     <option value="1 month">
-                      1 Month (Available: {(revokeManager.plan_acreages?.['1 month']?.available || 0).toFixed(2)} acres)
+                      {t('oneMonthPlan')} (Available: {(revokeManager.plan_acreages?.['1 month']?.available || 0).toFixed(2)} acres)
                     </option>
                     <option value="6 months">
-                      6 Months (Available: {(revokeManager.plan_acreages?.['6 months']?.available || 0).toFixed(2)} acres)
+                      {t('sixMonthPlan')} (Available: {(revokeManager.plan_acreages?.['6 months']?.available || 0).toFixed(2)} acres)
                     </option>
                     <option value="12 months">
-                      12 Months (Available: {(revokeManager.plan_acreages?.['12 months']?.available || 0).toFixed(2)} acres)
+                      {t('twelveMonthPlan')} (Available: {(revokeManager.plan_acreages?.['12 months']?.available || 0).toFixed(2)} acres)
                     </option>
                   </select>
                 </div>
@@ -1014,7 +1016,7 @@ export default function SuperAdminDashboard({
                 <div style={{ marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <label style={{ fontWeight: '500', fontSize: '14px', color: '#374151' }}>
-                      Area to Revoke (acres) *
+                      {t('areaToRevoke')} *
                     </label>
                     <button
                       type="button"
@@ -1033,7 +1035,7 @@ export default function SuperAdminDashboard({
                         textDecoration: 'underline'
                       }}
                     >
-                      Use Max
+                      {t('useMax')}
                     </button>
                   </div>
                   <input
@@ -1055,7 +1057,7 @@ export default function SuperAdminDashboard({
                     }}
                   />
                   <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
-                    This will deduct unused acreage from this manager and credit it back to the partner's account.
+                    {t('revokeDescription')}
                   </div>
                 </div>
 
@@ -1076,7 +1078,7 @@ export default function SuperAdminDashboard({
                       cursor: 'pointer'
                     }}
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button
                     type="submit"
@@ -1099,11 +1101,11 @@ export default function SuperAdminDashboard({
                     }}
                   >
                     {revokeLoading ? (
-                      'Revoking...'
+                      t('revoking')
                     ) : (
                       <>
                         <RotateCcw size={16} />
-                        Revoke Acreage
+                        {t('revoke')}
                       </>
                     )}
                   </button>

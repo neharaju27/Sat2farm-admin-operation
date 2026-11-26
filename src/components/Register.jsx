@@ -4,6 +4,7 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import '../styles/Sat2FarmAdminPortal.css';
 import toast from 'react-hot-toast';
+import { useLanguage } from '../context/LanguageContext';
 
 const API_URL = import.meta.env.VITE_BUSINESS_PORTAL_REGISTER_API_URL;
 const MANAGER_RESTRICT_API_URL = import.meta.env.VITE_MANAGER_RESTRICT_API_URL;
@@ -11,6 +12,7 @@ const GET_USER_ID_API_URL=import.meta.env.VITE_GET_USER_ID_API_URL;
 
 
 export default function Registration({ user, onPageChange }) {
+  const { t } = useLanguage();
   // Set currentRole based on actual user role
   const [currentRole, setCurrentRole] = useState(() => {
     const userRole = user?.role || user?.user_role || user?.type || 'ops';
@@ -157,7 +159,7 @@ export default function Registration({ user, onPageChange }) {
 
     // Validate email (only if provided)
     if (formData.user_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.user_email)) {
-      const errorMessage = "Please enter a valid email address";
+      const errorMessage = t('validEmail');
       setError(errorMessage);
       toast.error(errorMessage);
       setShowErrorModal(true);
@@ -172,7 +174,7 @@ export default function Registration({ user, onPageChange }) {
         const loggedInPhoneNumber = user?.phone_number || user?.phoneNumber || user?.pNumber;
         
         if (!loggedInPhoneNumber) {
-          const errorMessage = "Unable to verify account. Please log in again.";
+          const errorMessage = t('unableToVerifyAccount');
           setError(errorMessage);
           toast.error(errorMessage);
           setShowErrorModal(true);
@@ -193,7 +195,7 @@ export default function Registration({ user, onPageChange }) {
         // Block when manager_count is exactly 2 (already have 2 managers)
         if (currentManagerData.manager_count === 2) {
           console.log('🚫 BLOCKING: Manager count is', currentManagerData.manager_count, ', cannot add more');
-          const errorMessage = "Please contact operations team to add more managers";
+          const errorMessage = t('contactOperationsTeam');
           setError(errorMessage);
           toast.error(errorMessage);
           setShowErrorModal(true);
@@ -209,11 +211,11 @@ export default function Registration({ user, onPageChange }) {
         // If API fails (500 error), allow registration to proceed with a warning
         if (error.message.includes('Internal Server Error') || error.message.includes('500')) {
           console.log('API unavailable, allowing registration to proceed');
-          toast.info('Manager limit check temporarily unavailable. Registration will proceed.');
+          toast.info(t('managerLimitUnavailable'));
           // Don't return here - allow registration to continue
         } else {
           // For other errors, block registration
-          const errorMessage = "Failed to verify manager limit. Please try again.";
+          const errorMessage = t('failedToVerifyManagerLimit');
           setError(errorMessage);
           toast.error(errorMessage);
           setShowErrorModal(true);
@@ -272,7 +274,7 @@ export default function Registration({ user, onPageChange }) {
         console.log('Exact match test:', data.Message === "User already registered");
         
         if (data.Message && data.Message.toLowerCase().includes("already registered")) {
-          const errorMessage = "User already registered with this phone number. Please try registering with a new phone number.";
+          const errorMessage = t('userAlreadyRegistered');
           setError(errorMessage);
           toast.error(errorMessage);
           setShowErrorModal(true);
@@ -281,7 +283,7 @@ export default function Registration({ user, onPageChange }) {
         }
         
         setSuccess(true);
-        toast.success('User registered successfully!');
+        toast.success(t('userRegisteredSuccess'));
         // Add new user to the registered users list
         const newUser = {
           id: Date.now(),
@@ -293,7 +295,7 @@ export default function Registration({ user, onPageChange }) {
           accountId: formData.acc_id,
           referralCode: formData.referal_code || '-',
           category: formData.category,
-          password: data['User Login Password'] || data.password || data.new_password || data.user_password || data.Password || data.generated_password || data.temp_password || 'Not provided',
+          password: data['User Login Password'] || data.password || data.new_password || data.user_password || data.Password || data.generated_password || data.temp_password || t('notProvided'),
           registrationDate: new Date().toLocaleDateString()
         };
         setRegisteredUsers(prev => [...prev, newUser]);
@@ -311,13 +313,13 @@ export default function Registration({ user, onPageChange }) {
           country_code: "+91"
         }));
       } else {
-        const errorMessage = data.message || 'Registration failed. Please try again.';
+        const errorMessage = t('registrationFailed');
         setError(errorMessage);
         toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Registration error:', error);
-      const errorMessage = 'Network error. Please check your connection and try again.';
+      const errorMessage = t('networkError');
       setError(errorMessage);
       toast.error(errorMessage);
       setShowErrorModal(true);
@@ -342,29 +344,29 @@ export default function Registration({ user, onPageChange }) {
         <div className="topbar" style={{marginBottom: '20px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
           <div className="tb-left">
             <div>
-              <div className="tb-page">User Registration</div>
-              <div className="tb-sub">Operations · User Management</div>
+              <div className="tb-page">{t('userRegistration')}</div>
+              <div className="tb-sub">{t('operationsUserManagement')}</div>
             </div>
           </div>
           <div className="tb-right">
-            <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
+            <button className="btn btn-primary btn-sm" onClick={() => {}}>{t('new')}</button>
           </div>
         </div>
 
         {/* Success Message */}
         <div className="card" style={{marginBottom: '20px'}}>
           <div className="card-head">
-            <span className="card-title">Registration Successful!</span>
+            <span className="card-title">{t('registrationSuccessful')}</span>
           </div>
           <div className="card-body" style={{textAlign: 'center', padding: '20px'}}>
             <div className="metric metric-accent" style={{margin: '0 auto 16px', maxWidth: '80px'}}>
               <CheckCircle className="ic" style={{fontSize: '32px', color: 'var(--green-600)'}} />
             </div>
             <h3 style={{fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
-              User Registered Successfully
+              {t('userRegisteredSuccessfully')}
             </h3>
             <p style={{color: 'var(--text-2)', marginBottom: '16px'}}>
-              The user has been successfully registered in the system.
+              {t('userRegisteredMessage')}
             </p>
             <button 
               className="btn btn-primary" 
@@ -374,7 +376,7 @@ export default function Registration({ user, onPageChange }) {
               }}
               style={{padding: '8px 16px', fontSize: '13px'}}
             >
-              OK
+              {t('ok')}
             </button>
           </div>
         </div>
@@ -383,23 +385,23 @@ export default function Registration({ user, onPageChange }) {
         {registeredUsers.length > 0 && (
           <div className="card">
             <div className="card-head">
-              <span className="card-title">Registered Users</span>
-              <span className="badge badge-blue">{registeredUsers.length} User{registeredUsers.length !== 1 ? 's' : ''}</span>
+              <span className="card-title">{t('registeredUsers')}</span>
+              <span className="badge badge-blue">{registeredUsers.length} {registeredUsers.length !== 1 ? t('users') : t('user')}</span>
             </div>
             <div className="card-body">
               <div className="table-wrapper">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      <th>Country Code</th>
-                      <th>Account ID</th>
-                      <th>Category</th>
-                      <th>Referral Code</th>
-                      <th>Password</th>
-                      <th>Registration Date</th>
+                      <th>{t('name')}</th>
+                      <th>{t('email')}</th>
+                      <th>{t('phone')}</th>
+                      <th>{t('countryCode')}</th>
+                      <th>{t('accountId')}</th>
+                      <th>{t('category')}</th>
+                      <th>{t('referralCode')}</th>
+                      <th>{t('password')}</th>
+                      <th>{t('registrationDate')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -437,27 +439,27 @@ export default function Registration({ user, onPageChange }) {
       <div className="topbar" style={{marginBottom: '20px', marginLeft: '0', marginRight: '0', backgroundColor: '#ffffff', borderBottom: '1px solid var(--border)', padding: '0 24px'}}>
         <div className="tb-left">
           <div>
-            <div className="tb-page">User Registration</div>
-            <div className="tb-sub">Operations · User Management</div>
+            <div className="tb-page">{t('userRegistration')}</div>
+            <div className="tb-sub">{t('operationsUserManagement')}</div>
           </div>
         </div>
         <div className="tb-right">
-          <button className="btn btn-primary btn-sm" onClick={() => {}}>+ New</button>
+          <button className="btn btn-primary btn-sm" onClick={() => {}}>{t('new')}</button>
         </div>
       </div>
 
       <div style={{padding: '0 24px', maxWidth: '1000px', width: '100%', margin: '0 auto'}}>
         {/* Section Header */}
         <div className="section-head">
-          <div className="section-title"> Registration</div>
-          <span className="badge badge-blue">New Account</span>
+          <div className="section-title">{t('newRegistration')}</div>
+          <span className="badge badge-blue">{t('newAccount')}</span>
         </div>
 
         {/* Registration Form */}
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Create New Account</span>
-            <span className="card-sub">Fill in the details below to register</span>
+            <span className="card-title">{t('createNewAccount')}</span>
+            <span className="card-sub">{t('fillDetailsToRegister')}</span>
           </div>
           <div className="card-body" style={{padding: '32px 24px'}}>
             <form onSubmit={handleSubmit}>
@@ -467,7 +469,7 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <User className="input-icon" />
-                    <label>First Name *</label>
+                    <label>{t('firstName')} *</label>
                   </div>
                   <input
                     type="text"
@@ -475,21 +477,21 @@ export default function Registration({ user, onPageChange }) {
                     value={formData.fName}
                     onChange={handleChange}
                     required
-                    placeholder="Enter first name"
+                    placeholder={t('enterFirstName')}
                   />
                 </div>
 
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <User className="input-icon" />
-                    <label>Last Name</label>
+                    <label>{t('lastName')}</label>
                   </div>
                   <input
                     type="text"
                     name="lName"
                     value={formData.lName}
                     onChange={handleChange}
-                    placeholder="Enter last name"
+                    placeholder={t('enterLastName')}
                   />
                 </div>
               </div>
@@ -499,21 +501,21 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Mail className="input-icon" />
-                    <label>Email Address</label>
+                    <label>{t('emailAddress')}</label>
                   </div>
                   <input
                     type="email"
                     name="user_email"
                     value={formData.user_email}
                     onChange={handleChange}
-                    placeholder="Enter email address"
+                    placeholder={t('enterEmailAddress')}
                   />
                 </div>
 
                 <div className="form-group">
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Phone className="input-icon" />
-                    <label>Phone Number *</label>
+                    <label>{t('phoneNumber')} *</label>
                   </div>
                   <PhoneInput
                     country={'in'}
@@ -554,14 +556,14 @@ export default function Registration({ user, onPageChange }) {
                 <div className="form-group" style={{marginBottom: '24px'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <Tag className="input-icon" />
-                    <label>Referral Code</label>
+                    <label>{t('referralCode')}</label>
                   </div>
                   <input
                     type="text"
                     name="referal_code"
                     value={formData.referal_code}
                     onChange={handleChange}
-                    placeholder="Enter referral code (optional)"
+                    placeholder={t('enterReferralCodeOptional')}
                     disabled
                     style={{backgroundColor: '#f3f4f6', cursor: 'not-allowed'}}
                   />
@@ -572,28 +574,28 @@ export default function Registration({ user, onPageChange }) {
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       <Building className="input-icon" />
-                      <label>Account ID</label>
+                      <label>{t('accountId')}</label>
                     </div>
                     <input
                       type="text"
                       name="acc_id"
                       value={formData.acc_id}
                       onChange={handleChange}
-                      placeholder="Enter account ID"
+                      placeholder={t('enterAccountId')}
                     />
                   </div>
 
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       <Tag className="input-icon" />
-                      <label>Referral Code</label>
+                      <label>{t('referralCode')}</label>
                     </div>
                     <input
                       type="text"
                       name="referal_code"
                       value={formData.referal_code}
                       onChange={handleChange}
-                      placeholder="Enter referral code (optional)"
+                      placeholder={t('enterReferralCodeOptional')}
                     />
                   </div>
                 </div>
@@ -603,14 +605,14 @@ export default function Registration({ user, onPageChange }) {
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       <Building className="input-icon" />
-                      <label>Account ID</label>
+                      <label>{t('accountId')}</label>
                     </div>
                     <input
                       type="text"
                       name="acc_id"
                       value={formData.acc_id}
                       onChange={handleChange}
-                      placeholder={currentRole === 'partner' || currentRole === 'manager' ? "Fetching account ID..." : "Enter account ID"}
+                      placeholder={currentRole === 'partner' || currentRole === 'manager' ? t('fetchingAccountId') : t('enterAccountId')}
                       disabled={currentRole === 'partner' || currentRole === 'manager'}
                       style={currentRole === 'partner' || currentRole === 'manager' ? {backgroundColor: '#f3f4f6', cursor: 'not-allowed'} : {}}
                     />
@@ -619,14 +621,14 @@ export default function Registration({ user, onPageChange }) {
                   <div className="form-group">
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       <Tag className="input-icon" />
-                      <label>Referral Code</label>
+                      <label>{t('referralCode')}</label>
                     </div>
                     <input
                       type="text"
                       name="referal_code"
                       value={formData.referal_code}
                       onChange={handleChange}
-                      placeholder="Fetching referral code..."
+                      placeholder={t('fetchingReferralCode')}
                       disabled
                       style={{backgroundColor: '#f3f4f6', cursor: 'not-allowed'}}
                     />
@@ -638,7 +640,7 @@ export default function Registration({ user, onPageChange }) {
               <div className="form-group" style={{marginBottom: '24px'}}>
                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                   <Tag className="input-icon" />
-                  <label>Category *</label>
+                  <label>{t('category')} *</label>
                 </div>
                 <select
                   name="category"
@@ -646,25 +648,25 @@ export default function Registration({ user, onPageChange }) {
                   onChange={handleChange}
                   required
                 >
-                  <option value="">Choose a role...</option>
+                  <option value="">{t('chooseRole')}</option>
                   {currentRole === 'partner' ? (
                     <>
-                      <option value="Manager">Manager</option>
+                      <option value="Manager">{t('manager')}</option>
                     </>
                   ) : currentRole === 'manager' ? (
                     <>
-                      <option value="Farmer">Farmer</option>
+                      <option value="Farmer">{t('farmer')}</option>
                     </>
                   ) : currentRole === 'client' ? (
                     <>
-                      <option value="Farmer">Farmer</option>
-                      <option value="Manager">Manager</option>
+                      <option value="Farmer">{t('farmer')}</option>
+                      <option value="Manager">{t('manager')}</option>
                     </>
                   ) : (
                     <>
-                      <option value="Farmer">Farmer</option>
-                      <option value="Partner">Partner</option>
-                      <option value="Manager">Manager</option>
+                      <option value="Farmer">{t('farmer')}</option>
+                      <option value="Partner">{t('partner')}</option>
+                      <option value="Manager">{t('manager')}</option>
                     </>
                   )}
                 </select>
@@ -678,7 +680,7 @@ export default function Registration({ user, onPageChange }) {
                   disabled={loading}
                   style={{width: '40%', padding: '6px 12px', fontSize: '12px', height: '36px'}}
                 >
-                  {loading ? 'Registering...' : 'Register User'}
+                  {loading ? t('registering') : t('registerUser')}
                   {!loading && <ArrowRight className="ic-xs" style={{marginLeft: '4px'}} />}
                 </button>
               </div>
@@ -730,7 +732,7 @@ export default function Registration({ user, onPageChange }) {
               marginBottom: '12px',
               margin: '0 0 12px 0'
             }}>
-              Registration Error
+              {t('registrationError')}
             </h3>
             
             <p style={{
@@ -768,7 +770,7 @@ export default function Registration({ user, onPageChange }) {
                 e.target.style.transform = 'translateY(0)';
               }}
             >
-              OK
+              {t('ok')}
             </button>
           </div>
         </div>
