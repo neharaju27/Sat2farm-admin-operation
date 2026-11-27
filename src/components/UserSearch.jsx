@@ -262,6 +262,12 @@ export default function UserSearch({ user }) {
   const hasUserCredentials = searchResult?.user_credentials;
   const hasAdminPortalDetails = searchResult?.admin_portal_details;
   const isSuperAdmin = searchResult?.user_credentials?.account_type === 'superadmin';
+  
+  // Check if current user is operation role (not sales)
+  const currentUserRole = user?.role || user?.account_type || '';
+  const isOperationRole = currentUserRole.toLowerCase().includes('operation') || 
+                          currentUserRole.toLowerCase().includes('ops') ||
+                          currentUserRole.toLowerCase().includes('admin');
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--surface)' }}>
@@ -733,7 +739,8 @@ export default function UserSearch({ user }) {
             </div>
           </div>
 
-          {/* Plan Acreages Cards - 1 Month, 6 Months, 12 Months */}
+          {/* Plan Acreages Cards - 1 Month, 6 Months, 12 Months - Only for Operation Role */}
+          {isOperationRole && (
           <div style={{ padding: '20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
             <h3 style={{ color: 'var(--text)', fontSize: '16px', fontWeight: '600', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MapPin size={20} />
@@ -897,6 +904,7 @@ export default function UserSearch({ user }) {
               </div>
             </div>
           </div>
+          )}
 
           {/* Bottom Section - Referred Accounts Table */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--surface)', overflow: 'visible' }}>
