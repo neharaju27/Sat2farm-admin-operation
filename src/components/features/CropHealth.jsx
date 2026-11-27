@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { X, ArrowLeft, Info, Calendar, Download } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import axios from 'axios';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function CropHealth({ onClose, onBack, farmId, clientId, farmCategory }) {
+  const { t } = useLanguage();
   const [satelliteData, setSatelliteData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
     if (farmId && clientId) {
       isPastureCategory ? fetchPastureData() : fetchSatelliteData();
     } else if (farmId && !clientId) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     }
   }, [farmId, clientId, farmCategory]);
 
@@ -51,7 +53,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
       });
       await processSatelliteData(response.data);
     } catch (err) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
@@ -126,11 +128,11 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
 
       if (!hasData) {
         console.log('Pasture - No data available from either API');
-        setError('Data will be available soon');
+        setError(t('dataAvailableSoon'));
       }
     } catch (err) {
       console.error('Pasture - Fetch error:', err);
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
@@ -285,7 +287,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
   const chartOption = chartDataToUse && chartDataToUse.length > 0 ? {
     backgroundColor: '#ffffff',
     title: {
-      text: 'NDVI Trend',
+      text: t('ndviTrend'),
       left: 'center',
       textStyle: {
         fontSize: 16,
@@ -298,7 +300,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
       formatter: (params) => {
         const item = params[0];
         const value = isPastureCategory ? item.value : item.value;
-        return `Date: ${item.name}<br/>NDVI: ${value.toFixed(4)}`;
+        return `${t('date')}: ${item.name}<br/>NDVI: ${value.toFixed(4)}`;
       }
     },
     grid: {
@@ -326,7 +328,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
     },
     yAxis: {
       type: 'value',
-      name: 'NDVI Value',
+      name: t('ndviValue'),
       nameTextStyle: {
         color: '#64748b',
         fontWeight: 600
@@ -400,7 +402,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
           <button className="btn btn-ghost btn-sm" onClick={onBack || onClose}>
             <ArrowLeft className="ic-xs" />
           </button>
-          <h3>{isPastureCategory ? 'Crop Health (Pasture)' : 'Crop Health'}</h3>
+          <h3>{isPastureCategory ? t('cropHealthPasture') : t('cropHealth')}</h3>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => setShowDisclaimer(true)}
@@ -416,7 +418,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
         <div className="modal-body" style={{overflowY: 'auto'}}>
           {loading ? (
             <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-2)'}}>
-              Loading satellite data...
+              {t('loadingCropHealthData')}
             </div>
           ) : error ? (
             <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
@@ -451,7 +453,7 @@ export default function CropHealth({ onClose, onBack, farmId, clientId, farmCate
                 <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                   {/* NDVI map */}
                   <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, fontWeight: 700 }}>Normalized Difference Vegetation Index</div>
+                    <div style={{ fontSize: 9, fontWeight: 700 }}>{t('normalizedDifferenceVegetationIndex')}</div>
                     {selectedDate?.png?.ndvi ? (
                       <img src={selectedDate.png.ndvi} alt="NDVI"
                            style={{ width: '100%', height: 250, objectFit: 'contain' }} />

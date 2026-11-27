@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Lock } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus, farmCategory }) {
+  const { t } = useLanguage();
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [showLockedPopup, setShowLockedPopup] = useState(false);
 
   // Determine feature status based on farm status
   const isFarmUnlocked = String(farmStatus).toLowerCase() === 'unlocked';
-  const featureStatus = isFarmUnlocked ? 'Active' : 'Inactive';
+  const featureStatus = isFarmUnlocked ? t('active') : t('inactive');
 
   // Check if farm category is tank
   const isTankCategory = String(farmCategory || '').toLowerCase() === 'tank';
@@ -27,120 +29,135 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
     }
   }, [isFarmUnlocked]);
 
-  const features = [
+  // Recalculate features when language changes
+  const features = useMemo(() => [
     {
       id: 1,
-      name: 'Farm Map',
-      description: 'Interactive map view of all your farms with boundaries and locations',
-      status: 'Active',
+      key: 'farmMap',
+      name: t('farmMap'),
+      description: t('farmMapDescription'),
+      status: isFarmUnlocked,
       icon: '🗺️',
       visibleFor: ['all']
     },
     {
       id: 11,
-      name: 'Guideline',
-      description: 'Guidelines and best practices for tank management',
-      status: featureStatus,
+      key: 'guideline',
+      name: t('guideline'),
+      description: t('guidelineDescription'),
+      status: isFarmUnlocked,
       icon: '📋',
       visibleFor: ['tank']
     },
     {
       id: 2,
-      name: 'Weather',
-      description: 'Real-time weather data and forecasts for your farm locations',
-      status: featureStatus,
+      key: 'weather',
+      name: t('weather'),
+      description: t('weatherDescription'),
+      status: isFarmUnlocked,
       icon: '🌤️',
       visibleFor: ['polyhouse', 'garden', 'farm', 'tank', 'pasture']
     },
     {
       id: 12,
-      name: 'NDCI',
-      description: 'Normalized Difference Chlorophyll Index for water quality analysis',
-      status: featureStatus,
+      key: 'ndci',
+      name: t('ndci'),
+      description: t('ndciDescription'),
+      status: isFarmUnlocked,
       icon: '�',
       visibleFor: ['tank']
     },
     {
       id: 13,
-      name: 'NDTI',
-      description: 'Normalized Difference Turbidity Index for water clarity monitoring',
-      status: featureStatus,
+      key: 'ndti',
+      name: t('ndti'),
+      description: t('ndtiDescription'),
+      status: isFarmUnlocked,
       icon: '💧',
       visibleFor: ['tank']
     },
     {
       id: 14,
-      name: 'Time Series',
-      description: 'Time series analysis for tank water level monitoring',
-      status: featureStatus,
+      key: 'timeSeries',
+      name: t('timeSeries'),
+      description: t('timeSeriesDescription'),
+      status: isFarmUnlocked,
       icon: '📈',
       visibleFor: ['tank']
     },
     {
       id: 3,
-      name: 'Crop Calendar',
-      description: 'Crop scheduling and planting calendar for optimal growth cycles',
-      status: featureStatus,
+      key: 'cropCalendar',
+      name: t('cropCalendar'),
+      description: t('cropCalendarDescription'),
+      status: isFarmUnlocked,
       icon: '📅',
       visibleFor: ['polyhouse', 'garden', 'farm']
     },
     {
       id: 4,
-      name: 'Pest and Disease',
-      description: 'Pest detection and disease monitoring for crop protection',
-      status: featureStatus,
+      key: 'pestAndDisease',
+      name: t('pestAndDisease'),
+      description: t('pestAndDiseaseDescription'),
+      status: isFarmUnlocked,
       icon: '🐛',
       visibleFor: ['polyhouse', 'garden', 'farm', 'pasture']
     },
     {
       id: 5,
-      name: 'Soil Moisture',
-      description: 'Soil moisture levels and irrigation recommendations',
-      status: featureStatus,
+      key: 'soilMoisture',
+      name: t('soilMoisture'),
+      description: t('soilMoistureDescription'),
+      status: isFarmUnlocked,
       icon: '💧',
       visibleFor: ['farm', 'pasture']
     },
     {
       id: 6,
-      name: 'Crop Health',
-      description: 'Crop health monitoring and growth analysis',
-      status: featureStatus,
+      key: 'cropHealth',
+      name: t('cropHealth'),
+      description: t('cropHealthDescription'),
+      status: isFarmUnlocked,
       icon: '🌱',
       visibleFor: ['farm', 'pasture']
     },
     {
       id: 7,
-      name: 'LSWI',
-      description: 'Land Surface Water Index for vegetation water content analysis',
-      status: featureStatus,
+      key: 'lswi',
+      name: t('lswi'),
+      description: t('lswiDescription'),
+      status: isFarmUnlocked,
       icon: '💧',
       visibleFor: ['farm', 'pasture']
     },
     {
       id: 8,
-      name: 'Image Advisory',
-      description: 'Satellite imagery and aerial photos for farm analysis',
-      status: featureStatus,
+      key: 'imageAdvisory',
+      name: t('imageAdvisory'),
+      description: t('imageAdvisoryDescription'),
+      status: isFarmUnlocked,
       icon: '🖼️',
       visibleFor: ['polyhouse', 'garden', 'farm', 'pasture']
     },
     {
       id: 9,
-      name: 'Irrigation',
-      description: 'Smart irrigation recommendations based on crop needs and weather',
-      status: featureStatus,
+      key: 'irrigation',
+      name: t('irrigation'),
+      description: t('irrigationDescription'),
+      status: isFarmUnlocked,
       icon: '🚿',
       visibleFor: ['farm', 'pasture']
     },
     {
       id: 10,
-      name: 'Soil Report',
-      description: 'Detailed soil analysis and nutrient recommendations for your farms',
-      status: featureStatus,
+      key: 'soilReport',
+      name: t('soilReport'),
+      description: t('soilReportDescription'),
+      status: isFarmUnlocked,
       icon: '🌍',
       visibleFor: ['farm', 'pasture']
     }
-  ];
+  ], [t, isFarmUnlocked]);
 
   // Filter features based on farm category
   const visibleFeatures = features.filter(feature => {
@@ -172,7 +189,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
     <div className="modal-overlay">
       <div className="modal" style={{width: '900px', maxWidth: '95vw', maxHeight: '90vh'}}>
         <div className="modal-head">
-          <h3>Feature Dashboard</h3>
+          <h3>{t('featureDashboard')}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>
             <X className="ic-xs" />
           </button>
@@ -180,10 +197,10 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
         <div className="modal-body" style={{overflowY: 'auto'}}>
           <div style={{marginBottom: '24px'}}>
             <h4 style={{fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-1)'}}>
-              Available Features
+              {t('availableFeatures')}
             </h4>
             <p style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '16px'}}>
-              Explore and manage available features for your farms
+              {t('exploreManageFeatures')}
             </p>
           </div>
 
@@ -196,22 +213,26 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
                   border: '1px solid var(--border)',
                   borderRadius: '12px',
                   padding: '20px',
-                  cursor: feature.status === 'Active' ? 'pointer' : 'not-allowed',
+                  cursor: feature.status ? 'pointer' : 'not-allowed',
                   transition: 'all 0.2s ease',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                  opacity: feature.status === 'Active' ? 1 : 0.6
+                  opacity: feature.status ? 1 : 0.6
                 }}
-                onClick={() => feature.status === 'Active' && onFeatureSelect(feature)}
+                onClick={() => {
+                  if (feature.status) {
+                    onFeatureSelect(feature.key);
+                  }
+                }}
                 onMouseEnter={(e) => {
-                  if (feature.status === 'Active') {
-                    e.target.style.transform = 'translateY(-2px)';
-                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                  if (feature.status) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (feature.status === 'Active') {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                  if (feature.status) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
                   }
                 }}
               >
@@ -230,11 +251,11 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
                       fontSize: '12px',
                       padding: '4px 8px',
                       borderRadius: '12px',
-                      backgroundColor: feature.status === 'Active' ? '#dcfce7' : '#fee2e2',
-                      color: feature.status === 'Active' ? '#16a34a' : '#dc2626',
+                      backgroundColor: feature.status ? '#dcfce7' : '#fee2e2',
+                      color: feature.status ? '#16a34a' : '#dc2626',
                       fontWeight: '500'
                     }}>
-                      {feature.status}
+                      {feature.status ? t('active') : t('inactive')}
                     </span>
                   </div>
                 </div>
@@ -246,7 +267,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
 
@@ -255,7 +276,7 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
         <div className="modal-overlay" style={{zIndex: 2000}}>
           <div className="modal" style={{width: '400px', maxWidth: '90vw'}}>
             <div className="modal-head">
-              <h3>Farm Locked</h3>
+              <h3>{t('farmLocked')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowLockedPopup(false)}>
                 <X className="ic-xs" />
               </button>
@@ -275,17 +296,17 @@ export default function FeatureDashboard({ onClose, onFeatureSelect, farmStatus,
                   <Lock size={32} color="#dc2626" />
                 </div>
                 <h4 style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px'}}>
-                  Farm is Locked
+                  {t('farmIsLocked')}
                 </h4>
                 <p style={{fontSize: '14px', color: 'var(--text-2)', lineHeight: '1.6', marginBottom: '20px'}}>
-                  Please unlock the farm to access the features.
+                  {t('unlockFarmMessage')}
                 </p>
                 <button
                   className="btn btn-primary"
                   onClick={() => setShowLockedPopup(false)}
                   style={{width: '100%'}}
                 >
-                  Got it
+                  {t('gotIt')}
                 </button>
               </div>
             </div>

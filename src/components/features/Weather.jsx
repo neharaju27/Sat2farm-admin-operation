@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Info } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import axios from 'axios';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function Weather({ onClose, onBack, farmId, clientId }) {
+  const { t } = useLanguage();
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -13,9 +15,9 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchWeatherData();
     } else if (farmId && !clientId) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     }
-  }, [farmId, clientId]);
+  }, [farmId, clientId, t]);
 
   const fetchWeatherData = async () => {
     setLoading(true);
@@ -99,18 +101,19 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         forecast: forecast
       });
     } catch (err) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
   };
-  const rainfallChartOption = weatherData ? {
+  // Recalculate chart options when language changes
+  const rainfallChartOption = useMemo(() => weatherData ? {
     backgroundColor: '#ffffff',
     tooltip: {
       trigger: 'axis',
       formatter: (params) => {
         const item = params[0];
-        return `Date: ${item.name}<br/>Rainfall: ${item.value.toFixed(3)} mm`;
+        return `${t('date')}: ${item.name}<br/>${t('rainfall')}: ${item.value.toFixed(3)} mm`;
       }
     },
     grid: {
@@ -139,7 +142,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
     },
     yAxis: {
       type: 'value',
-      name: 'Rainfall (mm)',
+      name: t('rainfallMm'),
       nameTextStyle: {
         color: '#64748b',
         fontWeight: 600
@@ -165,7 +168,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
       }
     },
     series: [{
-      name: 'Rainfall',
+      name: t('rainfall'),
       data: weatherData.forecast.map(d => d.rainfall),
       type: 'bar',
       itemStyle: {
@@ -174,14 +177,14 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
       },
       barWidth: '50%'
     }]
-  } : null;
+  } : null, [weatherData, t]);
 
-  const temperatureChartOption = weatherData ? {
+  const temperatureChartOption = useMemo(() => weatherData ? {
     backgroundColor: '#ffffff',
     tooltip: {
       trigger: 'axis',
       formatter: (params) => {
-        let result = `Date: ${params[0].name}<br/>`;
+        let result = `${t('date')}: ${params[0].name}<br/>`;
         params.forEach(param => {
           result += `${param.seriesName}: ${param.value.toFixed(1)}°C<br/>`;
         });
@@ -189,7 +192,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
       }
     },
     legend: {
-      data: ['Max Temperature', 'Min Temperature'],
+      data: [t('maxTemperature'), t('minTemperature')],
       bottom: '8%',
       textStyle: {
         color: '#64748b'
@@ -221,7 +224,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
     },
     yAxis: {
       type: 'value',
-      name: 'Temperature (°C)',
+      name: t('temperatureC'),
       nameTextStyle: {
         color: '#64748b',
         fontWeight: 600
@@ -247,7 +250,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
     },
     series: [
       {
-        name: 'Max Temperature',
+        name: t('maxTemperature'),
         data: weatherData.forecast.map(d => d.maxTemp),
         type: 'line',
         smooth: true,
@@ -263,7 +266,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         symbolSize: 6
       },
       {
-        name: 'Min Temperature',
+        name: t('minTemperature'),
         data: weatherData.forecast.map(d => d.minTemp),
         type: 'line',
         smooth: true,
@@ -279,7 +282,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         symbolSize: 6
       }
     ]
-  } : null;
+  } : null, [weatherData, t]);
 
   return (
     <div className="modal-overlay">
@@ -288,7 +291,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
           <button className="btn btn-ghost btn-sm" onClick={onBack || onClose}>
             <ArrowLeft className="ic-xs" />
           </button>
-          <h3>Weather</h3>
+          <h3>{t('weather')}</h3>
           <button 
             className="btn btn-ghost btn-sm" 
             onClick={() => setShowDisclaimer(true)}
@@ -304,7 +307,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         <div className="modal-body" style={{overflowY: 'auto'}}>
           {loading ? (
             <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-2)'}}>
-              Loading weather data...
+              {t('loadingWeatherData')}
             </div>
           ) : error ? (
             <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
@@ -322,22 +325,22 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}>
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                    Current Weather
+                    {t('currentWeather')}
                   </h5>
                   <div style={{marginBottom: '16px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>Date</div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('date')}</div>
                     <div style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)'}}>
                       {weatherData.current.date}
                     </div>
                   </div>
                   <div style={{marginBottom: '16px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>Temperature</div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('temperature')}</div>
                     <div style={{fontSize: '32px', fontWeight: '700', color: 'var(--text-1)'}}>
                       {weatherData.current.temperature}°C
                     </div>
                   </div>
                   <div style={{marginBottom: '24px'}}>
-                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>Description</div>
+                    <div style={{fontSize: '14px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('description')}</div>
                     <div style={{fontSize: '16px', color: 'var(--text-1)'}}>
                       {weatherData.current.description}
                     </div>
@@ -352,23 +355,23 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
                   }}>
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px'}}>
                       <div>
-                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>Humidity</div>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('humidity')}</div>
                         <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)'}}>{weatherData.current.humidity}%</div>
                       </div>
                       <div>
-                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>Wind Speed</div>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('windSpeed')}</div>
                         <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)'}}>{weatherData.current.windSpeed} km/h</div>
                       </div>
                       <div>
-                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>Cloud Cover</div>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('cloudCover')}</div>
                         <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)'}}>{weatherData.current.cloudCover}%</div>
                       </div>
                       <div>
-                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>Precipitation</div>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('precipitation')}</div>
                         <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)'}}>{weatherData.current.precipitationType}</div>
                       </div>
                       <div style={{gridColumn: 'span 2'}}>
-                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>Precipitation Chance</div>
+                        <div style={{fontSize: '12px', color: 'var(--text-2)', marginBottom: '4px'}}>{t('precipitationChance')}</div>
                         <div style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)'}}>{weatherData.current.precipitationChance}%</div>
                       </div>
                     </div>
@@ -383,7 +386,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}> 
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                    14-Days Forecast
+                    {t('daysForecast')}
                   </h5>
                   <div style={{
                     display: 'grid',
@@ -426,7 +429,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}>
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px'}}>
-                    Rainfall Statistics
+                    {t('rainfallStatistics')}
                   </h5>
                   {rainfallChartOption && (
                     <ReactECharts option={rainfallChartOption} style={{height: '500px'}} />
@@ -441,7 +444,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}>
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px'}}>
-                    Temperature Statistics
+                    {t('temperatureStatistics')}
                   </h5>
                   {temperatureChartOption && (
                     <ReactECharts option={temperatureChartOption} style={{height: '500px'}} />
@@ -452,7 +455,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
           ) : null}
         </div>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
 
@@ -461,7 +464,7 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
         <div className="modal-overlay" style={{zIndex: 2000}}>
           <div className="modal" style={{width: '500px', maxWidth: '90vw'}}>
             <div className="modal-head">
-              <h3>Disclaimer</h3>
+              <h3>{t('disclaimer')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowDisclaimer(false)}>
                 <X className="ic-xs" />
               </button>
@@ -469,16 +472,16 @@ export default function Weather({ onClose, onBack, farmId, clientId }) {
             <div className="modal-body">
               <div style={{padding: '20px'}}>
                 <h5 style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                  Weather Forecast
+                  {t('weatherForecast')}
                 </h5>
                 <p style={{fontSize: '14px', color: 'var(--text-1)', lineHeight: '1.6'}}>
-                  Users are advised to note that meteorological conditions can undergo swift changes, and the provided data may not consistently mirror real-time situations.
+                  {t('disclaimerText')}
                 </p>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-primary" onClick={() => setShowDisclaimer(false)}>
-                Close
+                {t('close')}
               </button>
             </div>
           </div>

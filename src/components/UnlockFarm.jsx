@@ -4939,9 +4939,9 @@ const parseCsvCoordinatePairs = (content) => {
             setFeatureFarmPlan(null);
             setFeatureFarmUnlockDate(null);
           }} 
-          onFeatureSelect={(feature) => {
+          onFeatureSelect={(featureKey) => {
             setModalOpen(null);
-            setFeatureModalOpen(feature.name);
+            setFeatureModalOpen(featureKey);
           }}
           farmStatus={featureFarmStatus}
           farmCategory={featureFarmCategory}
@@ -4949,20 +4949,20 @@ const parseCsvCoordinatePairs = (content) => {
       )}
 
       {/* Specific Feature Modals */}
-      {featureModalOpen === 'Farm Map' && <FarmMap onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Weather' && <Weather onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Crop Calendar' && <CropCalendar onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Pest and Disease' && <PestAndDisease onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Soil Moisture' && <SoilMoisture onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Crop Health' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmCategory={featureFarmCategory} />}
-      {featureModalOpen === 'LSWI' && <LSWI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Soil Report' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); setFeatureFarmPlan(null); setFeatureFarmUnlockDate(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmPlan={featureFarmPlan} farmUnlockDate={featureFarmUnlockDate} />}
-      {featureModalOpen === 'Image Advisory' && <ImageAdvisory onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'NDCI' && <NDCI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'NDTI' && <NDTI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Time Series' && <TimeSeries onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
-      {featureModalOpen === 'Guideline' && <Guideline onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} />}
+      {featureModalOpen === 'farmMap' && <FarmMap onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'weather' && <Weather onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'cropCalendar' && <CropCalendar onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'pestAndDisease' && <PestAndDisease onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'soilMoisture' && <SoilMoisture onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'cropHealth' && <CropHealth onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmCategory={featureFarmCategory} />}
+      {featureModalOpen === 'lswi' && <LSWI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'irrigation' && <Irrigation onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'soilReport' && <SoilReport onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); setFeatureFarmPlan(null); setFeatureFarmUnlockDate(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} farmPlan={featureFarmPlan} farmUnlockDate={featureFarmUnlockDate} />}
+      {featureModalOpen === 'imageAdvisory' && <ImageAdvisory onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'ndci' && <NDCI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'ndti' && <NDTI onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'timeSeries' && <TimeSeries onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} farmId={featureFarmId} clientId={featureClientId} />}
+      {featureModalOpen === 'guideline' && <Guideline onClose={() => { setFeatureModalOpen(null); setFeatureFarmId(null); setFeatureClientId(null); }} onBack={() => { setFeatureModalOpen(null); setModalOpen('feature-dashboard'); }} />}
     </div>
   );
 }

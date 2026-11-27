@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Info, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
+  const { t } = useLanguage();
   const [currentDay, setCurrentDay] = useState(60);
   const [farmData, setFarmData] = useState(null);
   const [calendarData, setCalendarData] = useState(null);
@@ -16,7 +18,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchFarmDetails();
     } else if (farmId && !clientId) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     }
   }, [farmId, clientId]);
 
@@ -68,7 +70,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
 
       setFarmData({ ...farm, crop_type: cropType, Sowing_date: sowingDateRaw });
     } catch (err) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
@@ -101,7 +103,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
 
       setCalendarData(response.data.data || response.data);
     } catch (err) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
@@ -189,12 +191,12 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
           <button className="btn btn-ghost btn-sm" onClick={onBack || onClose}>
             <ArrowLeft className="ic-xs" />
           </button>
-          <h3>Crop Calendar</h3>
+          <h3>{t('cropCalendar')}</h3>
           <button 
             className="btn btn-ghost btn-sm" 
             onClick={() => setShowDisclaimer(true)}
             style={{marginRight: '8px'}}
-            title="Disclaimer"
+            title={t('disclaimer')}
           >
             <Info className="ic-xs" />
           </button>
@@ -205,7 +207,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
         <div className="modal-body" style={{overflowY: 'auto'}}>
           {loading ? (
             <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-2)'}}>
-              Loading crop calendar...
+              {t('loadingCropCalendar')}
             </div>
           ) : error ? (
             <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
@@ -223,7 +225,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                     gap: '8px'
                   }}
                 >
-                  Before Transplantation
+                  {t('beforeTransplantation')}
                   <Info size={16} />
                 </button>
               </div>
@@ -245,13 +247,13 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                     }}
                   >
                     <ChevronLeft size={16} />
-                    Previous
+                    {t('previous')}
                   </button>
                   <button 
                     onClick={handleToday}
                     className="btn btn-primary btn-sm"
                   >
-                    Today
+                    {t('today')}
                   </button>
                   <button 
                     onClick={() => handleRangeChange('next')}
@@ -262,7 +264,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                       gap: '4px'
                     }}
                   >
-                    Next
+                    {t('next')}
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -274,7 +276,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                       color: 'var(--text-2)',
                       marginBottom: '4px'
                     }}>
-                      Crop: {farmData.crop_type}
+                      {t('crop')}: {farmData.crop_type}
                     </div>
                   )}
                   {farmData && (
@@ -282,7 +284,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                       fontSize: '14px',
                       color: 'var(--text-2)'
                     }}>
-                      Sowing Date: {farmData.Sowing_date}
+                      {t('sowingDate')}: {farmData.Sowing_date}
                     </div>
                   )}
                 </div>
@@ -300,7 +302,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                       color: 'var(--text-1)',
                       marginBottom: '12px'
                     }}>
-                      ({calendarData[0].Range}) days of sowing
+                      ({calendarData[0].Range}) {t('daysOfSowing')}
                     </h5>
                     <div style={{
                       fontSize: '14px',
@@ -317,7 +319,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
           )}
         </div>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
 
@@ -326,7 +328,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
         <div className="modal-overlay" style={{zIndex: 2000}}>
           <div className="modal" style={{width: '500px', maxWidth: '90vw'}}>
             <div className="modal-head">
-              <h3>Disclaimer</h3>
+              <h3>{t('disclaimer')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowDisclaimer(false)}>
                 <X className="ic-xs" />
               </button>
@@ -334,16 +336,16 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
             <div className="modal-body">
               <div style={{padding: '20px'}}>
                 <h5 style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                  Crop Calendar
+                  {t('cropCalendar')}
                 </h5>
                 <p style={{fontSize: '14px', color: 'var(--text-1)', lineHeight: '1.6'}}>
-                  The packages of practices offered are derived from reputable government research institutes. The variations in these practices are contingent upon the agroclimatic zones within each particular region.
+                  {t('cropCalendarDisclaimer')}
                 </p>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-primary" onClick={() => setShowDisclaimer(false)}>
-                Close
+                {t('close')}
               </button>
             </div>
           </div>
@@ -355,7 +357,7 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
         <div className="modal-overlay" style={{zIndex: 2000}}>
           <div className="modal" style={{width: '800px', maxWidth: '95vw', maxHeight: '90vh'}}>
             <div className="modal-head">
-              <h3>Before Transplantation</h3>
+              <h3>{t('beforeTransplantation')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowBeforeTransplantationModal(false)}>
                 <X className="ic-xs" />
               </button>
@@ -382,13 +384,13 @@ export default function CropCalendar({ onClose, onBack, farmId, clientId }) {
                 </div>
               ) : (
                 <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-2)'}}>
-                  No before transplantation information available
+                  {t('noBeforeTransplantationInfo')}
                 </div>
               )}
             </div>
             <div className="modal-actions">
               <button className="btn btn-primary" onClick={() => setShowBeforeTransplantationModal(false)}>
-                Close
+                {t('close')}
               </button>
             </div>
           </div>

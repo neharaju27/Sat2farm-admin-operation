@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { X, ArrowLeft, Info } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import axios from 'axios';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
+  const { t } = useLanguage();
   const [satelliteData, setSatelliteData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -15,7 +17,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
     if (farmId && clientId) {
       fetchSatelliteData();
     } else if (farmId && !clientId) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     }
   }, [farmId, clientId]);
 
@@ -52,7 +54,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
         await fetchChartData(validData);
       }
     } catch (err) {
-      setError('Data will be available soon');
+      setError(t('dataAvailableSoon'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +114,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
   const chartOption = chartData && chartData.length > 0 ? {
     backgroundColor: '#ffffff',
     title: {
-      text: 'SM Graph',
+      text: t('smGraph'),
       left: 'center',
       textStyle: {
         fontSize: 16,
@@ -124,7 +126,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
       trigger: 'axis',
       formatter: (params) => {
         const item = params[0];
-        return `Date: ${item.name}<br/>Mean Value of SM: ${item.value.toFixed(4)}`;
+        return `${t('date')}: ${item.name}<br/>${t('meanValueOfSm')} ${item.value.toFixed(4)}`;
       }
     },
     grid: {
@@ -152,7 +154,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
     },
     yAxis: {
       type: 'value',
-      name: 'Mean Value of SM',
+      name: t('meanValueOfSmAxis'),
       nameTextStyle: {
         color: '#64748b',
         fontWeight: 600
@@ -226,7 +228,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
           <button className="btn btn-ghost btn-sm" onClick={onBack || onClose}>
             <ArrowLeft className="ic-xs" />
           </button>
-          <h3>Soil Moisture</h3>
+          <h3>{t('soilMoisture')}</h3>
           <button 
             className="btn btn-ghost btn-sm" 
             onClick={() => setShowDisclaimer(true)}
@@ -242,7 +244,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
         <div className="modal-body" style={{overflowY: 'auto'}}>
           {loading ? (
             <div style={{textAlign: 'center', padding: '40px', color: '#64748b'}}>
-              Loading satellite data...
+              {t('loadingSoilMoistureData')}
             </div>
           ) : error ? (
             <div style={{textAlign: 'center', padding: '40px', color: '#2563eb'}}>
@@ -252,7 +254,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
             <>
               <div style={{marginBottom: '20px'}}>
                 <label style={{fontSize: '14px', fontWeight: '600', color: 'var(--text-1)', marginRight: '12px'}}>
-                  Select Date:
+                  {t('selectDate')}
                 </label>
                 <select 
                   value={selectedDate?.Date || ''} 
@@ -270,13 +272,13 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
                 >
                   {pngData.map((item) => (
                     <option key={item.Date} value={item.Date}>
-                      {formatDate(item.Date)}{item.Date === lastPngDate ? ' (Last PNG)' : ''}
+                      {formatDate(item.Date)}{item.Date === lastPngDate ? ` ${t('lastPng')}` : ''}
                     </option>
                   ))}
                 </select>
                 {nextReportDate && (
                   <div style={{marginTop: '8px', fontSize: '13px', color: '#64748b'}}>
-                    Next Soil Moisture report will be available on: <span style={{fontWeight: '600', color: '#1e293b'}}>{nextReportDate}</span>
+                    {t('nextSoilMoistureReport')} <span style={{fontWeight: '600', color: '#1e293b'}}>{nextReportDate}</span>
                   </div>
                 )}
               </div>
@@ -289,7 +291,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}>
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px'}}>
-                    Soil Moisture Image
+                    {t('soilMoistureImage')}
                   </h5>
                   {selectedDate && selectedDate.png && selectedDate.png.sm && selectedDate.png.sm !== 'None' ? (
                     <img 
@@ -315,7 +317,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
                       border: '2px dashed #cbd5e1'
                     }}>
                       <div style={{textAlign: 'center', color: '#64748b'}}>
-                        <div style={{fontSize: '14px'}}>No image available for this date</div>
+                        <div style={{fontSize: '14px'}}>{t('noImageAvailable')}</div>
                       </div>
                     </div>
                   )}
@@ -328,7 +330,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
                   padding: '20px'
                 }}>
                   <h5 style={{fontSize: '16px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '12px'}}>
-                    Soil Moisture Trend
+                    {t('soilMoistureTrend')}
                   </h5>
                   {chartOption ? (
                     <div style={{
@@ -351,7 +353,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
                       border: '2px dashed #cbd5e1'
                     }}>
                       <div style={{textAlign: 'center', color: '#64748b'}}>
-                        <div style={{fontSize: '14px'}}>No graph data available</div>
+                        <div style={{fontSize: '14px'}}>{t('noGraphDataAvailable')}</div>
                       </div>
                     </div>
                   )}
@@ -361,7 +363,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
           )}
         </div>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-ghost" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
 
@@ -370,7 +372,7 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
         <div className="modal-overlay" style={{zIndex: 2000}}>
           <div className="modal" style={{width: '500px', maxWidth: '90vw'}}>
             <div className="modal-head">
-              <h3>Disclaimer</h3>
+              <h3>{t('disclaimer')}</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowDisclaimer(false)}>
                 <X className="ic-xs" />
               </button>
@@ -378,19 +380,19 @@ export default function SoilMoisture({ onClose, onBack, farmId, clientId }) {
             <div className="modal-body">
               <div style={{padding: '20px'}}>
                 <h5 style={{fontSize: '18px', fontWeight: '600', color: 'var(--text-1)', marginBottom: '16px'}}>
-                  Soil Moisture
+                  {t('soilMoisture')}
                 </h5>
                 <p style={{fontSize: '14px', color: 'var(--text-1)', lineHeight: '1.6'}}>
-                  Soil moisture is estimated by using the microwave (SAR) satellite data. It is useful to identify the areas having relatively lower soil moisture in a farm.
+                  {t('soilMoistureDisclaimer')}
                 </p>
                 <p style={{fontSize: '14px', color: 'var(--text-1)', lineHeight: '1.6', marginTop: '12px'}}>
-                  However, microwave data is also influenced by soil roughness and canopy structure. Soil moisture data is subjected to available satellite passes.
+                  {t('soilMoistureDisclaimer2')}
                 </p>
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-primary" onClick={() => setShowDisclaimer(false)}>
-                Close
+                {t('close')}
               </button>
             </div>
           </div>
